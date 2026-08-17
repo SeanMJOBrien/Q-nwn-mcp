@@ -262,13 +262,14 @@ export function buildMinimalUtc(): GffDocument {
     ScriptEndRound: { type: "resref", value: "nw_c2_default3" },
     ScriptHeartbeat: { type: "resref", value: "nw_c2_default1" },
     ScriptOnBlocked: { type: "resref", value: "nw_c2_defaulte" },
-    ScriptPercption: { type: "resref", value: "nw_c2_default2" },
+    ScriptOnNotice: { type: "resref", value: "nw_c2_default2" },
     ScriptRested: { type: "resref", value: "nw_c2_defaulta" },
     ScriptSpawn: { type: "resref", value: "nw_c2_default9" },
     ScriptSpellAt: { type: "resref", value: "nw_c2_defaultb" },
     ScriptUserDefine: { type: "resref", value: "nw_c2_defaultd" },
     SkillList: { type: "list", value: [] },
     SoundSetFile: { type: "word", value: 0 },
+    StartingPackage: { type: "byte", value: 0 },
     SpecAbilityList: { type: "list", value: [] },
     Str: { type: "byte", value: 10 },
     Subrace: { type: "cexostring", value: "" },
@@ -283,4 +284,59 @@ export function buildMinimalUtc(): GffDocument {
     refbonus: { type: "short", value: 0 },
     willbonus: { type: "short", value: 0 },
   };
+}
+
+// ─── VarTable (local variables) ─────────────────────────────────────────────
+
+/** A local variable to set on a blueprint or placed instance. */
+export interface VarTableEntry {
+  name: string;
+  type: "int" | "float" | "string";
+  value: number | string;
+}
+
+/** GFF VarTable type codes, and the GFF field type each value is stored as. */
+const VAR_TYPE_CODES: Record<VarTableEntry["type"], { code: number; gffType: string }> = {
+  int: { code: 1, gffType: "int" },
+  float: { code: 2, gffType: "float" },
+  string: { code: 3, gffType: "cexostring" },
+};
+
+/**
+ * Merge local variables into an object's VarTable, matching existing entries by
+ * name (case-insensitively) and overwriting them in place rather than appending
+ * a duplicate. Creates the VarTable list if the object doesn't have one.
+ *
+ * Preferred over modify_gff_field for this, which replaces the whole list and
+ * cannot address a list element by index.
+ */
+export function mergeVarTable(obj: GffObj, vars: VarTableEntry[]): void {
+  if (!obj.VarTable || typeof obj.VarTable !== "object") {
+    obj.VarTable = { type: "list", value: [] };
+  }
+  const table = obj.VarTable as { type: string; value: GffObj[] };
+  if (!Array.isArray(table.value)) table.value = [];
+
+  for (const entry of vars) {
+    const spec = VAR_TYPE_CODES[entry.type];
+    if (!spec) throw new Error(`Unknown VarTable type "${entry.type}" for variable "${entry.name}" (expected int, float, or string)`);
+
+    const existing = table.value.find(v => {
+      const nameField = v.Name as { value?: unknown } | undefined;
+      return typeof nameField?.value === "string"
+        && nameField.value.toLowerCase() === entry.name.toLowerCase();
+    });
+
+    if (existing) {
+      existing.Type = { type: "dword", value: spec.code };
+      existing.Value = { type: spec.gffType, value: entry.value };
+    } else {
+      table.value.push({
+        __struct_id: 0,
+        Name: { type: "cexostring", value: entry.name },
+        Type: { type: "dword", value: spec.code },
+        Value: { type: spec.gffType, value: entry.value },
+      } as unknown as GffObj);
+    }
+  }
 }

@@ -153,6 +153,7 @@ export function registerCreatureTools(server: McpServer): void {
           spawn: getFieldStr(c, "ScriptSpawn"),
           rested: getFieldStr(c, "ScriptRested"),
           userDefined: getFieldStr(c, "ScriptUserDefine"),
+          onBlocked: getFieldStr(c, "ScriptOnBlocked"),
         },
         position: {
           x: getFieldNum(c, "XPosition"),

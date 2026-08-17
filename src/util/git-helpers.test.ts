@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { degToRad, buildMinimalUtc, getGitDoc, updateAreaCounts } from "./git-helpers.js";
+import { degToRad, buildMinimalUtc, getGitDoc, updateAreaCounts, mergeVarTable } from "./git-helpers.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 
@@ -197,5 +197,75 @@ describe("updateAreaCounts", () => {
   it("does nothing for unknown area (no crash)", () => {
     const index = makeIndex("testarea", makeGitDoc(0, 0, 0));
     expect(() => updateAreaCounts(index, "nonexistent")).not.toThrow();
+  });
+});
+
+describe("mergeVarTable", () => {
+  it("creates the VarTable when the object has none", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: 5 }]);
+
+    const table = obj.VarTable as { type: string; value: GffObj[] };
+    expect(table.type).toBe("list");
+    expect(table.value).toHaveLength(1);
+    expect((table.value[0].Name as { value: string }).value).toBe("HENCH_LEVEL");
+    expect((table.value[0].Type as { value: number }).value).toBe(1);
+    expect((table.value[0].Value as { value: number }).value).toBe(5);
+  });
+
+  it("overwrites an existing variable by name rather than duplicating", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: 3 }]);
+    mergeVarTable(obj, [{ name: "hench_level", type: "int", value: 9 }]);
+
+    const table = obj.VarTable as { value: GffObj[] };
+    expect(table.value).toHaveLength(1);
+    expect((table.value[0].Value as { value: number }).value).toBe(9);
+  });
+
+  it("preserves unrelated existing variables", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [{ name: "NW_GENERIC_MASTER", type: "int", value: 1024 }]);
+    mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: 4 }]);
+
+    const table = obj.VarTable as { value: GffObj[] };
+    expect(table.value).toHaveLength(2);
+    const names = table.value.map(v => (v.Name as { value: string }).value);
+    expect(names).toEqual(["NW_GENERIC_MASTER", "HENCH_LEVEL"]);
+  });
+
+  it("maps each type to its GFF type code and field type", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [
+      { name: "anInt", type: "int", value: 1 },
+      { name: "aFloat", type: "float", value: 1.5 },
+      { name: "aString", type: "string", value: "hello" },
+    ]);
+
+    const table = obj.VarTable as { value: GffObj[] };
+    expect((table.value[0].Type as { value: number }).value).toBe(1);
+    expect((table.value[1].Type as { value: number }).value).toBe(2);
+    expect((table.value[2].Type as { value: number }).value).toBe(3);
+    expect((table.value[2].Value as { type: string }).type).toBe("cexostring");
+  });
+
+  it("throws on an unknown variable type", () => {
+    const obj = {} as GffObj;
+    expect(() =>
+      mergeVarTable(obj, [{ name: "bad", type: "object" as "int", value: 1 }]),
+    ).toThrow(/Unknown VarTable type/);
+  });
+});
+
+describe("buildMinimalUtc script fields", () => {
+  it("uses ScriptOnNotice, the real UTC field name, not the ScriptPercption typo", () => {
+    const doc = buildMinimalUtc() as GffObj;
+    expect((doc.ScriptOnNotice as { value: string }).value).toBe("nw_c2_default2");
+    expect(doc.ScriptPercption).toBeUndefined();
+  });
+
+  it("includes StartingPackage so LevelUpHenchman has something to key off", () => {
+    const doc = buildMinimalUtc() as GffObj;
+    expect(doc.StartingPackage).toBeDefined();
   });
 });

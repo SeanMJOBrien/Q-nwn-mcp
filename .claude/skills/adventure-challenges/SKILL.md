@@ -89,6 +89,50 @@ Read **Party Size** and **Difficulty** from `## Module`.
 
 Apply these multipliers throughout Phase 3-6.
 
+**Grounding: the 3.5e Encounter Level system.** NWN's CR values come from D&D 3.5, so use its
+rules to sanity-check the counts above:
+
+- **EL = APL is a standard encounter** — it costs the party roughly 20-25% of its daily
+  resources, and four of them make an adventuring day. Design most groups here.
+- **The baseline party is four characters.** EL = APL assumes four. A solo player facing an
+  EL = APL group is facing four characters' worth of opposition.
+- **Doubling the number of identical creatures is +2 EL, not +CR.** Two CR 3 orcs are EL 5,
+  not EL 6. This is the rule that makes the party-size table above matter: adding "+2 creatures"
+  to a 3-creature group is close to +2 EL, a real jump, not a tweak.
+- **EL = APL + 4 risks a character death**; reserve it for the boss and telegraph it.
+- Solo play is *below* the baseline, so a solo run of a group designed at base counts is already
+  harder than a standard encounter. Treat the solo column as the floor, not the norm.
+
+**`suggest_encounter` does not implement this.** Its XP budget is a flat linear function
+(≈50 × CR) with invented difficulty multipliers — it is a rough sizing aid, not the EL system,
+and it will not tell you that doubling a group jumped the EL by 2. Use it for creature
+*suggestions* and cross-check the composition against the rules above yourself.
+
+**Guard class distribution.** A creature whose role is *guard* — gate sentry, patrol,
+garrison, watch, house troops — is **90% Fighter** (`classes.2da` row **4**). The remaining
+10% is split evenly across the other ten base classes, ~1% each:
+
+| Class | Row | Share |
+|---|---|---|
+| **Fighter** | **4** | **90%** |
+| Barbarian · Bard · Cleric · Druid · Monk · Paladin · Ranger · Rogue · Sorcerer · Wizard | 0,1,2,3,5,6,7,8,9,10 | 1% each |
+
+Roll per guard, not per group — a garrison of ten should read as ten fighters, with the odd
+cleric or rogue as the exception that makes the roster look human rather than stamped. Do
+**not** apply this to named characters, boss lieutenants, or creatures whose class the plot
+specifies; those are authored.
+
+Two traps this avoids, both of which have shipped:
+
+- **Class 20 is Commoner, not a combat class.** A "guard" cloned from `nw_bartender` or any
+  other commoner chassis gets no BAB, no feats, and no proficiencies — it is a civilian in a
+  tabard. Guards must carry a real PC class.
+- **Verify the class ID before writing it.** Confirm with
+  `search_2da(table: "classes", column: "Label", value: "Fighter")` and read the row number —
+  do not assume the ordering. Name the creature to match the class you actually gave it: this
+  module shipped a henchman resref'd `sic_hen_ftr` and named as a fighter that is in fact
+  `classId 2`, a Cleric.
+
 ---
 
 ### Phase 2: Spatial Analysis (per area)
@@ -197,6 +241,40 @@ For each enemy type needed, create a blueprint with `create_creature_blueprint`.
 - `spells` — JSON array of spell-like abilities (for casters/healers)
 - `equipment` — JSON object mapping slots to base game item resrefs (for humanoids)
 
+**Gear every NPC randomly, from its class and level.** Two creatures of the same class and
+level should not come off the line identically — pick from the class's legal options rather
+than always reaching for the same longsword. The class decides *what kind* of gear; the level
+decides *how much* (via `get_wealth_budget`, below); the roll decides *which*.
+
+| Class | Weapon pool (roll one) | Armour | Shield |
+|---|---|---|---|
+| Fighter | any martial: longsword, battleaxe, warhammer, greatsword, halberd, longbow | any, to budget | if one-handed |
+| Barbarian | greataxe, greatsword, battleaxe | medium (hide, chain shirt) | no |
+| Ranger | longbow, shortbow, two shortswords | light/medium | no |
+| Rogue | shortsword, dagger, rapier, light crossbow | leather, studded leather | no |
+| Cleric | mace, morningstar, warhammer | any, to budget | yes |
+| Paladin | longsword, warhammer, mace | heavy | yes |
+| Druid | scimitar, club, quarterstaff, sling | hide, leather (**no metal**) | wood only |
+| Monk | kama, quarterstaff, or unarmed | **none** | **no** |
+| Bard | rapier, longsword, shortbow | light only | small |
+| Wizard / Sorcerer | quarterstaff, dagger, light crossbow | **none** | **no** |
+
+**Hard constraints — these are proficiency and mechanics, not taste.** A monk or caster in
+armour loses the class's defining ability; a druid in metal armour is prohibited outright; a
+non-proficient wielder takes attack penalties that quietly break the CR you costed. Check the
+weapon's `ReqFeat0..4` in `baseitems.2da` when in doubt.
+
+Then size it: `get_wealth_budget(level: "<level>", role: "<pc|elite|standard|mook>")` and spend
+against real blueprint costs from `resolve_blueprint`. A level-3 `standard` guard gets ~1,350gp
+— chainmail (150) + longsword (15) + large shield (50) leaves plenty, so the roll can afford a
+better armour grade rather than a magic weapon. Reserve enchantments for `elite`.
+
+Apply the same rules to **henchmen and companions** — a recruitable NPC that joins the party is
+geared by its own class and level exactly as a hostile is, and its gear is visible to the player
+for the whole adventure, so it is the worst place to leave a default loadout.
+
+For visual variety on top of the mechanical roll, see Phase 7c (`create_gear_randomizer`).
+
 **Equipment rules:**
 - **Melee fighters:** weapon (righthand) + shield (lefthand) + armor (chest). Most use swords and shields. Mix in maces, axes, warhammers for variety.
 - **Ranged fighters:** bow (righthand) + light armor (chest). No shield.
@@ -205,10 +283,37 @@ For each enemy type needed, create a blueprint with `create_creature_blueprint`.
 - **Tanks:** greatsword/greataxe (righthand, two-handed so no lefthand) + heavy armor (chest).
 - **Monsters** (non-humanoid): No equipment — use `naturalAC` instead of armor, rely on stats and spells.
 
+**Gear budget — how much equipment a creature should be carrying.**
+
+Call `get_wealth_budget(level: "<target level>", role: "<role>")`. It returns a total gold
+budget, a per-slot split, and the enhancement tier that budget affords, derived from D&D 3.5
+DMG Table 5-1 (wealth by level). Roles and their share of a PC's wealth:
+
+| Role | Share | Use for |
+|------|-------|---------|
+| `pc` | 100% | The player's own expected wealth — the yardstick |
+| `elite` | 100% | Bosses and named lieutenants |
+| `standard` | 50% | Ordinary classed enemies |
+| `mook` | 25% | Fodder |
+
+**The `elite` share is a real 3.5e rule, and it has a cost:** a classed NPC given full PC
+wealth is worth **CR +1**. Equipping a boss to `elite` therefore raises its effective CR by one
+— count that in the EL maths from Phase 1.5 rather than treating the gear as free flavour.
+The `standard`/`mook` shares below it are project heuristics, not book rules.
+
+**A budget is not a price list.** NWN prices magic items from the `Cost` column of
+`itempropdef.2da`, not the 3.5e formula, and the two disagree substantially — a +1 longsword is
+about 1,650 gp in NWN against roughly 2,315 by the book. Always spend against the *actual*
+blueprint cost from `resolve_blueprint`, never against a computed book price.
+
 **Magic item guidelines:**
 - **Standard enemies:** Mundane equipment only.
 - **Elite enemies:** Minor magic items (+1 weapons or armor). Only 1-2 magic items per creature. Use base game magic item resrefs (e.g., `nw_wswmls002` for a +1 longsword).
 - **Bosses:** Moderate magic items (+1 to +2). 2-3 magic items. Magic items should not exceed the wielder's power level.
+- **Never infer a magic item's bonus from its resref number.** The trailing digits are not an
+  enchantment ladder — for longswords, `002` is +1, `010` is +2 and `012` is +3. Call
+  `resolve_blueprint` and read the Enhancement property's `costValue` (and the item's cost)
+  before equipping it or counting it against a budget.
 - **Custom enchanted items:** When base game magic items don't fit the theme, create custom enchanted items with `create_item_blueprint` using `sourceResref` + `properties`:
   ```
   create_item_blueprint(
@@ -217,10 +322,10 @@ For each enemy type needed, create a blueprint with `create_creature_blueprint`.
     name: "Blazing Longsword",
     baseItem: "4",
     sourceResref: "nw_wswls001",
-    properties: '[{"propertyName": 56, "subType": 0, "costTable": 2, "costValue": 1}, {"propertyName": 16, "subType": 6, "costTable": 2, "costValue": 2}]'
+    properties: '[{"propertyName": 6, "subType": 0, "costTable": 2, "costValue": 1}, {"propertyName": 16, "subType": 6, "costTable": 2, "costValue": 2}]'
   )
   ```
-  Common property IDs: `56`=Enhancement Bonus (costValue=bonus), `16`=Damage Bonus (subType=damage type, costValue=dice), `0`=Ability Bonus, `20`=Damage Resistance.
+  Common property IDs: `6`=**Enhancement Bonus** (costValue=bonus), `16`=Damage Bonus (subType=damage type, costValue=dice), `0`=Ability Bonus, `20`=Damage Resistance, `56`=Attack Bonus. Row 6 is Enhancement and row 56 is Attack Bonus in `itempropdef.2da` — they are commonly transposed, and the swap silently produces a weaker, cheaper item. Verify any unfamiliar ID with `resolve_2da(table: "itempropdef", row: "<id>")`.
   Always set the `description` parameter on custom enchanted items — 1-2 sentences describing the enchantment and tying it to the adventure's plot or the creature who wields it (e.g., `"A frost-rimed blade carried by the Blackgrove's cursed guardian. Cold radiates from the steel."`). These items become player loot on kill, so their descriptions should feel rewarding to read.
 - All magic items equipped on creatures are noted in adventure.md for `/adventure-rewards` to analyze as potential player loot.
 
@@ -306,6 +411,21 @@ Scale damage with target level:
 - Level 4-6: `d6(2)` to `d6(3)`
 - Level 7-10: `d6(3)` to `d6(4)`
 
+**Scale the DCs too — do not leave them at the 15 in the example above.** On the 3.5e scale
+(DC 0 very easy, 10 easy, 15 tough, 20 challenging, 25 formidable, 30 heroic, 40 nearly
+impossible), a fixed DC 15 is a genuine obstacle at level 1 and an auto-success by level 5, so a
+frozen DC quietly turns every trap in the back half of an adventure into scenery:
+
+| Target level | `detectDC` / `disarmDC` |
+|---|---|
+| 1-3 | 12-15 |
+| 4-6 | 16-20 |
+| 7-10 | 20-25 |
+
+Pitch the trap that guards the adventure's objective at the top of its band and ordinary
+corridor traps at the bottom. The same scale governs any skill DC the adventure sets — a check
+worth writing a dialog branch for sits at "challenging" for the target level, not at a flat 15.
+
 **Trap placement guidelines:**
 - Corridors and chokepoints (where players MUST walk through)
 - In front of treasure or quest objectives
@@ -342,6 +462,44 @@ modify_gff_field(resource: "<area>", type: "git", path: "Creature List.<index>.S
 ```
 
 3. Avoid cluttering safe areas with patrol waypoints — they show up in the toolset.
+
+---
+
+### Phase 7c: Visual Variety (optional)
+
+Groups built from one blueprint are visually identical, which reads as filler. `create_gear_randomizer`
+generates an include (`inc_gear` by default) that recolours a creature's equipment at spawn, so six
+guards from one blueprint arrive in six different liveries at no design cost.
+
+```
+create_gear_randomizer(includeName: "inc_gear")
+```
+
+Wire it through a spawn script that **chains** the default AI rather than replacing it — dropping
+`nw_c2_default9` costs the creature its whole spawn setup, including waypoint walking:
+
+```nwscript
+#include "inc_gear"
+void main() {
+    GearRandomizeCreature(OBJECT_SELF);
+    ExecuteScript("nw_c2_default9", OBJECT_SELF);
+}
+```
+
+Then point the placed creatures' `ScriptSpawn` at it exactly as in Phase 7b step 2.
+
+**Constraints that matter:**
+- **Colours are always safe; models are not.** Armour colours are a fixed 0-175 palette and weapon
+  colours 1-4, so any value in range is valid on any item. Weapon *model* indices are valid
+  **per-base-item** — a blanket random range produces invalid parts and an item that renders as a
+  bag. Model randomisation is therefore off by default; leave it off unless you have checked the
+  valid range for the specific base item.
+- **Don't randomise the boss or any named NPC.** Their appearance is authored; the helper sets a
+  `GEAR_RANDOMIZED` local so a creature is never processed twice, but it cannot know which
+  creatures are supposed to look a particular way. Apply the spawn script only to rank-and-file
+  groups.
+- `CopyItemAndModify` returns a **new object** and the original must be destroyed and re-equipped.
+  The generated `GearApply()` helper handles this; do not hand-write the calls.
 
 ---
 

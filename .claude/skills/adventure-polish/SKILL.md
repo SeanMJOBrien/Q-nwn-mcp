@@ -81,7 +81,7 @@ Compile an **issue checklist** to drive the audit. Work through each phase below
 Run `validate_module`. Read the full output.
 
 **Triage results:**
-- **Skip** known base-game false positives: scripts like `nw_c2_default*`, `nw_ch_ac*`, `nw_i0_*`, items like `nw_wblms001`. These resolve at runtime from game BIFs.
+- **Skip** known base-game false positives: scripts like `nw_c2_default*`, `nw_ch_ac*`, `nw_i0_*`, `x0_ch_hen_*` (the henchman/associate AI), `x0_i0_*`, `x0_inc_*`, `x2_mod_def_*`, and items like `nw_wblms001`. These resolve at runtime from game BIFs.
 - **Fix** everything else: missing scripts, missing dialogs, missing blueprints, unresolvable resrefs.
 
 Common fixable validation errors:
@@ -334,10 +334,82 @@ Never skip Blocking or Breaking issues. Minor issues can be documented without f
 
 ---
 
+## Final Gate: `verify_all`
+
+**This is the last thing the phase does, after every fix and after `repack_module`.**
+
+```
+verify_all(checkWalkable: true)
+```
+
+`validate_module` checks cross-references — does the script this creature names exist.
+`verify_all` checks the things a reference check cannot see: dialogs missing the fields
+the engine silently requires, dangling dialog link indices, weapons with no model,
+creatures with no perception handler, objects placed outside the walkable zone, quests
+with no End entry, and rewards that reach only one player in co-op.
+
+**The module is shippable only when `shippable: true` (zero errors).**
+
+- **Errors block.** Fix them, re-run, repeat. Use `errorsByCode` to see the dominant
+  problem first — one root cause usually explains many findings.
+- **Warnings are advisory.** Record them in the summary; fix the cheap ones.
+- If an error genuinely cannot be fixed in this phase, record `"status": "partial"` in
+  `adventure-status.json` with the full error list. Never report success with errors
+  outstanding.
+
+Common gates and what they mean:
+
+| Error code | Meaning | Fix |
+|-----------|---------|-----|
+| `dialog_missing_node_field` | Engine will silently refuse to load the conversation | Rebuild the node via `add_dialog_node` |
+| `dialog_dangling_index` | A link points past the end of its target list | Correct the `Index` via `modify_gff_field` |
+| `composite_model_part_zero` | Weapon renders as a shapeless blob | Set all three `ModelPart*` fields |
+| `quest_no_end_entry` | Quest can never be completed | `edit_journal_entry` with `end: true` |
+| `quest_never_awarded` | No script awards the quest | Add the `AddJournalQuestEntry` call |
+| `reward_not_party_wide` | Co-op: only one player is rewarded | Loop `GetFirstFactionMember`/`GetNextFactionMember` |
+| `gic_out_of_sync` | Objects invisible in the toolset | Re-run a placement tool on the area |
+| `henchman_no_command_handler` | Companion ignores follow/stay orders | Rebuild with `henchman: true` |
+
+---
+
+## Co-op / multiplayer rules
+
+**Every module is assumed to be playable in a party.** A reward handed to a single PC
+reaches one player and silently skips the rest — invisible in solo testing, which is
+exactly why it ships. `verify_coop_rules` (also run inside `verify_all`) enforces:
+
+- **XP, gold and items must be fanned out across the party.** Loop
+  `GetFirstFactionMember(oPC, TRUE)` / `GetNextFactionMember(oPC, TRUE)`, or use
+  `RewardPartyXP` / `RewardPartyGP`. `GiveXPToCreature(GetPCSpeaker(), n)` on its own is
+  an error.
+- **Journal entries must be party-wide.** `AddJournalQuestEntry`'s 4th argument
+  (`bAllPartyMembers`) defaults to TRUE — never pass FALSE, or one player's journal
+  advances while the others cannot complete the quest.
+- **Shared quest state must not live on one PC.** `SetLocalInt(GetPCSpeaker(), ...)`
+  gives each player their own copy; store shared progress on `GetModule()` or the quest
+  giver instead.
+
+Three things the checker cannot tell you, which matter when reading its findings:
+
+- **`RewardPartyXP` / `RewardPartyGP` do not divide a pot.** They live in `nw_i0_tool` (an
+  include, not `nwscript.nss`) and hand *each* party member the full amount. Do not
+  pre-divide a quest award by party size expecting them to split it — that pays each
+  player a quarter share.
+- **Items cannot be divided at all.** `CreateItemOnObject` targets one creature, so a party
+  reward is either one copy per player or one copy total; there is no third option. Loot
+  placed in a chest is inherently first-come-first-served and is invisible to the checker,
+  which only reads scripts — if fair distribution matters, hand the item out from a script.
+- **The module's `OnClientEnter` handler is exempt, by design.** It fires once per
+  connecting player, so a single-target grant there already reaches everyone. `verify_all`
+  reads the module's registered `Mod_OnClientEntr` and skips exactly that resref. An *area*
+  `OnEnter` gets no such exemption and genuinely must fan out.
+
+---
+
 ## Important Notes
 
 - **Do NOT auto-export HTML reports.**
-- **Repack after all changes.** Call `repack_module` at the end.
+- **Repack after all changes.** Call `repack_module` at the end, then run `verify_all`.
 - **Don't rebuild what works.** If a dialog is functional but not perfect, note it — don't rewrite it.
 - **Filter base-game false positives** from `validate_module`. Scripts and items from the base game BIFs (`nw_*`, `x0_*`, `x2_*`) that appear as "missing" are resolved at runtime and are NOT errors.
 - **Trace, don't assume.** Use `flatten_dialog`, `get_area_creatures`, `get_area_doors` to verify — don't assume prior skills did everything correctly.

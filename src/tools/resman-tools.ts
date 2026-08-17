@@ -218,7 +218,7 @@ export function registerResmanTools(server: McpServer): void {
           const entry: Record<string, unknown> = { resref, name, tag };
 
           switch (bpType) {
-            case "utc":
+            case "utc": {
               entry.cr = getFieldNum(obj, "ChallengeRating");
               entry.race = getFieldNum(obj, "Race");
               entry.faction = getFieldNum(obj, "FactionID");
@@ -230,6 +230,7 @@ export function registerResmanTools(server: McpServer): void {
                 }));
               }
               break;
+            }
             case "uti":
               entry.baseItem = getFieldNum(obj, "BaseItem");
               entry.cost = getFieldNum(obj, "Cost");

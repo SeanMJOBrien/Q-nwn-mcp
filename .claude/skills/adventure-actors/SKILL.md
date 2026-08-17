@@ -80,6 +80,132 @@ For each NPC described in the plot's `### Key NPCs` section:
 
 ---
 
+### Phase 3b: Create Companions (henchmen)
+
+Any NPC the plot describes as joining, following, accompanying, or being rescued/freed
+must be built as a **real NWN henchman**, or they will stand still while the player walks
+away. This is the single most-reported defect in generated modules.
+
+**Cap at 3 companions per adventure** (the generated `a_mod_load` sets `SetMaxHenchmen(4)`,
+leaving one slot spare). Use fewer unless the plot calls for a full party — every companion
+is another actor to keep alive, pathed, and balanced against.
+
+**Skip this phase entirely if the plot has no companion characters.**
+
+#### Step 1: Shared scripts (once per module)
+
+**Idempotency check:** `list_resources(pattern: "a_hen_*")`. If `a_hen_join` already
+exists, skip to Step 3.
+
+Write these six with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
+reports `compiled: true`.
+
+| Resref | Purpose |
+|--------|---------|
+| `c_hen_free` | `StartingConditional` — TRUE when the companion has no master |
+| `c_hen_mine` | `StartingConditional` — TRUE when the PC speaking is its master |
+| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark |
+| `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
+| `a_hen_stay` | Stand ground, via `bkRespondToHenchmenShout` |
+| `a_hen_follow` | Follow master, via `bkRespondToHenchmenShout` |
+
+Two rules that make or break this — both are silent failures:
+- **`SetMaxHenchmen()` must be raised before `AddHenchman()`.** `AddHenchman` is a
+  no-op when the cap is too low, and reports no error. `a_hen_join` raises it defensively.
+- **`SetAssociateListenPatterns()` must be called on recruit.** The engine delivers
+  radial follow/stand-ground orders as a silent command shout the companion matches in
+  its OnConversation handler. Without this it ignores every order.
+
+#### Step 2: Raise the henchman cap at module load
+
+`get_module_info` → read `onModLoad`. If it is not already `a_mod_load`:
+- `write_script("a_mod_load")` calling `SetMaxHenchmen(4)` then
+  `ExecuteScript("<the previous onModLoad value>")` — **chain, do not replace**. Omit
+  the `ExecuteScript` line only if the previous value was empty.
+- `set_module_scripts(Mod_OnModLoad: "a_mod_load")`
+
+#### Step 3: Per companion — dialog first, then blueprint
+
+`create_dialog("dlg_hen_<resref>")` with **three roots in this order**. The engine
+evaluates `StartingList` in order and the first TRUE condition wins, which gives
+state-based branching without needing link-backs:
+
+1. `condition: "c_hen_mine"` — in-party hub. PC replies: "Hold this position"
+   (`script: a_hen_stay`), "Stay close to me" (`script: a_hen_follow`), "We should part
+   ways" (the NPC farewell entry beneath carries `script: a_hen_leave`), "Never mind".
+2. `condition: "c_hen_free"` — story exposition, who they are and why they are here.
+   PC replies: "Tell me about yourself" (backstory), "Will you travel with me?" (the NPC
+   accept entry beneath carries `script: a_hen_join`), "Another time".
+3. *No condition* — a short fallback line. Without this, if both conditions are false
+   the conversation opens empty.
+
+Then `create_creature_blueprint`:
+
+```
+create_creature_blueprint(
+  sourceResref: "<class chassis — see table below>",
+  resref: "<name>", tag: "<name>",
+  name: "<display name>",
+  faction: 2,
+  henchman: true,
+  conversation: "dlg_hen_<resref>",
+  soundset: <TYPE 0 row matching gender — see table>,
+  varTable: '[{"name": "HENCH_LEVEL", "type": "int", "value": <module target level>}]'
+)
+```
+
+`henchman: true` wires all 13 script fields to the stock `x0_ch_hen_*` associate AI.
+These are base-game resources resolved at runtime — **never write them into the module**,
+and expect `validate_module` to report them as missing (a false positive).
+
+#### Step 4: Verify before moving on
+
+For each companion: `verify_creature(resref: "<resref>", henchman: true)` and
+`verify_dialog(resref: "dlg_hen_<resref>")`. **Both must return zero errors.** Fix and
+re-verify; after two failed attempts record `"status": "partial"` in
+`adventure-status.json` with the error list rather than reporting success.
+
+#### Companion source blueprints — class chassis only
+
+**Never build a companion on a Commoner blueprint.** `nw_bartender`, `nw_oldman`,
+`nw_convict` and `nw_shopkeep` are all Commoner (class 20): levelling one grants no
+feats, no spellbook and no BAB, so the companion joins with no abilities at all. This is
+the exact cause of the "Cleric NPC has no spells" bug.
+
+| Archetype | Resref | Class |
+|-----------|--------|-------|
+| Fighter | `nw_humanmerc002` / `nw_dwarfmerc002` | Fighter |
+| Ranger / archer | `nw_elfmerc001` | Ranger |
+| Cleric / healer | `nw_halfcel001` | Cleric |
+| Wizard | `nw_elfmage001` | Wizard |
+| Rogue | `nw_halfmerc001` | Rogue |
+| Bandit-turned-ally | `nw_bandit001` | Fighter |
+
+#### Companion soundsets — TYPE 0 (PC voicesets) only
+
+TYPE 0 rows carry the full `VOICE_CHAT_*` range the associate AI barks. TYPE 3 NPC sets
+are sparse and leave the companion intermittently mute.
+
+| Archetype | Male | Female |
+|-----------|------|--------|
+| Fighter / Barbarian | 419 | 357 |
+| Ranger / archer | 420 | 433 |
+| Wizard / Sorcerer | 418 | 361 |
+| Cleric / Druid | 366 | 422 |
+| Rogue / Bard | 367 | 421 |
+| Commoner / rescued NPC | 368 | 423 |
+
+Validate before use: `resolve_2da(table: "soundset", row: "<n>")` — confirm `RESREF` is
+not `****` and `GENDER` matches the creature. If nothing validates, omit `soundset`
+rather than writing a garbage row (a creature-TYPE row makes a human companion growl).
+
+#### Companions get no walk waypoints
+
+Skip companions in Phase 6b. `x0_ch_hen_spawn` sets `NW_FLAG_IMMOBILE_AMBIENT_ANIMATIONS`
+and never reads `NW_GENERIC_MASTER`, so patrol routes would be dead weight.
+
+---
+
 ### Phase 4: Create NPC Dialogs
 
 For each key NPC, create a simple greeting dialog using `create_dialog`.
@@ -193,25 +319,34 @@ NPCs and ambient creatures should walk waypoint routes instead of standing still
 
 #### Step 1: Set Walk Flags on Creature Blueprints
 
-After creating each creature blueprint (key NPC or ambient), use `modify_gff_field` to add a `VarTable` entry that enables day/night walk posting. The `NW_GENERIC_MASTER` variable is a bitmask — set bit 10 (`NW_FLAG_DAY_NIGHT_POSTING` = `0x400` = `1024`):
+The `NW_GENERIC_MASTER` variable is a bitmask — set bit 10 (`NW_FLAG_DAY_NIGHT_POSTING` = `0x400` = `1024`).
+
+**Set this via `create_creature_blueprint`'s `varTable` parameter when you create the creature**, not afterwards:
 
 ```
-modify_gff_field(
-  file: "<blueprint_resref>.utc",
-  path: "VarTable",
-  value: [
-    {
-      "__struct_id": 0,
-      "Name": { "type": "cexostring", "value": "NW_GENERIC_MASTER" },
-      "Type": { "type": "dword", "value": 1 },
-      "Value": { "type": "int", "value": 1024 }
-    }
-  ],
-  fieldType: "list"
+create_creature_blueprint(
+  ...,
+  varTable: '[{"name": "NW_GENERIC_MASTER", "type": "int", "value": 1024}]'
 )
 ```
 
-If the blueprint already has a `VarTable`, merge into it rather than replacing.
+It merges by name, so it will not clobber other variables.
+
+**Ordering is load-bearing.** `place_creature` deep-copies the entire `.utc` into the area's GIT — the placed instance is a snapshot, not a reference. **Any blueprint edit made after placement never reaches the placed creature.** All `.utc` mutation must happen before Phase 6.
+
+If you must edit a blueprint after creation, the correct call is:
+
+```
+modify_gff_field(
+  resource: "<blueprint_resref>",
+  type: "utc",
+  path: "VarTable",
+  value: [ ... ],
+  gffType: "list"
+)
+```
+
+Note `resource` + `type` (not `file`), and `gffType` (not `fieldType`). This replaces the whole list — prefer the `varTable` parameter above, which merges.
 
 #### Step 2: Place Walk Waypoints
 
@@ -255,8 +390,25 @@ Append an `## Actors` section to `adventure.md` with this structure:
 - [creature type] x[count] (`amb_resref`) — [brief note, e.g., "wandering the clearing"]
 ...
 
+**Companions:**
+- **[Name]** (`resref`, tag: `tag`) — [class] targeting level [N], recruitable in [area].
+  Dialog: `dlg_hen_[resref]`. Chassis: `[source_blueprint]`. Soundset: [row].
+  `HENCH_LEVEL` = [N]. Scripts: `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`;
+  conditions `c_hen_free` / `c_hen_mine`.
+
+**Henchman cap:** `a_mod_load` sets `SetMaxHenchmen(4)`, chained from `[previous Mod_OnModLoad]`.
+
 **Faction:** All actors set to Commoner (ID 2).
 ```
+
+**Downstream skills must respect the companion entries:**
+- `/adventure-quests` must **not** overwrite a companion's `Conversation`, and must **not**
+  add quest roots with `parentIndex: 0` to a companion dialog — that unshifts the quest root
+  ahead of the two conditional roots and breaks recruitment. Prefer not making companions
+  quest-givers at all.
+- `/adventure-challenges` must **not** make a companion hostile.
+- `/adventure-polish` must whitelist the base-game `x0_ch_hen_*` scripts when checking
+  for missing references.
 
 This data is used by downstream skills to select actors for quest roles (`/adventure-quests`) and to know which areas already have creature presence (`/adventure-challenges`).
 
@@ -360,3 +512,10 @@ Clone each type once with `create_creature_blueprint`, setting `faction=2`.
 - **Repack after placing.** Call `repack_module` at the end so the user can see changes in the toolset.
 - **Ambient creatures don't get dialogs.** Only key NPCs from the plot get `create_dialog` calls.
 - **Max 16 character resrefs.** NWN has a 16-char limit on resref identifiers.
+- **All blueprint edits must precede `place_creature`.** Placement snapshots the `.utc` into
+  the GIT; later blueprint edits never reach the placed instance.
+- **Max 3 companions**, and never on a Commoner chassis.
+- **Companion AI scripts (`x0_ch_hen_*`) are base-game** — never write them into the module.
+  `validate_module` reporting them as missing is a false positive.
+- **Verify before reporting success.** Every companion must pass `verify_creature(henchman: true)`
+  and `verify_dialog` with zero errors.

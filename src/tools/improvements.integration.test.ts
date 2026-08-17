@@ -50,10 +50,17 @@ vi.mock("./tileset-tools.js", () => ({
   buildAreaTransitions: vi.fn(() => []),
 }));
 
-// Mock walkmesh: always report walkable
+// Mock walkmesh: always report walkable.
+// Must cover every export the placement/movement tools import — vitest throws
+// "No <name> export is defined on the mock" from inside the tool handler, and the
+// handler returns that message as its text payload, which then fails JSON.parse.
 vi.mock("../util/walkmesh.js", () => ({
-  checkPositionWalkable: vi.fn(async () => ({ walkable: true, material: "Grass", materialId: 7 })),
+  checkPositionWalkable: vi.fn(async () => ({ walkable: true, material: "Grass", materialId: 7, z: 0 })),
+  // NB: checkPlacementWalkable returns { ok, reason?, z? } — NOT { walkable }.
+  checkPlacementWalkable: vi.fn(async () => ({ ok: true, z: 0 })),
   ensureWokCacheDir: vi.fn(),
+  setWokCacheDir: vi.fn(),
+  clearWokCache: vi.fn(),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -151,7 +158,7 @@ afterEach(async () => {
 // ─── Tests: Collision detection ──────────────────────────────────────────
 
 describe("placement collision detection", () => {
-  it("warns when placing a creature near an existing creature", async () => {
+  it("blocks placing a creature near an existing creature", async () => {
     // Set up area with an existing creature at (25, 25)
     const git = makeGitDoc();
     const creatureList = (git as GffObj)["Creature List"] as { type: string; value: GffObj[] };
@@ -190,16 +197,21 @@ describe("placement collision detection", () => {
         arguments: { area: "testarea", blueprint: "new_npc", x: "25.5", y: "25.0" },
       });
 
-      const parsed = parseResult(result) as Record<string, unknown>;
-      expect(parsed.success).toBe(true);
-      expect(parsed.collisionWarning).toBeDefined();
-      expect(parsed.collisionWarning).toContain("existing_npc");
+      // Collision is a hard block, not a warning: the tool returns a plain-text
+      // refusal naming the offending object rather than a JSON success payload.
+      const text = result.content.find(c => c.type === "text")?.text ?? "";
+      expect(text).toContain("Placement blocked");
+      expect(text).toContain("existing_npc");
+
+      // And nothing was actually added to the GIT.
+      const list = (git as GffObj)["Creature List"] as { value: GffObj[] };
+      expect(list.value).toHaveLength(1);
     } finally {
       await cleanup();
     }
   });
 
-  it("does not warn when placing far from existing objects", async () => {
+  it("places successfully when far from existing objects", async () => {
     const git = makeGitDoc();
     const creatureList = (git as GffObj)["Creature List"] as { type: string; value: GffObj[] };
     creatureList.value.push({
@@ -405,7 +417,7 @@ describe("create_trap_blueprint", () => {
       expect(parsed.detectDC).toBe(15); // default
       expect(parsed.disarmDC).toBe(15); // default
       expect(parsed.oneShot).toBe(true); // default
-      expect(parsed.size).toBe(3.0); // default
+      expect(parsed.size).toBe(4.0); // default
     } finally {
       await cleanup();
     }

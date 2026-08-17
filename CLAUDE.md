@@ -248,3 +248,162 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 - **Placement Z height from walkmesh.** All placement tools automatically set the object's Z position from the walkmesh surface height. The walkmesh check returns the highest walkable face Z at the position. Use `fix_object_heights` to retroactively fix objects placed before this feature.
 - **Zone solver rejects incompatible adjacencies.** `adventure_apply_layout` returns early with zero placements and `INCOMPATIBLE TERRAIN ADJACENCY` errors if the zone layout contains terrain pairs with no transition tiles. Fix the zone layout, don't retry.
 - **`fallbackSubstitute` is constrained.** The zone solver's fallback only tries terrains present in the corner grid (zone-defined + default). It will never inject an alien terrain.
+- **GFF `Dropable`/`Lootable` can be silently overridden at runtime.** Setting `Dropable=1` on an item (via `create_creature_blueprint`, `set_creature_equipment`, `place_creature`/`place_placeable` inventory) or `Lootable=1` on a creature only controls the *default* engine behavior. A module's own scripts — most commonly an `OnSpawn` handler that hands out randomly-generated loot — can call the legacy native functions `SetDroppableFlag(object, int)` / `SetLootable(object, int)` on the object at spawn time, which take precedence over the GFF fields and are invisible from the GFF data alone. If a user reports "I set Dropable/Lootable but nothing drops in-game" after nwn-mcp wrote those fields correctly, the next place to look is the creature's `ScriptSpawn` (OnSpawn) source for a `SetDroppableFlag(..., FALSE)`/`SetLootable(..., FALSE)` call — this is out of nwn-mcp's GFF-editing scope (see Scope) but worth telling the user about. Confirmed root cause of a real "nothing drops" bug report in a separate PW module (DwarfStory), traced to 75 such calls across 12 OnSpawn scripts.
+
+## Pitfalls Found by Building a Real Module
+
+These came out of generating a full four-area module end-to-end. Each cost real
+debugging time, and none was visible from unit tests.
+
+- **`modify_gff_field` cannot write float fields.** The MCP layer serialises `value`
+  as a string, so a float field receives `{"type":"float","value":"60"}` and `nwn_gff`
+  rejects it with a `ValueError`. Worse, `setGffByPath` has already mutated the
+  in-memory document by then, so a **failed write leaves `index.parsedGff` holding a
+  value that will fail every subsequent write of that resource**. Recover by
+  `repack_module` (which packs the still-valid files on disk) then `load_module` to
+  re-read. Affects `Mod_Entry_X/Y/Z` and any other float — set positions at creation
+  time instead, or reload after a failure.
+- **Interior tilesets fill with `wall`, not floor.** `create_area` on `tic01`/`tde01`
+  and friends fails with *"No suitable default tile found"* for any floor terrain,
+  because floor tiles only exist as room interiors bounded by wall — the adjacency
+  list shows every floor terrain connecting to `wall` alone. Create the area with the
+  tileset's own default terrain (`wall`) and carve rooms with
+  `adventure_generate_layout` + `adventure_apply_layout`.
+- **Decorated interior terrains are only partly walkable.** `tic01`'s `rich` tiles
+  carry furniture, so a tile that exists is not necessarily a place a creature can
+  stand — a throne-room centre computed as `tile * 10.0 + 5.0` came back
+  `Nonwalk (ID 7)`. Never compute a placement position arithmetically on a decorated
+  terrain; always ask `adventure_find_walkable`.
+- **`create_module` leaves a dead `_start` area.** The template's `tms01` stub stays in
+  the module after real areas are built, and shows up as permanently unreachable in
+  `check_area_connectivity`. Delete it once the real entry area exists and
+  `Mod_Entry_Area` points at it.
+- **Base-game whitelists must be shared, not per-tool.** `validate_module` reported 255
+  errors on a module it had just created, every one a stock `nw_*`/`x2_*` reference.
+  `isBaseGameScript()` / `isBaseGameResource()` in `src/util/verify/common.ts` are the
+  single source of truth — any new checker must use them. A checker with false
+  positives trains people to ignore it, which is worse than no checker.
+
+## Verification Gate (verify_* tools)
+
+Generated `.nss` has the compiler as its acceptance gate. Nothing played that role for
+any other generated file type, so structurally-broken assets shipped silently. The
+`verify_*` family (`src/tools/verify-tools.ts` + `src/util/verify/*.ts`) is that gate.
+
+- **Complements `validate_module`, does not replace it.** `validate_module` does
+  cross-reference checks (does the named script exist). `verify_*` does intra-file
+  structural and semantic checks (does this dialog carry the fields the engine silently
+  requires; is this tile ID inside the tileset; is this NPC standing somewhere reachable).
+- **Severity is a contract.** `error` = the engine or toolset will misbehave ⇒ blocks.
+  `warning` = quality/plausibility ⇒ advisory. Each finding carries a stable `code` so
+  skills can branch on a specific defect, and a `fix` naming the tool that repairs it.
+- **`verify_all` is the shipping gate.** `shippable: true` means zero errors module-wide.
+  `/adventure-polish` runs it last; every other phase verifies its own output before
+  writing `success` to `adventure-status.json`.
+- **Base-game scripts are whitelisted by prefix** in `isBaseGameScript()`
+  (`src/util/verify/common.ts`) — `nw_c2_default*`, `x0_ch_hen_*`, `nw_ch_ac*` and
+  friends resolve at runtime and must never be reported as missing.
+
+## Co-op / Multiplayer Rules
+
+**Every module is assumed to be party-playable by default.** A dialog action script runs
+once, on the NPC, with exactly one PC as `GetPCSpeaker()`. Any reward handed to that
+object alone reaches one player and silently skips the rest — invisible in solo testing,
+which is why it survives to multiplayer. Enforced by `verify_coop_rules`:
+
+- **XP/gold/items must fan out.** Use the generated `inc_reward` helpers
+  (`create_reward_system`), or loop `GetFirstFactionMember(oPC, TRUE)` /
+  `GetNextFactionMember(oPC, TRUE)` by hand. A bare
+  `GiveXPToCreature(GetPCSpeaker(), n)` is an **error**, not a warning.
+- **`AddJournalQuestEntry`'s 4th arg (`bAllPartyMembers`) defaults to TRUE** — never pass
+  FALSE, or one player's journal advances while the rest cannot complete the quest.
+- **Shared quest state must not live on a single PC.** `SetLocalInt(GetPCSpeaker(), ...)`
+  gives each player their own copy; use `GetModule()` or the quest giver.
+- **Single-player modules opt out** with `coop: false` on `verify_coop_rules`/`verify_all`.
+  The same findings are still reported, as warnings rather than errors.
+
+### Rewards are per-player, not a divided pot
+
+**Quest rewards are NOT split by party size — each player receives 100%.** This is the
+default policy and the one to keep. `RewardPartyXP`/`RewardPartyGP` in `nw_i0_tool` are
+loops calling `GiveXPToCreature(oPartyMember, XP)` with the *same* amount for every
+member; they divide nothing. Only **combat** XP is divided by the engine.
+
+`create_reward_system` generates `inc_reward.nss` with the policy baked in:
+
+| Helper | Behaviour under the default FULL policy |
+|---|---|
+| `CoopRewardXP(oPC, n)` | every player gets `n` |
+| `CoopRewardGold(oPC, n)` | every player gets `n` |
+| `CoopRewardItem(oPC, r, c)` | every player gets their own copy |
+| `CoopRewardClassItem(oPC, t)` | every player gets the tier-`t` item matching **their own** primary class |
+| `CoopRewardQuest(oPC, x, g, t)` | all of the above in one call |
+
+- **Policies:** `full` (default, 100% each), `split` (XP/gold divided; items go to the
+  triggering PC, since an item cannot be halved), `speaker` (single-player).
+  `sharePercent` scales every payout and never rounds a positive reward to zero.
+- **Callers pass the triggering PC** (`GetPCSpeaker()`, `GetLastUsedBy()`) and never
+  iterate the party themselves. The helpers walk PCs only — `GetFirstFactionMember(oPC,
+  TRUE)` — so henchmen never absorb a share.
+- **`CoopPrimaryClass` picks the highest base-class level**, so a multiclass PC gets gear
+  matching what they actually play rather than whichever class came first.
+- **An include cannot compile standalone** (no `main()`), so the tool proves it with a
+  throwaway probe script and reports `compiles`. Never trust an unverified include.
+- **Placed loot cannot fan out.** A chest with one sword is first-come-first-served, and
+  no checker can see it — hand shared signature rewards out from a script instead.
+
+## Henchmen / Companions
+
+`create_creature_blueprint`'s `henchman: true` wires all 13 script fields to the stock
+BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at runtime —
+**never write them into the module**.
+
+- **`SetMaxHenchmen()` must run before `AddHenchman()`.** `AddHenchman` is a silent no-op
+  when the cap is too low. The generated `a_mod_load` raises it and chains the previous
+  `Mod_OnModLoad` handler rather than replacing it.
+- **`SetAssociateListenPatterns()` must be called on recruit.** The engine delivers radial
+  follow/stand-ground orders as a silent command shout matched in the companion's
+  OnConversation handler. Omit this and it ignores every order.
+- **`ScriptDialogue` = `x0_ch_hen_conv` and `ScriptHeartbeat` = `x0_ch_hen_heart` carry the
+  feature.** The latter tail-calls `nw_ch_ac1`, the actual follow AI. Never set `nw_ch_ac*`
+  in a UTC field yourself.
+- **Never build a companion on a Commoner chassis** (`nw_bartender`, `nw_oldman`,
+  `nw_convict`, `nw_shopkeep` are all class 20). `LevelUpHenchman` grants a Commoner no
+  feats and no spellbook — the root cause of the "cleric has no spells" report. Use a
+  PC-class chassis and set `startingPackage`.
+- **Abilities come from vanilla `LevelUpHenchman(oHench, CLASS_TYPE_INVALID, TRUE, PACKAGE_INVALID)`**
+  at recruit, looped to the blueprint's `HENCH_LEVEL` local. `bReadyAllSpells = TRUE`
+  matters — without it the companion joins with an empty memorized list.
+- **Companion voices must be TYPE 0 (PC voiceset) rows** from `soundset.2da`. TYPE 3 NPC
+  sets are sparse and leave the companion intermittently mute.
+
+## Gear Appearance
+
+Generated gear uses the base item's **default** model variant, applied by
+`applyDefaultItemModels()` (`src/util/item-models.ts`) after `BaseItem` is final. A
+composite weapon (`baseitems.2da` ModelType 2) needs `ModelPart1..3` all non-zero; any
+part left at 0 renders as a shapeless blob in the creature's hand.
+
+**TODO — randomised gear appearance.** Once per-base-item model-variant counts can be
+derived from the resman stack (baseitems.2da carries no variant count), the helper can
+pick a random valid variant per part so generated NPCs stop sharing identical weapons.
+Until then "default model" is correct: a wrong variant index renders as nothing at all.
+
+## Testing
+
+**Everything runs locally. No hosted CI, and none is wanted** — modules generated with
+this server are one-off and local, so module generation and testing must never depend on
+a service. Do not add a `.github/workflows/` pipeline; the pre-commit hook is the gate.
+
+- `npm run verify` runs the full gate: build (tsc), lint (biome), test (vitest).
+- `npm run hooks:install` installs the pre-commit hook (once per clone). It runs the same
+  `scripts/verify.sh` before every commit touching `src/`, `package.json`, `tsconfig.json`
+  or `biome.json`; bypass with `git commit --no-verify`.
+- Biome ships its binary as a platform-specific optional dependency. If `npm run lint`
+  dies with `MODULE_NOT_FOUND`, install it:
+  `npm install --no-save @biomejs/cli-$(node -p "process.platform+'-'+process.arch")`.
+  `scripts/verify.sh` detects this and skips lint with a message rather than failing opaquely.
+- The suite runs in ~1s with no network and no NWN install, which is what makes a
+  pre-commit hook tolerable. Checks needing real game data (tilesets, 2DAs, walkmeshes)
+  degrade to "skip", never to "fail".
+- See `docs/TEST_PLAN.md` for the project-wide test plan and test case specification.

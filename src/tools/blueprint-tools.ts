@@ -5,6 +5,7 @@
  * - create_creature_blueprint: Create a new UTC blueprint from scratch or cloned from base game
  * - create_encounter_blueprint: Create a new UTE encounter blueprint
  * - create_store_blueprint: Create a new UTM store blueprint with inventory
+ * - create_trap_blueprint: Create a new UTT trap trigger blueprint
  */
 
 import { z } from "zod";
@@ -15,10 +16,59 @@ import { optNumParam, toI, toF } from "../util/params.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
-import { resolveBlueprint, buildMinimalUtc, buildMinimalUte, buildMinimalUtm } from "../util/git-helpers.js";
+import { resolveBlueprint, buildMinimalUtc, buildMinimalUte, buildMinimalUtm, mergeVarTable } from "../util/git-helpers.js";
+import type { VarTableEntry } from "../util/git-helpers.js";
 import { setField, getFieldList, getFieldNum } from "../types/gff.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { EQUIP_SLOT_MAP } from "../util/equip-slots.js";
+
+/**
+ * Standard non-associate creature AI. Applied to every creature unless the
+ * `henchman` preset or an explicit `scripts` override says otherwise.
+ */
+export const DEFAULT_CREATURE_SCRIPTS: Record<string, string> = {
+  ScriptAttacked: "nw_c2_default5",
+  ScriptDamaged: "nw_c2_default6",
+  ScriptDeath: "nw_c2_default7",
+  ScriptDialogue: "nw_c2_default4",
+  ScriptDisturbed: "nw_c2_default8",
+  ScriptEndRound: "nw_c2_default3",
+  ScriptHeartbeat: "nw_c2_default1",
+  ScriptOnBlocked: "nw_c2_defaulte",
+  ScriptOnNotice: "nw_c2_default2",
+  ScriptRested: "nw_c2_defaulta",
+  ScriptSpawn: "nw_c2_default9",
+  ScriptSpellAt: "nw_c2_defaultb",
+  ScriptUserDefine: "nw_c2_defaultd",
+};
+
+/**
+ * Stock BioWare henchman/associate AI. These are base-game resources resolved at
+ * runtime — never write them into the module.
+ *
+ * Two of these carry the whole feature:
+ *  - ScriptDialogue (x0_ch_hen_conv) matches the engine's silent command shout via
+ *    GetListenPatternNumber(); without it the companion ignores every radial order.
+ *  - ScriptHeartbeat (x0_ch_hen_heart) tail-calls nw_ch_ac1, the actual follow AI.
+ */
+export const HENCHMAN_CREATURE_SCRIPTS: Record<string, string> = {
+  ScriptAttacked: "x0_ch_hen_attack",
+  ScriptDamaged: "x0_ch_hen_damage",
+  ScriptDeath: "x0_ch_hen_death",
+  ScriptDialogue: "x0_ch_hen_conv",
+  ScriptDisturbed: "x0_ch_hen_distrb",
+  ScriptEndRound: "x0_ch_hen_combat",
+  ScriptHeartbeat: "x0_ch_hen_heart",
+  ScriptOnBlocked: "x0_ch_hen_block",
+  ScriptOnNotice: "x0_ch_hen_percep",
+  ScriptRested: "x0_ch_hen_rest",
+  ScriptSpawn: "x0_ch_hen_spawn",
+  ScriptSpellAt: "x0_ch_hen_spell",
+  ScriptUserDefine: "x0_ch_hen_usrdef",
+};
+
+/** The 13 UTC creature script fields, for validating `scripts` overrides. */
+export const CREATURE_SCRIPT_FIELDS: ReadonlySet<string> = new Set(Object.keys(DEFAULT_CREATURE_SCRIPTS));
 
 export function registerBlueprintTools(server: McpServer): void {
 
@@ -51,9 +101,14 @@ export function registerBlueprintTools(server: McpServer): void {
       spells: z.string().optional().describe("JSON array of {spell, level} objects. Sets SpecAbilityList (spell-like abilities). spell=spells.2da row, level=caster level."),
       equipment: z.string().optional().describe("JSON object mapping slot names to item resrefs. Resolves from base game/HAKs. Slots: head, chest, boots, arms, righthand, lefthand, cloak, leftring, rightring, neck, belt, arrows, bullets, bolts"),
       inventory: z.string().optional().describe("JSON array of carried (non-equipped) items: [{resref: 'nw_waxhn001', quantity?: 1}]. Dropped on death if creature is lootable."),
-      lootable: z.boolean().optional().describe("Whether the creature leaves a lootable corpse (default false)"),
+      lootable: z.boolean().optional().describe("Whether the creature leaves a lootable corpse (default false). Note: an OnSpawn script can override this at runtime via SetLootable()/SetDroppableFlag() on items it creates — if loot isn't appearing in-game despite this being set, check the creature's ScriptSpawn source."),
+      henchman: z.boolean().optional().describe("Wire the stock NWN henchman/associate AI (x0_ch_hen_*) instead of the standard nw_c2_default* set, so the creature can be recruited with AddHenchman(), follows the PC, and obeys radial follow/stand-ground commands. Base-game scripts — nothing is written into the module."),
+      scripts: z.string().optional().describe('JSON object overriding individual creature script fields, applied on top of the default (or henchman) set. e.g. {"ScriptSpawn":"my_spawn","ScriptDeath":"my_death"}. Valid keys: ScriptAttacked, ScriptDamaged, ScriptDeath, ScriptDialogue, ScriptDisturbed, ScriptEndRound, ScriptHeartbeat, ScriptOnBlocked, ScriptOnNotice, ScriptRested, ScriptSpawn, ScriptSpellAt, ScriptUserDefine.'),
+      soundset: optNumParam("Voice set — soundset.2da row. Companions should use a TYPE 0 (PC voiceset) row matching the creature's gender; TYPE 3 NPC sets are sparse and leave the creature intermittently mute."),
+      startingPackage: optNumParam("packages.2da row. Determines the picks LevelUpHenchman() makes when levelling this creature at runtime."),
+      varTable: z.string().optional().describe('JSON array of local variables to set on the blueprint, merged by name: [{"name":"HENCH_LEVEL","type":"int","value":5}]. type is one of int|float|string.'),
     },
-    async ({ resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation, str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment, inventory, lootable }) => {
+    async ({ resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation, str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment, inventory, lootable, henchman, scripts, soundset, startingPackage, varTable }) => {
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
       const key = `${resrefLower}.utc`;
@@ -107,26 +162,35 @@ export function registerBlueprintTools(server: McpServer): void {
       if (cha !== undefined) setField(obj, "Cha", "byte", toI(cha));
       if (naturalAC !== undefined) setField(obj, "NaturalAC", "byte", toI(naturalAC));
       if (lootable !== undefined) setField(obj, "Lootable", "byte", lootable ? 1 : 0);
+      if (soundset !== undefined) setField(obj, "SoundSetFile", "word", toI(soundset));
+      if (startingPackage !== undefined) setField(obj, "StartingPackage", "byte", toI(startingPackage));
 
-      // Ensure default AI scripts are set (source creatures may have blanks
-      // or custom scripts — standardize to nw_c2_default* series)
-      const defaultScripts: Record<string, string> = {
-        ScriptAttacked: "nw_c2_default5",
-        ScriptDamaged: "nw_c2_default6",
-        ScriptDeath: "nw_c2_default7",
-        ScriptDialogue: "nw_c2_default4",
-        ScriptDisturbed: "nw_c2_default8",
-        ScriptEndRound: "nw_c2_default3",
-        ScriptHeartbeat: "nw_c2_default1",
-        ScriptOnBlocked: "nw_c2_defaulte",
-        ScriptPercption: "nw_c2_default2",
-        ScriptRested: "nw_c2_defaulta",
-        ScriptSpawn: "nw_c2_default9",
-        ScriptSpellAt: "nw_c2_defaultb",
-        ScriptUserDefine: "nw_c2_defaultd",
+      // Standardize AI scripts. Source creatures may have blanks or custom scripts,
+      // so the chosen set is always written in full; `scripts` then overlays it.
+      const scriptWarnings: string[] = [];
+      const scriptSet: Record<string, string> = {
+        ...(henchman ? HENCHMAN_CREATURE_SCRIPTS : DEFAULT_CREATURE_SCRIPTS),
       };
-      for (const [field, script] of Object.entries(defaultScripts)) {
+      if (scripts) {
+        for (const [field, script] of Object.entries(JSON.parse(scripts) as Record<string, string>)) {
+          if (!CREATURE_SCRIPT_FIELDS.has(field)) {
+            scriptWarnings.push(`Unknown creature script field ignored: ${field}`);
+            continue;
+          }
+          scriptSet[field] = script;
+        }
+      }
+      for (const [field, script] of Object.entries(scriptSet)) {
         setField(obj, field, "resref", script);
+      }
+      // "ScriptPercption" was a long-standing misspelling of ScriptOnNotice written by
+      // earlier versions of this tool. Drop it so cloning a previously-generated
+      // blueprint doesn't carry the junk field forward.
+      delete (obj as GffObj).ScriptPercption;
+
+      // Local variables — merged by name so callers can add without clobbering.
+      if (varTable) {
+        mergeVarTable(obj, JSON.parse(varTable) as VarTableEntry[]);
       }
 
       // Classes — replaces ClassList
@@ -252,7 +316,12 @@ export function registerBlueprintTools(server: McpServer): void {
         name,
         source: sourceResref || "scratch",
         sizeBytes: stat.size,
+        henchman: !!henchman,
+        scripts: scriptSet,
       };
+      if (soundset !== undefined) result.soundset = toI(soundset);
+      if (startingPackage !== undefined) result.startingPackage = toI(startingPackage);
+      if (scriptWarnings.length > 0) result.scriptWarnings = scriptWarnings;
 
       if (equipment) {
         const parsed: Record<string, string> = JSON.parse(equipment);

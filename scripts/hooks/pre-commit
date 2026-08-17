@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#
+# nwn-mcp managed hook — pre-commit
+#
+# Runs the full verification gate (build, lint, test) before every commit, so a
+# commit can never land with a broken build or a failing test.
+#
+# Bypass for a single commit with:  git commit --no-verify
+
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+# Nothing staged that could break the build? Let it through quickly.
+if git diff --cached --quiet -- 'src/**' 'package.json' 'tsconfig.json' 'biome.json' 2>/dev/null; then
+  exit 0
+fi
+
+echo "pre-commit: running verification gate..."
+if ! ./scripts/verify.sh; then
+  echo
+  echo "pre-commit: FAILED — commit aborted." >&2
+  echo "Fix the errors above, or bypass with: git commit --no-verify" >&2
+  exit 1
+fi
