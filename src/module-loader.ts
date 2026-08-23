@@ -60,8 +60,15 @@ export async function buildResmanOptions(index: ModuleIndex): Promise<ResmanOpti
 }
 
 export async function loadModule(modPath: string): Promise<ModuleIndex> {
-  // Clean up previous
-  if (currentIndex) {
+  const absPath = path.resolve(modPath);
+
+  // Clean up the previous module's temp dir only when switching to a
+  // different module. createTempDir() derives the dir name deterministically
+  // from the module's absolute path, so reloading the *same* module reuses
+  // the same dir — wiping it here would destroy sidecar files (e.g.
+  // adventure.md) that skills write there directly with Write/Edit but that
+  // aren't part of the .mod archive and can't be reconstructed by re-extracting.
+  if (currentIndex && currentIndex.modPath !== absPath) {
     await cleanupTempDir(currentIndex.tempDir).catch(() => {});
   }
   clearWokCache();
@@ -70,7 +77,6 @@ export async function loadModule(modPath: string): Promise<ModuleIndex> {
 
   const BATCH_SIZE = 20;  // Max concurrent child processes per batch
   const loadWarnings: Array<{ type: string; message: string }> = [];
-  const absPath = path.resolve(modPath);
   const tempDir = await createTempDir(absPath);
   setWokCacheDir(tempDir);
 
