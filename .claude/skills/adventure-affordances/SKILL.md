@@ -184,6 +184,39 @@ Stock items appropriate to the adventure's target level and theme. For a level 3
 - Arrows/bolts (x99) — category 1
 - Torches (x5) — category 4
 
+**Stock against the level's wealth budget.** Call `get_wealth_budget(level: "<target level>",
+role: "pc")` and treat the result as the ceiling for what a character can actually buy here.
+Mundane staples go in as `infinite: true` — they are cheap enough that supply is not the
+constraint. Then add a small number of items at or just under the budget as the aspirational
+purchases, so the shop offers a real decision rather than a wall of unaffordable stock. At level 3
+(2,700 gp) that means a handful of +1 weapons at ~1,650 gp each, not a +2 anything.
+
+**Verify each priced item with `resolve_blueprint` before listing it.** Store stock is the one
+place where a mis-costed item is immediately visible to the player, and magic weapon resrefs do
+not encode their bonus in the trailing digits (`nw_wswmls002` is +1, `010` is +2, `012` is +3).
+
+---
+
+#### Optional: the starting outfitter
+
+If the adventure begins with characters who may arrive underequipped — a fresh level 1, or an
+imported character at a level the module was not built around — a starting-area shop lets them
+kit up before the first encounter instead of dying to it.
+
+The pattern is a quartermaster NPC in the module's entry area with a store stocked to the target
+level's budget, plus an optional **top-up stipend** on the module's `OnClientEnter`: sum the
+player's `GetGold()` and the `GetGoldPieceValue()` of everything in inventory and all 18
+equipment slots, and pay only the **shortfall** to the wealth-by-level figure. Paying the flat
+amount instead rewards arriving poor and lets a returning player farm it.
+
+**This is the one place a per-player reward is correct.** `OnClientEnter` fires once for *each*
+connecting player, so `GiveGoldToCreature(GetEnteringObject(), n)` there already reaches
+everybody — one at a time. Do **not** fan it out across the party: that would pay every member
+again on every connect. `verify_coop_rules` and `verify_all` know this and exempt the module's
+registered `Mod_OnClientEntr` handler specifically; the exemption is deliberately narrow, and an
+*area* `OnEnter` still must fan out, because that one fires for whoever crosses the boundary
+first.
+
 ---
 
 ### Phase 6: Create Custom Items (if needed)
@@ -202,16 +235,43 @@ create_item_blueprint(
   sourceResref: "nw_it_mpotion001",
   cost: "25",
   description: "Water blessed by a village priest. Effective against undead.",
-  properties: '[{"propertyName": 56, "subType": 0, "costTable": 2, "costValue": 1}]'
+  properties: '[{"propertyName": 15, "subType": 66, "costTable": 3, "costValue": 1}]'
 )
 ```
 
-**Common item property IDs** (from itempropdef.2da):
-- `0` = Ability Bonus (subType: 0=STR, 1=DEX, 2=CON, 3=INT, 4=WIS, 5=CHA; costValue=bonus amount)
-- `6` = Attack Bonus (costValue=bonus 1-20)
-- `16` = Damage Bonus (subType=damage type; costTable=2, costValue=damage dice)
-- `56` = Enhancement Bonus (costValue=bonus 1-20)
-- `20` = Damage Resistance (subType=damage type, costValue=amount)
+Read that property left to right: `15` = Cast Spell, `subType: 66` = the `iprp_spells.2da` row
+for Cure Light Wounds at caster level 2, `costTable: 3` = the uses-per-day table, `costValue: 1`
+= single use. Every one of those four numbers comes from a 2DA lookup, none from memory.
+
+**Common item property IDs** (row numbers in `itempropdef.2da`):
+
+| ID | Property | subType | costTable / costValue |
+|----|----------|---------|----------------------|
+| `0` | Ability Bonus | 0=STR, 1=DEX, 2=CON, 3=INT, 4=WIS, 5=CHA | costValue = bonus |
+| `6` | **Enhancement Bonus** | none — pass `0` | costTable 2, costValue = bonus 1-20 |
+| `15` | Cast Spell | row in `iprp_spells.2da` | costTable 3, costValue = uses/day |
+| `16` | Damage Bonus | damage type | costTable 2, costValue = dice |
+| `20` | Damage Resistance | damage type | costValue = amount |
+| `56` | Attack Bonus | none — pass `0` | costTable 2, costValue = bonus 1-20 |
+
+**`6` is Enhancement, `56` is Attack Bonus — not the other way round.** Verified against
+`resolve_2da(table: "itempropdef", row: "6")` → `Label: Enhancement`, and row `56` →
+`Label: AttackBonus`. They are not interchangeable: enhancement raises attack *and* damage and
+costs twice as much (`Cost` column 1 vs 0.5), so using 56 for a "+1 weapon" produces a weaker
+item at a lower price than intended.
+
+**Before using any property ID not in this table, call `resolve_2da(table: "itempropdef", row: "<id>")`**
+and read three columns: `Label` confirms the property, `SubTypeResRef` names the 2DA the `subType`
+must come from (`****` means there is no subtype — pass `0`), and `CostTableResRef` is the
+`costTable` value. Guessing an ID produces an item that loads fine and behaves wrongly.
+
+**Then look up the subtype row too — do not pass `0` into a real subtype table.** `iprp_spells.2da`
+row 0 is Acid Fog: a 49,500 gp effect whose `PotionUse` column is `0`, so it is not even legal on a
+potion. A subtype guessed as zero is how a 25 gp vial of holy water ends up carrying a sixth-level
+spell it cannot use. Use `search_2da(table: "iprp_spells", column: "Label", value: "...")` to find
+the row, then check `PotionUse` / `WandUse` / `GeneralUse` allow it on the base item you are
+building, and `CasterLvl` suits the target level (the same spell appears at several caster levels
+and prices).
 
 **Item descriptions are mandatory for custom items.** Always set the `description` parameter to a 1-2 sentence text that:
 1. Describes what the item does mechanically (e.g., "Deals bonus fire damage on hit")

@@ -16,7 +16,8 @@ export const NWN_FOLDER_USER = process.env.NWN_FOLDER_USER || "";
 export const TEMP_BASE = process.env.MCP_FOLDER_TEMP || path.join(os.tmpdir(), "nwn-mcp");
 
 export function nimtool(name: string): string {
-  return path.join(NIM_FOLDER_NWTOOLS, `${name}.exe`);
+  const suffix = process.platform === "win32" ? ".exe" : "";
+  return path.join(NIM_FOLDER_NWTOOLS, `${name}${suffix}`);
 }
 
 // GFF file extensions that we can parse to JSON
@@ -41,6 +42,7 @@ export const GIT_STRUCT_ID = {
 // Script event field names found in GFF files
 export const SCRIPT_FIELDS = new Set([
   "OnHeartbeat", "ScriptHeartbeat", "OnPerception", "ScriptOnNotice",
+  "ScriptOnBlocked",
   "OnSpellCastAt", "ScriptSpellAt", "OnPhysicalAttacked", "ScriptAttacked",
   "OnDamaged", "ScriptDamaged", "OnDeath", "ScriptDeath",
   "OnDisturbed", "ScriptDisturbed", "OnEndRound", "ScriptEndRound",

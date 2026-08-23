@@ -10,7 +10,9 @@
     "test": "vitest run",
     "lint": "biome lint src/",
     "format": "biome format --write src/",
-    "check": "biome check src/"
+    "check": "biome check src/",
+    "verify": "./scripts/verify.sh",
+    "hooks:install": "./scripts/install-hooks.sh"
   },
   "keywords": [
     "nwn",

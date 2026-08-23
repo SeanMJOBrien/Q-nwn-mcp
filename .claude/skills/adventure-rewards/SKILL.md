@@ -76,15 +76,36 @@ Read `adventure.md`. Extract from all sections:
 
 ### Phase 2: Calculate XP Budget
 
-**Party size adjustment:**
-Read **Party Size** from `## Module`. NWN distributes XP across the party automatically.
-To ensure the adventure provides enough total XP for the target level:
-- Solo (1): base XP as calculated
-- Party of 2: multiply quest XP by 1.5
-- Party of 3: multiply quest XP by 2.0
-- Party of 4: multiply quest XP by 2.5
+**Quest XP is per-player, and is NOT divided by party size.**
 
-This compensates for XP splitting so each player still reaches the target level.
+This is the single most misunderstood point in reward design, so be precise about which
+of the two XP channels you are budgeting:
+
+| Channel | How it scales with party size |
+|---|---|
+| **Combat XP** (automatic, per kill) | The engine **divides** it — each player's share shrinks as the party grows. |
+| **Quest XP** (this skill) | Each player receives the **full** amount. Nothing is divided. |
+
+Quest XP reaches players either through `CoopRewardXP` (see Phase 2b) or through the
+journal category's XP field, and both hand every recipient the same number. BioWare's own
+`RewardPartyXP` in `nw_i0_tool` is a loop calling `GiveXPToCreature(oPartyMember, XP)`
+with the *same* `XP` for each member — confirm this for yourself before changing the
+numbers below.
+
+**Consequence: do not multiply quest XP by party size.** A 2.5x multiplier on a
+four-player party gives each of them 2.5x the intended reward, not their fair share.
+
+**Party size adjustment (small, and for the right reason):**
+Read **Party Size** from `## Module`. Because the *combat* share shrinks with party size
+while quest XP does not, a large party earns less total XP per player. Nudge quest XP up
+to compensate — modestly, since only the monster half is affected:
+- Solo (1): base XP as calculated
+- Party of 2: multiply quest XP by 1.15
+- Party of 3: multiply quest XP by 1.25
+- Party of 4: multiply quest XP by 1.35
+
+These are estimates for pacing, not exact math — the engine's combat XP formula factors
+average party level as well as size. Treat the Step 4 sanity check as authoritative.
 
 Estimate total adventure XP and determine quest XP allocation.
 
@@ -138,6 +159,55 @@ The total adventure XP should bring the player **60-80% of the way to the next l
 
 ---
 
+### Phase 2b: Create the Reward System
+
+Before writing any script that hands out a reward, generate the shared include:
+
+```
+create_reward_system(
+  policy: "full",
+  classItems: '[{"tier":"boss","items":{"fighter":"...","wizard":"..."},"fallback":"..."}]'
+)
+```
+
+This writes `inc_reward.nss` and proves it compiles. **Check `compiles: true` in the
+response before continuing** — every later reward script includes this file, so a broken
+include fails everywhere at once, far from the cause.
+
+`policy: "full"` is the default and what every generated module should use: each player
+receives 100% of every reward. Use `"split"` or `"speaker"` only when the adventure brief
+explicitly asks for a divided pot or a single-player module.
+
+**Use these helpers instead of raw reward calls.** They fan out to the whole party, so
+`verify_coop_rules` passes automatically:
+
+| Instead of | Call |
+|---|---|
+| `GiveXPToCreature(oPC, n)` | `CoopRewardXP(oPC, n)` |
+| `GiveGoldToCreature(oPC, n)` | `CoopRewardGold(oPC, n)` |
+| `CreateItemOnObject(r, oPC)` | `CoopRewardItem(oPC, r)` |
+| XP + gold + item together | `CoopRewardQuest(oPC, nXP, nGold, "tier")` |
+| A per-class item | `CoopRewardClassItem(oPC, "tier")` |
+
+Every helper takes the *triggering* PC (`GetPCSpeaker()`, `GetLastUsedBy()`) and walks the
+party itself. Never iterate the party in a reward script by hand.
+
+**Class-appropriate rewards.** `CoopRewardClassItem` resolves each party member's *own*
+primary class, so a four-player party walks away with four different items rather than
+four copies of whatever suited the one who happened to be talking. Define a tier per
+reward moment and give it an entry for each class the party plausibly contains, plus a
+`fallback` for the rest:
+
+- Create the item blueprints **first** (Phase 4), then pass their resrefs to
+  `create_reward_system`. The response lists `missingItemBlueprints` for any resref with
+  no `.uti` — an unresolved resref silently gives that player nothing.
+- Cover at minimum the four archetypes a party is likely to field: a melee weapon
+  (fighter/barbarian/paladin), a light weapon or thieves' tool (rogue/ranger/monk), an
+  arcane item (wizard/sorcerer/bard), a divine item (cleric/druid).
+- Multiclass PCs resolve to whichever base class they have the most levels in.
+
+---
+
 ### Phase 3: Assign Quest XP
 
 For each quest with a completion journal entry (`end=true`), call `edit_journal_quest`:
@@ -159,6 +229,28 @@ edit_journal_quest(
 ### Phase 4: Design Reward Items
 
 Plan 1-3 notable reward items for the adventure. These are the "signature loot" — items the player remembers the adventure for.
+
+**Anchor the value to the target level before choosing power.** Call
+`get_wealth_budget(level: "<target level>", role: "pc")` for the gold a character at that level is
+expected to be carrying in total, from D&D 3.5 DMG Table 5-1 (level 1: 150 · 3: 2,700 · 5: 9,000 ·
+10: 49,000 · 15: 200,000 · 20: 760,000). Read the whole adventure's reward package against that
+number:
+
+- The **boss reward** should be a visible fraction of it — roughly a quarter to a third of a
+  single character's total wealth at the target level. At level 3 that is a ~700-900 gp item; a
+  4,000 gp blade there hands the player several levels of wealth in one drop and devalues
+  everything the rest of the adventure can offer.
+- **All rewards plus all lootable creature gear together** should land near one level's worth of
+  progress, not several. Compare against the `## Challenges` magic item list before adding more.
+- **Under-rewarding is the more common failure at low levels.** At level 1-2 the budget is tiny
+  (150-900 gp), so a single +1 weapon is already the adventure's entire treasure — which is fine,
+  and better than three of them.
+
+**Price from the blueprint, not from the book.** NWN derives item cost from the `Cost` column of
+`itempropdef.2da`, which does not match the 3.5e magic item formula (a +1 longsword is ~1,650 gp
+in NWN, ~2,315 by the book). Always call `resolve_blueprint` and read the item's real cost when
+checking it against a budget, and never infer an enchantment level from the resref's trailing
+digits — for longswords `002` is +1, `010` is +2, `012` is +3.
 
 **Boss Reward (always include 1):**
 - Placed in or near the boss area — in a treasure container, on a final altar, or in the boss's hoard
@@ -189,10 +281,12 @@ Plan 1-3 notable reward items for the adventure. These are the "signature loot" 
      sourceResref: "nw_wswls001",
      cost: "2000",
      description: "A longsword forged in the fires beneath Blackgrove Inn. Its blade smolders with residual heat.",
-     properties: '[{"propertyName": 56, "subType": 0, "costTable": 2, "costValue": 1}, {"propertyName": 16, "subType": 6, "costTable": 2, "costValue": 2}]'
+     properties: '[{"propertyName": 6, "subType": 0, "costTable": 2, "costValue": 1}, {"propertyName": 16, "subType": 6, "costTable": 2, "costValue": 2}]'
    )
    ```
-   Common property IDs: `56`=Enhancement Bonus (costValue=bonus 1-20), `16`=Damage Bonus (subType: 1=Bludgeoning, 2=Piercing, 3=Slashing, 5=Magical, 6=Fire, 7=Cold, 8=Electrical, 9=Acid; costTable=2, costValue=dice), `0`=Ability Bonus (subType: 0=STR thru 5=CHA; costValue=bonus), `20`=Damage Resistance, `6`=Attack Bonus.
+   Common property IDs: `6`=**Enhancement Bonus** (costValue=bonus 1-20), `16`=Damage Bonus (subType: 1=Bludgeoning, 2=Piercing, 3=Slashing, 5=Magical, 6=Fire, 7=Cold, 8=Electrical, 9=Acid; costTable=2, costValue=dice), `0`=Ability Bonus (subType: 0=STR thru 5=CHA; costValue=bonus), `20`=Damage Resistance, `56`=Attack Bonus.
+
+   **`6` is Enhancement and `56` is Attack Bonus** — verified against `itempropdef.2da`, where row 6 is `Enhancement` and row 56 is `AttackBonus`. Swapping them yields a weaker item (attack only, no damage) at roughly half the intended price. See `/adventure-affordances` for the full lookup procedure; when in doubt call `resolve_2da(table: "itempropdef", row: "<id>")` and read `Label`, `SubTypeResRef`, and `CostTableResRef` before writing the property.
 
    **Item descriptions are mandatory for custom reward items.** Always set the `description` parameter to a 1-2 sentence text that:
    - Describes what the item does mechanically (e.g., "+1 longsword that deals bonus fire damage")
@@ -229,6 +323,19 @@ Use `resman_search` with these patterns, then `resolve_blueprint` to check the i
 **Idempotency check:** Before placing a new container or adding items, call `get_area_placeables(area: "...")`. If a reward container with the same tag already exists, **skip** placing it. If the container already contains the reward item (check its inventory), **skip** adding it.
 
 For each reward item, place it in the module.
+
+**Co-op caveat — placed loot cannot fan out.** A chest holding one sword is
+first-come-first-served: whoever opens it takes it, and `verify_coop_rules` cannot see the
+problem because no script is involved. Placed loot is fine for consumables and flavour,
+but for a **signature reward the whole party should share**, prefer one of:
+
+1. Hand it out from a script with `CoopRewardItem` / `CoopRewardClassItem` — an NPC's
+   thank-you dialog, or the quest-completion script. This is the only option that gives
+   every player a copy.
+2. Stock the container with **one copy per expected player** (read **Party Size** from
+   `## Module`), accepting that a smaller party finds spares.
+
+Use plain placement for everything else.
 
 **Option A: Place in an existing container**
 

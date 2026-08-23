@@ -22,6 +22,7 @@ import { requireIndex } from "../module-loader.js";
 import { buildResmanOptions } from "../module-loader.js";
 import { MCP_FOLDER_USERREPORTS } from "../config.js";
 import { listAllTilesets, getTilesetInfo } from "../util/tileset.js";
+import { analyzeAllGroups, findFlatFillerTiles, checkTilesetIntegrity } from "../util/tileset-rules.js";
 import { computeValidPairs } from "../util/zone-solver.js";
 import { loadAreaWalkmeshData, computeWalkableZones, } from "../util/walkmesh.js";
 import type { AreaTransitionInfo } from "../util/walkmesh.js";
@@ -184,6 +185,44 @@ export function registerTilesetTools(server: McpServer): void {
           [...tilesByPattern.entries()].map(([pattern, tiles]) => [pattern, tiles]),
         ),
         totalTiles: info.tiles.length,
+      };
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify(result, null, 2),
+        }],
+      };
+    },
+  );
+
+  // ─── analyze_tileset_rules ──────────────────────────────────────────────
+
+  server.tool(
+    "analyze_tileset_rules",
+    "Verify a tileset's .set data rather than just reporting it: cross-checks every group's declared Rows/Columns against its tiles' model names (catching cases like stock tcn01's SlumHouse_1x2 and Market_2x1, which share Rows=1 Columns=2 despite opposite-sounding names — the declared shape is not always trustworthy on its own), lists flat filler tiles per terrain type (safe to tile a whole area with — flat AND single-terrain AND crosser-free, a stricter bar than 'zero height'), and flags any group referencing an out-of-range tile ID. Use get_tileset_details for what a tileset declares; use this for whether those declarations hold up.",
+    {
+      tileset: z.string().describe("Tileset resref (e.g., 'tcn01' for city exterior, 'tdm01' for dungeon)"),
+    },
+    { readOnlyHint: true, idempotentHint: true },
+    async ({ tileset: tilesetResref }) => {
+      const index = requireIndex();
+      const resmanOpts = await buildResmanOptions(index);
+      const info = await getTilesetInfo(tilesetResref.toLowerCase(), resmanOpts, index);
+
+      const groupLayouts = analyzeAllGroups(info);
+      const confirmed = groupLayouts.filter(g => g.verdict === "confirmed").length;
+      const irregular = groupLayouts.filter(g => g.verdict === "irregular").length;
+      const notApplicable = groupLayouts.filter(g => g.verdict === "n/a").length;
+
+      const result = {
+        resref: info.resref,
+        groups: {
+          summary: { confirmed, irregular, notApplicable, total: groupLayouts.length },
+          details: groupLayouts,
+        },
+        flatFillerByTerrain: findFlatFillerTiles(info),
+        integrity: checkTilesetIntegrity(info),
       };
 
       return {

@@ -199,6 +199,44 @@ describe("create_item_blueprint", () => {
     }
   });
 
+  it("defaults omitted property fields instead of emitting undefined", async () => {
+    // Regression: an undefined `value` is dropped by JSON.stringify, so the
+    // struct reached nwn_gff with no `value` key and it died with
+    // `key not found: value` plus a Nim stack trace naming neither the property
+    // nor the field. Properties legitimately omit subType — Enhancement (row 6)
+    // has no subtype table — so this is the common case, and the test above
+    // missed it only because it passes every field explicitly.
+    const { registerWriteTools } = await import("./write-tools.js");
+    const { client, cleanup } = await createTestClient(registerWriteTools);
+
+    try {
+      const result = await client.callTool({
+        name: "create_item_blueprint",
+        arguments: {
+          resref: "plus_one",
+          tag: "PLUS_ONE",
+          name: "Longsword +1",
+          baseItem: "1",
+          properties: JSON.stringify([{ propertyName: 6, costTable: 2, costValue: 1 }]),
+        },
+      });
+
+      expect((parseResult(result) as Record<string, unknown>).success).toBe(true);
+
+      const doc = mockIndex.parsedGff.get("plus_one.uti") as GffObj;
+      const prop = (doc.PropertiesList as { value: Array<GffObj> }).value[0];
+
+      // Every field must carry a concrete value, and survive a JSON round trip.
+      for (const field of ["PropertyName", "Subtype", "CostTable", "CostValue", "Param1", "Param1Value"]) {
+        expect((prop[field] as { value: unknown }).value).toBeTypeOf("number");
+      }
+      expect(prop.Subtype).toEqual({ type: "word", value: 0 });
+      expect(JSON.parse(JSON.stringify(prop)).Subtype).toHaveProperty("value");
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("rejects duplicate resref", async () => {
     const { registerWriteTools } = await import("./write-tools.js");
     const { client, cleanup } = await createTestClient(registerWriteTools);
@@ -255,9 +293,9 @@ describe("create_creature_blueprint", () => {
 
       const doc = mockIndex.parsedGff.get("test_fighter.utc") as GffObj;
       expect((doc.Tag as { value: string }).value).toBe("TEST_FIGHTER");
-      // optNumParam passes raw string through setField; nwn_gff handles type coercion
-      expect((doc.Str as { value: unknown }).value).toBe("18");
-      expect((doc.MaxHitPoints as { value: unknown }).value).toBe("50");
+      // optNumParam yields a string param; toI()/toF() parse it to a number before setField
+      expect((doc.Str as { value: unknown }).value).toBe(18);
+      expect((doc.MaxHitPoints as { value: unknown }).value).toBe(50);
 
       const classList = (doc.ClassList as { value: Array<GffObj> }).value;
       expect(classList).toHaveLength(1);
@@ -266,6 +304,94 @@ describe("create_creature_blueprint", () => {
 
       const featList = (doc.FeatList as { value: Array<GffObj> }).value;
       expect(featList).toHaveLength(3);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("writes the standard AI script set, using ScriptOnNotice not the old typo", async () => {
+    const { registerBlueprintTools } = await import("./blueprint-tools.js");
+    const { client, cleanup } = await createTestClient(registerBlueprintTools);
+
+    try {
+      await client.callTool({
+        name: "create_creature_blueprint",
+        arguments: { resref: "plain_npc", tag: "PLAIN_NPC", name: "Plain NPC" },
+      });
+
+      const doc = mockIndex.parsedGff.get("plain_npc.utc") as GffObj;
+      expect((doc.ScriptOnNotice as { value: string }).value).toBe("nw_c2_default2");
+      expect((doc.ScriptHeartbeat as { value: string }).value).toBe("nw_c2_default1");
+      // "ScriptPercption" was a misspelling in earlier versions — no real .utc uses it.
+      expect(doc.ScriptPercption).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("wires the stock henchman AI when henchman:true", async () => {
+    const { registerBlueprintTools } = await import("./blueprint-tools.js");
+    const { client, cleanup } = await createTestClient(registerBlueprintTools);
+
+    try {
+      const result = await client.callTool({
+        name: "create_creature_blueprint",
+        arguments: {
+          resref: "comp_cleric",
+          tag: "COMP_CLERIC",
+          name: "Companion Cleric",
+          henchman: true,
+          soundset: "422",
+          startingPackage: "2",
+          varTable: JSON.stringify([{ name: "HENCH_LEVEL", type: "int", value: 5 }]),
+        },
+      });
+
+      const parsed = parseResult(result) as Record<string, unknown>;
+      expect(parsed.success).toBe(true);
+      expect(parsed.henchman).toBe(true);
+
+      const doc = mockIndex.parsedGff.get("comp_cleric.utc") as GffObj;
+      // ScriptDialogue drives the command radial; ScriptHeartbeat drives following.
+      expect((doc.ScriptDialogue as { value: string }).value).toBe("x0_ch_hen_conv");
+      expect((doc.ScriptHeartbeat as { value: string }).value).toBe("x0_ch_hen_heart");
+      expect((doc.ScriptOnNotice as { value: string }).value).toBe("x0_ch_hen_percep");
+      expect((doc.SoundSetFile as { value: number }).value).toBe(422);
+      expect((doc.StartingPackage as { value: number }).value).toBe(2);
+
+      const varTable = (doc.VarTable as { value: Array<GffObj> }).value;
+      expect(varTable).toHaveLength(1);
+      expect((varTable[0].Name as { value: string }).value).toBe("HENCH_LEVEL");
+      expect((varTable[0].Value as { value: number }).value).toBe(5);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("applies scripts overrides on top of the chosen set and warns on unknown fields", async () => {
+    const { registerBlueprintTools } = await import("./blueprint-tools.js");
+    const { client, cleanup } = await createTestClient(registerBlueprintTools);
+
+    try {
+      const result = await client.callTool({
+        name: "create_creature_blueprint",
+        arguments: {
+          resref: "custom_npc",
+          tag: "CUSTOM_NPC",
+          name: "Custom NPC",
+          scripts: JSON.stringify({ ScriptSpawn: "my_spawn", NotAField: "nope" }),
+        },
+      });
+
+      const parsed = parseResult(result) as Record<string, unknown>;
+      expect(parsed.scriptWarnings).toBeDefined();
+      expect((parsed.scriptWarnings as string[])[0]).toContain("NotAField");
+
+      const doc = mockIndex.parsedGff.get("custom_npc.utc") as GffObj;
+      expect((doc.ScriptSpawn as { value: string }).value).toBe("my_spawn");
+      // Untouched fields keep the default set.
+      expect((doc.ScriptDeath as { value: string }).value).toBe("nw_c2_default7");
+      expect(doc.NotAField).toBeUndefined();
     } finally {
       await cleanup();
     }

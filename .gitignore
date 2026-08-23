@@ -25,4 +25,17 @@ Desktop.ini
 
 # Temp / cache
 *.log
+
+# Generated module output.
+# Modules are one-off local builds — the .mod and the adventure pipeline's
+# working state are artifacts, never source. These paths only land inside the
+# repo when MCP_FOLDER_TEMP / MCP_FOLDER_USERREPORTS point here, but ignoring
+# them unconditionally means a misconfigured env can't commit a 400KB binary.
+modules/
+reports/
+*.mod
 adventure.md
+adventure-status.json
+
+# swamp CLI audit output — a harness side effect, never source.
+.swamp/

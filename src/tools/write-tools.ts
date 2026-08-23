@@ -6,6 +6,7 @@ import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { gffToJson, jsonToGff, erfPack } from "../nim-tools.js";
 import { setGffByPath } from "../util/gff-path.js";
 import { resolveBlueprint } from "../util/git-helpers.js";
+import { applyDefaultItemModels } from "../util/item-models.js";
 import { setField } from "../types/gff.js";
 import { optNumParam, toI, toF } from "../util/params.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
@@ -103,7 +104,7 @@ export function registerWriteTools(server: McpServer): void {
       stackSize: optNumParam("Stack size (default 1)"),
       charges: optNumParam("Number of charges (default 0)"),
       addCost: optNumParam("Additional cost modifier"),
-      properties: z.string().optional().describe("JSON array of item properties. Each: {propertyName, subType, costTable, costValue, param1?, param1Value?}. PropertyName from itempropdef.2da. Common: 56=Enhancement Bonus (costValue=bonus 1-20), 16=Damage Bonus (subType=damage type, costTable=2, costValue=amount), 0=Ability Bonus (subType=ability 0-5, costValue=bonus)"),
+      properties: z.string().optional().describe("JSON array of item properties. Each: {propertyName, subType?, costTable?, costValue?, param1?, param1Value?} — only propertyName is required, the rest default to 0. PropertyName is the row index in itempropdef.2da; verify with resolve_2da rather than assuming. Common rows: 6=Enhancement Bonus (weapons/armour, costTable=2, costValue=bonus 1-20), 1=AC/Armor Bonus (costTable=2, costValue=bonus), 16=Damage Bonus (subType=damage type, costTable=2, costValue=amount), 0=Ability Bonus (subType=ability 0-5, costValue=bonus)"),
     },
     async ({ resref, tag, name, baseItem, sourceResref, cost, description, plot, stackSize, charges, addCost, properties }) => {
       const index = requireIndex();
@@ -167,25 +168,36 @@ export function registerWriteTools(server: McpServer): void {
       if (stackSize !== undefined) setField(obj, "StackSize", "word", toI(stackSize));
       if (charges !== undefined) setField(obj, "Charges", "byte", toI(charges));
 
+      // Gear uses the base item's default models. A composite weapon (ModelType 2)
+      // needs all three parts — leaving any at 0 renders it as a shapeless blob.
+      // Runs after BaseItem is final, since which parts are required depends on it.
+      const defaultedModels = applyDefaultItemModels(obj, index);
+
       // Item properties — replaces PropertiesList
       if (properties) {
         const parsed: Array<{
           propertyName: number;
-          subType: number;
-          costTable: number;
-          costValue: number;
+          subType?: number;
+          costTable?: number;
+          costValue?: number;
           param1?: number;
           param1Value?: number;
         }> = JSON.parse(properties);
 
+        // Every field needs an explicit default. An undefined `value` is dropped
+        // by JSON.stringify, so the struct reaches nwn_gff with no `value` key
+        // and it dies with `key not found: value` and a Nim stack trace that
+        // says nothing about which property or field was at fault. Properties
+        // legitimately omit subType (Enhancement has no subtype table at all),
+        // so this is the common case, not an edge case.
         obj.PropertiesList = {
           type: "list",
           value: parsed.map(p => ({
             __struct_id: 0,
-            PropertyName: { type: "word", value: p.propertyName },
-            Subtype: { type: "word", value: p.subType },
-            CostTable: { type: "byte", value: p.costTable },
-            CostValue: { type: "word", value: p.costValue },
+            PropertyName: { type: "word", value: p.propertyName ?? 0 },
+            Subtype: { type: "word", value: p.subType ?? 0 },
+            CostTable: { type: "byte", value: p.costTable ?? 0 },
+            CostValue: { type: "word", value: p.costValue ?? 0 },
             Param1: { type: "byte", value: p.param1 ?? 255 },
             Param1Value: { type: "byte", value: p.param1Value ?? 0 },
             ChanceAppear: { type: "byte", value: 100 },
@@ -221,6 +233,7 @@ export function registerWriteTools(server: McpServer): void {
         const parsed = JSON.parse(properties);
         result.propertiesCount = parsed.length;
       }
+      if (defaultedModels.length > 0) result.defaultedModelParts = defaultedModels;
 
       return {
         content: [{

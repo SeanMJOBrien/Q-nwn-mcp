@@ -24,6 +24,10 @@ import { registerFactionTools } from "./tools/faction-tools.js";
 import { registerUndoTools } from "./tools/undo-tools.js";
 import { registerWriteTools } from "./tools/write-tools.js";
 import { registerAdventureTools } from "./tools/adventure-tools.js";
+import { registerWebTools } from "./tools/web-tools.js";
+import { registerVerifyTools } from "./tools/verify-tools.js";
+import { registerRewardTools } from "./tools/reward-tools.js";
+import { registerGearTools } from "./tools/gear-tools.js";
 
 const server = new McpServer({
   name: "nwn-mcp",
@@ -43,6 +47,7 @@ registerEncounterTools(server);
 registerResmanTools(server);
 registerTilesetTools(server);
 registerDatabaseTools(server);
+registerVerifyTools(server);
 
 // ── Base tools: module writing, editing, placement ──────────────────────
 registerWriteTools(server);
@@ -56,9 +61,12 @@ registerModuleTools(server);
 registerFactionTools(server);
 registerBulkTools(server);
 registerUndoTools(server);
+registerRewardTools(server);
+registerGearTools(server);
 
 // ── Adventure creator tools ─────────────────────────────────────────────
 registerAdventureTools(server);
+registerWebTools(server);
 
 // Start the server
 const transport = new StdioServerTransport();

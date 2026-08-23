@@ -50,6 +50,18 @@ vi.mock("./tileset-tools.js", () => ({
   invalidateTagToAreaCache: vi.fn(),
 }));
 
+// Mock walkmesh: always report walkable. Without this the real walkmesh code runs,
+// finds no .wok cache in the test temp dir, and blocks every move/placement — the
+// tool then returns a "not walkable" message instead of its JSON success payload.
+vi.mock("../util/walkmesh.js", () => ({
+  checkPositionWalkable: vi.fn(async () => ({ walkable: true, material: "Grass", materialId: 7, z: 0 })),
+  // NB: checkPlacementWalkable returns { ok, reason?, z? } — NOT { walkable }.
+  checkPlacementWalkable: vi.fn(async () => ({ ok: true, z: 0 })),
+  ensureWokCacheDir: vi.fn(),
+  setWokCacheDir: vi.fn(),
+  clearWokCache: vi.fn(),
+}));
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 let tempDir: string;

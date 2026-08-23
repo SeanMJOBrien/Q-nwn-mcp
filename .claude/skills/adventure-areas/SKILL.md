@@ -347,3 +347,24 @@ The solver prioritizes preserving crossers over exact corner matching. At a Pit/
 - **Manual overrides:** Use `paint_tiles` with exact tileId for tiles the zone solver can't handle.
 - **Z-height sanity check.** After placing objects or transitions, verify the Z coordinate is near 0 (±0.5). Positions with Z far below 0 (e.g., -2.5) are on depressed terrain like tree borders or cliff edges — the object will appear sunken underground. If `adventure_find_walkable` returns a position with Z < -1.0, discard it and try a different region or use explicit tile-center coordinates (col*10+5, row*10+5) on known floor/clearing tiles.
 - **Do NOT auto-export HTML reports.**
+- **Interior tilesets fill with `wall`, not floor.** On `tic01`, `tde01`, `tdc01` and the
+  other interiors, `create_area` fails with *"No suitable default tile found"* for any
+  floor terrain — floor tiles only exist as room interiors bounded by wall (check
+  `validTerrainAdjacencies`: every floor terrain connects to `wall` alone). Create the
+  area with the tileset's own default terrain, then carve rooms with
+  `adventure_generate_layout` + `adventure_apply_layout`.
+- **Decorated interior terrain is only partly walkable.** `tic01`'s `rich` tiles carry
+  furniture, so a tile existing does not mean a creature can stand on it — a throne-room
+  centre computed as `col*10+5, row*10+5` came back `Nonwalk (ID 7)`. On any decorated
+  terrain, get positions from `adventure_find_walkable`, never from arithmetic. (This
+  qualifies the tile-centre fallback in the Z-height note above: that fallback is safe on
+  plain floor/clearing tiles only.)
+- **Delete the template's `_start` area** once the real entry area exists and
+  `Mod_Entry_Area` points at it. `create_module` always leaves a `tms01` stub behind, and
+  it shows up as permanently unreachable in `check_area_connectivity`.
+- **Setting the module entry position needs care.** `modify_gff_field` cannot write float
+  fields (`Mod_Entry_X/Y/Z`) — the value arrives as a string and `nwn_gff` rejects it,
+  leaving the in-memory document dirty so later writes of `module.ifo` also fail. If it
+  happens: `repack_module` then `load_module` to re-read from disk. Prefer choosing an
+  entry area whose default position is already walkable, verified with
+  `adventure_find_walkable` on a bounding box around it.

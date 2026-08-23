@@ -5,6 +5,7 @@ import { numParam, optNumParam, toI } from "../util/params.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "../types/gff.js";
 import type { GffObj, GffDocument } from "../types/gff.js";
 import { buildTagToAreaMap, buildAreaTransitions } from "./tileset-tools.js";
+import { isBaseGameResource, isBaseGameScript } from "../util/verify/common.js";
 import { flattenDialog } from "../util/dialog-walker.js";
 import type { FlatDialogNode } from "../types/dialog.js";
 
@@ -250,8 +251,13 @@ export function registerAnalysisTools(server: McpServer): void {
       const errors: Array<{ type: string; message: string; resource?: string }> = [];
       const warnings: Array<{ type: string; message: string; resource?: string }> = [];
 
-      // Check script references: verify .nss or .ncs exists
+      // Check script references: verify .nss or .ncs exists.
+      // Base-game scripts resolve from the game's own data at runtime and are
+      // never module resources — reporting them is a false positive. A freshly
+      // created module references ~10 of them from its own template, so without
+      // this filter validate_module fails every module it has just built.
       for (const [scriptResref, usages] of index.scripts) {
+        if (isBaseGameScript(scriptResref)) continue;
         const hasSource = index.resources.has(`${scriptResref}.nss`);
         const hasCompiled = index.resources.has(`${scriptResref}.ncs`);
         if (!hasSource && !hasCompiled) {
@@ -329,7 +335,9 @@ export function registerAnalysisTools(server: McpServer): void {
           const equipItems = getFieldList(creature, "Equip_ItemList");
           for (const item of equipItems) {
             const resref = getFieldStr(item, "EquippedRes");
-            if (resref && !index.resources.has(`${resref}.uti`)) {
+            // Stock equipment carried along by a cloned creature resolves at
+            // runtime; flagging it produces two false warnings per creature.
+            if (resref && !isBaseGameResource(resref) && !index.resources.has(`${resref}.uti`)) {
               warnings.push({
                 type: "missing_equipped_item",
                 message: `Creature "${tag}" in ${areaResref} has equipped item "${resref}" but no matching .uti blueprint in module`,
@@ -630,7 +638,7 @@ export function registerAnalysisTools(server: McpServer): void {
 
         for (const [resref, src] of scriptSources) {
           const regex = new RegExp(`AddJournalQuestEntry\\s*\\(\\s*"${questTag}"\\s*,\\s*(\\d+)`, "g");
-          let match;
+          let match: RegExpExecArray | null;
           while ((match = regex.exec(src)) !== null) {
             const entryId = parseInt(match[1], 10);
             const existing = stageScripts.get(entryId) || [];

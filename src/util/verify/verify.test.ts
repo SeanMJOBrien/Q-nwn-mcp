@@ -1,0 +1,550 @@
+import { describe, expect, it } from "vitest";
+import type { GffObj } from "../../types/gff.js";
+import type { ModuleIndex, TwoDATable } from "../../types/module.js";
+import { verifyCreature, verifyItem, verifyPlaceable, verifyTrigger } from "./blueprints.js";
+import { isBaseGameResource, isBaseGameScript, Report } from "./common.js";
+import { verifyDialog } from "./dialog.js";
+import { verifyJournal } from "./journal.js";
+
+// ─── Fixtures ─────────────────────────────────────────────────────────────
+
+function makeIndex(overrides?: Partial<ModuleIndex>): ModuleIndex {
+  return {
+    modPath: "/fake/mod.mod",
+    tempDir: "/tmp/fake",
+    moduleName: "Test",
+    resources: new Map(),
+    tags: new Map(),
+    scripts: new Map(),
+    areas: new Map(),
+    dialogs: new Map(),
+    creatures: [],
+    items: [],
+    parsedGff: new Map(),
+    twodaTables: new Map(),
+    customTlk: null,
+    baseTlk: null,
+    hakList: [],
+    customTlkName: "",
+    loadWarnings: [],
+    ...overrides,
+  };
+}
+
+function twoDA(columns: string[], rows: Array<[number, Record<string, string>]>): TwoDATable {
+  return { columns, rows: new Map(rows) };
+}
+
+/** A creature with all 13 script fields wired to the given set. */
+function makeCreature(scriptPrefix: string, extra: Record<string, unknown> = {}): GffObj {
+  const fields = [
+    "ScriptAttacked", "ScriptDamaged", "ScriptDeath", "ScriptDialogue",
+    "ScriptDisturbed", "ScriptEndRound", "ScriptHeartbeat", "ScriptOnBlocked",
+    "ScriptOnNotice", "ScriptRested", "ScriptSpawn", "ScriptSpellAt",
+    "ScriptUserDefine",
+  ];
+  const obj: GffObj = {
+    Tag: { type: "cexostring", value: "test_npc" },
+    FirstName: { type: "cexolocstring", value: { "0": "Test NPC" } },
+    ClassList: {
+      type: "list",
+      value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }],
+    },
+    ...extra,
+  } as GffObj;
+  for (const f of fields) obj[f] = { type: "resref", value: `${scriptPrefix}x` };
+  return obj;
+}
+
+/** A dialog node carrying every field the engine requires. */
+function makeNode(text: string, linkField: string, links: number[] = []): GffObj {
+  return {
+    __struct_id: 0,
+    Animation: { type: "dword", value: 0 },
+    AnimLoop: { type: "byte", value: 1 },
+    Comment: { type: "cexostring", value: "" },
+    Delay: { type: "dword", value: 4294967295 },
+    Quest: { type: "cexostring", value: "" },
+    Script: { type: "resref", value: "" },
+    Sound: { type: "resref", value: "" },
+    Text: { type: "cexolocstring", value: { "0": text } },
+    [linkField]: {
+      type: "list",
+      value: links.map((i) => ({
+        __struct_id: 0,
+        Index: { type: "dword", value: i },
+        Active: { type: "resref", value: "" },
+        IsChild: { type: "byte", value: 0 },
+      })),
+    },
+  } as unknown as GffObj;
+}
+
+function makeLink(index: number, active = ""): GffObj {
+  return {
+    __struct_id: 0,
+    Index: { type: "dword", value: index },
+    Active: { type: "resref", value: active },
+    IsChild: { type: "byte", value: 0 },
+  } as unknown as GffObj;
+}
+
+// ─── common ───────────────────────────────────────────────────────────────
+
+describe("isBaseGameScript", () => {
+  it("recognises the standard and henchman AI families", () => {
+    expect(isBaseGameScript("nw_c2_default9")).toBe(true);
+    expect(isBaseGameScript("x0_ch_hen_heart")).toBe(true);
+    expect(isBaseGameScript("nw_ch_ac1")).toBe(true);
+    expect(isBaseGameScript("x2_mod_def_load")).toBe(true);
+  });
+
+  it("does not swallow module-authored scripts", () => {
+    expect(isBaseGameScript("a_hen_join")).toBe(false);
+    expect(isBaseGameScript("q_reward")).toBe(false);
+  });
+
+  // Regression: create_module wires these three itself, so omitting the nw_o0_
+  // prefix made every freshly created module fail its own verification.
+  it("recognises the module-level default handlers create_module wires", () => {
+    expect(isBaseGameScript("nw_o0_death")).toBe(true);
+    expect(isBaseGameScript("nw_o0_dying")).toBe(true);
+    expect(isBaseGameScript("nw_o0_respawn")).toBe(true);
+  });
+});
+
+describe("isBaseGameResource", () => {
+  // Regression: cloning a stock creature carries its stock equipment resrefs
+  // along, which produced two false "missing item" warnings per creature.
+  it("recognises stock equipment carried by a cloned creature", () => {
+    expect(isBaseGameResource("nw_wblml001")).toBe(true);
+    expect(isBaseGameResource("nw_ashto001")).toBe(true);
+    expect(isBaseGameResource("nw_wswdg001")).toBe(true);
+    expect(isBaseGameResource("x2_it_drowcl001")).toBe(true);
+  });
+
+  it("does not swallow module-authored blueprints", () => {
+    expect(isBaseGameResource("sic_crown")).toBe(false);
+    expect(isBaseGameResource("dlg_hen_wiz")).toBe(false);
+  });
+});
+
+// ─── Creature ─────────────────────────────────────────────────────────────
+
+describe("verifyCreature", () => {
+  it("passes a well-formed creature", () => {
+    const report = new Report("t", "utc");
+    verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"));
+    expect(report.errors).toHaveLength(0);
+  });
+
+  it("flags the ScriptPercption typo", () => {
+    const obj = makeCreature("nw_c2_default", {
+      ScriptPercption: { type: "resref", value: "nw_c2_default2" },
+    });
+    const report = new Report("t", "utc");
+    verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("script_percption_typo");
+  });
+
+  it("flags a missing script field", () => {
+    const obj = makeCreature("nw_c2_default");
+    delete obj.ScriptOnNotice;
+    const report = new Report("t", "utc");
+    verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("missing_script_field");
+  });
+
+  it("flags an empty ClassList", () => {
+    const obj = makeCreature("nw_c2_default", { ClassList: { type: "list", value: [] } });
+    const report = new Report("t", "utc");
+    verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("no_classes");
+  });
+
+  describe("henchman rules", () => {
+    it("flags a companion wired with the standard AI instead of the associate AI", () => {
+      const report = new Report("t", "utc");
+      verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"), { henchman: true });
+      const codes = report.errors.map((e) => e.code);
+      expect(codes).toContain("henchman_no_command_handler");
+      expect(codes).toContain("henchman_no_follow_ai");
+    });
+
+    it("flags a Commoner-class companion", () => {
+      const obj = makeCreature("x0_ch_hen_", {
+        ClassList: {
+          type: "list",
+          value: [{ __struct_id: 2, Class: { type: "int", value: 20 }, ClassLevel: { type: "short", value: 1 } }],
+        },
+        Conversation: { type: "resref", value: "dlg_x" },
+      });
+      const index = makeIndex({
+        resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
+      });
+      const report = new Report("t", "utc");
+      verifyCreature(report, index, obj, { henchman: true });
+      expect(report.errors.map((e) => e.code)).toContain("henchman_commoner_class");
+    });
+
+    it("flags a companion with no conversation", () => {
+      const report = new Report("t", "utc");
+      verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
+      expect(report.errors.map((e) => e.code)).toContain("henchman_no_dialog");
+    });
+
+    it("warns when HENCH_LEVEL and voice are absent", () => {
+      const report = new Report("t", "utc");
+      verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
+      const codes = report.warnings.map((w) => w.code);
+      expect(codes).toContain("henchman_no_level_var");
+      expect(codes).toContain("henchman_no_voice");
+    });
+
+    it("accepts a fully-wired companion", () => {
+      const obj = makeCreature("x0_ch_hen_", {
+        Conversation: { type: "resref", value: "dlg_x" },
+        SoundSetFile: { type: "word", value: 422 },
+        Gender: { type: "byte", value: 1 },
+        VarTable: {
+          type: "list",
+          value: [
+            {
+              __struct_id: 0,
+              Name: { type: "cexostring", value: "HENCH_LEVEL" },
+              Type: { type: "dword", value: 1 },
+              Value: { type: "int", value: 5 },
+            },
+          ],
+        },
+      });
+      const index = makeIndex({
+        resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
+        twodaTables: new Map([["soundset", twoDA(["RESREF", "GENDER"], [[422, { RESREF: "healer", GENDER: "1" }]])]]),
+      });
+      const report = new Report("t", "utc");
+      verifyCreature(report, index, obj, { henchman: true });
+      expect(report.errors).toHaveLength(0);
+      expect(report.warnings).toHaveLength(0);
+    });
+  });
+});
+
+// ─── Item ─────────────────────────────────────────────────────────────────
+
+describe("verifyItem", () => {
+  // A live baseitems row: real label, real Name strref, and an ItemClass the
+  // inventory icon name can be derived from.
+  const baseitems = (modelType: string) =>
+    new Map([
+      [
+        "baseitems",
+        twoDA(
+          ["ModelType", "label", "Name", "ItemClass"],
+          [[4, { ModelType: modelType, label: "Longsword", Name: "168", ItemClass: "WswLs" }]],
+        ),
+      ],
+    ]);
+
+  /** A retired row, as BioWare leaves them: present, but blanked in place. */
+  const retiredBaseitems = () =>
+    new Map([
+      [
+        "baseitems",
+        twoDA(
+          ["ModelType", "label", "Name", "ItemClass"],
+          [[54, { ModelType: "0", label: "DELETED", Name: "0", ItemClass: "it_spscroll" }]],
+        ),
+      ],
+    ]);
+
+  it("flags a composite weapon with zero model parts — the flail-as-bag bug", () => {
+    const obj = {
+      Tag: { type: "cexostring", value: "flail" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Jail Key" } },
+      BaseItem: { type: "int", value: 4 },
+      ModelPart1: { type: "byte", value: 0 },
+      ModelPart2: { type: "byte", value: 0 },
+      ModelPart3: { type: "byte", value: 0 },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "uti");
+    verifyItem(report, makeIndex({ twodaTables: baseitems("2") }), obj);
+    const finding = report.errors.find((e) => e.code === "composite_model_part_zero");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("ModelPart1");
+  });
+
+  it("accepts a composite weapon with all three parts set", () => {
+    const obj = {
+      Tag: { type: "cexostring", value: "sword" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Sword" } },
+      BaseItem: { type: "int", value: 4 },
+      ModelPart1: { type: "byte", value: 1 },
+      ModelPart2: { type: "byte", value: 1 },
+      ModelPart3: { type: "byte", value: 1 },
+      StackSize: { type: "word", value: 1 },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "uti");
+    verifyItem(report, makeIndex({ twodaTables: baseitems("2") }), obj);
+    expect(report.errors).toHaveLength(0);
+  });
+
+  it("only requires ModelPart1 for a simple-model item", () => {
+    const obj = {
+      Tag: { type: "cexostring", value: "potion" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Potion" } },
+      BaseItem: { type: "int", value: 4 },
+      ModelPart1: { type: "byte", value: 1 },
+      StackSize: { type: "word", value: 1 },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "uti");
+    verifyItem(report, makeIndex({ twodaTables: baseitems("0") }), obj);
+    expect(report.errors).toHaveLength(0);
+  });
+
+  it("flags a retired base item row — the no-icon / Bad Strref bug", () => {
+    // The row exists, so an existence check passes; only the label and the
+    // strref reveal that it is decommissioned. This shipped as "Shard of the
+    // Iron Crown" on baseitems row 54.
+    const obj = {
+      Tag: { type: "cexostring", value: "sic_crown" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Shard of the Iron Crown" } },
+      BaseItem: { type: "int", value: 54 },
+      ModelPart1: { type: "byte", value: 1 },
+      StackSize: { type: "word", value: 1 },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "uti");
+    verifyItem(report, makeIndex({ twodaTables: retiredBaseitems() }), obj);
+    const finding = report.errors.find((e) => e.code === "retired_base_item");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("DELETED");
+  });
+
+  it("flags a base item with no ItemClass — no icon name can be derived", () => {
+    const twodaTables = new Map([
+      [
+        "baseitems",
+        twoDA(
+          ["ModelType", "label", "Name", "ItemClass"],
+          [[43, { ModelType: "0", label: "Gem", Name: "192", ItemClass: "****" }]],
+        ),
+      ],
+    ]);
+    const obj = {
+      Tag: { type: "cexostring", value: "gem" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Gem" } },
+      BaseItem: { type: "int", value: 43 },
+      ModelPart1: { type: "byte", value: 1 },
+      StackSize: { type: "word", value: 1 },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "uti");
+    verifyItem(report, makeIndex({ twodaTables }), obj);
+    expect(report.errors.map((e) => e.code)).toContain("base_item_no_item_class");
+  });
+
+  it("accepts a live base item row", () => {
+    const obj = {
+      Tag: { type: "cexostring", value: "shard" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Shard" } },
+      BaseItem: { type: "int", value: 4 },
+      ModelPart1: { type: "byte", value: 1 },
+      StackSize: { type: "word", value: 1 },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "uti");
+    verifyItem(report, makeIndex({ twodaTables: baseitems("0") }), obj);
+    expect(report.errors).toHaveLength(0);
+  });
+});
+
+// ─── Placeable ────────────────────────────────────────────────────────────
+
+describe("verifyPlaceable", () => {
+  it("flags LocalizedName set instead of LocName", () => {
+    const obj = {
+      Tag: { type: "cexostring", value: "chest" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Chest" } },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "utp");
+    verifyPlaceable(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("placeable_wrong_name_field");
+  });
+
+  it("flags inventory contents on a container with HasInventory unset", () => {
+    const obj = {
+      Tag: { type: "cexostring", value: "chest" },
+      LocName: { type: "cexolocstring", value: { "0": "Chest" } },
+      HasInventory: { type: "byte", value: 0 },
+      ItemList: { type: "list", value: [{ __struct_id: 0, InventoryRes: { type: "resref", value: "gold" } }] },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "utp");
+    verifyPlaceable(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("inventory_not_enabled");
+  });
+});
+
+// ─── Trigger geometry ─────────────────────────────────────────────────────
+
+describe("verifyTrigger", () => {
+  it("flags a trigger with no geometry", () => {
+    const obj = { Tag: { type: "cexostring", value: "trig" } } as unknown as GffObj;
+    const report = new Report("t", "utt");
+    verifyTrigger(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("missing_geometry");
+  });
+
+  it("flags a zero-area trigger", () => {
+    const point = (x: number, y: number) => ({
+      __struct_id: 3,
+      PointX: { type: "float", value: x },
+      PointY: { type: "float", value: y },
+      PointZ: { type: "float", value: 0 },
+    });
+    const obj = {
+      Tag: { type: "cexostring", value: "trig" },
+      Geometry: { type: "list", value: [point(5, 5), point(5, 5), point(5, 5), point(5, 5)] },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "utt");
+    verifyTrigger(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("zero_area_geometry");
+  });
+});
+
+// ─── Dialog ───────────────────────────────────────────────────────────────
+
+describe("verifyDialog", () => {
+  it("passes a well-formed two-node conversation", () => {
+    const doc = {
+      StartingList: { type: "list", value: [makeLink(0)] },
+      EntryList: { type: "list", value: [makeNode("Hello", "RepliesList", [0])] },
+      ReplyList: { type: "list", value: [makeNode("Goodbye", "EntriesList", [])] },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "dlg");
+    verifyDialog(report, makeIndex(), doc);
+    expect(report.errors).toHaveLength(0);
+  });
+
+  it("flags a node missing a mandatory field — the silent load failure", () => {
+    const entry = makeNode("Hello", "RepliesList", []);
+    delete entry.Delay;
+    const doc = {
+      StartingList: { type: "list", value: [makeLink(0)] },
+      EntryList: { type: "list", value: [entry] },
+      ReplyList: { type: "list", value: [] },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "dlg");
+    verifyDialog(report, makeIndex(), doc);
+    const finding = report.errors.find((e) => e.code === "dialog_missing_node_field");
+    expect(finding).toBeDefined();
+    expect(finding?.message).toContain("Delay");
+  });
+
+  it("flags a dangling link index", () => {
+    const doc = {
+      StartingList: { type: "list", value: [makeLink(7)] },
+      EntryList: { type: "list", value: [makeNode("Hello", "RepliesList", [])] },
+      ReplyList: { type: "list", value: [] },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "dlg");
+    verifyDialog(report, makeIndex(), doc);
+    expect(report.errors.map((e) => e.code)).toContain("dialog_dangling_index");
+  });
+
+  it("flags an empty StartingList", () => {
+    const doc = {
+      StartingList: { type: "list", value: [] },
+      EntryList: { type: "list", value: [makeNode("Hello", "RepliesList", [])] },
+      ReplyList: { type: "list", value: [] },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "dlg");
+    verifyDialog(report, makeIndex(), doc);
+    expect(report.errors.map((e) => e.code)).toContain("dialog_no_start");
+  });
+
+  it("warns when every root is conditional", () => {
+    const doc = {
+      StartingList: { type: "list", value: [makeLink(0, "c_hen_mine")] },
+      EntryList: { type: "list", value: [makeNode("Hello", "RepliesList", [])] },
+      ReplyList: { type: "list", value: [] },
+    } as unknown as GffObj;
+
+    const index = makeIndex({
+      resources: new Map([["c_hen_mine.ncs", { resref: "c_hen_mine", extension: "ncs", filePath: "/x", sizeBytes: 1 }]]),
+    });
+    const report = new Report("t", "dlg");
+    verifyDialog(report, index, doc);
+    expect(report.warnings.map((w) => w.code)).toContain("dialog_all_roots_conditional");
+  });
+
+  it("warns about unreachable nodes", () => {
+    const doc = {
+      StartingList: { type: "list", value: [makeLink(0)] },
+      EntryList: {
+        type: "list",
+        value: [makeNode("Reachable", "RepliesList", []), makeNode("Orphan", "RepliesList", [])],
+      },
+      ReplyList: { type: "list", value: [] },
+    } as unknown as GffObj;
+
+    const report = new Report("t", "dlg");
+    verifyDialog(report, makeIndex(), doc);
+    expect(report.warnings.map((w) => w.code)).toContain("dialog_orphan_nodes");
+  });
+});
+
+// ─── Journal ──────────────────────────────────────────────────────────────
+
+describe("verifyJournal", () => {
+  const questDoc = (entries: Array<{ id: number; end?: boolean }>) =>
+    ({
+      Categories: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Tag: { type: "cexostring", value: "q_amulet" },
+            Name: { type: "cexolocstring", value: { "0": "The Amulet" } },
+            EntryList: {
+              type: "list",
+              value: entries.map((e) => ({
+                __struct_id: 0,
+                ID: { type: "dword", value: e.id },
+                End: { type: "word", value: e.end ? 1 : 0 },
+                Text: { type: "cexolocstring", value: { "0": `stage ${e.id}` } },
+              })),
+            },
+          },
+        ],
+      },
+    }) as unknown as GffObj;
+
+  it("flags a quest with no End entry", async () => {
+    const report = new Report("t", "jrl");
+    await verifyJournal(report, makeIndex(), questDoc([{ id: 1 }, { id: 2 }]));
+    expect(report.errors.map((e) => e.code)).toContain("quest_no_end_entry");
+  });
+
+  it("flags duplicate entry IDs", async () => {
+    const report = new Report("t", "jrl");
+    await verifyJournal(report, makeIndex(), questDoc([{ id: 1 }, { id: 1, end: true }]));
+    expect(report.errors.map((e) => e.code)).toContain("quest_duplicate_entry_id");
+  });
+
+  it("flags a quest no script ever awards", async () => {
+    const report = new Report("t", "jrl");
+    await verifyJournal(report, makeIndex(), questDoc([{ id: 1, end: true }]));
+    expect(report.errors.map((e) => e.code)).toContain("quest_never_awarded");
+  });
+});
