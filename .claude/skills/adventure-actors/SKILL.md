@@ -143,16 +143,24 @@ Then `create_creature_blueprint`:
 
 ```
 create_creature_blueprint(
-  sourceResref: "<class chassis — see table below>",
+  sourceResref: "<class chassis — see table below, for APPEARANCE only>",
   resref: "<name>", tag: "<name>",
   name: "<display name>",
   faction: 2,
   henchman: true,
+  classes: '[{"class": <verified class ID from the table — never assumed from sourceResref>, "level": 1}]',
   conversation: "dlg_hen_<resref>",
   soundset: <TYPE 0 row matching gender — see table>,
   varTable: '[{"name": "HENCH_LEVEL", "type": "int", "value": <module target level>}]'
 )
 ```
+
+**Always pass `classes` explicitly, starting at level 1** — the companion levels up live to
+`HENCH_LEVEL` via `LevelUpHenchman()` when `a_hen_join` fires on recruit (that's what grants
+the correct feat/proficiency/spell progression by the engine's own rules, per the same
+principle now documented in `adventure-challenges/SKILL.md`'s automatic-class-feats section).
+Do not pre-set a higher static level here — a companion built at level 1 and leveled live is
+the difference between this working correctly and the "cleric henchman has no spells" bug.
 
 `henchman: true` wires all 13 script fields to the stock `x0_ch_hen_*` associate AI.
 These are base-game resources resolved at runtime — **never write them into the module**,
@@ -172,14 +180,23 @@ re-verify; after two failed attempts record `"status": "partial"` in
 feats, no spellbook and no BAB, so the companion joins with no abilities at all. This is
 the exact cause of the "Cleric NPC has no spells" bug.
 
+**Verified against the actual blueprint `ClassList`, not assumed from the name** —
+three entries in this table used to be wrong (`nw_humanmerc002` labeled Fighter is
+really Cleric; `nw_elfmerc001` labeled Ranger is really Wizard; `nw_halfcel001`
+labeled Cleric is really Fighter), which would silently build a companion with the
+wrong spellbook/proficiencies if you trusted the source chassis's native class. Always
+cross-check with `resolve_blueprint(resource: "<resref>.utc")` → `classes` before using
+any *new* source not in this table, and **pass `classes` explicitly on the
+`create_creature_blueprint` call regardless** — appearance and combat class are
+independent, so never rely on a chassis's native `ClassList` by omission.
+
 | Archetype | Resref | Class |
 |-----------|--------|-------|
-| Fighter | `nw_humanmerc002` / `nw_dwarfmerc002` | Fighter |
-| Ranger / archer | `nw_elfmerc001` | Ranger |
-| Cleric / healer | `nw_halfcel001` | Cleric |
-| Wizard | `nw_elfmage001` | Wizard |
-| Rogue | `nw_halfmerc001` | Rogue |
-| Bandit-turned-ally | `nw_bandit001` | Fighter |
+| Fighter | `nw_dwarfmerc002` / `nw_bandit001` | Fighter (class 4) |
+| Ranger / archer | `nw_elfranger001` | Ranger (class 7) |
+| Cleric / healer | `nw_halfcel001` | Native class is Fighter — **must** override `classes` to `[{"class": 2, "level": <target>}]` explicitly; use this resref for its half-elf-cleric appearance only |
+| Wizard | `nw_elfmage001` / `nw_elfmerc001` | Wizard (class 10) |
+| Rogue | `nw_halfmerc001` | Rogue (class 8) |
 
 #### Companion soundsets — TYPE 0 (PC voicesets) only
 
