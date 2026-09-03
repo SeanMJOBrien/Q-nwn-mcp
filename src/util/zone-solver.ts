@@ -253,17 +253,61 @@ export function buildCrosserGrid(
   return grid;
 }
 
+// ─── Deterministic tile-pick RNG ────────────────────────────────────────────
+//
+// Different tile IDs (distinct 3D models) can share an identical abstracted
+// corner+crosser signature at their natural .set Orientation — e.g. a tileset
+// commonly has 5-10 different "plain cobble" or "plain floor" model variants
+// that all satisfy the same filler request. The corner/crosser abstraction
+// can't see model-level detail (a baked-in seam, drain, crack pattern, etc.)
+// that makes one variant read as directional or context-sensitive in a given
+// spot. There's no data in the .set file to rank these variants by visual
+// fit — [PRIMARY RULES]/[SECONDARY RULES] encode terrain-name-level autotiling
+// hints (e.g. "cobble next to cobble stays cobble"), not tile-ID preferences,
+// so they can't inform this choice. Picking a genuinely different tile ID here
+// is not a bug — it's what "visual variety" means — so this doesn't remove the
+// randomness. It replaces Math.random() (whose result for a given grid cell
+// depends on however many other findTileByCorners calls happened earlier in
+// the process) with a hash of the cell's own position, so the exact same
+// layout always solves to the exact same tile choices. That determinism is
+// what makes a "this tile looks wrong at (x,y)" report reproducible.
+
+/** FNV-1a string hash → 32-bit unsigned seed. */
+function hashSeed(key: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** Mulberry32 PRNG — deterministic, well-distributed for small integer seeds. */
+function seededRandom(seed: number): number {
+  let t = (seed + 0x6d2b79f5) >>> 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
 // ─── Tile Lookup ────────────────────────────────────────────────────────────
 
 /**
  * Find a tile+orientation matching exact corners and crossers.
  * Picks randomly among matches for visual variety.
  * Prefers tiles without doors.
+ *
+ * `seedKey`, when provided (e.g. the grid position "x,y"), makes the pick
+ * deterministic and reproducible for a given layout — the same key always
+ * yields the same choice among tied candidates, while different keys still
+ * vary, preserving visual variety across the map. Omit it to fall back to
+ * Math.random() (used by callers/tests that don't care about reproducibility).
  */
 export function findTileByCorners(
   wantCorners: { tl: string; tr: string; bl: string; br: string },
   wantCrossers: CrosserEdges,
   tileset: TilesetInfo,
+  seedKey?: string,
 ): TilePlacement | null {
   const matches: TilePlacement[] = [];
 
@@ -304,7 +348,8 @@ export function findTileByCorners(
   });
   if (natural.length > 0) pool = natural;
 
-  return pool[Math.floor(Math.random() * pool.length)];
+  const roll = seedKey !== undefined ? seededRandom(hashSeed(seedKey)) : Math.random();
+  return pool[Math.floor(roll * pool.length)];
 }
 
 // ─── Area Solver ────────────────────────────────────────────────────────────
@@ -436,9 +481,12 @@ export function solveArea(
       };
       const wantCrossers = crosserGrid[y * width + x];
       const hasCrs = !!(wantCrossers.top || wantCrossers.right || wantCrossers.bottom || wantCrossers.left);
+      // Deterministic per-cell seed — same layout always solves to the same
+      // tile choices, making reported tile-appearance issues reproducible.
+      const seedKey = `${x},${y}`;
 
       // Step 1: exact corners + exact crossers
-      let placement = findTileByCorners(wantCorners, wantCrossers, tileset);
+      let placement = findTileByCorners(wantCorners, wantCrossers, tileset, seedKey);
       let warnMsg = "";
 
       // Step 1.5: adjust free corners + keep crossers.
@@ -457,7 +505,7 @@ export function solveArea(
             for (const terrain of allowedTerrains) {
               if (terrain === wantCorners[adj.key]) continue;
               const modified = { ...wantCorners, [adj.key]: terrain };
-              placement = findTileByCorners(modified, wantCrossers, tileset);
+              placement = findTileByCorners(modified, wantCrossers, tileset, seedKey);
               if (placement) {
                 cornerGrid[adj.gridIdx] = terrain;
                 warnMsg = `Adjusted ${adj.key}: ${wantCorners[adj.key]}→${terrain} (crossers preserved)`;
@@ -476,7 +524,7 @@ export function solveArea(
                   for (const t2 of allowedTerrains) {
                     if (t1 === wantCorners[adjustable[i].key] && t2 === wantCorners[adjustable[j].key]) continue;
                     const modified = { ...wantCorners, [adjustable[i].key]: t1, [adjustable[j].key]: t2 };
-                    placement = findTileByCorners(modified, wantCrossers, tileset);
+                    placement = findTileByCorners(modified, wantCrossers, tileset, seedKey);
                     if (placement) {
                       cornerGrid[adjustable[i].gridIdx] = t1;
                       cornerGrid[adjustable[j].gridIdx] = t2;
@@ -495,7 +543,7 @@ export function solveArea(
 
       // Step 2: exact corners + no crossers
       if (!placement) {
-        placement = findTileByCorners(wantCorners, noCrossers, tileset);
+        placement = findTileByCorners(wantCorners, noCrossers, tileset, seedKey);
         if (placement && hasCrs) warnMsg = "Dropped crossers (corners preserved)";
       }
 
@@ -510,7 +558,7 @@ export function solveArea(
             for (const terrain of allowedTerrains) {
               if (terrain === wantCorners[adj.key]) continue;
               const modified = { ...wantCorners, [adj.key]: terrain };
-              placement = findTileByCorners(modified, noCrossers, tileset);
+              placement = findTileByCorners(modified, noCrossers, tileset, seedKey);
               if (placement) {
                 cornerGrid[adj.gridIdx] = terrain;
                 warnMsg = `Adjusted ${adj.key}: ${wantCorners[adj.key]}→${terrain}`;
@@ -530,7 +578,7 @@ export function solveArea(
                   for (const t2 of allowedTerrains) {
                     if (t1 === wantCorners[adjustable[i].key] && t2 === wantCorners[adjustable[j].key]) continue;
                     const modified = { ...wantCorners, [adjustable[i].key]: t1, [adjustable[j].key]: t2 };
-                    placement = findTileByCorners(modified, noCrossers, tileset);
+                    placement = findTileByCorners(modified, noCrossers, tileset, seedKey);
                     if (placement) {
                       cornerGrid[adjustable[i].gridIdx] = t1;
                       cornerGrid[adjustable[j].gridIdx] = t2;
@@ -552,7 +600,7 @@ export function solveArea(
       if (!placement) {
         placement = findTileByCorners(
           { tl: lcDefault, tr: lcDefault, bl: lcDefault, br: lcDefault },
-          noCrossers, tileset,
+          noCrossers, tileset, seedKey,
         );
         if (placement) {
           warnMsg = `No valid tile for zone corners; fell back to default terrain '${lcDefault}' (wanted TL=${wantCorners.tl} TR=${wantCorners.tr} BL=${wantCorners.bl} BR=${wantCorners.br})`;

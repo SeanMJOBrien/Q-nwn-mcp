@@ -252,6 +252,65 @@ describe("findTileByCorners", () => {
     expect(result).not.toBeNull();
     expect(result!.tileId).not.toBe(10);
   });
+
+  describe("seeded selection (reproducibility)", () => {
+    // Tileset where the all-Grass filler pattern is satisfied by several
+    // genuinely distinct tile IDs at their natural orientation — mirrors the
+    // real-world case (e.g. tcn01 has 6 distinct "plain cobble" tile IDs, tdr01
+    // has 11 distinct "plain floor" tile IDs) that motivated seeded picking.
+    function makeMultiVariantTileset(): TilesetInfo {
+      const base = makeTileset();
+      return {
+        ...base,
+        tiles: [
+          ...base.tiles,
+          makeTile(base.tiles.length, "Grass", "Grass", "Grass", "Grass"),
+          makeTile(base.tiles.length + 1, "Grass", "Grass", "Grass", "Grass"),
+          makeTile(base.tiles.length + 2, "Grass", "Grass", "Grass", "Grass"),
+          makeTile(base.tiles.length + 3, "Grass", "Grass", "Grass", "Grass"),
+        ],
+      };
+    }
+
+    it("is deterministic: same seedKey always yields the same tile among tied candidates", () => {
+      const tileset = makeMultiVariantTileset();
+      const corners = { tl: "Grass", tr: "Grass", bl: "Grass", br: "Grass" };
+      const crossers = { top: "", right: "", bottom: "", left: "" };
+
+      const first = findTileByCorners(corners, crossers, tileset, "5,3");
+      for (let i = 0; i < 20; i++) {
+        const repeat = findTileByCorners(corners, crossers, tileset, "5,3");
+        expect(repeat).toEqual(first);
+      }
+    });
+
+    it("still varies across different seedKeys (preserves visual variety)", () => {
+      const tileset = makeMultiVariantTileset();
+      const corners = { tl: "Grass", tr: "Grass", bl: "Grass", br: "Grass" };
+      const crossers = { top: "", right: "", bottom: "", left: "" };
+
+      const picks = new Set<number>();
+      for (let x = 0; x < 30; x++) {
+        const result = findTileByCorners(corners, crossers, tileset, `${x},0`);
+        expect(result).not.toBeNull();
+        picks.add(result!.tileId);
+      }
+      // With 5 candidate tile IDs (0, 20, 21, 22, 23) and 30 distinct positions,
+      // a working PRNG should hit more than just one tile ID.
+      expect(picks.size).toBeGreaterThan(1);
+    });
+
+    it("falls back to Math.random() when no seedKey is given (back-compat)", () => {
+      const tileset = makeTileset();
+      const result = findTileByCorners(
+        { tl: "Grass", tr: "Grass", bl: "Grass", br: "Grass" },
+        { top: "", right: "", bottom: "", left: "" },
+        tileset,
+      );
+      expect(result).not.toBeNull();
+      expect(result!.tileId).toBe(0);
+    });
+  });
 });
 
 // ─── solveArea ──────────────────────────────────────────────────────────────
@@ -309,6 +368,30 @@ describe("solveArea", () => {
     const t00 = result.placements.find(p => p.x === 0 && p.y === 0);
     expect(t00).toBeDefined();
     expect(t00!.tileId).toBe(8); // Stream top+bottom
+  });
+
+  it("solves the same layout to identical tile choices across repeated runs", () => {
+    // Reproducibility guarantee: with several distinct tile IDs tied on the
+    // same corner+crosser pattern (mirrors real tilesets like tcn01/tdr01,
+    // which have multiple distinct "plain filler" tile IDs), re-solving the
+    // exact same zone layout must pick the exact same tiles every time — not
+    // a fresh Math.random() draw — so a reported "tile X looks wrong at (x,y)"
+    // is reproducible.
+    const base = makeTileset();
+    const tileset: TilesetInfo = {
+      ...base,
+      tiles: [
+        ...base.tiles,
+        makeTile(base.tiles.length, "Grass", "Grass", "Grass", "Grass"),
+        makeTile(base.tiles.length + 1, "Grass", "Grass", "Grass", "Grass"),
+        makeTile(base.tiles.length + 2, "Grass", "Grass", "Grass", "Grass"),
+      ],
+    };
+
+    const first = solveArea(6, 6, "Grass", tileset, [], [], []);
+    const second = solveArea(6, 6, "Grass", tileset, [], [], []);
+
+    expect(second.placements).toEqual(first.placements);
   });
 
   it("does not inject alien terrain when zones have incompatible adjacency", () => {
