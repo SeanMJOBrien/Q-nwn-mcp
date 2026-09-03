@@ -32,6 +32,17 @@ ground is part of the look.
 Rural Winter's 20 median waypoints are spawn-system infrastructure from the source worlds, not a
 pattern to copy into a one-shot.
 
+**These norms blend wilderness/farmland with settlements — split them by purpose before applying
+either figure.** A rural area that's mostly open field genuinely should stay near the sparse
+4.5-per-100-tiles baseline (see "Don't over-dress" below — it still holds for that case). But a
+village center meant to house multiple shops, an inn, and NPCs who hand out quests or lore is a
+different job, and the blanket average understates it: cross-checked against a large, live,
+actively-hosted PW (`ttr01`, n=23), settlement-focused rural areas there run **~43 placeables per
+100 tiles and ~4 doors** — roughly 10x the placeable density and 4x the doors of this skill's
+blanket figures — because each shop/dwelling building group needs its own working door and its
+own interior dressing to feel real, not just a facade. Decide which job the area is doing first:
+sparse for open countryside, denser (with real doors on real buildings) for the settlement itself.
+
 ## Terrain and crossers
 
 - **Terrain:** `grass` (default), `water`, `trees`
@@ -64,7 +75,12 @@ crosser passes cleanly through a wall — use those rather than fighting the sol
 1. `create_area(width: "24", height: "24", tileset: "ttr01", defaultTerrain: "grass")`.
 2. Lay a `road` crosser across the area first. Everything else hangs off it.
 3. Place the settlement groups along the road. A village is typically 4–8 building groups; a
-   farmstead 2–3 plus fields.
+   farmstead 2–3 plus fields. **A concrete, checkable linkage rule for a settlement area:** every
+   building group meant to be enterable needs its own door, and every door needs an interior area
+   on the other side — run `check_area_connectivity` after wiring doors/transitions and treat any
+   door that doesn't resolve to a real interior as unfinished, not decorative. A village with
+   fewer doors than functioning buildings is a stage set, the same failure mode `area-city-exterior`
+   calls out for cities.
 4. Add `trees` terrain in blocks at the edges to frame the space, and `water` with a `Footbridge`
    or ship group if the plot wants a shore.
 5. Vary `Tile_Height` on a few tiles for rolling ground — this is the one exterior family where

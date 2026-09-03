@@ -238,7 +238,23 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 - **Primary/secondary rules in .set files are NOT functional and must be IGNORED.** They are toolset autotiling propagation rules, not tile placement constraints. The tile solver works entirely by matching corner terrains, corner heights, edge crossers, and the `.set` Orientation field.
 - **Height tiles excluded from solving.** Tiles with any corner height > 0 are filtered out. All solver-placed tiles are flat.
 - **Tile rotation: do NOT swap cases 1 and 3.** Case 1 = 90° CW, case 3 = 270° CW. Verified against `forwardRotate` + SVG normalization pipeline.
-- **DLG field completeness is critical.** The NWN engine silently fails to load dialogs missing standard fields. Every entry/reply MUST include `Animation`, `AnimLoop`, `Comment`, `Delay`, `Quest`, `Script`, `Sound`. Every link struct MUST include `IsChild`. The `makeEntry`/`makeReply`/`makeLink` helpers in `dialog-write-tools.ts` handle this.
+- **DLG field completeness is critical — with two verified exceptions.** The NWN engine silently
+  fails to load dialogs missing standard fields. Every entry/reply MUST include `Animation`,
+  `Comment`, `Delay`, `Quest`, `Script`, `Sound`. Every link struct **nested inside an
+  entry/reply's `RepliesList`/`EntriesList`** MUST include `IsChild`. The `makeEntry`/
+  `makeReply`/`makeLink` helpers in `dialog-write-tools.ts` handle all of this — keep writing
+  every field, this is not a reason to trim any.
+  - **`AnimLoop` is not load-blocking.** Verified against a large (416-dialog, 19,779-node),
+    live, actively-hosted PW module (`~/tfndev`, "The Frozen North") — ~14% of its entry/reply
+    nodes lack `AnimLoop` entirely (confirmed against the compiled `.mod` binary via this
+    project's own `nwn_erf`/`nwn_gff` extraction, not just checked-in source), spread across
+    many different dialog files with no pattern by node type, and the module runs fine in
+    production. Still write it (no cost, and the field does control animation looping), but
+    don't diagnose "missing AnimLoop" as a load failure — it isn't one.
+  - **Root (`StartingList`) links don't carry `IsChild`.** In that same corpus, 100% of
+    `StartingList` link structs omit `IsChild` (1596/1596) while 100% of nested
+    `RepliesList`/`EntriesList` links carry it (0/31917 missing) — `IsChild` is meaningless on a
+    root link (a root is never anyone's child), so the requirement is real only for nested links.
 - **`create_dialog` condition field.** The `condition` on a node goes on the **link pointing to it** (`Active` field), not the node itself.
 - **Tileset door placement.** Each tile's .set file has `[TILE<id>DOOR<n>]` subsections with local-space offsets. Use `getTileDoorWorldPositions()` in `tileset.ts` to convert to world space. Never guess door positions.
 - **CPDB blob format.** Campaign database blobs (compressed=1) use a 24-byte header (`"CPDB"` + version + fields) followed by zstd-compressed data (NOT zlib). The payload is JSON text, not binary GFF. Vartype codes are ASCII chars: F=70 float, I=73 int, J=74 json, L=76 location, O=79 object, S=83 string, V=86 vector. F/I/L/V are uncompressed ASCII; J/O/S are CPDB/zstd compressed.

@@ -215,6 +215,18 @@ void main() {
 }
 ```
 
+**Every call above relies on `AddJournalQuestEntry`'s default `bAllPartyMembers=TRUE`
+— never pass `FALSE` here.** This is scope-specific, not a universal NWN rule:
+`/create-adventure` always builds for one fixed party sharing a single session, so
+broadcasting the journal update to every player is correct — one player finishing a
+step should never leave the others unable to see or complete it. A persistent-world
+module tracking independent per-player quest progress (dozens of unrelated
+concurrent players, each with their own persisted quest state) can correctly pass
+`FALSE` instead — that's a different architecture serving a different problem, not a
+mistake. See `quest-explorer` if you're auditing an *existing* module rather than
+generating new content, since you'll need to tell which architecture it uses before
+judging a `FALSE` call.
+
 ---
 
 ### Phase 6: Modify/Build Quest Dialogs

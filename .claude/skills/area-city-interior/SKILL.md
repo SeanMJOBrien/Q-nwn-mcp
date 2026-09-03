@@ -28,6 +28,24 @@ housing systems. Those are excluded below — they are not hand-built design.
 **Interiors are rooms, not maps.** The median hand-built interior is 8 tiles. A 16×16 tavern is
 wrong — build an 8-tile common room and put the cellar behind a door.
 
+**Density should track the room's narrative job, not sit at the blanket average.** The
+3.1-per-100-tiles figure above blends every kind of interior — closets, storage, a spare bedroom
+— with the rooms that are actually the point: a shop stocked with goods, a tavern common room,
+anywhere an NPC gives quests or exposition. Cross-checked against a large, live, actively-hosted
+PW (`tin01`, n=69 interiors): median placeable density there is **~169 per 100 tiles** — roughly
+50x this skill's blanket figure — because its shops and taverns are genuinely furnished with
+wares, seating, and clutter, not sparsely dressed. Use the blanket average as the floor for a
+minor/incidental room; for a room whose job is "the player shops here" or "the player gets story
+from an NPC here," lean hard toward the denser end — sparse furnishing in a shop reads as an
+empty stage set, not a going concern.
+
+**A dense shop/tavern interior is also more likely to need a human pass in the toolset.**
+Correctly furnishing a crowded room — goods placement that reads as a coherent shop layout, not
+just "more objects," multiple NPCs with distinct roles rather than duplicate greeters — is a
+harder autonomous judgment call than a sparse room, and this pipeline's current placement logic
+hasn't been measured against that harder case. Don't assume a first autonomous pass at high
+density is production-ready the way a sparse room's pass usually is; say so if reviewing one.
+
 Interiors are also where the corpus's strongest area-settings conventions live: **97% set
 `IsNight`** and **94% set `FogClipDist` ≤ 45**. An interior without those looks like an exterior
 with a roof.

@@ -189,9 +189,46 @@ Before creating creature blueprints, look up the IDs you need.
 | Rapid Shot | `RapidShot` | Ranged |
 | Combat Casting | `CombCast` | Caster/Healer |
 | Spell Focus (by school) | `SpellFoc` | Caster |
-| Armor Proficiency (Light/Medium/Heavy) | `ArmProf` | By role |
-| Weapon Proficiency (Martial/Simple) | `WeapProf` | By role |
-| Shield Proficiency | `ShieldProf` | Melee/Healer |
+
+This table is for **bonus/flavor feats only** — the ones a build chooses (Power Attack,
+Weapon Focus, Spell Focus, etc.). **Never hand-pick proficiency feats from it.** Use the
+automatic-class-feats procedure below instead — that's what the DMG rules actually
+enforce, and hand-picking here is exactly how this module shipped 56 soldiers unable to
+wear their own armor (see Known Pitfalls in the project CLAUDE.md).
+
+**Automatic class feats — "spawn at 1st level, level up to target" (mandatory, not optional).**
+A creature's `feats` array must model what a character actually gets by leveling 1→N in
+that class, not a hand-picked subset. Proficiencies (weapon, armor, shield) and other
+class features (Turn Undead, Sneak Attack, Bardic Knowledge, Familiar, Wild Shape, crafting
+feats, etc.) are granted **automatically by the class**, not chosen — and NWN's own data
+says exactly which, at which level. Do the lookup instead of guessing:
+
+1. `resolve_2da(table: "classes", row: "<classId>", column: "FeatsTable")` → e.g. `CLS_FEAT_FIGHT`. Lowercase it for the next call (`cls_feat_fight`).
+2. Read every row of that table (`resolve_2da(table: "cls_feat_<class>", row: "<n>")` per row, or `search_2da` if you only need specific ones). A row is an **automatic grant** — include it — when `GrantedOnLevel` is a number between `1` and the creature's target level (inclusive) and is not `-1` (eligible-but-unchosen bonus-feat-pool entry) or `99` (toolset player-tool menu item, not a real feat). `FeatIndex` is the feat ID to put in the `feats` array.
+3. Do this **once per class actually used** and cache the result (which feat IDs apply at which level) — reuse across every creature of that class rather than re-deriving per creature.
+4. Add the role-appropriate bonus/flavor feats from the table above **on top of**, never instead of, this automatic set.
+
+Class → feats-table quick reference (row IDs per `create_creature_blueprint`'s `classes` doc):
+
+| Class | Row | Table |
+|---|---|---|
+| Barbarian | 0 | `cls_feat_barb` |
+| Bard | 1 | `cls_feat_bard` |
+| Cleric | 2 | `cls_feat_cler` |
+| Druid | 3 | `cls_feat_druid` |
+| Fighter | 4 | `cls_feat_fight` |
+| Monk | 5 | `cls_feat_monk` |
+| Paladin | 6 | `cls_feat_pal` |
+| Ranger | 7 | `cls_feat_rang` |
+| Rogue | 8 | `cls_feat_rog` |
+| Sorcerer | 9 | `cls_feat_sorc` |
+| Wizard | 10 | `cls_feat_wiz` |
+
+Worked example — Fighter (`cls_feat_fight`), automatic grants at level 1: `WeapProfSim`(46),
+`WeapProfMar`(45), `ArmProfLgt`(3), `ArmProfMed`(4), `ArmProfHvy`(2), `Shield`(32) — the
+**full** proficiency chain, all at once, because a 1st-level Fighter gets all of it as a
+class feature. This is why "just grant Heavy Armor Proficiency for a heavily-armored
+Fighter" was wrong: the real rule isn't tiered-by-role, it's granted-in-full-by-class.
 
 **Spells:** Use `search_2da(table="spells", column="Label", value="...")` to find spell IDs. The row number IS the spell ID. Key spells to look up:
 
@@ -287,7 +324,12 @@ For visual variety on top of the mechanical roll, see Phase 7c (`create_gear_ran
 
 Call `get_wealth_budget(level: "<target level>", role: "<role>")`. It returns a total gold
 budget, a per-slot split, and the enhancement tier that budget affords, derived from D&D 3.5
-DMG Table 5-1 (wealth by level). Roles and their share of a PC's wealth:
+DMG Table 5-1 (wealth by level). **This table already is "starting gold for a character
+built at that level"** — it's not a per-level income rate to sum, it's the cumulative total
+a character has if they were generated straight at level N (the same table 3.5e uses for
+starting gold on above-1st-level PCs). So `role: "standard"` already means "equip this
+creature with half of what a same-level PC would start with" — no separate calculation
+needed. Roles and their share of a PC's wealth:
 
 | Role | Share | Use for |
 |------|-------|---------|
@@ -559,6 +601,16 @@ Call `repack_module()` to save all changes.
 
 Scale creature stats based on the adventure's target level. Appearance is independent — a beholder can be CR 2 with reduced stats.
 
+**The "Natural AC" column below applies to the Monster (Non-Humanoid) role only.** For every
+humanoid role (Melee, Tank, Ranged, Caster, Healer) reach the AC target through armor/shield
+`equipment`, not by setting `naturalAC` — D&D 3.5e reserves natural armor for a creature's innate
+hide (dragons, oozes, monsters); a Fighter or Ranger's AC comes from what they're wearing.
+Confirmed against a large, live, balanced PW's real combat roster (n=201 pure-PC-class NPCs):
+**80% have `NaturalAC=0` outright**, and the average never exceeds ~1 until CR 12+. Setting
+`naturalAC` on a humanoid boss to hit the number in this table is the wrong reading of it — that
+number describes total AC, and a humanoid should get there via gear, the same way the Combat Role
+Templates below already build Fighters and Rangers.
+
 ### By Difficulty Tier
 
 **Target level 1-3:**
@@ -599,6 +651,13 @@ Scale creature stats based on the adventure's target level. Appearance is indepe
 | Ranged | Ranger (7) | = target | DEX | High DEX, medium STR/CON | Bow, light armor |
 | Caster | Wizard (10) or Sorcerer (9) | = target | INT or CHA | High casting stat, low physical | Robes, staff |
 | Healer | Cleric (2) | = target | WIS | High WIS, medium STR/CON | Mace + shield, medium armor |
+| Skirmisher | Rogue (8) | = target | DEX | High DEX, medium everything else | Light weapon, sneak attack, low armor |
+| Nature Caster | Druid (3) | = target | WIS | High WIS, medium CON | Scimitar/club, light/medium armor, nature spells |
+| Holy Melee | Paladin (6) | = target | STR | High STR, medium CHA | Sword + shield, medium/heavy armor |
+
+Confirmed against a large, live, balanced PW's real combat roster (`docs/tfn-corpus-survey/balance.md`):
+every primary-stat claim above held cleanly, including the three added roles — Rogue/Druid/Paladin
+together make up 14% of a real roster and weren't previously covered here.
 
 ---
 
