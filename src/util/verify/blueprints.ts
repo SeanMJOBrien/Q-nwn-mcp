@@ -4,6 +4,9 @@
  * .ute encounters, .utm stores, .utw waypoints, .uts sounds.
  */
 
+import { resolveBlueprint } from "../git-helpers.js";
+import { EQUIP_SLOT_MAP } from "../equip-slots.js";
+import type { ResmanOptions } from "../../nim-tools.js";
 import type { GffObj } from "../../types/gff.js";
 import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
@@ -18,6 +21,18 @@ import {
   type Report,
   twoDARow,
 } from "./common.js";
+
+/**
+ * baseitems.2da's AmmunitionType -> the Equip_ItemList slot that must carry
+ * ammo for the weapon to actually fire. 1=bow/arrows, 2=crossbow/bolts,
+ * 3=sling/bullets. Verified against the live baseitems.2da via this
+ * project's own nwn_twoda CSV pipeline, not by hand-parsing the raw 2DA text.
+ */
+const AMMO_SLOT_BY_TYPE: Record<string, number> = {
+  "1": EQUIP_SLOT_MAP.arrows,
+  "2": EQUIP_SLOT_MAP.bolts,
+  "3": EQUIP_SLOT_MAP.bullets,
+};
 
 /** The 13 UTC creature script fields the engine dispatches on. */
 const CREATURE_SCRIPT_FIELDS = [
@@ -45,14 +60,21 @@ const HENCHMAN_SCRIPT_PREFIX = "x0_ch_hen_";
 export interface CreatureVerifyOptions {
   /** Apply the stricter companion rules (script set, class, HENCH_LEVEL, voice). */
   henchman?: boolean;
+  /**
+   * When set, the equipped RightHand weapon is resolved to check ranged/ammo
+   * pairing. Omit to skip that check (e.g. when NWN_FOLDER_DATA isn't
+   * configured) — matches verifyArea's "degrade to skip, never to fail"
+   * pattern for checks needing real game data.
+   */
+  resmanOpts?: ResmanOptions;
 }
 
-export function verifyCreature(
+export async function verifyCreature(
   report: Report,
   index: ModuleIndex,
   obj: GffObj,
   opts: CreatureVerifyOptions = {},
-): void {
+): Promise<void> {
   // ─── Identity ───────────────────────────────────────────────────────────
   if (!getFieldStr(obj, "Tag")) {
     report.error("missing_tag", "Creature has no Tag — scripts and dialogs cannot address it", "Tag");
@@ -118,10 +140,41 @@ export function verifyCreature(
   checkResourceRef(report, index, getFieldStr(obj, "Conversation"), "dlg", "Conversation");
 
   // ─── Equipment ──────────────────────────────────────────────────────────
-  for (const [i, item] of listOf(obj, "Equip_ItemList").entries()) {
+  const equipList = listOf(obj, "Equip_ItemList");
+  for (const [i, item] of equipList.entries()) {
     const resref = getFieldStr(item, "EquippedRes");
     if (resref) {
       checkResourceRef(report, index, resref, "uti", `Equip_ItemList.${i}.EquippedRes`, "warning");
+    }
+  }
+
+  // A ranged weapon in RightHand with no matching ammo slot filled cannot
+  // actually fire — confirmed against a live, played PW module that this
+  // exact gap slipped into 12 of its own creatures (see
+  // docs/tfn-corpus-survey/actors.md), so it's a real, easy-to-miss category
+  // and not hypothetical.
+  if (opts.resmanOpts) {
+    const rightHandEntry = equipList.find((e) => e.__struct_id === EQUIP_SLOT_MAP.righthand);
+    const rightHandRes = rightHandEntry ? getFieldStr(rightHandEntry, "EquippedRes") : "";
+    if (rightHandRes) {
+      const itemDoc = await resolveBlueprint(index, rightHandRes, "uti", opts.resmanOpts);
+      if (itemDoc) {
+        const baseItem = getFieldNum(itemDoc, "BaseItem");
+        const baseRow = twoDARow(index, "baseitems", baseItem);
+        if (baseRow && hasCell(baseRow, "RangedWeapon")) {
+          const ammoType = baseRow.AmmunitionType;
+          const ammoSlot = ammoType ? AMMO_SLOT_BY_TYPE[ammoType] : undefined;
+          const hasAmmo = ammoSlot !== undefined && equipList.some((e) => e.__struct_id === ammoSlot);
+          if (!hasAmmo) {
+            report.error(
+              "ranged_weapon_no_ammo",
+              `RightHand carries a ranged weapon ("${rightHandRes}", BaseItem ${baseItem}) but no matching ammo is equipped — it cannot fire`,
+              "Equip_ItemList",
+              "set_creature_equipment with the matching ammo (arrows/bolts/bullets) in the ammo slot",
+            );
+          }
+        }
+      }
     }
   }
 

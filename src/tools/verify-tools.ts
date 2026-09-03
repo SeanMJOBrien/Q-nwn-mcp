@@ -176,7 +176,8 @@ export function registerVerifyTools(server: McpServer): void {
         });
 
       const report = new Report(target, "utc");
-      verifyCreature(report, index, obj, { henchman });
+      const resmanOpts = await buildResmanOptions(index);
+      await verifyCreature(report, index, obj, { henchman, resmanOpts });
       return payload(report.result());
     },
   );
@@ -355,7 +356,7 @@ export function registerVerifyTools(server: McpServer): void {
           // A creature wired with the associate AI is a companion; hold it to
           // the stricter rules automatically.
           const isHenchman = getFieldStr(doc, "ScriptHeartbeat").startsWith("x0_ch_hen_");
-          verifyCreature(report, index, doc, { henchman: isHenchman });
+          await verifyCreature(report, index, doc, { henchman: isHenchman, resmanOpts });
           results.push(report.result());
           continue;
         }

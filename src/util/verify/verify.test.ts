@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ResmanOptions } from "../../nim-tools.js";
 import type { GffObj } from "../../types/gff.js";
 import type { ModuleIndex, TwoDATable } from "../../types/module.js";
 import { verifyCreature, verifyItem, verifyPlaceable, verifyTrigger } from "./blueprints.js";
@@ -132,46 +133,85 @@ describe("isBaseGameResource", () => {
 // ─── Creature ─────────────────────────────────────────────────────────────
 
 describe("verifyCreature", () => {
-  it("passes a well-formed creature", () => {
+  it("passes a well-formed creature", async () => {
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"));
+    await verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"));
     expect(report.errors).toHaveLength(0);
   });
 
-  it("flags the ScriptPercption typo", () => {
+  it("flags the ScriptPercption typo", async () => {
     const obj = makeCreature("nw_c2_default", {
       ScriptPercption: { type: "resref", value: "nw_c2_default2" },
     });
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("script_percption_typo");
   });
 
-  it("flags a missing script field", () => {
+  it("flags a missing script field", async () => {
     const obj = makeCreature("nw_c2_default");
     delete obj.ScriptOnNotice;
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("missing_script_field");
   });
 
-  it("flags an empty ClassList", () => {
+  it("flags an empty ClassList", async () => {
     const obj = makeCreature("nw_c2_default", { ClassList: { type: "list", value: [] } });
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("no_classes");
   });
 
+  it("flags a ranged weapon with no matching ammo equipped", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, EquippedRes: { type: "resref", value: "some_bow" } }],
+      },
+    });
+    const index = makeIndex({
+      parsedGff: new Map([["some_bow.uti", { __data_type: "UTI", BaseItem: { type: "int", value: 8 } }]]),
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj, { resmanOpts: {} as ResmanOptions });
+    expect(report.errors.map((e) => e.code)).toContain("ranged_weapon_no_ammo");
+  });
+
+  it("does not flag a ranged weapon with matching ammo equipped", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          { __struct_id: 16, EquippedRes: { type: "resref", value: "some_bow" } },
+          { __struct_id: 2048, EquippedRes: { type: "resref", value: "nw_waegar001" } },
+        ],
+      },
+    });
+    const index = makeIndex({
+      parsedGff: new Map([["some_bow.uti", { __data_type: "UTI", BaseItem: { type: "int", value: 8 } }]]),
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj, { resmanOpts: {} as ResmanOptions });
+    expect(report.errors.map((e) => e.code)).not.toContain("ranged_weapon_no_ammo");
+  });
+
   describe("henchman rules", () => {
-    it("flags a companion wired with the standard AI instead of the associate AI", () => {
+    it("flags a companion wired with the standard AI instead of the associate AI", async () => {
       const report = new Report("t", "utc");
-      verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"), { henchman: true });
+      await verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"), { henchman: true });
       const codes = report.errors.map((e) => e.code);
       expect(codes).toContain("henchman_no_command_handler");
       expect(codes).toContain("henchman_no_follow_ai");
     });
 
-    it("flags a Commoner-class companion", () => {
+    it("flags a Commoner-class companion", async () => {
       const obj = makeCreature("x0_ch_hen_", {
         ClassList: {
           type: "list",
@@ -183,25 +223,25 @@ describe("verifyCreature", () => {
         resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
       });
       const report = new Report("t", "utc");
-      verifyCreature(report, index, obj, { henchman: true });
+      await verifyCreature(report, index, obj, { henchman: true });
       expect(report.errors.map((e) => e.code)).toContain("henchman_commoner_class");
     });
 
-    it("flags a companion with no conversation", () => {
+    it("flags a companion with no conversation", async () => {
       const report = new Report("t", "utc");
-      verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
+      await verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
       expect(report.errors.map((e) => e.code)).toContain("henchman_no_dialog");
     });
 
-    it("warns when HENCH_LEVEL and voice are absent", () => {
+    it("warns when HENCH_LEVEL and voice are absent", async () => {
       const report = new Report("t", "utc");
-      verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
+      await verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
       const codes = report.warnings.map((w) => w.code);
       expect(codes).toContain("henchman_no_level_var");
       expect(codes).toContain("henchman_no_voice");
     });
 
-    it("accepts a fully-wired companion", () => {
+    it("accepts a fully-wired companion", async () => {
       const obj = makeCreature("x0_ch_hen_", {
         Conversation: { type: "resref", value: "dlg_x" },
         SoundSetFile: { type: "word", value: 422 },
@@ -223,7 +263,7 @@ describe("verifyCreature", () => {
         twodaTables: new Map([["soundset", twoDA(["RESREF", "GENDER"], [[422, { RESREF: "healer", GENDER: "1" }]])]]),
       });
       const report = new Report("t", "utc");
-      verifyCreature(report, index, obj, { henchman: true });
+      await verifyCreature(report, index, obj, { henchman: true });
       expect(report.errors).toHaveLength(0);
       expect(report.warnings).toHaveLength(0);
     });
