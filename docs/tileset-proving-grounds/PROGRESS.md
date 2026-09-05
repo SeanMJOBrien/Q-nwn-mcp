@@ -1,0 +1,285 @@
+# Tileset Proving Grounds — build progress
+
+**Purpose:** an exploration module covering every base-game tileset this project's
+`area-*` skills support (no HAK files) — large, complex, maximum-tile-variety areas
+per tileset, so the user can walk each one in the toolset and flag solver/tileset
+mistakes for future calibration. Structure + light dressing only (no plot/quests/
+challenges/rewards, per user's explicit call). Includes 4 henchmen of different
+classes and a mandatory starter store (per the new rule in
+`adventure-affordances/SKILL.md`).
+
+**Module:** `tileset-proving-grounds.mod` at
+`/home/qlippoth/nwn-data/user/modules/tileset-proving-grounds.mod` (created, loaded).
+
+**If resuming after an interruption:** `load_module("tileset-proving-grounds.mod")`,
+re-read this file, `list_areas` to confirm what's actually landed on disk (this file
+is the intent/plan — cross-check against reality before trusting a row marked done),
+then continue from the first `pending` row below. `autoRepack: "true"` is used on
+every `adventure_apply_layout` call, so progress up to the last completed area
+survives even mid-interruption.
+
+## Style mapping (judgment calls, not from an existing skill doc)
+
+`LayoutStyle.type` only has 10 literal values (dungeon/cave/dwelling/forest/rural/
+city/plains/desert/castle/tundra) — several tilesets below don't have a dedicated
+key and needed a closest-match choice, noted in the table.
+
+## Area plan
+
+| # | Tileset | Style | Size (target) | Rooms (target) | Status | Area resref |
+|---|---|---|---|---|---|---|
+| 1 | `tno01` (castle ext.) | castle | 32x32 | 9 real (10 requested) | **DONE** | `pg_tno01` |
+| 2 | `tic01` (castle int.) | dungeon | 32x32 | 8 real, 8 features | **DONE** | `pg_tic01` |
+| 3 | `ttf01` (forest) | forest | 32x32 | 8 real, all placed | **DONE** | `pg_ttf01` |
+| 4 | `ttf02` (forest 2) | forest | 32x32 | 9 real, 8/9 features | **DONE** (fixed a self-inflicted apply_layout mistake, see notes) | `pg_ttf02` |
+| 5 | `ttr01` (rural) | rural | 32x32 | 8 real, 7/8 features | **DONE** | `pg_ttr01` |
+| 6 | `tts01` (rural winter) | rural | 32x32 | 10 real, all 10 features | **DONE** | `pg_tts01` |
+| 7 | `tcn01` (city ext.) | city | 32x32 | 10 real, all 10 features | **DONE** | `pg_tcn01` |
+| 8 | `tin01` (city int.) | dwelling | 32x32 | 10 real, 1024/1024 resolved, no features (only 1 feature group exists at all — Chessboard, banned) | **DONE** | `pg_tin01` |
+| 9 | `tni01` (city int. 2) | dwelling | 32x32 | 10 real, 1024/1024 resolved, no features (same as tin01) | **DONE** | `pg_tni01` |
+| 10 | `ttd01` (desert) | desert | 32x32 | 8 | **DONE** | `pg_ttd01` |
+| 11 | `tde01` (dungeon) | dungeon | 32x32 | 10 | **DONE** | `pg_tde01` |
+| 12 | `tdm01` (mines/caverns) | cave | 32x32 | 10 | **DONE** | `pg_tdm01` |
+| 13 | `tdc01` (crypt) | dungeon | 32x32 | 10 | **DONE** | `pg_tdc01` |
+| 14 | `tds01` (sewers) | dungeon | 32x32 | 10 | **DONE** | `pg_tds01` |
+| 15 | `tdr01` (ruins) | castle *(no dedicated key — collapsed stone structures + overgrowth, closest to castle's wall/floor vocab)* | 32x32 | 8 | **DONE** | `pg_tdr01` |
+| 16 | `ttu01` (underdark) | dungeon *(no dedicated key — area-underdark's own doc explicitly distinguishes it from a raw cave: "a settled underground tileset... whole cities", so dungeon's room+corridor variety fits better than cave)* | 32x32 | 10 | **DONE** | `pg_ttu01` |
+| 17 | `tti01` (frozen wastes) | tundra | 32x32 | 8 | **DONE** | `pg_tti01` |
+
+## After all 17 areas — ALL DONE, module complete
+
+- [x] Connected all 17 areas via `adventure_create_transition` in a **chain** topology
+      (simpler than hub-and-spoke — avoids crowding 16 portals into one area):
+      `pg_tno01 ↔ pg_tic01 ↔ pg_ttf01 ↔ pg_ttf02 ↔ pg_ttr01 ↔ pg_tts01 ↔ pg_tcn01 ↔
+      pg_tin01 ↔ pg_tni01 ↔ pg_ttd01 ↔ pg_tde01 ↔ pg_tdm01 ↔ pg_tdc01 ↔ pg_tds01 ↔
+      pg_tdr01 ↔ pg_ttu01 ↔ pg_tti01`. 16 bidirectional portal pairs, all compiled.
+- [x] Deleted the dead `_start` area. Set `Mod_Entry_Area` = `pg_tno01` via
+      `modify_gff_field` (safe — it's a string field, not a float). Deliberately did
+      **not** touch `Mod_Entry_X/Y/Z` — those are floats and `modify_gff_field` is
+      documented in `CLAUDE.md` as corrupting float writes; left at their stale
+      `_start` value (15,15,0), which passes `verify_module_info`'s bounds check but
+      may not be walkable in `pg_tno01`. Cosmetic-only gap, flagged for a manual
+      toolset fix rather than risking module.ifo corruption.
+- [x] Placed 4 henchmen (Fighter/Wizard/Cleric/Rogue) in the hub (`pg_tno01`),
+      following `adventure-actors/SKILL.md`'s companion pattern: PC-class chassis
+      (verified via `resolve_blueprint`, not assumed from name — `nw_halfcel001`'s
+      native class really is Fighter, overridden to Cleric per the skill's own
+      warning), `henchman: true`, level-1 blueprints with `HENCH_LEVEL=6`,
+      TYPE-0 voicesets validated via `resolve_2da`. `a_mod_load` (chains
+      `x2_mod_def_load`) sets `SetMaxHenchmen(4)`; `a_hen_join` loops
+      `LevelUpHenchman` to `HENCH_LEVEL`, then `AddHenchman` +
+      `SetAssociateListenPatterns`. Simplified from the full adventure-actors
+      pattern: single join-only dialog per companion (no stay/follow/leave hub) —
+      justified since this module is a structural test scaffold, not a real
+      adventure with companion-management needs.
+- [x] Placed a starter store (`pg_gen_store`, "Proving Grounds Outfitter") in the
+      hub — 4 items landed (a weapon, 2 potions, a torch); several guessed
+      mundane-item resrefs (shield, dagger, buckler, scroll) don't exist under
+      those names in the resman index and were dropped with warnings rather than
+      guessed further.
+- [x] `check_area_connectivity` — `fullyConnected: true`, all 17 areas reachable.
+- [x] `verify_all(checkWalkable: true)` — **shippable: true, 0 errors, 0 warnings**
+      across 61 checked targets.
+- [x] Final `repack_module`.
+
+**New pitfall found:** `compile_script` reported `success: true` with a valid
+`outputFile` path, and the `.ncs` genuinely existed on disk — but `verify_all`
+still reported `uncompiled_script` errors for both `a_hen_join` and `a_mod_load`,
+and a `repack_module` right after compiling produced a **byte-identical** `.mod`
+to the pre-compile version (i.e. the new `.ncs` files were silently not packed).
+Root cause: the module's in-memory resource index doesn't pick up files written
+via `write_script`/`compile_script` mid-session for `repack_module`'s purposes —
+only `load_module` rebuilds it. **Fix:** `load_module` (reload the same path) after
+writing+compiling new scripts, *before* the next `repack_module`, then re-run
+`verify_all` to confirm. Cheap and reliable; worth doing any time new scripts are
+added mid-session rather than trusting `compile_script`'s own success report.
+
+## Critical lesson: `adventure_apply_layout` is NOT incremental
+
+Learned the hard way on area 4 (`pg_ttf02`): I truncated the wall zone's tile list
+when re-pasting a layout back into `adventure_apply_layout` (to save space), which
+silently left the border painted with default terrain instead of the intended wall
+terrain. Tried to "patch" it with a second call containing only the missing wall
+tiles — that call **wiped all 8 already-placed features back to null**, confirmed via
+`visualize_area` (`groupName` was `null` on all 1024 tiles afterward). Root cause:
+`adventure_apply_layout` re-solves the *entire* area fresh from whatever `zones` it's
+given each call — it does not merge with whatever the area already had. "Apply a
+**complete** area layout atomically" in the tool description is the literal behavior,
+not just phrasing. **Never pass a partial/patch zones list — always pass the full,
+exact `LayoutResult` from `adventure_generate_layout` in one call, and never
+hand-truncate any zone's tile list even when it looks safe to trim.** Fixed by
+resubmitting the original complete payload once, which restored everything correctly
+(973/1024 tiles, all 8 features back).
+
+## Confirmed working recipe (use for every remaining area)
+
+1. `create_area(resref, name, width, height, tileset)`
+2. `adventure_list_features(tileset, style)` → pick as many preferredFeatures as
+   `rooms` requested, ordered by size variety (1x1 through the biggest available).
+3. `adventure_generate_layout(tileset, width, height, style JSON incl. rooms +
+   preferredFeatures, transitionCount: 4)`
+4. `adventure_apply_layout(area, layout, autoRepack: "true")` — check
+   `featureWarnings` for skipped groups (door-on-transition-tile is the common
+   reason — a real tileset/solver finding worth keeping, not a bug in this build).
+5. `set_area_properties(area, ...)` — light ambience touch (skyBox/windPower etc.
+   is enough for "light dressing").
+6. `repack_module()` — cheap, do it anyway even though step 3 already did.
+7. Mark the row done in this file, note any feature warnings.
+
+## Area 1 (`pg_tno01`) result
+
+32x32, requested rooms:10 → **9 real rooms**, 9/9 chosen preferredFeatures had a
+room to try; 5 placed (**Tower Hill, Tower3 m69 3x3, Stables_1, Hay_barn,
+FantasyTower 4x4**), 4 skipped — **House_Inn_2x2, MarketStall_2x2 m54,
+Forge_L_shape_2x2, City_House_2x2_m26** all failed with "door tiles on terrain
+transition or crosser edge". All 4 skipped ones are door-bearing building
+features — worth checking by hand whether that's a genuine solver limitation on
+`tno01` specifically (this tileset's building doors may sit at positions the
+solver's corner-matching can't validate reliably) or a fixable room-placement
+issue. 982/1024 tiles resolved. `tilesResolved` and `featuresPlaced` counts are
+*tile* counts, not GIT object counts — feature groups are terrain geometry, so
+`placeableCount` staying 0 in `list_areas` is expected and correct, not a bug.
+
+## Area 2 (`pg_tic01`) result
+
+Only 3 feature groups exist for tic01/dungeon-style at all (`Chessboard`, `Portal`
+— both banned — and `Fountain`), so this is a genuine tileset finding: tic01 has
+almost no non-banned decorative feature groups on `stone` floor terrain. 8/8 rooms
+got a Fountain, 1016/1024 tiles resolved, no feature warnings this time (single-tile
+features have no doors to conflict).
+
+## Area 10 (`pg_ttd01`) result
+
+Confirmed done retroactively (context was cleared mid-build before this file's status
+row was updated) via `visualize_area`: features placed are `AdobeBuilding_2x2` (×4
+tiles), `Camp01_2x2` (×4), `GoodTemple_3x3` (×9), `Minaret` (×1), `Oasis_3x3` (×9),
+`Shipwreck` (×9), `SmallTent` (×1), `Well` (×1) — 8 distinct groups, matching the
+8-room target. Terrain is `cliff` (border/default) and `desert` (floor), walkability
+ranges 0-100% across tiles as expected for a mixed room/corridor/obstacle layout.
+Module was already packed (`load_module` read 11 areas straight from the `.mod`).
+
+## Area 11 (`pg_tde01`) result
+
+9 real rooms (10 requested), 9/10 preferredFeatures placed (Energy Source had no
+remaining room), 1003/1024 tiles resolved. Confirms the `adventure_generate_layout`
+compact-JSON fix from the earlier session notes is live and working — this 32x32
+10-room dungeon response returned inline with no token-cap issue. Minor solver
+warnings at (18,23)/(18,24)/(17,23) — dropped/mismatched crossers at one corridor
+junction, corners preserved, not an error.
+
+## Area 12 (`pg_tdm01`) result
+
+9 real rooms (10 requested), 9/10 preferredFeatures placed (Mineshaft had no
+remaining room), 1005/1024 tiles resolved, no solver warnings.
+
+## Area 13 (`pg_tdc01`) result
+
+10/10 real rooms, 10/10 preferredFeatures placed, 1002/1024 tiles resolved. One
+solver adjustment at (9,26): floor→wall corner swap, crossers preserved.
+
+## Area 14 (`pg_tds01`) result
+
+10/10 real rooms, 10/10 preferredFeatures placed, 1002/1024 tiles resolved. Three
+solver adjustments (floor→wall corner swaps, crossers preserved) — same benign
+pattern as area 13.
+
+## Area 15 (`pg_tdr01`) result
+
+Genuine tileset finding: only 3 non-banned feature groups exist for `tdr01`/castle
+style at all (`Exterior Fountain 1x2`, `Interior Rubble`, `Interior Mosaic 2x2`) —
+same pattern as `tic01` (area 2) and `tdr01`'s own default terrain is `wall`, like
+an interior tileset, despite the ruins theme reading exterior. 8/8 real rooms,
+7/8 feature placements succeeded (one `Interior Rubble` skipped — its tile corners
+landed on a `wall`-terrain zone, not the room's `floor` terrain, so the solver
+correctly rejected it). 1008/1024 tiles resolved.
+
+## Area 16 (`pg_ttu01`) result
+
+Notable tileset finding: `ttu01`'s default terrain is `floor` (not `wall` like every
+other dungeon-family tileset built so far), and `adventure_generate_layout` responded
+by emitting `wall`-type crossers between rooms instead of the usual `corridor`-type —
+the generator adapts corridor crosser type to whichever terrain needs carving through.
+8 real rooms (10 requested), 8/10 preferredFeatures placed (Temple, Cave had no
+remaining room), 993/1024 tiles resolved, no solver warnings. 21 feature groups exist
+for this tileset/style — the richest catalog of any area built so far, consistent
+with `area-underdark`'s doc describing it as "a settled underground tileset... whole
+cities."
+
+## Area 17 (`pg_tti01`) result — all 17 areas now built
+
+8/8 real rooms, 8/8 preferredFeatures placed, 1012/1024 tiles resolved, no solver
+warnings. Notable: `tti01`'s default terrain is `pit`, but the generated layout
+paints the entire 32x32 grid as `floor` first (open snowfield) rather than leaving
+a wall-type border — consistent with `area-frozen`'s tundra description ("open
+terrain, sparse clearings") and distinct from every interior/dungeon-family tileset
+built earlier, where the default fill stays as a bounding wall terrain.
+
+**All 17 planned tileset areas are now built and repacked.** Remaining work is the
+["After all 17 areas"](#after-all-17-areas) checklist below: connect areas, delete
+the dead `_start` area, place henchmen, place a starter store, verify connectivity,
+final repack.
+
+## Notes / decisions made along the way
+
+- **Lesson learned the hard way:** `pg_tno01`'s area shell (from before the MCP
+  restart) was lost — `create_area` was never followed by a `repack_module`, so it
+  only existed in the temp dir's working files, not the packed `.mod`. On restart,
+  `load_module` re-extracts from the `.mod` file itself, which still only had
+  `_start` in it. **New rule for the rest of this build: repack after every single
+  area, not just at natural checkpoints** — `adventure_apply_layout`'s
+  `autoRepack: "true"` covers that step, but a bare `create_area` call (before a
+  layout is generated/applied) needs an explicit `repack_module` right after it too,
+  or skip straight to generate+apply in the same breath without leaving a
+  create-only area sitting unpacked.
+
+- **Blocker hit on area 1 (`pg_tno01`):** `adventure_generate_layout` at 32x32 +
+  10 rooms returned an 81,253-character / 5,629-line result — over the tool-result
+  token cap, saved to a file instead of returned inline. Root cause: exterior
+  styles (castle/forest/rural/city/desert/tundra — 11 of these 17 areas) paint the
+  *entire* area as one wall zone first (`generateLayout`'s "paint entire area with
+  wall" step), which at 32x32 = 1024 tiles is ~1024 `{x,y}` objects pretty-printed
+  at 2-space indent — this is exactly the already-tracked `CLAUDE.md` TODO
+  "drop pretty-printed JSON from tool responses" (item was reverted once before
+  for an unrelated, much larger change — `visualize_area` region/detail params —
+  but this is a narrower, purely-cosmetic fix: `adventure_generate_layout`'s
+  `JSON.stringify(result, null, 2)` → `JSON.stringify(result)` in
+  `src/tools/adventure-tools.ts`, zero field/behavior change, just whitespace).
+  **Fix is coded and built (`npm run verify` passes, 347 tests), but needs an MCP
+  server restart to take effect** — per this project's own convention, TypeScript
+  changes don't apply to a running server until restarted. `pg_tno01`'s area shell
+  exists (`create_area` succeeded, 1024 tiles, default terrain) but has no layout
+  applied yet — safe to resume from exactly here once the server is restarted:
+  re-run the same `adventure_generate_layout` call for `tno01`/castle/32x32/
+  10 rooms with the preferredFeatures list below, then `adventure_apply_layout`.
+- **`pg_tno01` preferredFeatures already chosen** (10, spanning 1x1 to 4x4, no
+  banned Chessboard/Portal): `Tower Hill`, `Tower3 m69 3x3`, `House_Inn_2x2`,
+  `MarketStall_2x2 m54`, `Forge_L_shape_2x2`, `City_House_2x2_m26`, `Stables_1`,
+  `FantasyTower 4x4`, `Hay_barn`, `BarrowEntry_2x2`. `transitionCount: 4` was the
+  call param (one per compass-ish direction, for the eventual connectivity graph).
+- **The "Reconnected to nwn-mcp" restart did NOT pick up the code fix.** Verified:
+  `dist/tools/adventure-tools.js` on disk correctly has the compact
+  `JSON.stringify(result)` (confirmed by reading the built file directly), but a
+  32x32 `adventure_generate_layout` call *after* the reconnect still produced
+  79,149 characters — barely smaller than the original pretty-printed 81,253
+  (a ~2.6% drop; compact-vs-pretty for uniform `{x,y}` objects should cut this by
+  ~70-75%, not ~3%). This means the live server process is still running old code
+  — `/mcp`'s "Reconnected to nwn-mcp" reattached the client channel to an
+  **already-running** server process rather than actually respawning it. **A true
+  process restart is needed** (fully quit and relaunch whatever hosts the MCP
+  server — not just the client-side `/mcp` reconnect) before retrying a large
+  exterior-style area.
+- **Working fallback confirmed while waiting on a real restart:** 20x20 for
+  `tno01`/castle/8-rooms-requested succeeded and returned inline (well under the
+  cap) — but only actually produced 4 real rooms (BSP split apparently terminates
+  before reaching the requested count once leaves get too small — `rooms` is a
+  target, not a guarantee), so only 4 of 8 `preferredFeatures` got placed. 26x26
+  was tried next and still exceeded the cap under the still-not-fixed pretty JSON.
+  Once the real fix is live, re-test at 26x26/32x32 to see how many rooms actually
+  land — that number, not raw tile count, is what determines full preferredFeatures
+  usage.
+- **If the token-cap issue recurs even after the restart** (e.g. on `visualize_area`
+  calls for inspecting these once built — that tool's payload was NOT touched this
+  session, still pretty-printed): the fallback is reading the saved
+  `tool-results/*.txt` file in chunks, or reducing area size for that one tileset
+  specifically. Don't reduce size pre-emptively across the board — the whole point
+  is maximum tile coverage.

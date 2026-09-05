@@ -237,7 +237,7 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 - **`validate_module` false positives.** Base game scripts (`nw_c2_default5`, etc.) and items (`nw_wblms001`) are resolved at runtime — filter these "missing" references.
 - **Primary/secondary rules in .set files are NOT functional and must be IGNORED.** They are toolset autotiling propagation rules, not tile placement constraints. The tile solver works entirely by matching corner terrains, corner heights, edge crossers, and the `.set` Orientation field.
 - **Height tiles excluded from solving.** Tiles with any corner height > 0 are filtered out. All solver-placed tiles are flat.
-- **Tile rotation: do NOT swap cases 1 and 3.** Case 1 = 90° CW, case 3 = 270° CW. Verified against `forwardRotate` + SVG normalization pipeline.
+- **Tile rotation: do NOT swap cases 1 and 3 in `getRotatedCorners`/`getRotatedCrossers`/`forwardRotate`.** Case 1 = 90° CW, case 3 = 270° CW. This solve-time rotation math (applied to an already-parsed tile's corners to compute its effective corners at a given GIT placement orientation) is verified correct — cross-checked against 31 real, human-placed instances of a tno01 corner tile across 12 independently-built areas in a large hand-built PW corpus (`~/tfndev`), 100% match. **A separate, now-fixed bug lived one level earlier, at parse time** (see "Real Module" pitfalls below) — don't conflate the two. If a tile still looks misrotated after confirming the parse-time fix is live, the bug is somewhere else (e.g. zone-solver orientation selection), not in these three functions.
 - **DLG field completeness is critical — with two verified exceptions.** The NWN engine silently
   fails to load dialogs missing standard fields. Every entry/reply MUST include `Animation`,
   `Comment`, `Delay`, `Quest`, `Script`, `Sound`. Every link struct **nested inside an
@@ -276,6 +276,43 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 
 These came out of generating a full four-area module end-to-end. Each cost real
 debugging time, and none was visible from unit tests.
+
+- **FIXED — parse-time tile-corner "un-rotation" was corrupting every tile whose
+  `.set` `Orientation` field is non-zero.** `tileset.ts`'s `.set` parser used to treat
+  a tile's `Orientation` field (90/180/270) as a statement that the file's
+  `TopLeft`/`TopRight`/`BottomLeft`/`BottomRight` fields were recorded "pre-rotated"
+  and needed un-rotating back to GIT-orientation-0 terms (`unrotateCorners`/
+  `unrotateCrossers`, called unconditionally whenever `Orientation != 0`). This was
+  wrong: those fields already describe the tile in GIT-orientation-0 terms exactly as
+  written, regardless of `Orientation`'s value — `Orientation` only records which
+  rotation the 3D model was designed at (used by the solver's separate
+  "prefer natural orientation" placement preference, which is unaffected and still
+  correct). Confirmed by a real user report: `tno01` castle-wall convex corners
+  ("square corner" tile 209 / round "tower corner" tile 230, both `.set`
+  `Orientation=90`) rendered visibly rotated wrong in the toolset, while the concave
+  3-wall corner tile (223, `.set` `Orientation=0`, hence never exercising the buggy
+  code path) rendered correctly — exactly the fingerprint of a parse-time bug gated
+  on non-zero `Orientation`, not a solve-time rotation-direction bug (see the
+  "Tile rotation" pitfall above, which is unaffected and still correct).
+  **Verification method, for reuse on any future tile-rotation report:** don't trust
+  this codebase's own rotation code to check itself (comparing `getRotatedCorners`
+  against `forwardRotate` only proves they agree with each other, not with the real
+  engine — this was tried first and gave a false pass). Instead cross-reference
+  against a large, independently-built, human-authored module using the same
+  tileset (`~/tfndev` — 12 real `tno01` areas were available) by finding every real
+  placed instance of the suspect tile ID, reading its neighbors' terrain at the
+  *raw, unrotated* `.set` corner values (only trustworthy for neighbors placed at
+  GIT orientation 0, or fully rotation-symmetric all-one-terrain tiles, so no
+  rotation formula needs to be trusted on the read side either), and checking
+  whether the pattern the code predicts for that orientation matches what humans
+  actually built. Tabulate multiple samples per orientation value (0/1/2/3) — a
+  clean, uniform match or a clean, uniform offset both a real signal; noise is not.
+  **Fix:** removed the `unrotateCorners`/`unrotateCrossers` call and the two
+  functions themselves from `tileset.ts` — corners/crossers are now stored exactly
+  as parsed from the `.set` file. Needs an MCP server restart to take effect, and
+  any already-generated area containing an affected corner tile needs
+  regeneration (`adventure_generate_layout` + `adventure_apply_layout`) to pick up
+  corrected data — the bug was in parsing, not in data already written to a `.are`.
 
 - **`modify_gff_field` cannot write float fields.** The MCP layer serialises `value`
   as a string, so a float field receives `{"type":"float","value":"60"}` and `nwn_gff`
