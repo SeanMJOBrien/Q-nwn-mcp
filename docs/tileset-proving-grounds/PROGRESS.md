@@ -43,7 +43,7 @@ key and needed a closest-match choice, noted in the table.
 | 13 | `tdc01` (crypt) | dungeon | 32x32 | 10 | **DONE** | `pg_tdc01` |
 | 14 | `tds01` (sewers) | dungeon | 32x32 | 10 | **DONE** | `pg_tds01` |
 | 15 | `tdr01` (ruins) | castle *(no dedicated key — collapsed stone structures + overgrowth, closest to castle's wall/floor vocab)* | 32x32 | 8 | **DONE** | `pg_tdr01` |
-| 16 | `ttu01` (underdark) | dungeon *(no dedicated key — area-underdark's own doc explicitly distinguishes it from a raw cave: "a settled underground tileset... whole cities", so dungeon's room+corridor variety fits better than cave)* | 32x32 | 10 | **DONE** | `pg_ttu01` |
+| 16 | `ttu01` (underdark) | dungeon *(no dedicated key — area-underdark's own doc explicitly distinguishes it from a raw cave: "a settled underground tileset... whole cities", so dungeon's room+corridor variety fits better than cave)* | 32x32 | 10 | **DONE — user-verified good** | `pg_ttu01` |
 | 17 | `tti01` (frozen wastes) | tundra | 32x32 | 8 | **DONE** | `pg_tti01` |
 
 ## After all 17 areas — ALL DONE, module complete
@@ -148,6 +148,37 @@ almost no non-banned decorative feature groups on `stone` floor terrain. 8/8 roo
 got a Fountain, 1016/1024 tiles resolved, no feature warnings this time (single-tile
 features have no doors to conflict).
 
+## Area 6 (`pg_tts01`) follow-up — height-transition feature bug found and fixed
+
+Built pre-`/clear` with no result write-up at the time. User testing flagged a real
+bug: the `Cave` feature (tile 244) at (col=23, row=29) rendered as a bare cave mouth
+floating in a flat snow field — no elevated ground behind or beside it, cliff-edge
+seam on 3 sides. Root cause: `adventure_apply_layout`'s feature-group filter
+checked terrain *name* only, never corner *height* — tile 244 is "snow" on all 4
+corners by name (passes) but has `TopLeft`/`TopRightHeight=1` (a real cave-in-a-rise,
+not flat). **Fixed in code** — see `CLAUDE.md`'s "Pitfalls Found by Building a Real
+Module" entry and `area-frozen/SKILL.md`'s Pitfalls section for the full writeup
+and the general rule for hand-placing height-transition features going forward.
+
+**This specific instance patched by hand** (not regenerated — `adventure_apply_layout`
+isn't incremental): computed tile 244's actual placed corner heights
+(`TL=1,TR=1,BL=0,BR=0` at its placement orientation 0), then found which rotation of
+three `tts01` `aXX` slope tiles reproduces each matching edge exactly:
+- North (23,30): tile 0 (`a01_01`) at orientation 2 → bottom edge `(1,1)` matches
+  the cave's top edge exactly.
+- West (22,29): tile 1 (`a02_01`) at orientation 1 → right edge `(1,0)` matches the
+  cave's left edge exactly. **Zero constraint warnings** — a fully clean match.
+- East (24,29): tile 3 (`a04_01`) at orientation 0 → left edge `(1,0)` matches the
+  cave's right edge exactly.
+North and east placements each carry one/two residual terrain-name-only warnings
+(`snow vs trees`) one tile further out, where the collar meets the pre-existing
+snow/trees transition zone — a much smaller, more distant seam than the original
+floating-cave problem, not a height mismatch. This is a 1-tile collar directly
+around the feature, not a fully seamless terrace — a wider apron would need more
+hand-modeling, plausibly better done in the toolset. `verify_area(checkWalkable:
+true)` passes clean. **Not yet re-confirmed by the user visually** — recorded here
+per the same convention as the castle-corner and water-tile investigations.
+
 ## Area 10 (`pg_ttd01`) result
 
 Confirmed done retroactively (context was cleared mid-build before this file's status
@@ -172,6 +203,34 @@ junction, corners preserved, not an error.
 9 real rooms (10 requested), 9/10 preferredFeatures placed (Mineshaft had no
 remaining room), 1005/1024 tiles resolved, no solver warnings.
 
+**Follow-up — disconnected corridor dead-ends found and fixed (user report).**
+User flagged three spots that looked like adjacent hallway ends that should
+connect: (col28,row24)/(col28,row25), (col19,row7)/(col19,row8), and
+(col14,row27)/(col14,row28). Root cause traced to a real, general bug in
+`layout-generator.ts`: `connectRooms()` computes each corridor path's edges
+independently, with no awareness of other corridor paths — cave style's
+`shortcutCount: 3` produced a shortcut corridor whose dead end landed one tile
+from an unrelated main corridor's dead end in all three cases, each capped with
+its one open side facing away from the other. Confirmed by computing each
+placed tile's actual effective crossers (raw `.set` values rotated by the
+tile's real orientation) and showing neither open edge faced the other despite
+the tiles touching. **Fixed at the source** — see `CLAUDE.md`'s Pitfalls entry
+for `mergeAdjacentDeadEnds()`, a new post-process step that closes this class of
+gap for all future generations. **This module's three instances hand-patched**
+(not regenerated, since `adventure_apply_layout` re-solves the whole area):
+- (28,24): `47/2`→`165/0` (straight vertical, now open both to the existing
+  corridor below and the new connection above); (28,25): `167/1`→`43/0`
+  (corner-turn, now open both west to its existing corridor and south to the
+  new connection).
+- (19,7): `167/3`→`43/2` (corner-turn, open east to its existing corridor and
+  north to the new connection); (19,8): `47/0`→`164/0` (straight vertical).
+- (14,27): `47/2`→`165/0` (straight vertical); (14,28): `47/1`→`43/0`
+  (corner-turn, open west to its existing corridor and south to the new
+  connection).
+`verify_area(checkWalkable: true)` passes clean on all six edits. **Not yet
+re-confirmed by the user visually** — recorded here per the same convention as
+the other investigations in this file.
+
 ## Area 13 (`pg_tdc01`) result
 
 10/10 real rooms, 10/10 preferredFeatures placed, 1002/1024 tiles resolved. One
@@ -182,6 +241,50 @@ solver adjustment at (9,26): floor→wall corner swap, crossers preserved.
 10/10 real rooms, 10/10 preferredFeatures placed, 1002/1024 tiles resolved. Three
 solver adjustments (floor→wall corner swaps, crossers preserved) — same benign
 pattern as area 13.
+
+**Follow-up — gate/fence-door test (user request).** The original build used only
+`preferredFeatures` from `adventure_list_features`, which never returns `tds01`'s
+door-bearing groups (`Big Door 1/2`, `Fence Door 1/2`, `Bridge Door`, `Exit 1/2`,
+`Door Transition`) — they're correctly excluded by the "no crosser edges" rule for
+feature packing (per `CLAUDE.md`'s door-containing-group filter), which is why the
+area shipped with no visible gates at all. To actually test whether this tileset's
+door *placement math* (`getTileDoorWorldPositions()`) is correct, two were added by
+hand directly into the existing area (via `paint_tiles` + `place_door`, not through
+`adventure_apply_layout` — which is not incremental and would have re-solved the
+whole area):
+
+- **Big Door 1** (tile 68, `tds01_g07_01`, `wall/wall/wall/wall` + `T:corridor,B:corridor`
+  — same signature as a plain corridor tile, so it drops cleanly into an existing
+  corridor run with zero adjacency warnings): swapped in at world tile (26,11),
+  orientation 0, replacing a plain straight-corridor tile. Door object placed at
+  the tile's computed door offset `(265, 115, 0)`, bearing `0`, blueprint
+  `tn_gdoor_mt_07` (base-game `TNO_MetalDoor02`, `genericdoors.2da` row 17 — matches
+  the tile's own `doorPlacements[0].type`).
+- **Fence Door 1** (tile 60, `tds01_i07_01`, `floor/floor/floor/floor` +
+  `T:fence,B:fence`): a 3-tile fence line (`Fence-straight 56 / Fence Door 60 /
+  Fence-straight 56`) inserted into an open room at (4,6)-(6,6), all orientation 0.
+  Door object at `(55, 65, 0)`, bearing `270`, blueprint `tn_gdoor_st_05` (base-game
+  `TNO_StoneDoor01`, `genericdoors.2da` row 15 — matches type).
+- Both doors' world position/bearing were computed by hand using the exact same
+  formula as `getTileDoorWorldPositions()` in `tileset.ts` (`x = col*10+5+rx, y =
+  row*10+5+ry` where `(rx,ry)` is the door's local offset rotated by the tile's GIT
+  orientation; `bearing = (doorPlacement.orientation + tileOrientation*90) % 360`) —
+  cross-checking the tool's own math this way rather than trusting it blindly.
+  `place_door` confirmed both land on walkable Stone surface.
+- **Bridge Door** (tile 112, needs `pit/pit/pit/pit` + a bridge crosser path) was
+  *not* added — `pg_tds01` has no pit/bridge terrain anywhere, and improvising one
+  felt like a bigger change than "add a couple of test gates." Worth doing as a
+  follow-up if the two above check out.
+- **Found and fixed a real, separate bug while verifying:** `verify_door` flagged
+  both placed doors' stock `OnDeath` script (`x2_door_death`, a genuine base-game
+  Hordes-of-the-Underdark script) as missing — `isBaseGameScript()`
+  (`src/util/verify/common.ts`) had no `x2_door_` prefix in its curated whitelist.
+  Added it. Needs an MCP restart to take effect in this session; unrelated to
+  whether the doors themselves are placed correctly.
+- **Not yet confirmed by the user** — this entry records what was built and the
+  reasoning, not a verdict. Waiting on visual/toolset confirmation of whether the
+  gate sits correctly in the corridor and the fence gate looks right, same as the
+  castle-corner and water-tile investigations above.
 
 ## Area 15 (`pg_tdr01`) result
 

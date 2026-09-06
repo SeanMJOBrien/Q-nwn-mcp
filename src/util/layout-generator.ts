@@ -408,6 +408,18 @@ export function generateLayout(
     }
   }
 
+  // ── 8b. Merge accidentally-adjacent dead-end corridors ────────────────────
+  // Each connectRooms() call (main room-connectors, shortcuts) computes its own
+  // path's edge flags purely from its own prev/next tiles — it has no visibility
+  // into any other crosser path. When a shortcut corridor's dead end happens to
+  // land cardinally adjacent to a different corridor's dead end (a real, reported
+  // case in a cave-style area with shortcutCount:3), the result is two capped
+  // corridor tiles that are physically touching but have no edge connecting them:
+  // each cap's one open side faces away from the other, so the tile grid treats
+  // them as unrelated even though a player sees two hallway ends sitting right
+  // next to each other. mergeAdjacentDeadEnds() closes that gap post-hoc.
+  mergeAdjacentDeadEnds(crossers);
+
   // ── 9. Transitions & description ─────────────────────────────────────────
   const transitionPoints = computeTransitions(rooms, width, height, transitionCount, transitionDirections, suggestedFeatures, floorTiles, tileset);
 
@@ -675,6 +687,68 @@ function connectRooms(
     });
 
   return { type: crosserType, path };
+}
+
+// ─── Cross-path dead-end merging ────────────────────────────────────────────
+
+/**
+ * Connect any two crosser-path tiles that are cardinally adjacent, share the
+ * same crosser type, and currently have no edge pointing at each other.
+ *
+ * connectRooms() computes each path's edges independently — a corridor never
+ * knows another corridor exists. Two unrelated paths (e.g. a shortcut and a
+ * main room-connector) can end up one tile apart by pure geometric coincidence,
+ * each capped with its single open side facing away from the other. The tile
+ * grid has two dead ends touching; the player sees two hallway stubs that
+ * obviously should link up but don't. There is no legitimate case in this
+ * generator's model where two same-type crosser tiles occupy adjacent cells
+ * without being meant to connect — every crosser tile represents a routed,
+ * walkable corridor — so this always closes the gap rather than only
+ * sometimes applying.
+ *
+ * Mutates `crossers` in place (sets edge flags on existing path tile objects).
+ */
+function mergeAdjacentDeadEnds(crossers: CrosserPath[]): void {
+  type Loc = { pathIndex: number; tileIndex: number; type: string };
+  const byPos = new Map<string, Loc[]>();
+  crossers.forEach((path, pathIndex) => {
+    path.path.forEach((tile, tileIndex) => {
+      const key = `${tile.x},${tile.y}`;
+      const list = byPos.get(key);
+      if (list) list.push({ pathIndex, tileIndex, type: path.type });
+      else byPos.set(key, [{ pathIndex, tileIndex, type: path.type }]);
+    });
+  });
+
+  const DIRS: Array<{
+    dx: number; dy: number;
+    thisEdge: "top" | "right" | "bottom" | "left";
+    otherEdge: "top" | "right" | "bottom" | "left";
+  }> = [
+    { dx: 0, dy: 1, thisEdge: "top", otherEdge: "bottom" },
+    { dx: 0, dy: -1, thisEdge: "bottom", otherEdge: "top" },
+    { dx: 1, dy: 0, thisEdge: "right", otherEdge: "left" },
+    { dx: -1, dy: 0, thisEdge: "left", otherEdge: "right" },
+  ];
+
+  for (const [key, locs] of byPos) {
+    const [xStr, yStr] = key.split(",");
+    const x = Number(xStr), y = Number(yStr);
+    for (const loc of locs) {
+      const tile = crossers[loc.pathIndex].path[loc.tileIndex];
+      for (const dir of DIRS) {
+        if (tile.edges[dir.thisEdge]) continue;
+        const neighborLocs = byPos.get(`${x + dir.dx},${y + dir.dy}`);
+        if (!neighborLocs) continue;
+        const match = neighborLocs.find(
+          (n) => n.type === loc.type && !crossers[n.pathIndex].path[n.tileIndex].edges[dir.otherEdge],
+        );
+        if (!match) continue;
+        tile.edges[dir.thisEdge] = true;
+        crossers[match.pathIndex].path[match.tileIndex].edges[dir.otherEdge] = true;
+      }
+    }
+  }
 }
 
 // ─── Winding connector (for secondary crossers like streams) ────────────────

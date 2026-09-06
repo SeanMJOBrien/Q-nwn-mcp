@@ -277,6 +277,59 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 These came out of generating a full four-area module end-to-end. Each cost real
 debugging time, and none was visible from unit tests.
 
+- **FIXED — independently-routed corridor paths could dead-end cardinally
+  adjacent to each other with no connecting edge, reading as two hallway stubs
+  that obviously should link but don't.** `connectRooms()` in `layout-generator.ts`
+  computes each corridor's edge flags purely from its own path's prev/next tiles
+  — it has no visibility into any other corridor. A shortcut corridor (cave style
+  uses `shortcutCount: 3`) can by geometric coincidence end one tile from a
+  main room-connector corridor, each capped with its one open side facing away
+  from the other. Confirmed by a real user report against `tdm01` (Mines/Caverns):
+  three separate instances in one area (a vertical corridor capped facing south
+  sitting directly below a horizontal corridor capped facing west, and two more
+  of the same shape) — traced by computing each placed tile's actual effective
+  crossers (raw `.set` values rotated by the tile's real GIT orientation, the
+  same rotation math already verified correct against `~/tfndev`) and confirming
+  neither tile's open edge faced the other despite the tiles touching. **Fix:**
+  `mergeAdjacentDeadEnds()` (`layout-generator.ts`), run once after all room
+  connectors, shortcuts, and the secondary crosser are assembled and before the
+  layout is returned. For every pair of cardinally-adjacent tiles across *all*
+  crosser paths that share the same crosser type and have no edge pointing at
+  each other, it sets the connecting edge on both sides. There is no legitimate
+  case in this generator's model where two same-type crosser tiles occupy
+  touching cells without being meant to connect — every crosser tile represents
+  a routed, walkable corridor — so the merge always applies, never conditionally.
+  Verified against a synthetic reproduction of the exact reported shape (see the
+  function's usage) plus two guard cases: different crosser types never merge,
+  and an already-fully-connected path is left untouched (byte-identical before/
+  after). The three already-generated instances in the shipped module were
+  hand-patched with `paint_tiles` (swapping each capped tile for a through or
+  corner-turn tile computed from the same rotation formula) rather than
+  regenerating the area, since `adventure_apply_layout` re-solves the whole area
+  from scratch and isn't incremental.
+
+- **FIXED — `adventure_apply_layout`'s feature-group placement checked terrain
+  *name* but never corner *height*, letting height-transition features get dropped
+  into dead-flat zones.** The zone solver already excludes any tile with non-zero
+  corner height from its own placements (`tileset.ts`'s per-tile `flat` field) —
+  but the separate feature-group code path in `adventure-tools.ts` only validated
+  that a candidate group's tiles matched the surrounding zone's terrain *name* on
+  all four corners, with no height check at all. A tile can be "snow/snow/snow/
+  snow" by name and still have `TopLeftHeight=1` — exactly `tts01`'s `Cave` group,
+  a cave mouth carved into a rise (top edge elevated, bottom/entrance flat).
+  Confirmed by a real user report: the cave rendered floating in an open field,
+  cliff-edge seam on every side but the entrance, because its flat "snow" corner
+  names satisfied the only check that existed. **Fix:** feature groups containing
+  any non-flat tile are now rejected with a `featureWarning`, the same standard the
+  solver already holds itself to. This pipeline has no automated way to also
+  terrace matching elevated ground around a height-transition feature — a group
+  like this now needs deliberate hand-placement (`paint_tiles`, not
+  `adventure_apply_layout`) plus manually rotation-matched neighboring slope tiles.
+  See `area-frozen/SKILL.md`'s Pitfalls section for the worked recipe (computing a
+  cave tile's real corner heights at its placed orientation, finding which
+  rotation of a neighboring slope tile reproduces the exact matching edge, and
+  what "good enough" looks like — a 1-tile collar, not a fully seamless terrace).
+
 - **FIXED — parse-time tile-corner "un-rotation" was corrupting every tile whose
   `.set` `Orientation` field is non-zero.** `tileset.ts`'s `.set` parser used to treat
   a tile's `Orientation` field (90/180/270) as a statement that the file's

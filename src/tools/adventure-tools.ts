@@ -604,6 +604,25 @@ export function registerAdventureTools(server: McpServer): void {
           featureWarnings.push(`${sf.feature}: skipped (contains crosser tiles — causes edge mismatches)`);
           continue;
         }
+        // Reject groups containing height-transition tiles (e.g. cave mouths carved
+        // into a rise). The terrain-name check below only compares corner terrain
+        // strings, not corner height, so a tile like tno01's "Cave" (flat snow/snow/
+        // snow/snow by name, but TopLeft/TopRightHeight=1) passes that check and gets
+        // dropped into a dead-flat zone with no elevated neighbors to meet it —
+        // visually a cave mouth floating in an open field with a cliff-edge seam on
+        // every side but the entrance. The zone solver already excludes non-flat
+        // tiles from its own placements (see tileset.ts's `flat` field); feature
+        // groups need the same exclusion, since this pipeline has no mechanism to
+        // also terrace matching elevated terrain around a height-transition feature.
+        const hasHeightTransition = group.tileIds.some(id => {
+          if (id < 0) return false;
+          const t = tileset.tiles[id];
+          return t && !t.flat;
+        });
+        if (hasHeightTransition) {
+          featureWarnings.push(`${sf.feature}: skipped (height-transition tile — needs hand-terraced elevated terrain, not auto-placeable)`);
+          continue;
+        }
         // Reject groups whose tile corners don't match the surrounding zone terrain.
         // Look up what terrain the zone solver will paint at this position.
         const featureZoneTerrain = (() => {
