@@ -531,3 +531,25 @@ not a general fix" status as height-transition features. `DockDoor`/`BridgeDoor`
 particular are also feature groups per the "Not included" list in
 `water-tile-gallery.md` and would need the same treatment if a future report flags
 them.
+
+## CityGate_2x2 collar correction (real user report, second bug found this session)
+
+The ship-dock collar fix above wasn't the only real bug this session's rigor caught.
+A separate user report ("tcn01_a01_01 is rotated incorrectly 180 degrees") on the
+**pre-existing** `CityGate_2x2` collar (see "Area 7 follow-up" above) turned out to be
+correct: 2 of its 4 collar tiles (west-south and east-north) were placed at
+orientation 3 where orientation 1 was needed — exactly 180°, matching the report
+precisely. Found by mechanically reapplying `getRotatedCorners`'s own rotation
+formula to each tile's raw corner *heights* (not exposed on `TileDefinition`, so
+done via a small deterministic script mirroring the formula exactly) instead of
+re-trusting the original hand-derivation from that earlier session. The other two
+collar tiles (west-north, east-south) were already correct. Fixed in
+`feature-collars.ts` and repainted at (2,27) and (5,28) in `pg_tcn01`; both
+boundaries re-verified with corner+height match confirmed true.
+
+**Lesson, stated plainly: the original derivation for both this and the ship-dock
+collar used mental arithmetic to reapply the rotation formula, and mental
+arithmetic is exactly what produced this bug.** Every future collar/rotation
+derivation should use a small deterministic script, the same as the corpus
+cross-check technique — never re-derive a rotation by hand and trust it without
+running the actual formula in code.
