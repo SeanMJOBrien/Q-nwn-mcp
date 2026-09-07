@@ -211,17 +211,40 @@ not encode their bonus in the trailing digits (`nw_wswmls002` is +1, `010` is +2
 
 ---
 
-#### Optional: the starting outfitter
+#### Optional: the "Starter" store
 
 If the adventure begins with characters who may arrive underequipped — a fresh level 1, or an
-imported character at a level the module was not built around — a starting-area shop lets them
-kit up before the first encounter instead of dying to it.
+imported character at a level the module was not built around — a **Starter store** in a
+dedicated pre-story start area lets them kit up before the first encounter instead of dying to
+it. This is a distinct pattern from the regular in-adventure store(s) in Phase 5, with its own
+pricing and narrative rules:
 
-The pattern is a quartermaster NPC in the module's entry area with a store stocked to the target
-level's budget, plus an optional **top-up stipend** on the module's `OnClientEnter`: sum the
-player's `GetGold()` and the `GetGoldPieceValue()` of everything in inventory and all 18
-equipment slots, and pay only the **shortfall** to the wealth-by-level figure. Paying the flat
-amount instead rewards arriving poor and lets a returning player farm it.
+- **A Starter store is always 100/100** — `markUp: "100", markDown: "100"`: no markup, no
+  markdown, buy and sell at face value. It is not a business the player is haggling with — it
+  exists purely to let the player convert a flat gold allowance into gear of their own choosing
+  before the adventure begins. The regular `120`/`80` economy from Phase 5 does not apply here.
+- **The start area is outside the adventure.** No plot, lore, or story-relevant dialog is
+  required in the start area itself or in the Starter store NPC's conversation — the story has
+  not started yet. A short **overview/orientation line or two** (what the adventure is broadly
+  about, a reminder to gear up) is fine and often helpful, but treat it as out-of-character
+  framing, not narrative content.
+- **Any store placed *inside* the start area is, by that same logic, outside the adventure** —
+  it follows the Starter-store rules above (100/100, no story content), regardless of what it's
+  called or who runs it.
+- **Any store placed anywhere *other than* the start area is inside the adventure** — it is a
+  regular Phase 5 store: normal `120`/`80` pricing, and its NPC/dialog should carry whatever
+  story context that character would plausibly know.
+- **The start area needs to be a real, dedicated area — see `adventure-areas/SKILL.md`'s Phase 0
+  note on this.** It is not simply "whichever area happens to be first" if that area is where
+  the plot actually opens; the module's entry point is the pre-story staging ground, and the
+  first *story* area is reached from it via a normal transition.
+
+The pattern is a quartermaster NPC in this start area with a store stocked to the target level's
+budget (the "gold allowance per level" — see `get_wealth_budget` in Phase 5), plus an optional
+**top-up stipend** on the module's `OnClientEnter`: sum the player's `GetGold()` and the
+`GetGoldPieceValue()` of everything in inventory and all 18 equipment slots, and pay only the
+**shortfall** to the wealth-by-level figure. Paying the flat amount instead rewards arriving poor
+and lets a returning player farm it.
 
 **This is the one place a per-player reward is correct.** `OnClientEnter` fires once for *each*
 connecting player, so `GiveGoldToCreature(GetEnteringObject(), n)` there already reaches

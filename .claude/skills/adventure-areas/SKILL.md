@@ -21,10 +21,25 @@ Fully autonomous. Make all decisions based on the plot document — do NOT ask t
 
 ### Phase 0: Clean Up Starter Area
 
-If the module was created by `create_module`, it contains a temporary `_start` area (MicroSet 3x3). Before building real areas:
+If the module was created by `create_module`, it contains a temporary `_start` area (MicroSet 3x3). Before building real areas, check whether `adventure.md`'s `## Plot` notes a "Starter" store (see `adventure-affordances/SKILL.md`'s "Optional: the Starter store" — a pre-story shop where the player spends a gold allowance on gear of their choosing before the adventure begins).
+
+**No Starter store planned:**
 1. Call `remove_object` to remove `_start` from the GIT if needed
 2. The first real area you create will become the new entry area — after creating it, update the IFO entry point: use `modify_gff_field` to set `Mod_Entry_Area` to the new area's resref, and set `Mod_Entry_X`/`Mod_Entry_Y` to a walkable position in that area
 3. Remove `_start` from `Mod_Area_list` in the IFO, and delete `_start.are`, `_start.git`, `_start.gic` from the temp dir
+
+**Starter store planned:** the start area must be a real, dedicated area, kept — not deleted and
+folded into the first story area the way it is above. It houses the Starter store and nothing
+else story-related (an overview/orientation line is fine; plot content is not — see
+`adventure-affordances/SKILL.md`).
+1. Rebuild `_start` as a small real area (or repaint the existing stub) sized for one merchant
+   NPC + the store — this stays `Mod_Entry_Area` and `Mod_Entry_X`/`Mod_Entry_Y` point into it,
+   unchanged from the module template's own entry point.
+2. The first *story* area is a separate area, built normally, connected from the start area via
+   `adventure_create_transition` (Phase 7's standard mechanism) — the player steps through it
+   once they've geared up, and that's where the plot actually opens.
+3. Do not remove `_start` from `Mod_Area_list` or delete its files — it remains a real, permanent
+   area for the life of the module.
 
 ---
 
