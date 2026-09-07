@@ -1,25 +1,44 @@
 /**
- * Known collar-tile requirements for height-transition feature groups.
+ * Known collar-tile requirements for feature groups the generator would
+ * otherwise reject outright: height-transition tiles, or tiles carrying
+ * crosser edges (dock/bridge/stream/etc).
  *
- * A "collar" is one or more neighboring tiles that must sit next to a
- * height-transition feature (e.g. a cave mouth carved into a rise, or a city
- * gate's corner towers) for its elevated edge to read as connected ground
- * rather than a floating cliff. `adventure-tools.ts`'s `hasHeightTransition`
- * check rejects every group containing a non-flat tile by default, since this
- * pipeline has no general way to auto-terrace matching elevated terrain. This
- * table is the curated exception list: specific (tileset, group) pairs a
- * human has already hand-derived and verified a working collar for. Any
- * height-transition group NOT listed here still falls through to the default
- * rejection — adding an entry is how a newly-investigated feature graduates
- * from "always skipped" to "auto-placed correctly."
+ * A "collar" is one or more neighboring tiles that must sit next to such a
+ * feature for it to read as connected rather than floating in open terrain
+ * or a floating cliff. `adventure-tools.ts` rejects every group containing a
+ * non-flat tile (`hasHeightTransition`) or a crosser tile (`hasCrossers`) by
+ * default — the solver, unaware a feature is about to be stamped down, has
+ * already placed something incompatible at the tiles touching it (an
+ * elevated edge floating over flat ground; a dock/bridge crosser edge facing
+ * plain water with nothing to connect to). This pipeline has no *general*
+ * mechanism to auto-terrace elevated terrain or auto-extend a crosser
+ * network to meet a feature — this table is the curated exception list:
+ * specific (tileset, group) pairs a human has already hand-derived and
+ * verified a working collar for. Any height-transition or crosser-bearing
+ * group NOT listed here still falls through to the default rejection —
+ * adding an entry is how a newly-investigated feature graduates from
+ * "always skipped" to "auto-placed correctly."
  *
- * Each entry's tile ID + orientation was derived by computing the feature's
- * actual placed corner heights (from `get_tileset_details(detail:"full")` /
- * the cached `.set` file), then searching the tileset's own corner-height
- * data for a tile + rotation whose edge reproduces it exactly — the same
- * method documented in `area-frozen/SKILL.md`'s Pitfalls section. See
- * `docs/tileset-proving-grounds/PROGRESS.md` for the specific derivation of
- * every entry below (search for the tileset name).
+ * **Height-transition entries**: tile ID + orientation derived by computing
+ * the feature's actual placed corner heights (from
+ * `get_tileset_details(detail:"full")` / the cached `.set` file), then
+ * searching the tileset's own corner-height data for a tile + rotation whose
+ * edge reproduces it exactly — the same method documented in
+ * `area-frozen/SKILL.md`'s Pitfalls section.
+ *
+ * **Crosser entries**: tile ID + orientation derived by finding a tile whose
+ * *only* crosser (so it terminates cleanly rather than creating a new
+ * dangling connection one tile further out) matches the feature's outward-
+ * facing crosser type, then using `getRotatedCrossers`' own rotation formula
+ * (`tileset.ts`) to find which orientation puts that crosser on the edge
+ * actually touching the feature. Corner terrain (not crosser) is still what
+ * gets checked at placement time — see the terrain-mismatch check in
+ * `adventure-tools.ts`'s collar-application loop — so a crosser collar tile
+ * should also be chosen with corners that match the feature's own zone
+ * terrain (uniform water/water/water/water is the easy case).
+ *
+ * See `docs/tileset-proving-grounds/PROGRESS.md` for the specific derivation
+ * of every entry below (search for the tileset name).
  *
  * Offsets are relative to the feature's own placement origin — `sf.x`/`sf.y`,
  * the group's bottom-left tile (`gc=0, gr=0`) — NOT rotated by any feature
@@ -76,6 +95,22 @@ const FEATURE_COLLARS: Record<string, Record<string, FeatureCollarTile[]>> = {
       { relX: -1, relY: 1, tileId: 0, orientation: 2 }, // west, north sub-tile: a01_01 @ ori2
       { relX: 2, relY: 0, tileId: 3, orientation: 0 },  // east, south sub-tile: a04_01 @ ori0 (zero warnings)
       { relX: 2, relY: 1, tileId: 3, orientation: 3 },  // east, north sub-tile: a04_01 @ ori3 (zero warnings)
+    ],
+    // ShipDocked_2x2 (tileIds [243,244,241,242], rows=2 cols=2 — 243/244 south
+    // row is the ship's hull, no crossers; 241/242 north row is the dock-facing
+    // side, each carrying "R:dock,L:dock" — i.e. BOTH the west edge (241's
+    // L:dock, the group's own west boundary) and the east edge (242's R:dock,
+    // the group's own east boundary) of that row expect a connecting dock
+    // tile. k05_01 (id 186) has exactly one crosser (T:dock at its native
+    // orientation) — a dock tile that terminates cleanly rather than opening a
+    // new dangling connection — and uniform water/water/water/water corners,
+    // so it matches any water zone terrain regardless of rotation. Rotated via
+    // getRotatedCrossers's own formula: ori3 puts T:dock on the tile's right
+    // edge (meets 241's west-facing L:dock); ori1 puts T:dock on its left edge
+    // (meets 242's east-facing R:dock).
+    shipdocked_2x2: [
+      { relX: -1, relY: 1, tileId: 186, orientation: 3 }, // west, dock row: k05_01 @ ori3
+      { relX: 2, relY: 1, tileId: 186, orientation: 1 },  // east, dock row: k05_01 @ ori1
     ],
   },
 };

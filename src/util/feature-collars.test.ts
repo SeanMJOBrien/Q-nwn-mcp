@@ -43,5 +43,11 @@ describe("getFeatureCollar", () => {
       { relX: 2, relY: 0, tileId: 3, orientation: 0 },
       { relX: 2, relY: 1, tileId: 3, orientation: 3 },
     ]);
+    // tcn01 ShipDocked_2x2: dock-crosser collar, west and east of the dock row
+    // (see docs/tileset-proving-grounds/water-tile-gallery.md)
+    expect(getFeatureCollar("tcn01", "ShipDocked_2x2")).toEqual([
+      { relX: -1, relY: 1, tileId: 186, orientation: 3 },
+      { relX: 2, relY: 1, tileId: 186, orientation: 1 },
+    ]);
   });
 });

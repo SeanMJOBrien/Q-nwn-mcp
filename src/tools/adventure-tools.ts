@@ -595,16 +595,19 @@ export function registerAdventureTools(server: McpServer): void {
           continue;
         }
         // Reject groups that contain crosser references — crossers on feature tiles
-        // conflict with the solver's crosser grid and create edge mismatches
+        // conflict with the solver's crosser grid and create edge mismatches — UNLESS
+        // a human has already hand-derived and verified a matching collar for this
+        // exact (tileset, group) pair (see feature-collars.ts). A feature's crosser
+        // tile expects a specific neighbor (e.g. a dock tile) on its outer edge; the
+        // solver, unaware a feature is coming, would otherwise place something
+        // incompatible there. The collar mechanism already solves exactly this shape
+        // of problem for height-transition features below — same lookup, same
+        // curated-exception philosophy, just keyed off crossers instead of height.
         const hasCrossers = group.tileIds.some(id => {
           if (id < 0) return false;
           const t = tileset.tiles[id];
           return t && !!(t.crossers.top || t.crossers.right || t.crossers.bottom || t.crossers.left);
         });
-        if (hasCrossers) {
-          featureWarnings.push(`${sf.feature}: skipped (contains crosser tiles — causes edge mismatches)`);
-          continue;
-        }
         // Reject groups containing height-transition tiles (e.g. cave mouths carved
         // into a rise) UNLESS a human has already hand-derived and verified a
         // matching collar for this exact (tileset, group) pair — see
@@ -624,7 +627,11 @@ export function registerAdventureTools(server: McpServer): void {
           const t = tileset.tiles[id];
           return t && !t.flat;
         });
-        const collar = hasHeightTransition ? getFeatureCollar(tilesetResref, sf.feature) : undefined;
+        const collar = (hasCrossers || hasHeightTransition) ? getFeatureCollar(tilesetResref, sf.feature) : undefined;
+        if (hasCrossers && !collar) {
+          featureWarnings.push(`${sf.feature}: skipped (contains crosser tiles — causes edge mismatches)`);
+          continue;
+        }
         if (hasHeightTransition && !collar) {
           featureWarnings.push(`${sf.feature}: skipped (height-transition tile — needs hand-terraced elevated terrain, not auto-placeable)`);
           continue;

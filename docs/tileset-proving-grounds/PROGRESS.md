@@ -471,3 +471,63 @@ re-confirmed by the user visually.**
   `tool-results/*.txt` file in chunks, or reducing area size for that one tileset
   specifically. Don't reduce size pre-emptively across the board — the whole point
   is maximum tile coverage.
+
+## `tcn01` water-tile-gallery follow-up — rotation reports resolved, ship-dock collar added
+
+**User report:** `tcn01_b02_04`/`b02_03`/`b02_01` "facing 180 degrees from where they
+should", `tcn01_a14_01` "incorrectly turned 90 degrees counterclockwise" (in
+`pg_water_gal`), plus `tcn01_p19_01`/`o19_01` (the `ShipDocked_2x2` feature) "should
+enforce some dock tiles such as `tcn01_k02_01` or `tcn01_k05_01`... connected to one
+of those tiles."
+
+**Rotation reports — not a code bug, confirmed two ways:**
+1. An automated cross-check (`getRotatedCorners()`, this codebase's own real code,
+   not re-derived) against `~/tfndev`'s real `tcn01` areas (`aqueducts`, `benzor`,
+   `tobaro`, `westbenzorslums`) found **0 mismatches across 204 real neighbor edges**
+   touching all four reported tiles, at every GIT orientation 0-3 real builders used.
+2. Root cause: `pg_water_gal` placed every tile at GIT `Orientation=0`, but 18 of its
+   50 tiles have a non-zero `.set Orientation` — that field records the rotation the
+   *model* was designed at, and the solver's own `naturalOri = round(setOrientation /
+   90) % 4` (zone-solver.ts) is the actual "correct" pose to display, not 0. Both
+   user reports match their tile's real `.set Orientation` exactly (180° and 90°).
+   Fixed by repainting all 18 affected cells at their natural orientation instead of
+   a blanket 0 — see `water-tile-gallery.md`'s "Revision note (second pass)" for the
+   full writeup, corrected legend, and several corner-terrain transcription errors
+   found and fixed in the same pass (regenerated from `parseTilesetFile()` directly
+   instead of hand-transcribed).
+
+**Ship-dock report — real generator gap, fixed via `feature-collars.ts`.**
+`ShipDocked_2x2` (tiles 243/244 hull row, 241/242 dock row, `R:dock,L:dock` on both
+241 and 242) was being unconditionally rejected by `adventure_apply_layout`'s
+`hasCrossers` check — any feature group containing a crosser tile at all, full stop,
+regardless of whether a collar exists. This is a broader gap than height-transition
+features (which already had the curated-collar escape hatch) — every crosser-bearing
+group in `tcn01` (`DockDoor`, `BridgeDoor`, `Boathouse`, `ShipDocked_2x2`,
+`ShipFloating_1x2`, `Boat`, `Merchant_Docked`, `Merchant_Ship_Undockable`,
+`Weathered_Docked`, `Weathered_Ship_Undockable`) is presumably affected the same way,
+though only `ShipDocked_2x2` was investigated this session.
+
+**Fix:** `adventure-tools.ts`'s `hasCrossers` rejection now respects a curated collar
+the same way `hasHeightTransition` already did (`const collar = (hasCrossers ||
+hasHeightTransition) ? getFeatureCollar(...) : undefined`). Added
+`tcn01.shipdocked_2x2` to `feature-collars.ts`: `k05_01` (id 186 — exactly one
+crosser, so it terminates cleanly rather than opening a new dangling connection, and
+uniform water corners so it matches regardless of rotation) at `relX:-1,relY:1,ori:3`
+(west) and `relX:2,relY:1,ori:1` (east) — both derived via `getRotatedCrossers`'s own
+rotation formula, not guessed.
+
+**Verified for real**, not just by inspection: built a throwaway 10x8 `tcn01` water
+area (`pg_shiptest`, kept in the module as a reference) and called
+`adventure_apply_layout` with a hand-built layout placing `ShipDocked_2x2` at (2,3).
+`featuresPlaced: 6` (4 feature tiles + both collar tiles — previously this would have
+been rejected outright, 0 tiles placed). Independently re-verified both collar
+boundaries with the same corner+crosser cross-check technique: **corner match: true,
+crosser match: true (dock vs dock)** on both the west and east collar edges. Zero
+constraint warnings.
+
+**Not done this session:** the other 9 crosser-bearing `tcn01` groups listed above
+remain rejected by default (no curated collar yet) — same "curated exception list,
+not a general fix" status as height-transition features. `DockDoor`/`BridgeDoor` in
+particular are also feature groups per the "Not included" list in
+`water-tile-gallery.md` and would need the same treatment if a future report flags
+them.
