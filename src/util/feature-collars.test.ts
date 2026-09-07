@@ -36,12 +36,14 @@ describe("getFeatureCollar", () => {
     expect(getFeatureCollar("tti01", "Ramp")).toEqual([
       { relX: 1, relY: 0, tileId: 8, orientation: 2 },
     ]);
-    // tcn01 CityGate_2x2: 4 collar tiles, one per corner tower (see PROGRESS.md Area 7 follow-up)
+    // tcn01 CityGate_2x2: 4 collar tiles, one per corner tower (see PROGRESS.md
+    // Area 7 follow-up; orientations 1/1 corrected from an original 3/3 error
+    // found via real user report, see the "CORRECTED" comment in feature-collars.ts)
     expect(getFeatureCollar("tcn01", "CityGate_2x2")).toEqual([
-      { relX: -1, relY: 0, tileId: 0, orientation: 3 },
+      { relX: -1, relY: 0, tileId: 0, orientation: 1 },
       { relX: -1, relY: 1, tileId: 0, orientation: 2 },
       { relX: 2, relY: 0, tileId: 3, orientation: 0 },
-      { relX: 2, relY: 1, tileId: 3, orientation: 3 },
+      { relX: 2, relY: 1, tileId: 3, orientation: 1 },
     ]);
     // tcn01 ShipDocked_2x2: dock-crosser collar, west and east of the dock row
     // (see docs/tileset-proving-grounds/water-tile-gallery.md)

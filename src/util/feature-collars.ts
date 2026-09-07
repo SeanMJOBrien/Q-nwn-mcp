@@ -90,11 +90,20 @@ const FEATURE_COLLARS: Record<string, Record<string, FeatureCollarTile[]>> = {
     // warnings on both east-side collars, terrain-name-only residual
     // warnings on the west side one tile further out (pre-existing building
     // zone, not a height mismatch).
+    // CORRECTED: the original derivation of the two entries marked below was
+    // wrong by exactly 180° (ori3 where ori1 was needed) -- found via a real
+    // user report ("tcn01_a01_01 is rotated incorrectly 180 degrees") and
+    // confirmed by mechanically reapplying getRotatedCorners's own formula to
+    // each collar tile's raw corner heights, rather than re-trusting the
+    // original hand reasoning. West-south needs its EAST edge (TR,BR) to
+    // match tile 239's west edge (TL=1,BL=0) -> (1,0); only ori1 produces
+    // that from a01_01's raw corners (TL=1,TR=1,BL=0,BR=1), not ori3. Same
+    // error, same fix, for east-north against tile 262's east edge.
     citygate_2x2: [
-      { relX: -1, relY: 0, tileId: 0, orientation: 3 }, // west, south sub-tile: a01_01 @ ori3
+      { relX: -1, relY: 0, tileId: 0, orientation: 1 }, // west, south sub-tile: a01_01 @ ori1 (corrected from ori3)
       { relX: -1, relY: 1, tileId: 0, orientation: 2 }, // west, north sub-tile: a01_01 @ ori2
-      { relX: 2, relY: 0, tileId: 3, orientation: 0 },  // east, south sub-tile: a04_01 @ ori0 (zero warnings)
-      { relX: 2, relY: 1, tileId: 3, orientation: 3 },  // east, north sub-tile: a04_01 @ ori3 (zero warnings)
+      { relX: 2, relY: 0, tileId: 3, orientation: 0 },  // east, south sub-tile: a04_01 @ ori0
+      { relX: 2, relY: 1, tileId: 3, orientation: 1 },  // east, north sub-tile: a04_01 @ ori1 (corrected from ori3)
     ],
     // ShipDocked_2x2 (tileIds [243,244,241,242], rows=2 cols=2 — 243/244 south
     // row is the ship's hull, no crossers; 241/242 north row is the dock-facing
