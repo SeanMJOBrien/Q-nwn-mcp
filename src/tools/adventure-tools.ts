@@ -33,6 +33,7 @@ import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatche
 import type { LayoutStyle, SuggestedFeature } from "../util/layout-generator.js";
 import { solveArea } from "../util/zone-solver.js";
 import type { TerrainZone, CrosserPath, FeatureTile } from "../util/zone-solver.js";
+import { getFeatureCollar } from "../util/feature-collars.js";
 
 export function registerAdventureTools(server: McpServer): void {
 
@@ -605,21 +606,26 @@ export function registerAdventureTools(server: McpServer): void {
           continue;
         }
         // Reject groups containing height-transition tiles (e.g. cave mouths carved
-        // into a rise). The terrain-name check below only compares corner terrain
-        // strings, not corner height, so a tile like tno01's "Cave" (flat snow/snow/
-        // snow/snow by name, but TopLeft/TopRightHeight=1) passes that check and gets
-        // dropped into a dead-flat zone with no elevated neighbors to meet it —
-        // visually a cave mouth floating in an open field with a cliff-edge seam on
-        // every side but the entrance. The zone solver already excludes non-flat
-        // tiles from its own placements (see tileset.ts's `flat` field); feature
-        // groups need the same exclusion, since this pipeline has no mechanism to
-        // also terrace matching elevated terrain around a height-transition feature.
+        // into a rise) UNLESS a human has already hand-derived and verified a
+        // matching collar for this exact (tileset, group) pair — see
+        // feature-collars.ts. The terrain-name check below only compares corner
+        // terrain strings, not corner height, so a tile like tts01's "Cave" (flat
+        // snow/snow/snow/snow by name, but TopLeft/TopRightHeight=1) passes that
+        // check and gets dropped into a dead-flat zone with no elevated neighbors
+        // to meet it — visually a cave mouth floating in an open field with a
+        // cliff-edge seam on every side but the entrance. The zone solver already
+        // excludes non-flat tiles from its own placements (see tileset.ts's `flat`
+        // field); feature groups need the same exclusion by default, since this
+        // pipeline has no *general* mechanism to auto-terrace matching elevated
+        // terrain — feature-collars.ts is the curated exception list of specific
+        // features this has already been solved for by hand.
         const hasHeightTransition = group.tileIds.some(id => {
           if (id < 0) return false;
           const t = tileset.tiles[id];
           return t && !t.flat;
         });
-        if (hasHeightTransition) {
+        const collar = hasHeightTransition ? getFeatureCollar(tilesetResref, sf.feature) : undefined;
+        if (hasHeightTransition && !collar) {
           featureWarnings.push(`${sf.feature}: skipped (height-transition tile — needs hand-terraced elevated terrain, not auto-placeable)`);
           continue;
         }
@@ -666,6 +672,37 @@ export function registerAdventureTools(server: McpServer): void {
             const tileId = group.tileIds[gr * group.columns + gc];
             if (tileId < 0) continue; // empty slot
             featureTiles.push({ x: sf.x + gc, y: sf.y + gr, tileId, orientation: 0 });
+          }
+        }
+        // Resolve the feature's collar, if it has a curated one (feature-collars.ts).
+        // Each collar tile still gets its own bounds + terrain-name check — the
+        // curated table is trusted for tile ID/orientation, not for whether this
+        // *specific* placement's surroundings still match what it was derived
+        // against. A collar tile that can't be placed is dropped with a warning;
+        // the main feature is not rolled back for it (a feature with a partially
+        // missing collar is still strictly better than the pre-fix behavior of
+        // rejecting the feature outright).
+        if (collar) {
+          for (const ct of collar) {
+            const cx = sf.x + ct.relX, cy = sf.y + ct.relY;
+            if (cx < 0 || cx >= areaWidth || cy < 0 || cy >= areaHeight) {
+              featureWarnings.push(`${sf.feature}: collar tile at (${cx},${cy}) skipped (out of bounds)`);
+              continue;
+            }
+            const collarTile = tileset.tiles[ct.tileId];
+            if (!collarTile) {
+              featureWarnings.push(`${sf.feature}: collar tile id ${ct.tileId} not found in tileset`);
+              continue;
+            }
+            if (featureZoneTerrain &&
+                (collarTile.corners.topLeft.toLowerCase() !== featureZoneTerrain ||
+                 collarTile.corners.topRight.toLowerCase() !== featureZoneTerrain ||
+                 collarTile.corners.bottomLeft.toLowerCase() !== featureZoneTerrain ||
+                 collarTile.corners.bottomRight.toLowerCase() !== featureZoneTerrain)) {
+              featureWarnings.push(`${sf.feature}: collar tile at (${cx},${cy}) skipped (terrain mismatch — this instance's surroundings differ from what the collar was derived against)`);
+              continue;
+            }
+            featureTiles.push({ x: cx, y: cy, tileId: ct.tileId, orientation: ct.orientation });
           }
         }
         featureGroups.push(sf.feature);

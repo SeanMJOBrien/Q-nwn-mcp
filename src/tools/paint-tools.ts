@@ -574,6 +574,7 @@ export function registerPaintTools(server: McpServer): void {
       musicDay: z.string().optional().describe("Day music ID (from ambientmusic.2da)"),
       musicNight: z.string().optional().describe("Night music ID"),
       musicBattle: z.string().optional().describe("Battle music ID"),
+      musicDelay: z.string().optional().describe("Gap in seconds before the music loop repeats. Left at 0 (the area-creation default) the track restarts instantly."),
       // Ambient sounds (in GIT AreaProperties)
       ambientSndDay: z.string().optional().describe("Day ambient sound ID (from ambientsound.2da)"),
       ambientSndDayVol: z.string().optional().describe("Day ambient volume (0-100)"),
@@ -655,6 +656,7 @@ export function registerPaintTools(server: McpServer): void {
           setAp("MusicDay", pi(params.musicDay), "int");
           setAp("MusicNight", pi(params.musicNight), "int");
           setAp("MusicBattle", pi(params.musicBattle), "int");
+          setAp("MusicDelay", pi(params.musicDelay), "int");
           setAp("AmbientSndDay", pi(params.ambientSndDay), "int");
           setAp("AmbientSndDayVol", pi(params.ambientSndDayVol), "int");
           setAp("AmbientSndNight", pi(params.ambientSndNight), "int");

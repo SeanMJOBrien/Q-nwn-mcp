@@ -100,6 +100,16 @@ Follow `area-rural` for the group vocabulary — it is identical — but use the
   4. This patches a 1-tile collar immediately around the feature, not a fully seamless terrace —
      say so when reporting the fix. A wider apron is genuinely a hand-modeling task better done
      in the toolset than chased further here.
+  5. **TODO — extend the collar into a proper cliff-to-trees transition where trees terrain is
+     nearby.** The recipe above reaches only for same-terrain elevation tiles (`tts01`'s `aXX`
+     snow slope family). `tts01` separately ships ids 39-48 and 247/248, a family mixing `Snow`
+     at height 1 with `Trees` at height 0 in the same tile — the tileset's own purpose-built
+     piece for exactly this transition, not yet used by this recipe. If trees terrain sits near
+     the feature (a common `tts01`/`ttr01` neighbor), extend the collar 1-2 more tiles outward
+     on that side using this family instead of dropping straight back to flat terrain. Same
+     method: compute the collar tile's already-placed edge, find which of ids 39-48/247/248 (at
+     which orientation) reproduces it exactly. See `docs/tileset-proving-grounds/PROGRESS.md`'s
+     Area 6 entry for the specific case this was raised against.
 - **Don't expect variety from `tti01`.** 75 tiles total. If the area feels repetitive, that is the
   tileset; add placeable landmarks instead of hunting for tiles.
 - **Snow needs `ChanceSnow`.** A frozen area with clear weather reads as a mistake.

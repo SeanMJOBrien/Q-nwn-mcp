@@ -104,7 +104,7 @@ reports `compiled: true`.
 |--------|---------|
 | `c_hen_free` | `StartingConditional` — TRUE when the companion has no master |
 | `c_hen_mine` | `StartingConditional` — TRUE when the PC speaking is its master |
-| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark |
+| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark, log a verification summary (see below) |
 | `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
 | `a_hen_stay` | Stand ground, via `bkRespondToHenchmenShout` |
 | `a_hen_follow` | Follow master, via `bkRespondToHenchmenShout` |
@@ -143,17 +143,38 @@ Then `create_creature_blueprint`:
 
 ```
 create_creature_blueprint(
-  sourceResref: "<class chassis — see table below, for APPEARANCE only>",
   resref: "<name>", tag: "<name>",
   name: "<display name>",
   faction: 2,
   henchman: true,
-  classes: '[{"class": <verified class ID from the table — never assumed from sourceResref>, "level": 1}]',
+  race: <racialtypes.2da row for the NPC's described race>,
+  appearance: <same numeric value as race, for the 7 standard PC races — see note below>,
+  gender: <0=male, 1=female>,
+  classes: '[{"class": <class ID for the companion's role — 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger 8=Rogue 9=Sorcerer 10=Wizard>, "level": 1}]',
+  startingPackage: <same value as the class ID above>,
   conversation: "dlg_hen_<resref>",
   soundset: <TYPE 0 row matching gender — see table>,
   varTable: '[{"name": "HENCH_LEVEL", "type": "int", "value": <module target level>}]'
 )
 ```
+
+**Appearance rule — no chassis needed.** `appearance.2da` rows 0–6 (Dwarf, Elf, Gnome,
+Halfling, Half-Elf, Half-Orc, Human) map 1:1 by label to the same numeric values as the
+`race` parameter for the 7 standard PC races (verified directly against `appearance.2da`).
+Set `race` and `appearance` to the same value and the companion renders correctly with no
+`sourceResref` cloning required — this covers all 11 classes, not just the 5 with a
+verified chassis in the fallback table below. Skip `sourceResref` entirely unless the plot
+calls for a specific non-standard look (see "Companion source blueprints" below for that
+fallback path, and its caveats).
+
+**`startingPackage` must be set — this is not optional.** `LevelUpHenchman()` reads the
+companion's `StartingPackage` (a `packages.2da` row) to decide which feats, skills, and
+spells to grant at each level. Left unset it defaults to GFF row `0`, which is Barbarian's
+package — silently *correct* only if the companion actually is a Barbarian, and silently
+*wrong* for every other class. **Verified rule: for every base class's iconic package,
+`packages.2da` row index equals class ID** (Bard=1, Cleric=2, Druid=3, Fighter=4, Monk=5,
+Paladin=6, Ranger=7, Rogue=8, Sorcerer=9, Wizard=10, Barbarian=0) — so `startingPackage`
+should always be set to the same number as the `classes` entry's `class` value.
 
 **Always pass `classes` explicitly, starting at level 1** — the companion levels up live to
 `HENCH_LEVEL` via `LevelUpHenchman()` when `a_hen_join` fires on recruit (that's what grants
@@ -162,9 +183,28 @@ principle now documented in `adventure-challenges/SKILL.md`'s automatic-class-fe
 Do not pre-set a higher static level here — a companion built at level 1 and leveled live is
 the difference between this working correctly and the "cleric henchman has no spells" bug.
 
+**An empty `FeatList` on this level-1 blueprint is expected, not a defect.** Racial feats
+(weapon familiarity, favored-enemy mechanics, bonus first-level feats, etc.) come from
+`racialtypes.2da`'s `FeatsTable`/`ExtraFeatsAtFirstLevel`/`NormalFeatEveryNthLevel` columns
+and are computed by the engine from the `Race` field alone — they need no `FeatList` entry
+at creation time. Class feats and bonus feats are meant to come entirely from the live
+`LevelUpHenchman()` call above, using the package set by `startingPackage`. Don't try to
+pre-populate `FeatList` by hand to "fix" an apparently-empty feat list on a fresh blueprint.
+
 `henchman: true` wires all 13 script fields to the stock `x0_ch_hen_*` associate AI.
 These are base-game resources resolved at runtime — **never write them into the module**,
 and expect `validate_module` to report them as missing (a false positive).
+
+**Verify the recruit actually worked, live.** `verify_creature`/`verify_dialog` (Step 4
+below) only check static GFF preconditions — they cannot confirm `LevelUpHenchman()`
+behaved correctly at runtime. Have `a_hen_join` log a one-line summary after the level-up
+loop and `AddHenchman()` succeed — e.g. via `WriteTimestampedLogEntry`, dumping
+`GetLevelByClass()` per class against the `HENCH_LEVEL` target, `GetHitDice()`,
+`GetAppearanceType()`/`GetRacialType()`, and (for casters) whether the class's first spell
+level has any known/memorized spells. Read this from the server log after a real in-game
+recruit test — a mismatched level points at a package/recruit-script problem, zero spells
+for a caster points at a missing `bReadyAllSpells = TRUE`, and wrong appearance points at
+`race`/`appearance` not both having been set on the blueprint.
 
 #### Step 4: Verify before moving on
 
@@ -173,7 +213,12 @@ For each companion: `verify_creature(resref: "<resref>", henchman: true)` and
 re-verify; after two failed attempts record `"status": "partial"` in
 `adventure-status.json` with the error list rather than reporting success.
 
-#### Companion source blueprints — class chassis only
+#### Companion source blueprints — fallback only, for a specific non-standard look
+
+The default path above (`race` + matching `appearance`, no `sourceResref`) covers all 11
+classes and every standard PC race with no lookup table needed. Use `sourceResref`
+cloning **only** when the plot calls for a specific named look this doesn't cover (e.g. a
+particular named-NPC face/model). If you do clone a chassis:
 
 **Never build a companion on a Commoner blueprint.** `nw_bartender`, `nw_oldman`,
 `nw_convict` and `nw_shopkeep` are all Commoner (class 20): levelling one grants no
@@ -186,9 +231,13 @@ really Cleric; `nw_elfmerc001` labeled Ranger is really Wizard; `nw_halfcel001`
 labeled Cleric is really Fighter), which would silently build a companion with the
 wrong spellbook/proficiencies if you trusted the source chassis's native class. Always
 cross-check with `resolve_blueprint(resource: "<resref>.utc")` → `classes` before using
-any *new* source not in this table, and **pass `classes` explicitly on the
-`create_creature_blueprint` call regardless** — appearance and combat class are
-independent, so never rely on a chassis's native `ClassList` by omission.
+any *new* source not in this table, and **pass `classes` (and `startingPackage`)
+explicitly on the `create_creature_blueprint` call regardless** — appearance and combat
+class are independent, so never rely on a chassis's native `ClassList` by omission. Note
+that cloning also carries over whatever legacy/current field set (`Tail`/`Wings` vs.
+`Tail_New`/`Wings_New`, `Phenotype`, existing `FeatList`/`SkillList`) the source NPC
+happens to have — harmless, but another reason to prefer the chassis-free default path
+unless you specifically need one of these looks.
 
 | Archetype | Resref | Class |
 |-----------|--------|-------|

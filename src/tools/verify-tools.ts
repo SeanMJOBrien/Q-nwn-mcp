@@ -157,7 +157,7 @@ export function registerVerifyTools(server: McpServer): void {
 
   server.tool(
     "verify_creature",
-    "Verify a creature (.utc) blueprint or placed instance. Checks identity, appearance, classes, all 13 script fields, conversation, equipment and voice. Pass henchman:true to additionally apply companion rules (associate AI wired, non-Commoner class, HENCH_LEVEL set, voice present).",
+    "Verify a creature (.utc) blueprint or placed instance. Checks identity, appearance (including a Race/Appearance_Type mismatch check for the 7 standard PC races), classes, all 13 script fields, conversation, equipment and voice. Pass henchman:true to additionally apply companion rules (associate AI wired, non-Commoner class, StartingPackage set for the companion's class, HENCH_LEVEL set, voice present).",
     {
       ...targetParams,
       henchman: z.boolean().optional().describe("Apply the stricter companion checks"),

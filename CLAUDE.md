@@ -199,6 +199,21 @@ The `wok_cache/` directory is lazy-initialized on first use via `ensureWokCacheD
 
 `adventure_apply_layout` (adventure tool) takes the full `LayoutResult` from `adventure_generate_layout` and applies zones + crossers + features atomically via the zone solver (`src/util/zone-solver.ts`). `paint_tiles` and `paint_group` are base tools for direct/manual tile placement — no solving.
 
+**TODO — area prefabs.** Reconstructing complex multi-tile architecture (castle
+gates with towers, cave mouths carved into a rise) purely via corner/crosser
+matching is fragile — most of one session's worth of user bug reports were exactly
+this class of problem. `feature-collars.ts` (see the Pitfalls entry below) is the
+cheap fix for *known* height-transition features. Two bigger, not-yet-implemented
+approaches — hand-author a piece once, stamp the verified result into generated
+areas as an atomic unit instead of re-deriving it tile-by-tile every time — are
+fully spec'd out in `docs/area-prefabs-spec.md`: prefabs as oversized feature
+groups (smaller lift, reuses most of `packFeatures`), and prefabs as whole BSP
+rooms with declared corridor-connection points (bigger lift, needed for something
+the size of a full walled castle compound with real interior space). Recommended
+sequencing, the exact deliverable a hand-built prefab source area should look
+like, and a concrete starter-library TODO (specific prefabs for the *user* to
+hand-build in the toolset, two batches, priority order) are all in that doc.
+
 `get_tileset_details` defaults to `detail: "summary"` (~2KB) which includes terrain types, crosser types, valid terrain adjacencies, and group names. Use `detail: "full"` for the complete 60-100KB tile catalog.
 
 ### Tile Matching Rules
@@ -237,7 +252,7 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 - **`validate_module` false positives.** Base game scripts (`nw_c2_default5`, etc.) and items (`nw_wblms001`) are resolved at runtime — filter these "missing" references.
 - **Primary/secondary rules in .set files are NOT functional and must be IGNORED.** They are toolset autotiling propagation rules, not tile placement constraints. The tile solver works entirely by matching corner terrains, corner heights, edge crossers, and the `.set` Orientation field.
 - **Height tiles excluded from solving.** Tiles with any corner height > 0 are filtered out. All solver-placed tiles are flat.
-- **Tile rotation: do NOT swap cases 1 and 3 in `getRotatedCorners`/`getRotatedCrossers`/`forwardRotate`.** Case 1 = 90° CW, case 3 = 270° CW. This solve-time rotation math (applied to an already-parsed tile's corners to compute its effective corners at a given GIT placement orientation) is verified correct — cross-checked against 31 real, human-placed instances of a tno01 corner tile across 12 independently-built areas in a large hand-built PW corpus (`~/tfndev`), 100% match. **A separate, now-fixed bug lived one level earlier, at parse time** (see "Real Module" pitfalls below) — don't conflate the two. If a tile still looks misrotated after confirming the parse-time fix is live, the bug is somewhere else (e.g. zone-solver orientation selection), not in these three functions.
+- **Tile rotation: do NOT swap cases 1 and 3 in `getRotatedCorners`/`getRotatedCrossers`/`forwardRotate`.** Case 1 = 90° CW, case 3 = 270° CW. This solve-time rotation math (applied to an already-parsed tile's corners to compute its effective corners at a given GIT placement orientation) is verified correct — cross-checked against 31 real, human-placed instances of a tno01 corner tile across 12 independently-built areas in a large hand-built PW corpus (`~/tfndev`), 100% match. **The crosser-rotation half of the same math (`getRotatedCrossers`) is separately verified too** — cross-checked against 69 real placements of tdm01's corridor-cap/straight/corner-turn tile family (ids 43/44/47/164/165/167) across 15 independently-built `tdm01` dungeons in the same corpus, 68/69 exact matches (the one exception is an explainable dead-end, not a mismatch pattern). Do this same corpus cross-check — never trust the codebase's own rotation code to grade itself — any time a user reports a tile that still looks wrong after a fix; it either confirms the rotation math (as here) or finds the next real bug (as the original parse-time discovery did). **A separate, now-fixed bug lived one level earlier, at parse time** (see "Real Module" pitfalls below) — don't conflate the two. If a tile still looks misrotated after confirming the parse-time fix is live, the bug is somewhere else (e.g. zone-solver orientation selection), not in these three functions.
 - **DLG field completeness is critical — with two verified exceptions.** The NWN engine silently
   fails to load dialogs missing standard fields. Every entry/reply MUST include `Animation`,
   `Comment`, `Delay`, `Quest`, `Script`, `Sound`. Every link struct **nested inside an
@@ -276,6 +291,68 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 
 These came out of generating a full four-area module end-to-end. Each cost real
 debugging time, and none was visible from unit tests.
+
+- **Doors/gates architecture — why generated areas usually ship with none, and what
+  each layer of the gap actually is.** Investigated after a user observation that the
+  17-area `tileset-proving-grounds` module has almost no doors/gates anywhere. Four
+  separate, distinct causes, not one bug:
+  1. **`groupHasUnsupportedDoors`/`groupMatchesTerrain` check the *style's nominal*
+     floor terrain, not the *specific room's* actual zone terrain.** For single-terrain
+     interior/dungeon styles this never matters. For multi-terrain exterior styles
+     (castle's grass/dirt/keep, city's cobble/building/evilcastle) it does: a
+     door-bearing group can pass this pre-filter and still get silently dropped later
+     at `adventure_apply_layout`'s per-position `featureZoneTerrain` check, because
+     the room it lands in has different terrain than the style's nominal one.
+     Confirmed for real: 4 of 9 `preferredFeatures` requested for a `tno01`/castle
+     area (`House_Inn_2x2`, `MarketStall_2x2`, `Forge_L_shape_2x2`,
+     `City_House_2x2_m26` — all door-bearing buildings) were rejected this way. Not
+     wrong, just wasteful — the LLM burns `preferredFeatures` slots on picks that
+     can't succeed in a mixed-terrain area without knowing each room's terrain ahead
+     of time. A real improvement here would have `packFeatures` filter door-bearing
+     groups per-room (it already iterates rooms and could look up each room's actual
+     zone terrain) instead of once for the whole area.
+  2. **Tileset-integrated doors (gates, building doors, corridor archways) need a real
+     Door GIT object placed separately from the visual tile** — the tile model alone
+     is just a wall opening with no lock, script, or interactivity. This is a
+     documented, existing procedure: `adventure-areas/SKILL.md`'s **Phase 5b** scans
+     the painted grid for any tile with `doorPlacements` (from `get_tileset_details`)
+     and places+locks a real door for each. **This step was simply never run for the
+     proving-grounds module** — that build used an ad-hoc recipe outside the full
+     `/create-adventure` skill script (its own doc says "Structure + light dressing
+     only"), so Phase 5b never executed. A real `/create-adventure` run should
+     already produce functional doors wherever the tileset provides them — this
+     hasn't been end-to-end verified in this project, and is worth a real test rather
+     than assuming it works from the doc alone.
+  3. **FOUND A REAL MISTAKE while manually testing doors for this module**: a
+     tile's `doorPlacements[].type` value is a row index into **`doortypes.2da`**,
+     which maps directly to a `TemplateResRef` — the exact door blueprint that
+     tileset expects for that specific door tile (e.g. `tds01`'s Big Door 1, type 17,
+     maps to `nw_door_ttr_08`; its Fence Door 1, type 15, maps to `nw_door_ttr_07`).
+     The manual door test done for this module instead picked blueprints from
+     **`genericdoors.2da`** by matching appearance number — a different, generic
+     table meant for hand-placed doors with no tile association, not the
+     tile-integrated lookup `adventure-areas/SKILL.md`'s Phase 5b actually specifies.
+     Structurally harmless (the doors still placed, locked correctly, and verified),
+     but visually/thematically the wrong door model for that tile. **Always resolve
+     a `doorPlacements[].type` value through `doortypes.2da`, never `genericdoors.2da`.**
+  4. **Interior corridor archways (doorway-type crossers) are deliberately never
+     generated by `layout-generator.ts`** — see the existing "Crosser type" rule
+     under Layout Rules: `doorway` crossers need matched pairs on shared edges, which
+     the solver isn't built to guarantee, so the generator always requests `corridor`
+     type instead. This means auto-generated dungeons will never have a mid-corridor
+     doorway unless one comes from a deliberately-requested single-tile door group
+     (Big Door, Fence Door, etc.) — not a bug, a considered solver-reliability
+     tradeoff. Making doorway crossers reliable would be a real, separate
+     solver-extension project, not a quick fix.
+  5. **Inter-area transitions deliberately never use doors or triggers** — this is
+     intentional, existing design (`adventure-areas/SKILL.md`'s Phase 7: "Use
+     `adventure_create_transition` for ALL area transitions — do NOT use doors,
+     `link_doors`, or `create_area_transition`"), not a gap. Light-shaft portals need
+     no matched door pairs or trigger geometry across two areas, which is why the
+     pipeline standardized on them. Switching any of this to physical doors or
+     trigger-based transitions would be a deliberate scope change to the
+     `/create-adventure` pipeline, not a bug fix — needs explicit user sign-off, not
+     silent replacement.
 
 - **FIXED — independently-routed corridor paths could dead-end cardinally
   adjacent to each other with no connecting edge, reading as two hallway stubs
@@ -329,6 +406,29 @@ debugging time, and none was visible from unit tests.
   cave tile's real corner heights at its placed orientation, finding which
   rotation of a neighboring slope tile reproduces the exact matching edge, and
   what "good enough" looks like — a 1-tile collar, not a fully seamless terrace).
+
+- **`feature-collars.ts` — the reject-by-default rule above now has a curated
+  escape hatch.** After hand-deriving and verifying collars for four more
+  height-transition features this same session (`tts01` Cave, `tti01` Cave and
+  Ramp, `tcn01` CityGate_2x2), the pattern was clearly going to keep recurring —
+  every user report was "here's a feature that needs the exact same kind of fix
+  as last time." `src/util/feature-collars.ts` is a small curated table:
+  `(tileset, group name) → collar tiles` (each an offset from the feature's own
+  origin + tile ID + orientation). `adventure-tools.ts`'s height-transition
+  rejection now checks this table first — a listed (tileset, group) pair is
+  auto-placed *with* its collar in the same `adventure_apply_layout` call instead
+  of being rejected; anything not listed still falls through to the old
+  reject-by-default behavior. Each collar tile still gets its own bounds +
+  terrain-name check at placement time (the curated entry is trusted for tile
+  ID/orientation, not for whether *this specific* room's surroundings still
+  match what it was derived against) — a collar tile that can't be placed is
+  dropped with a warning, not treated as a reason to reject the whole feature.
+  **Growing this table is the cheapest way to fix the next reported instance of
+  this bug class**: derive the collar once via the recipe above, add one entry,
+  and every future generation gets it automatically instead of needing another
+  hand-patch. Needs an MCP restart to take effect; doesn't retroactively fix
+  already-built areas (a listed feature already painted before the restart still
+  needs the old hand-patch treatment).
 
 - **FIXED — parse-time tile-corner "un-rotation" was corrupting every tile whose
   `.set` `Orientation` field is non-zero.** `tileset.ts`'s `.set` parser used to treat
@@ -416,6 +516,17 @@ any other generated file type, so structurally-broken assets shipped silently. T
   (`src/util/verify/common.ts`) — `nw_c2_default*`, `x0_ch_hen_*`, `nw_ch_ac*` and
   friends resolve at runtime and must never be reported as missing.
 
+**TODO — a live server for runtime verification.** `verify_*` can only check static GFF
+preconditions — it cannot confirm behavior that only exists once the engine actually runs
+a script, most concretely `LevelUpHenchman()` granting the right feats/skills/spells to a
+companion on recruit (see "Henchmen / Companions" below) or tfndev's own
+`randspellbooks` system (`~/tfndev/src/nss/inc_rand_spell.nss`), which depends on NWNX
+and a persistent campaign database nwn-mcp has no way to invoke. Standing up `~/tfndev`
+or a similarly NWNX-enabled test server — not for hosting, just for actually loading a
+generated module and running it once — would close this gap: it's the only way to turn
+"the static checks pass" into "the companion actually joined with the right level." Future
+infrastructure, not a near-term task.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
@@ -483,9 +594,38 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   `nw_convict`, `nw_shopkeep` are all class 20). `LevelUpHenchman` grants a Commoner no
   feats and no spellbook — the root cause of the "cleric has no spells" report. Use a
   PC-class chassis and set `startingPackage`.
+- **`startingPackage` is not optional — it silently defaults to 0 (Barbarian's package)
+  if unset,** which is correct only for an actual Barbarian and wrong for every other
+  class, degrading `LevelUpHenchman()`'s feat/skill/spell picks. **Verified rule: for
+  every base class's iconic package, `packages.2da` row index equals class ID**
+  (Barbarian=0, Bard=1, Cleric=2, Druid=3, Fighter=4, Monk=5, Paladin=6, Ranger=7,
+  Rogue=8, Sorcerer=9, Wizard=10) — always set `startingPackage` to the same number as
+  the companion's `classes` entry. `verify_creature(henchman:true)` now flags
+  `henchman_no_package` when this is missed (`src/util/verify/blueprints.ts`).
+- **Appearance needs no chassis clone.** `appearance.2da` rows 0-6 (Dwarf, Elf, Gnome,
+  Halfling, Half-Elf, Half-Orc, Human) map 1:1 by label to the same numeric
+  `racialtypes.2da` rows used by the `race` field, for the 7 standard PC races. Set
+  `race` and `appearance` to the same value and skip `sourceResref` entirely — this was
+  the root cause of a "henchmen have no appearance" report: `buildMinimalUtc()`'s own
+  defaults are `Race=6` (Human) but `Appearance_Type=0` (Dwarf), a real mismatch out of
+  the box, not just an unset field. `verify_creature` now flags
+  `appearance_race_mismatch` for any creature (not just henchmen) where these disagree
+  within the standard-race range.
+- **An empty `FeatList` on a fresh level-1 blueprint is expected, not a defect.** Racial
+  feats and the bonus-feat cadence come from `racialtypes.2da`'s `FeatsTable`/
+  `ExtraFeatsAtFirstLevel`/`NormalFeatEveryNthLevel` columns, computed by the engine from
+  `Race` alone — no `FeatList` entry needed. Class/bonus feats are meant to come entirely
+  from the live `LevelUpHenchman()` call below. Don't hand-populate `FeatList` to "fix"
+  an apparently-empty one.
 - **Abilities come from vanilla `LevelUpHenchman(oHench, CLASS_TYPE_INVALID, TRUE, PACKAGE_INVALID)`**
   at recruit, looped to the blueprint's `HENCH_LEVEL` local. `bReadyAllSpells = TRUE`
   matters — without it the companion joins with an empty memorized list.
+- **Static verification can't confirm this actually worked at runtime.** Have the
+  recruit script (`a_hen_join`) log a summary after the level-up loop —
+  `GetLevelByClass()` vs. `HENCH_LEVEL`, `GetHitDice()`, `GetAppearanceType()`/
+  `GetRacialType()`, and spell-readiness for casters — via `WriteTimestampedLogEntry`, and
+  read it from the log after a real in-game recruit test. See the TODO under
+  "Verification Gate" above.
 - **Companion voices must be TYPE 0 (PC voiceset) rows** from `soundset.2da`. TYPE 3 NPC
   sets are sparse and leave the companion intermittently mute.
 

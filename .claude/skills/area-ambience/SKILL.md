@@ -53,7 +53,8 @@ Everything else in this skill — lighting, fog, weather, `IsNight`, `DayNightCy
 
 - **`MusicDay`** and **`MusicNight`** — a row from `ambientmusic.2da`. Look it up; do not guess.
 - **`MusicBattle`** — from `ambientmusic.2da` as well. 93% adoption: combat music is not optional.
-- **`MusicDelay`** — the gap before the loop repeats. Left at 0 the track restarts instantly and
+- **`MusicDelay`** — the gap before the loop repeats, in seconds. Set via `set_area_properties`'s
+  `musicDelay` param. Left at 0 (the area-creation default) the track restarts instantly and
   becomes maddening. Hand-built areas set it 91% of the time.
 - **`AmbientSndDay`** / **`AmbientSndNight`** — a row from `ambientsound.2da`, plus volumes
   (`AmbientSndDayVol`, `AmbientSndNitVol`). This is the single highest-adoption setting in the

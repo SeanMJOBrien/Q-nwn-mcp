@@ -179,6 +179,63 @@ hand-modeling, plausibly better done in the toolset. `verify_area(checkWalkable:
 true)` passes clean. **Not yet re-confirmed by the user visually** — recorded here
 per the same convention as the castle-corner and water-tile investigations.
 
+**TODO — proper cliff-to-trees transition around the cave, using the tileset's own
+purpose-built tiles for it.** User follow-up: the 1-tile collar above only uses
+same-terrain (snow-only) elevation tiles (the `aXX` family) — it doesn't address
+the neighboring terrain actually visible near this cave (tiles like 36
+`snow/trees/snow/trees` and 38 `trees/snow/snow/snow`, both flat, sit close by).
+The elevation should continue *outward* from the collar and blend into that
+existing trees terrain, rather than dropping straight back to flat snow one tile
+out. **Confirmed the right tile family exists**: `tts01` ships a dedicated set of
+elevated snow/trees transition tiles for exactly this purpose — ids 39-48 and
+247/248 (e.g. id 45 `d13_01`: `TL=Snow/1,TR=Snow/1,BL=Trees/0,BR=Snow/1`; id 48
+`d16_01`: `TL=Snow/1,TR=Trees/0,BL=Trees/0,BR=Trees/0`) — mixing `Snow` at height 1
+with `Trees` at height 0 in the same tile, i.e. cliff-face-into-treeline in one
+piece. None of these were used in the collar fix above (it only reached for the
+pure-snow `aXX` slope family). **Next step**: extend the collar 1-2 more tiles out
+on the sides that border trees terrain, selecting from ids 39-48/247/248 by the
+same method as before — compute the required edge heights+terrains from the
+collar tile's already-placed corners, then find which of these tiles (at which
+orientation) reproduces that edge exactly, same rotation-math approach, before
+handing off to a final flat trees zone. Not done in this session — flagging for
+the next pass rather than guessing at placements without re-deriving the exact
+edge requirements first.
+
+## Area 7 (`pg_tcn01`) follow-up — city gate corner towers found stranded, fixed
+
+User report: the `CityGate_2x2` feature at (col=3-4, row=27-28) — tile IDs 239
+(`o17_01`), 240 (`p17_01`), 237 (`o16_01`), 262 (`p16_01`) — "opens north/south" but
+had "no required walls or other tiles to the east or west, leaving the sides of the
+gate appearing cut off." Confirmed from the raw `.set` data: each of the 4 tiles has
+exactly one **outer** corner elevated (height 1) forming the gate's corner towers,
+with all **inner** corners (meeting at the gate's own center, the walkway) flat —
+i.e. a real gate structure with raised towers flanking a flat passage, same shape
+family as the `tts01`/`tti01` cases but with a diagonal (single-corner) elevation
+pattern instead of a uniform edge. Same root cause: `groupHasUnsupportedDoors`'s
+terrain-name-only check doesn't see height at all, so this feature (which does pass
+that check, since all 4 tiles are pure `cobble`) still had nothing placed beside it
+by the generator.
+
+**Patched by hand**, same rotation-based method: computed each gate tile's exact
+outer-edge corner heights (a *diagonal* pattern this time — e.g. tile 239's west
+edge is `(TL=1,BL=0)`, tile 237's west edge is `(TL=0,BL=1)` — not the uniform edges
+seen in the earlier `tts01`/`tti01` cases), then searched `tcn01`'s own `a01`-`a04`
+generic elevation-step family (ids 0-3, same naming convention already used
+successfully in `tno01`/`tts01`/`tti01`) for the exact rotation reproducing each
+edge. Placed:
+- (2,27): tile 0 (`a01_01`) @ ori3 — matches tile 239's west edge exactly.
+- (2,28): tile 0 (`a01_01`) @ ori2 — matches tile 237's west edge exactly.
+- (5,27): tile 3 (`a04_01`) @ ori0 — matches tile 240's east edge exactly, **zero
+  warnings**.
+- (5,28): tile 3 (`a04_01`) @ ori3 — matches tile 262's east edge exactly, **zero
+  warnings**.
+The two west-side placements ((2,27)/(2,28)) carry residual `cobble vs building`
+terrain-name warnings **one tile further west**, where the collar meets a
+pre-existing building zone — the same "smaller, more distant seam" category noted
+in every prior fix in this file, not a height mismatch, and not on the edge that
+actually meets the gate (which matched exactly). `verify_area(checkWalkable: true)`
+passes clean. **Not yet re-confirmed by the user visually.**
+
 ## Area 10 (`pg_ttd01`) result
 
 Confirmed done retroactively (context was cleared mid-build before this file's status
@@ -321,6 +378,34 @@ built earlier, where the default fill stays as a bounding wall terrain.
 ["After all 17 areas"](#after-all-17-areas) checklist below: connect areas, delete
 the dead `_start` area, place henchmen, place a starter store, verify connectivity,
 final repack.
+
+**Follow-up — two more stranded height-transition features found and fixed (user
+report).** `pg_tti01` was built before the height-transition feature-filter fix (see
+`CLAUDE.md`'s Pitfalls entry), so it shipped with the same class of bug as `tts01`'s
+cave: the `Ramp` feature (tile 46) at (col=12,row=8) and the `Cave` feature (tile 47)
+at (col=6,row=12) both have `TL=0,TR=1,BL=0,BR=1` (flat west edge, elevated east
+edge) but were dropped into all-flat surrounding floor with no elevated neighbor —
+reported by the user as a cave "opening West with no other required tiles around it"
+and a ramp "up to the East with no other required elevated tiles around it," matching
+each tile's actual corner data exactly (west=flat, east=elevated). **Patched by
+hand**: `tti01` has the same `aXX`-family elevation tiles as `tts01` (`a01`-`a04`,
+same model-naming convention) — tile 3 (`a02_01`) at orientation 2 produces effective
+corners `TL=1,TR=0,BR=0,BL=1`, an exact match for the Left edge needed east of both
+features. Placed tile 3@2 at (7,12) (east of the cave) and tile 8@2 (`a02_02`, same
+structural family, different model variant for visual variety) at (13,8) (east of
+the ramp) — **zero constraint warnings on both**, confirming an exact height+terrain
+match. This settles the elevation back to flat one tile further east (a small
+mound/step shape), not a full plateau — `tti01`'s tiny 75-tile catalog has no
+all-four-corners-elevated flat tile to terrace onto. Only the east edge was patched;
+the north/south edges of each feature are each half-elevated/half-flat (a diagonal
+step) that would need a different, more complex matching tile — not addressed here,
+same "1-tile collar, not a full terrace" scope as the `tts01` fix. **Caveat**: unlike
+the `tno01`/`tdm01` investigations, `tti01` itself has no real hand-built instances
+in the `~/tfndev` corpus to spot-check against (that corpus's closest resref is
+`tii01`, a different tileset) — this patch relies on the rotation formula itself
+being correct (independently verified via `tno01`/`tdm01`), not on a `tti01`-specific
+corpus confirmation. `verify_area(checkWalkable: true)` passes clean. **Not yet
+re-confirmed by the user visually.**
 
 ## Notes / decisions made along the way
 

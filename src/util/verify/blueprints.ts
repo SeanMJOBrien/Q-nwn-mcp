@@ -54,6 +54,23 @@ const CREATURE_SCRIPT_FIELDS = [
 /** NWN's Commoner class. Levelling a Commoner grants no feats and no spellbook. */
 const CLASS_TYPE_COMMONER = 20;
 
+/**
+ * Barbarian. The only class whose packages.2da row happens to equal
+ * StartingPackage's GFF default of 0 — every other class silently gets the
+ * wrong package (and thus wrong LevelUpHenchman() picks) if left unset.
+ */
+const CLASS_TYPE_BARBARIAN = 0;
+
+/**
+ * appearance.2da rows 0-6 (Dwarf, Elf, Gnome, Halfling, Half-Elf, Half-Orc,
+ * Human) map 1:1 by label to the same numeric racialtypes.2da rows used by
+ * the `race` field for the 7 standard PC races — verified directly against
+ * appearance.2da. buildMinimalUtc()'s own defaults (Race=6/Human,
+ * Appearance_Type=0/Dwarf) are a real-world instance of this mismatch, not
+ * hypothetical.
+ */
+const STANDARD_PC_RACE_MAX = 6;
+
 /** Henchman script set — used to detect a partially-wired companion. */
 const HENCHMAN_SCRIPT_PREFIX = "x0_ch_hen_";
 
@@ -86,6 +103,22 @@ export async function verifyCreature(
   // ─── Appearance ─────────────────────────────────────────────────────────
   const appearance = getFieldNum(obj, "Appearance_Type");
   checkTwoDARef(report, index, "appearance", appearance, "Appearance_Type", "NAME");
+
+  const race = getFieldNum(obj, "Race");
+  if (
+    race >= 0 &&
+    race <= STANDARD_PC_RACE_MAX &&
+    appearance >= 0 &&
+    appearance <= STANDARD_PC_RACE_MAX &&
+    appearance !== race
+  ) {
+    report.warn(
+      "appearance_race_mismatch",
+      `Race is ${race} but Appearance_Type is ${appearance} — for the 7 standard PC races, appearance.2da rows 0-6 match racialtypes.2da rows 0-6, so this creature will render with the wrong body model for its race`,
+      "Appearance_Type",
+      "create_creature_blueprint with appearance set to the same value as race",
+    );
+  }
 
   // ─── Faction ────────────────────────────────────────────────────────────
   const faction = getFieldNum(obj, "FactionID");
@@ -232,6 +265,17 @@ export async function verifyCreature(
         "Companion is Commoner class only — LevelUpHenchman() will grant no feats and no spellbook, so it will join with no abilities",
         "ClassList",
         "clone a PC-class chassis (nw_halfcel001, nw_elfmage001, nw_humanmerc002, ...) instead of nw_bartender/nw_oldman/nw_convict",
+      );
+    }
+
+    const startingPackage = getFieldNum(obj, "StartingPackage");
+    const primaryClass = classList.length > 0 ? getFieldNum(classList[0], "Class") : undefined;
+    if (primaryClass !== undefined && primaryClass !== CLASS_TYPE_BARBARIAN && startingPackage === 0) {
+      report.warn(
+        "henchman_no_package",
+        `Companion's StartingPackage is 0 (Barbarian's package) but its primary class is ${primaryClass} — LevelUpHenchman() will make Barbarian-appropriate feat/skill/spell picks for the wrong class`,
+        "StartingPackage",
+        `create_creature_blueprint with startingPackage:${primaryClass} (packages.2da row = class ID for each base class's iconic package)`,
       );
     }
 

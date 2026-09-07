@@ -156,6 +156,37 @@ describe("verifyCreature", () => {
     expect(report.errors.map((e) => e.code)).toContain("missing_script_field");
   });
 
+  it("flags an Appearance_Type/Race mismatch for a standard PC race", async () => {
+    // buildMinimalUtc()'s own real defaults: Race=6 (Human), Appearance_Type=0 (Dwarf).
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Appearance_Type: { type: "word", value: 0 },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).toContain("appearance_race_mismatch");
+  });
+
+  it("does not flag a matching Appearance_Type/Race pair", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 1 },
+      Appearance_Type: { type: "word", value: 1 },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("appearance_race_mismatch");
+  });
+
+  it("does not flag a non-standard (monster) race/appearance pairing", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 24 },
+      Appearance_Type: { type: "word", value: 350 },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("appearance_race_mismatch");
+  });
+
   it("flags an empty ClassList", async () => {
     const obj = makeCreature("nw_c2_default", { ClassList: { type: "list", value: [] } });
     const report = new Report("t", "utc");
@@ -241,11 +272,40 @@ describe("verifyCreature", () => {
       expect(codes).toContain("henchman_no_voice");
     });
 
+    it("warns on StartingPackage 0 for a non-Barbarian companion", async () => {
+      // makeCreature defaults to ClassList class 4 (Fighter) with no StartingPackage set,
+      // so it inherits the GFF default of 0 — Barbarian's package, not Fighter's.
+      const obj = makeCreature("x0_ch_hen_", { Conversation: { type: "resref", value: "dlg_x" } });
+      const index = makeIndex({
+        resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
+      });
+      const report = new Report("t", "utc");
+      await verifyCreature(report, index, obj, { henchman: true });
+      expect(report.warnings.map((w) => w.code)).toContain("henchman_no_package");
+    });
+
+    it("does not warn on StartingPackage 0 for an actual Barbarian companion", async () => {
+      const obj = makeCreature("x0_ch_hen_", {
+        Conversation: { type: "resref", value: "dlg_x" },
+        ClassList: {
+          type: "list",
+          value: [{ __struct_id: 2, Class: { type: "int", value: 0 }, ClassLevel: { type: "short", value: 3 } }],
+        },
+      });
+      const index = makeIndex({
+        resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
+      });
+      const report = new Report("t", "utc");
+      await verifyCreature(report, index, obj, { henchman: true });
+      expect(report.warnings.map((w) => w.code)).not.toContain("henchman_no_package");
+    });
+
     it("accepts a fully-wired companion", async () => {
       const obj = makeCreature("x0_ch_hen_", {
         Conversation: { type: "resref", value: "dlg_x" },
         SoundSetFile: { type: "word", value: 422 },
         Gender: { type: "byte", value: 1 },
+        StartingPackage: { type: "byte", value: 4 },
         VarTable: {
           type: "list",
           value: [

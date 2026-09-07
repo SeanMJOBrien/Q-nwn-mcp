@@ -17,6 +17,15 @@ Sub-skill of `/create-adventure`. Reads all prior sections of `adventure.md`, th
 
 Fully autonomous. Make all decisions based on the plot document and spatial data — do NOT ask the user for input.
 
+**RULE: every adventure gets at least one starter store — this is not optional.**
+Earlier wording ("1 store per adventure is typical") undersold it: a module with zero
+way to spend starting gold is an incomplete affordance pass, not a valid minimal one.
+If the plot genuinely has no plausible merchant NPC (e.g. a fully hostile dungeon
+crawl with no safe area at all), create one anyway — a traveling peddler, a vending
+placeable, or a quartermaster in the entry area — rather than skip the store
+entirely. See Phase 3/5 below for the store-design and blueprint-creation steps this
+rule always triggers.
+
 ---
 
 ### Pre-Check: Validate adventure.md
@@ -92,7 +101,7 @@ Also call `get_area_placeables` for each area to get the exact GIT index of cont
 Based on context, design the full affordance layout:
 
 **Store design:**
-- **1 store per adventure** is typical for a one-shot. 2 stores max if there are distinct safe areas.
+- **At least 1 store per adventure — mandatory, see the rule above.** 2 stores max if there are distinct safe areas.
 - Pick the most merchant-appropriate NPC (innkeeper, trader, shopkeeper).
 - Stock 10-20 items covering: healing potions, basic weapons, basic armor, utility items (torches, scrolls, antidotes).
 - Set prices to be affordable with starting gold — the player should be able to buy 3-5 key items.
@@ -163,6 +172,11 @@ create_store_blueprint(
   inventory: '[{"resref": "nw_wswls001", "infinite": true, "category": 1}, {"resref": "nw_it_mpotion001", "infinite": true, "category": 2}, ...]'
 )
 ```
+
+**`markUp`/`markDown` default to `100` each (no markup, no markdown — buy and sell at face
+value) if omitted.** Always pass them explicitly as shown above (`120`/`80` is a reasonable
+starter economy) — a store created without them is not a "normal" shop, just an at-cost
+exchange.
 
 **Inventory parameter:** JSON array where each item has:
 - `resref` — base game or module item blueprint resref

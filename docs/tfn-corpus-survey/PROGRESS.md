@@ -15,12 +15,23 @@ as `<category>_raw.json`; narrative findings as `<category>.md`.
 | Dialogs / quest logic | `src/dlg`, `src/nss` | 416 dlg, 2262 nss | **done** (script idioms deferred to the Scripts row) | `dialogs.md` |
 | Items / rewards | `src/uti` | 1358 | **done** | `items.md` |
 | Encounters | `src/ute` | 128 | **done** (low relevance — pipeline uses static placement, not `.ute`) | `encounters.md` |
-| Areas (cross-check vs existing area-* norms) | `src/are`, `src/git`, `src/gic` | 504 | **done — big finding, awaiting your decision** | `areas.md` |
-| Placeables / environment density | `src/utp` | 122 | **done** (covered by areas.md's per-100-tile figures) | `areas.md` |
+| Areas (cross-check vs existing area-* norms) | `src/are`, `src/git`, `src/gic` | 504 | **done** — density finding resolved; forest/underdark follow-up done, no change applied, second decision point open | `areas.md` |
+| Placeables / environment density | `src/utp` | 122 | **done** (density covered by areas.md; tile/terrain-positioning corpus — item 5 — now also done, partial tileset coverage) | `areas.md`, `placeables.md` |
 | Doors / triggers / area-connections | `src/utd`, `src/utt` | 10, 21 | **done** (door-count-per-area covered by areas.md; blueprint variety low, not separately notable) | `areas.md` |
 | Stores | `src/utm` | 27 | **done** | `stores.md` |
 | Scripts — quest/loot/spawn idioms | `src/nss` | 2262 | **done** (targeted grep pass, not exhaustive — loot system covered in actors.md) | `scripts.md` |
 | Combat balance by CR (stats/HP/AC) | `src/utc` (CR-banded) | 201 pure-PC-class | **done**, incl. follow-ups (ability-score-by-role: confirmed + extended; gear-value-by-CR: attempted, inconclusive) | `balance.md` |
+
+## Decision point 4 — resolved same session
+
+4. **Forest/underdark density "reversal"** — retracted. It was a population-mixing
+   artifact: TFN's forest/underdark corpora blend large wilderness-*travel* zones
+   (sparse by design, correctly so) with small named *destination* areas (what
+   `/create-adventure` actually builds). Split on that line, `ttu01`'s destination
+   subset is denser than published (70.0 vs 60) and `ttf01`'s moves back toward
+   published (48.2 vs 58) — consistent with the original finding, not a reversal
+   of it. No SKILL.md change applied. See `areas.md`'s "Forest/underdark
+   cross-reference" section for the full split and numbers.
 
 ## Decisions from the 3 pending items — all resolved
 
