@@ -645,6 +645,21 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
 - **Companion voices must be TYPE 0 (PC voiceset) rows** from `soundset.2da`. TYPE 3 NPC
   sets are sparse and leave the companion intermittently mute.
 
+**TODO — not every NPC should get full PC-class bonus-feat progression.** Everything above
+(`LevelUpHenchman`, `startingPackage`, `SPEC_VerifyCreature`) assumes an NPC is meant to
+progress exactly like a PC of that class — right for companions, wrong for a background
+NPC the plot describes as a plain "warrior" or "adept" rather than a named Fighter/Cleric
+character. **Confirmed via `nwscript.nss`: NWN ships no separate Warrior/Expert/Adept/
+Aristocrat `CLASS_TYPE_*` the way tabletop D&D 3.5's NPC classes do** — the only true
+non-PC catch-all is `CLASS_TYPE_COMMONER` (20), and that one already grants *no* feats or
+spellbook at all via `LevelUpHenchman` (see the "Commoner chassis" bullet above), which is
+too blunt for an NPC that should still fight competently, just without a PC's full bonus-
+feat chain (Cleave→Great Cleave, Weapon Specialization, metamagic feats, epic feats, ...).
+Needs: a way to mark a creature blueprint as "simple" at creation time, and either (a) a
+curated lighter feat set instead of running it through full `LevelUpHenchman`, or (b) a
+repair tool that strips specific over-advanced bonus feats from a creature that was already
+leveled the normal way. Not designed yet — raised by the user, not yet scoped.
+
 ## Gear Appearance
 
 Generated gear uses the base item's **default** model variant, applied by
