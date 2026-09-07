@@ -279,6 +279,22 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 - **Triggers need Geometry in placed instances.** UTT blueprints from resman do NOT contain geometry. When placing triggers, always ensure the `Geometry` list field exists with at least 4 vertices (PointX/PointY/PointZ). Without geometry, the engine won't detect entry and the toolset won't render the trigger.
 - **GIC must be synced with GIT.** The toolset uses the GIC file to index objects in an area. `writeBackGit()` automatically syncs the GIC. Without GIC entries, objects exist in the GIT but the toolset doesn't show them.
 - **A placed instance's `VarTable` (and other per-instance fields) is a separate copy from its UTC blueprint's — editing one does not edit the other.** `place_creature`/`create_creature_blueprint`'s own `varTable` param is unaffected by this (it sets the blueprint before the object is ever placed, so there's only one copy to get right at creation time) — the gap is specific to editing a creature that's *already placed* in a `.git`. Confirmed directly: batch-adding `SPEC_*` local variables to 110 already-placed companions' `.utc` files (verified present there via independent `nwn_gff` extraction) produced total silent failure at runtime — every one read back as unset, because the actual placed instances in the area's `.git` still only carried their original vars. The fix wrote the same entries into the `.git`'s `Creature List` directly. Same family of bug as the previously-found `SoundSetFile` case (a `modify_gff_field` write to a blueprint alone left a placed instance's voice unchanged) — treat any field edit made *after* placement as needing both files, never just the blueprint.
+- **TODO — investigate: creatures with verified-correct `Appearance_Type`/`Race` data can
+  still render invisible in the toolset.** Real user report against 110 already-placed
+  companions in a real module: `get_creature_details` confirmed `race`/`appearance` match
+  correctly (e.g. `race=0, appearance=0` = Dwarf) — the data is right — yet the creatures
+  showed no visible model in the toolset. User's own diagnostic: manually changing a
+  henchman's appearance to a different race and back in the toolset UI made it render
+  correctly. This strongly suggests an engine/toolset appearance-cache invalidation issue
+  specific to how these instances were written (direct GFF/`paint_tiles`-style writes,
+  never touched through the toolset's own property-panel mutation path), not a data
+  correctness problem — possibly the same *class* of bug as the `VarTable` pitfall right
+  above and the `SoundSetFile` pitfall below (a write that's byte-correct but doesn't
+  propagate through whatever cache/index the engine or toolset keeps). **Unconfirmed
+  hypothesis — not root-caused this session.** If this recurs, the next step is checking
+  whether it's specific to `Appearance_Type` alone or any creature field on an
+  already-placed instance, and whether it's a toolset-only display quirk or also affects a
+  live server's rendering.
 - **Placeable display name field is `LocName`**, not `LocalizedName`. Setting `LocalizedName` on a placeable has no effect — the toolset and engine read `LocName` (a cexolocstring).
 - **Placement Z height from walkmesh.** All placement tools automatically set the object's Z position from the walkmesh surface height. The walkmesh check returns the highest walkable face Z at the position. Use `fix_object_heights` to retroactively fix objects placed before this feature.
 - **Zone solver rejects incompatible adjacencies.** `adventure_apply_layout` returns early with zero placements and `INCOMPATIBLE TERRAIN ADJACENCY` errors if the zone layout contains terrain pairs with no transition tiles. Fix the zone layout, don't retry.
