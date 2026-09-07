@@ -72,11 +72,19 @@ describe("generateSpecCheckInclude — field checks", () => {
     expect(source).toContain('if (bPass) WriteTimestampedLogEntry("[SPEC_OK] tag=" + sTag);');
   });
 
-  it("only checks spells for casters at a level that actually grants spells", () => {
+  it("only checks spells for known-spells casters (Sorcerer/Wizard from 1, Bard from 2)", () => {
     expect(source).toContain("SpecIsCasterAtLevel(nExpectClass, nExpectLevel)");
-    // Full casters from level 1, half-casters (Paladin/Ranger) only from level 4.
+    expect(source).toContain("if (nClass == CLASS_TYPE_SORCERER || nClass == CLASS_TYPE_WIZARD)");
     expect(source).toContain("return nLevel >= 1;");
-    expect(source).toContain("return nLevel >= 4;");
+    expect(source).toContain("if (nClass == CLASS_TYPE_BARD)");
+    expect(source).toContain("return nLevel >= 2;");
+  });
+
+  it("never checks spell_count for prepared-caster classes (GetKnownSpellCount is structurally 0 for them)", () => {
+    // Cleric/Druid/Paladin/Ranger cast from their full class list rather than
+    // a personal known-spells list -- verified via a live end-to-end run.
+    expect(source).not.toContain("CLASS_TYPE_CLERIC ||");
+    expect(source).not.toContain("CLASS_TYPE_PALADIN || nClass == CLASS_TYPE_RANGER");
   });
 
   it("sums known spells across every spell level via the real GetKnownSpellCount builtin", () => {

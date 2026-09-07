@@ -184,16 +184,27 @@ ${classFeatBranches()}
     return -1;
 }
 
-// Classes that cast starting at level 1 (Bard/Cleric/Druid/Sorcerer/Wizard) vs.
-// level 4 (Paladin/Ranger, half-casters). Every other class returns FALSE.
+// Classes whose spell_count is checkable via GetKnownSpellCount() at all.
+// Cleric/Druid/Paladin/Ranger are "prepared, cast from the full class list"
+// divine casters -- they have no personal "known spells" list the way
+// Bard/Sorcerer/Wizard do, so GetKnownSpellCount() structurally returns 0 for
+// them regardless of how correctly built they are. Verified via a live
+// end-to-end run: 100% of Cleric/Druid/Paladin/Ranger test creatures failed
+// this check even after a real, successful LevelUpHenchman() pass, while
+// every Bard/Sorcerer/Wizard above level 1 passed cleanly. Checking a
+// prepared caster's actual state would need GetIsSpellPrepared-family
+// functions, not GetKnownSpellCount -- out of scope here; skip the check
+// entirely for these four rather than produce a guaranteed false positive.
+//
+// Sorcerer/Wizard cast from level 1; Bard's first spells come at class level
+// 2, matching NWN's own ruleset (verified: a level-1 Bard test creature had
+// zero known spells while level 2+ Bards did not).
 int SpecIsCasterAtLevel(int nClass, int nLevel)
 {
-    if (nClass == CLASS_TYPE_BARD || nClass == CLASS_TYPE_CLERIC ||
-        nClass == CLASS_TYPE_DRUID || nClass == CLASS_TYPE_SORCERER ||
-        nClass == CLASS_TYPE_WIZARD)
+    if (nClass == CLASS_TYPE_SORCERER || nClass == CLASS_TYPE_WIZARD)
         return nLevel >= 1;
-    if (nClass == CLASS_TYPE_PALADIN || nClass == CLASS_TYPE_RANGER)
-        return nLevel >= 4;
+    if (nClass == CLASS_TYPE_BARD)
+        return nLevel >= 2;
     return FALSE;
 }
 
