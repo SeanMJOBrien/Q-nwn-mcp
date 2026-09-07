@@ -26,10 +26,81 @@ all 7 standard PC races and all 11 base classes.
 `adventure-actors/SKILL.md` Phase 3b wires `SPEC_*` vars into every companion blueprint
 and calls `SPEC_VerifyCreature()` from `a_hen_join`.
 
-**§1, §4, §5 and §6 remain a plan, not an implementation** — no Docker config has been
-authored, no verification server has been stood up, and nothing in this project has ever
-grepped a live server log. That's real infrastructure work, gated on explicit user
-sign-off before spinning up any container (see §8).
+**§1 is implemented and has run a real end-to-end test successfully.** §4 and §6 remain
+unaddressed; §5's orchestration loop is proven by hand but not yet automated into a tool.
+
+**First real end-to-end run, against the actual module that started this whole effort**
+("Henchman Gear Showcase" — the "henchmen have bad stats and no appearance" bug report).
+All 110 companion blueprints were wired with `SPEC_*` vars and a chained
+`ScriptSpawn` (`a_hen_spawn`/`a_show_spawn`, whichever the module already used, calling
+the stock associate-AI spawn script first, then `SPEC_SelfTestOnSpawn`), `a_mod_load` set
+`MCP_VERIFY_MODE`, the module was run headless in `~/nwn-mcp-verify-server`, and the log
+was grepped for `[SPEC_FAIL]`. Result: **zero `[SPEC_OK]`, 384 `[SPEC_FAIL]` lines across
+all 110 creatures** — 110/110 `racial_feat`, 110/110 `class_feat`, 100/110 `package` (the
+10 Barbarians accidentally pass — package `0` is simultaneously "unset" and "Barbarian's
+real package"), 64/110 `spell_count` (every caster, at whatever level it starts casting).
+This is the exact bug this system was built to catch, caught automatically, with per-field
+diagnostics, from a plain headless module load — no human tester, no dialog interaction.
+
+**Real findings from getting there, not assumed:**
+- **Confirmed: NWN spawns every placed creature in every area at module load,
+  regardless of whether any player ever connects.** A fully headless, zero-player run
+  fires every creature's `OnSpawn` — the self-test design (§3, `SPEC_SelfTestOnSpawn`)
+  works exactly as intended for this. (The separate, still-open gap is `a_hen_join`
+  specifically, which only fires on a real dialog-driven recruit — see §8.)
+- **Confirmed: `GetHasFeat()` does not reflect an engine-computed racial feat set — it
+  strictly reads the creature's actual `FeatList`.** This resolves speculation elsewhere
+  in this doc and in CLAUDE.md about whether an empty `FeatList` is "fine because the
+  engine computes racial feats at runtime." It is not fine for `GetHasFeat()` purposes:
+  every one of the 110 test creatures (empty `FeatList`, per the existing documented
+  "empty FeatList is expected at level 1" rule extended incorrectly to every level here)
+  failed its `racial_feat` check. Racial feats still need to land in `FeatList` somehow
+  (via `LevelUpHenchman()` at some point in the creature's life) for `GetHasFeat()` to see
+  them — engine-side computation, if it exists at all, isn't visible to this builtin.
+- **Found and fixed: editing an already-placed creature's local variables requires
+  editing BOTH the UTC blueprint AND the GIT instance.** This is a second, concrete
+  instance of the pattern CLAUDE.md's `SoundSetFile` pitfall already documents ("GIT
+  instances carry independent copies that can silently diverge") — now confirmed for
+  `VarTable` specifically. The first wiring pass batch-edited only the 110 UTC blueprint
+  files (`SPEC_ENABLED` etc. correctly present there, confirmed via independent
+  `nwn_gff` extraction) and produced silent, total failure: every self-test read
+  `SPEC_ENABLED` as `0` and returned immediately with no log output at all, because the
+  actual placed instances in `showcase.git` still only carried the original `HENCH_LEVEL`
+  var. Fixed by writing the same `SPEC_*` entries into `showcase.git`'s `Creature List`
+  directly. **Any future tool or script that adds local variables to already-placed
+  creatures must write both files** — `create_creature_blueprint`'s own `varTable` param
+  is unaffected (it sets the blueprint before `place_creature` ever copies it into a GIT
+  instance, so there's only one copy to get right at creation time). The gap is specific
+  to editing objects that are already placed.
+- **Found and fixed: reloading the same module (`load_module`) re-extracts every file
+  from the still-unrepacked `.mod` on disk, silently discarding any direct file or IFO
+  edits made since the last load.** CLAUDE.md's existing note that "the temp dir persists
+  across reloads" is true but doesn't cover this — it only means sidecar files *not* part
+  of the archive (like a freshly-generated `inc_spec_check.nss`, before its first repack)
+  survive a reload. Files that already exist inside the packed `.mod` (every `.utc`, every
+  script, `module.ifo`) get overwritten back to their pre-edit content on reload, before a
+  repack ever runs. Confirmed concretely: `a_mod_load.nss`, `a_show_spawn.nss`, and
+  `module.ifo`'s `Mod_OnModLoad` field all silently reverted after a same-path
+  `load_module` call made between edits and the first `repack_module`. **Correct order:
+  make every edit, `repack_module`, and only reload afterward if the in-memory index
+  needs refreshing** — never reload between an edit and its repack.
+- **Found and fixed: the verification server's originally-pinned `nwnxee/unified:2f732e7`
+  image (chosen for reproducibility, matching other project configs) rejected the module
+  with "This module was created with a updated version of Neverwinter Nights."** The
+  module's `Mod_MinGameVer` is `1.89`; every locally cached `nwnxee/unified` tag — even
+  the newest, from December 2024 — predates that. A freshly `docker pull`ed `:latest`
+  (July 2026) worked immediately. Also hit and ruled out along the way: the *stale*
+  locally-cached `:latest` (last pulled January 2024) crashed with a `SIGSEGV` from an
+  internal `nwserver`/`NWNX_Core` build-number mismatch (`8193.37` vs `8193.36`) — a
+  broken image, unrelated to this project's config. **For this specific throwaway
+  verification use case, tracking `:latest` (and re-pulling before each real run) is the
+  right call, unlike a production server config that should pin** — the whole point of
+  this server is staying compatible with whatever nwn-mcp's own toolchain currently
+  produces, not reproducibility of a fixed environment.
+
+Config updated accordingly: `~/nwn-mcp-verify-server/docker-compose.yml` now pins
+`nwnxee/unified:latest`; `config/nwserver.env`'s `NWN_DIFFICULTY` fixed from an invalid
+`0` to `3` (cosmetic warning, not load-blocking, noticed along the way).
 
 ## 1. Can we actually run a module here?
 

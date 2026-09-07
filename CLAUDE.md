@@ -117,6 +117,7 @@ On `load_module`, the server builds a full resman stack (lowest to highest prior
 All 2DAs from the stack are extracted and parsed at load time (~598 base game tables). `load_module` accepts just a filename (e.g., `"mymod.mod"`) which resolves from `NWN_FOLDER_USER/modules/`.
 
 **The temp dir persists across reloads of the same module.** `createTempDir()` derives the dir name deterministically from the module's absolute path, so calling `load_module` again on the same path reuses the same dir instead of wiping it — only switching to a genuinely different module cleans up the old one. This is load-bearing: it's what lets skills persist sidecar files (e.g. `adventure.md`) directly into the temp dir with Write/Edit and have them survive a reload. Don't "clean up" by wiping the temp dir unconditionally in `loadModule` — that destroys sidecar files that aren't part of the `.mod` archive and can't be reconstructed by re-extracting.
+**But a reload still re-extracts everything already inside the packed `.mod`, silently reverting any edit made since the last repack.** "Persists" above only covers sidecar files that were never part of the archive (like a freshly generated include, before its first repack). Every `.utc`/`.nss`/`module.ifo`/etc. that already exists inside the `.mod` gets overwritten back to its packed content on `load_module`, even when reusing the same temp dir. Confirmed directly: edits to `a_mod_load.nss`, another creature-spawn script, and `module.ifo`'s `Mod_OnModLoad` field all silently reverted after a same-path `load_module` call issued between the edits and the first `repack_module`. **Never call `load_module` between an edit and its `repack_module`** — make every edit, repack once, and only reload afterward if the in-memory index genuinely needs refreshing.
 
 ## GFF Data Model
 
@@ -277,6 +278,7 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 - **GIT trigger field name is `TriggerList`** (no space), not `"Trigger List"`. Other no-space list names: `SoundList`, `StoreList`, `WaypointList`. With-space names: `Creature List`, `Door List`, `Encounter List`, `Placeable List`.
 - **Triggers need Geometry in placed instances.** UTT blueprints from resman do NOT contain geometry. When placing triggers, always ensure the `Geometry` list field exists with at least 4 vertices (PointX/PointY/PointZ). Without geometry, the engine won't detect entry and the toolset won't render the trigger.
 - **GIC must be synced with GIT.** The toolset uses the GIC file to index objects in an area. `writeBackGit()` automatically syncs the GIC. Without GIC entries, objects exist in the GIT but the toolset doesn't show them.
+- **A placed instance's `VarTable` (and other per-instance fields) is a separate copy from its UTC blueprint's — editing one does not edit the other.** `place_creature`/`create_creature_blueprint`'s own `varTable` param is unaffected by this (it sets the blueprint before the object is ever placed, so there's only one copy to get right at creation time) — the gap is specific to editing a creature that's *already placed* in a `.git`. Confirmed directly: batch-adding `SPEC_*` local variables to 110 already-placed companions' `.utc` files (verified present there via independent `nwn_gff` extraction) produced total silent failure at runtime — every one read back as unset, because the actual placed instances in the area's `.git` still only carried their original vars. The fix wrote the same entries into the `.git`'s `Creature List` directly. Same family of bug as the previously-found `SoundSetFile` case (a `modify_gff_field` write to a blueprint alone left a placed instance's voice unchanged) — treat any field edit made *after* placement as needing both files, never just the blueprint.
 - **Placeable display name field is `LocName`**, not `LocalizedName`. Setting `LocalizedName` on a placeable has no effect — the toolset and engine read `LocName` (a cexolocstring).
 - **Placement Z height from walkmesh.** All placement tools automatically set the object's Z position from the walkmesh surface height. The walkmesh check returns the highest walkable face Z at the position. Use `fix_object_heights` to retroactively fix objects placed before this feature.
 - **Zone solver rejects incompatible adjacencies.** `adventure_apply_layout` returns early with zero placements and `INCOMPATIBLE TERRAIN ADJACENCY` errors if the zone layout contains terrain pairs with no transition tiles. Fix the zone layout, don't retry.
@@ -516,21 +518,21 @@ any other generated file type, so structurally-broken assets shipped silently. T
   (`src/util/verify/common.ts`) — `nw_c2_default*`, `x0_ch_hen_*`, `nw_ch_ac*` and
   friends resolve at runtime and must never be reported as missing.
 
-**TODO — a live server to actually run the runtime verification script.** `verify_*` can
-only check static GFF preconditions — it cannot confirm behavior that only exists once the
-engine actually runs a script, most concretely `LevelUpHenchman()` granting the right
-feats/skills/spells to a companion on recruit (see "Henchmen / Companions" below) or
-tfndev's own `randspellbooks` system (`~/tfndev/src/nss/inc_rand_spell.nss`), which depends
-on NWNX and a persistent campaign database nwn-mcp has no way to invoke. **The check script
-itself now exists** (`create_spec_verification` → `inc_spec_check.nss`, see "Henchmen /
-Companions" below) — what's still missing is the server to actually execute it: standing up
-`~/tfndev` or, better, a new isolated NWNX-enabled test server dedicated to this (never
-reuse an existing live/hosted config — see `docs/runtime-verification-spec.md` §1 for why),
-loading a generated module, running it headless, and grepping the log for `[SPEC_FAIL]`
-lines. That orchestration loop is designed (`docs/runtime-verification-spec.md` §5) but not
-built, and spinning up Docker containers is a new category of side effect this project
-hasn't done — needs explicit user sign-off before attempting it. Future infrastructure, not
-a near-term task.
+**A live isolated verification server exists and has run a real end-to-end check
+successfully** (`~/nwn-mcp-verify-server`, outside any git-tracked repo — see
+`docs/runtime-verification-spec.md` §1 for the full setup and findings). `verify_*` can
+only check static GFF preconditions; this closes the gap for behavior that only exists
+once the engine actually runs a script. First real run, against "Henchman Gear Showcase"
+(the module whose bad-stats bug report started this whole effort): 110 companions wired
+with `SPEC_*` vars, run headless, grepped for `[SPEC_FAIL]` — caught the exact bug (empty
+`FeatList`, `StartingPackage` stuck at 0) with zero human interaction. **What's still
+missing is automation**: copying a generated module into the server's `modules/` folder,
+launching, polling for load completion, grepping, tearing down, and feeding failures back
+into nwn-mcp's repair tools is all still done by hand — the orchestration loop is designed
+(`docs/runtime-verification-spec.md` §5) and proven manually, but not built into a tool.
+`randspellbooks` (`~/tfndev/src/nss/inc_rand_spell.nss`) also still depends on NWNX and a
+persistent campaign database this project has no way to invoke — out of scope for
+`inc_spec_check.nss`, which deliberately uses zero `NWNX_*` functions.
 
 ## Co-op / Multiplayer Rules
 
@@ -616,12 +618,22 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   the box, not just an unset field. `verify_creature` now flags
   `appearance_race_mismatch` for any creature (not just henchmen) where these disagree
   within the standard-race range.
-- **An empty `FeatList` on a fresh level-1 blueprint is expected, not a defect.** Racial
-  feats and the bonus-feat cadence come from `racialtypes.2da`'s `FeatsTable`/
-  `ExtraFeatsAtFirstLevel`/`NormalFeatEveryNthLevel` columns, computed by the engine from
-  `Race` alone — no `FeatList` entry needed. Class/bonus feats are meant to come entirely
-  from the live `LevelUpHenchman()` call below. Don't hand-populate `FeatList` to "fix"
-  an apparently-empty one.
+- **An empty `FeatList` on a fresh level-1 blueprint is expected, not a defect** — but
+  **verified via a live headless server run: `GetHasFeat()` does NOT reflect any
+  engine-computed racial feat set when `FeatList` is empty; it strictly reads the actual
+  `FeatList`.** `racialtypes.2da`'s `FeatsTable`/`ExtraFeatsAtFirstLevel`/
+  `NormalFeatEveryNthLevel` columns describe what a racial feat progression *should* look
+  like, but nothing populates `FeatList` from them automatically — that population is
+  meant to happen via the live `LevelUpHenchman()` call below, same as class feats. An
+  empty `FeatList` is a legitimate *transient* state on a level-1 blueprint that hasn't
+  been leveled yet; it is not a legitimate *permanent* state for any creature a script
+  might later `GetHasFeat()`-check. Confirmed in a real end-to-end run: 110/110 companions
+  built with `ClassList` set directly to a target level (never run through
+  `LevelUpHenchman()`) failed a racial-feat `GetHasFeat()` check, 100% consistently. Don't
+  hand-populate `FeatList` to "fix" an apparently-empty one on a level-1, about-to-be-leveled
+  blueprint — but don't assume racial feats are "handled automatically" for a creature
+  that's meant to stay static at a level above 1 either; it needs a real
+  `LevelUpHenchman()` pass.
 - **Abilities come from vanilla `LevelUpHenchman(oHench, CLASS_TYPE_INVALID, TRUE, PACKAGE_INVALID)`**
   at recruit, looped to the blueprint's `HENCH_LEVEL` local. `bReadyAllSpells = TRUE`
   matters — without it the companion joins with an empty memorized list.
