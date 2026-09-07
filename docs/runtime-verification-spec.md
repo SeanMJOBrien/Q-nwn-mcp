@@ -11,8 +11,25 @@ level-1 stats and the wrong body model, because the defect only existed in what
 
 This spec answers the user's question directly: **yes, we can run a module**, and
 **yes, we can script an on-load self-check that reports pass/fail per creature**, closing
-the loop back to an LLM evaluation. This is a plan, not an implementation — nothing here
-has been built.
+the loop back to an LLM evaluation.
+
+## Status
+
+**§2, §3 and §7 are implemented.** `create_spec_verification` (`src/tools/spec-check-tools.ts`)
+generates `inc_spec_check.nss` (`src/util/spec-check-script.ts`) with a real
+`SPEC_VerifyCreature()` — same shared-function, no-guard, `MCP_VERIFY_MODE`-gated design
+described below, with the `SPEC_ENABLED` presence marker added (nwscript.nss has no
+`HasLocalVariable`-equivalent builtin, so "no spec on this creature" can't be
+distinguished from "SPEC_RACE happens to be 0/Dwarf" any other way). Representative-feat
+data (§3's `GetExpectedRacialFeat`/`GetExpectedClassFeat`) is real, verified 2DA data for
+all 7 standard PC races and all 11 base classes.
+`adventure-actors/SKILL.md` Phase 3b wires `SPEC_*` vars into every companion blueprint
+and calls `SPEC_VerifyCreature()` from `a_hen_join`.
+
+**§1, §4, §5 and §6 remain a plan, not an implementation** — no Docker config has been
+authored, no verification server has been stood up, and nothing in this project has ever
+grepped a live server log. That's real infrastructure work, gated on explicit user
+sign-off before spinning up any container (see §8).
 
 ## 1. Can we actually run a module here?
 
@@ -293,9 +310,15 @@ script nwn-mcp controls**, checked at runtime:
   companions/casters where the current bug class actually lives — leaning toward "every
   creature with a `classes` array," since the marginal cost of a few local vars is
   near-zero and the race/appearance check is already useful for non-henchmen too.
-- The representative-feat lookup tables (`GetExpectedRacialFeat`/`GetExpectedClassFeat`
-  in the pseudocode above) need to actually be populated per race/class — real research,
-  not assumed, matching this project's stated verification standard.
+- ~~The representative-feat lookup tables need to actually be populated per race/class~~
+  — **done** for all 7 standard PC races and all 11 base classes, via real
+  `resolve_2da`/`search_2da` calls against `race_feat_<race>.2da` (row 0 of each) and
+  `cls_feat_<class>.2da` (filtered to `List=3`, `GrantedOnLevel=1` — automatically-granted,
+  non-choosable level-1 feats). See `RACIAL_FEATS`/`CLASS_FEATS` in
+  `src/util/spec-check-script.ts`. Fighter's `cls_feat_fight` query initially overflowed
+  the research tool's response size (2,794 lines) — resolved by grepping the saved raw
+  output file for `"List": "3"` instead of re-requesting it inline; Fighter's automatic
+  level-1 feats include `WeapProfMar` (45), used as the representative.
 
 This is intentionally left as a plan. Building it is a real infrastructure project (new
 Docker config, new NWScript, a new orchestration flow in whatever drives the

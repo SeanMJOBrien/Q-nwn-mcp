@@ -516,16 +516,21 @@ any other generated file type, so structurally-broken assets shipped silently. T
   (`src/util/verify/common.ts`) — `nw_c2_default*`, `x0_ch_hen_*`, `nw_ch_ac*` and
   friends resolve at runtime and must never be reported as missing.
 
-**TODO — a live server for runtime verification.** `verify_*` can only check static GFF
-preconditions — it cannot confirm behavior that only exists once the engine actually runs
-a script, most concretely `LevelUpHenchman()` granting the right feats/skills/spells to a
-companion on recruit (see "Henchmen / Companions" below) or tfndev's own
-`randspellbooks` system (`~/tfndev/src/nss/inc_rand_spell.nss`), which depends on NWNX
-and a persistent campaign database nwn-mcp has no way to invoke. Standing up `~/tfndev`
-or a similarly NWNX-enabled test server — not for hosting, just for actually loading a
-generated module and running it once — would close this gap: it's the only way to turn
-"the static checks pass" into "the companion actually joined with the right level." Future
-infrastructure, not a near-term task.
+**TODO — a live server to actually run the runtime verification script.** `verify_*` can
+only check static GFF preconditions — it cannot confirm behavior that only exists once the
+engine actually runs a script, most concretely `LevelUpHenchman()` granting the right
+feats/skills/spells to a companion on recruit (see "Henchmen / Companions" below) or
+tfndev's own `randspellbooks` system (`~/tfndev/src/nss/inc_rand_spell.nss`), which depends
+on NWNX and a persistent campaign database nwn-mcp has no way to invoke. **The check script
+itself now exists** (`create_spec_verification` → `inc_spec_check.nss`, see "Henchmen /
+Companions" below) — what's still missing is the server to actually execute it: standing up
+`~/tfndev` or, better, a new isolated NWNX-enabled test server dedicated to this (never
+reuse an existing live/hosted config — see `docs/runtime-verification-spec.md` §1 for why),
+loading a generated module, running it headless, and grepping the log for `[SPEC_FAIL]`
+lines. That orchestration loop is designed (`docs/runtime-verification-spec.md` §5) but not
+built, and spinning up Docker containers is a new category of side effect this project
+hasn't done — needs explicit user sign-off before attempting it. Future infrastructure, not
+a near-term task.
 
 ## Co-op / Multiplayer Rules
 
@@ -620,12 +625,23 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
 - **Abilities come from vanilla `LevelUpHenchman(oHench, CLASS_TYPE_INVALID, TRUE, PACKAGE_INVALID)`**
   at recruit, looped to the blueprint's `HENCH_LEVEL` local. `bReadyAllSpells = TRUE`
   matters — without it the companion joins with an empty memorized list.
-- **Static verification can't confirm this actually worked at runtime.** Have the
-  recruit script (`a_hen_join`) log a summary after the level-up loop —
-  `GetLevelByClass()` vs. `HENCH_LEVEL`, `GetHitDice()`, `GetAppearanceType()`/
-  `GetRacialType()`, and spell-readiness for casters — via `WriteTimestampedLogEntry`, and
-  read it from the log after a real in-game recruit test. See the TODO under
-  "Verification Gate" above.
+- **Static verification can't confirm this actually worked at runtime — `create_spec_verification`
+  closes that gap.** It generates `inc_spec_check.nss` (`src/util/spec-check-script.ts`),
+  whose `SPEC_VerifyCreature(oCreature)` compares actual runtime race/appearance/class/
+  level/package/feats/spells against `SPEC_*` local variables set on the blueprint (via
+  `create_creature_blueprint`'s `varTable` — see `adventure-actors/SKILL.md` Phase 3b's
+  template), logging `[SPEC_OK]`/`[SPEC_FAIL] tag=... field=... expected=... actual=...`
+  lines. `a_hen_join` calls it as its last line. It is gated by the **module** local
+  `MCP_VERIFY_MODE` (set `1` by `a_mod_load` during generation, flipped to `0` as the last
+  build step before delivery) — `module.ifo` has no `VarTable` field to bake a static flag
+  into, unlike UTC/UTP blueprints, so this must be a runtime `SetLocalInt` rather than a
+  GFF field. See `docs/runtime-verification-spec.md` for the full design, including the
+  build→run→check→repair orchestration loop this is meant to support (not yet
+  implemented — see the TODO under "Verification Gate" above for the live-server piece).
+  **Representative-feat data is real, verified 2DA lookups for all 11 base classes and
+  all 7 standard PC races** (`RACIAL_FEATS`/`CLASS_FEATS` in `src/util/spec-check-script.ts`)
+  — `SpecExpectedClassFeat()`/`SpecExpectedRacialFeat()` return `-1` (check skipped, never
+  a false pass) only for anything outside those 11 classes/7 races.
 - **Companion voices must be TYPE 0 (PC voiceset) rows** from `soundset.2da`. TYPE 3 NPC
   sets are sparse and leave the companion intermittently mute.
 
