@@ -77,6 +77,18 @@ describe("buildMinimalUtc", () => {
     expect((utc.FeatList as { value: unknown[] }).value).toEqual([]);
   });
 
+  it("has both legacy (Tail/Wings) and current (Tail_New/Wings_New) fields", () => {
+    // A from-scratch UTC with only the _New pair was confirmed to produce
+    // creatures that render invisible in both the toolset and a live game,
+    // until the toolset's own property editor added the legacy pair as a
+    // side effect. Real base-game/toolset-authored creatures carry both.
+    const utc = buildMinimalUtc() as GffObj;
+    expect((utc.Tail as { value: number }).value).toBe(0);
+    expect((utc.Tail_New as { value: number }).value).toBe(0);
+    expect((utc.Wings as { value: number }).value).toBe(0);
+    expect((utc.Wings_New as { value: number }).value).toBe(0);
+  });
+
   it("returns independent copies on each call", () => {
     const a = buildMinimalUtc() as GffObj;
     const b = buildMinimalUtc() as GffObj;

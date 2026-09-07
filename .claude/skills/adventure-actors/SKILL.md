@@ -283,10 +283,20 @@ cross-check with `resolve_blueprint(resource: "<resref>.utc")` → `classes` bef
 any *new* source not in this table, and **pass `classes` (and `startingPackage`)
 explicitly on the `create_creature_blueprint` call regardless** — appearance and combat
 class are independent, so never rely on a chassis's native `ClassList` by omission. Note
-that cloning also carries over whatever legacy/current field set (`Tail`/`Wings` vs.
-`Tail_New`/`Wings_New`, `Phenotype`, existing `FeatList`/`SkillList`) the source NPC
-happens to have — harmless, but another reason to prefer the chassis-free default path
-unless you specifically need one of these looks.
+that cloning also carries over whatever legacy/current field set (`Phenotype`, existing
+`FeatList`/`SkillList`) the source NPC happens to have — another reason to prefer the
+chassis-free default path unless you specifically need one of these looks.
+
+**CORRECTION: the `Tail`/`Wings` vs. `Tail_New`/`Wings_New` field difference above was
+previously called "harmless" — that was wrong, verified by a real user report.** A
+from-scratch companion (built via the chassis-free default path, no `sourceResref`) only
+ever gets `Tail_New`/`Wings_New` from `buildMinimalUtc()` — and rendered invisible, both
+in the toolset AND in a live game session, until the toolset's own property editor
+touched the creature (which adds the legacy `Tail`/`Wings` pair as a side effect).
+`buildMinimalUtc()` (`git-helpers.ts`) now writes both pairs, so this is fixed for any
+companion built after this session — but it means the chassis-free path was never
+actually "safer" on this specific point; a cloned chassis carrying real `Tail`/`Wings`
+data was accidentally the one avoiding this bug.
 
 | Archetype | Resref | Class |
 |-----------|--------|-------|

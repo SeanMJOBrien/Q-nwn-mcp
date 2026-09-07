@@ -274,10 +274,18 @@ export function buildMinimalUtc(): GffDocument {
     Str: { type: "byte", value: 10 },
     Subrace: { type: "cexostring", value: "" },
     Tag: { type: "cexostring", value: "" },
+    // Both the legacy (Tail/Wings) and current (Tail_New/Wings_New) field
+    // names are written -- a from-scratch UTC with only the _New pair was
+    // confirmed to produce creatures that render invisible, in both the
+    // toolset AND a live game session, until the toolset's own property
+    // editor round-trips the creature (which adds the legacy pair as a side
+    // effect). Real base-game/toolset-authored creatures carry both.
+    Tail: { type: "byte", value: 0 },
     Tail_New: { type: "byte", value: 0 },
     TemplateList: { type: "list", value: [] },
     TemplateResRef: { type: "resref", value: "" },
     WalkRate: { type: "int", value: 4 },
+    Wings: { type: "byte", value: 0 },
     Wings_New: { type: "byte", value: 0 },
     Wis: { type: "byte", value: 10 },
     fortbonus: { type: "short", value: 0 },
