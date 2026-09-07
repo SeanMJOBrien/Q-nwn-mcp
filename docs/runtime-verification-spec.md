@@ -49,14 +49,59 @@ Confirmed on this machine:
 **Critical constraint: none of the existing configs may be reused or touched for this.**
 They are live, internet-facing, real player-facing persistent worlds (real
 `NWN_PLAYERPASSWORD`/`NWN_DMPASSWORD` values, a real `nwsync` URL pointing at a public
-DNS host, "The Frozen North" is described elsewhere in this repo as "actively-hosted").
-Pointing one of these at an nwn-mcp-generated test module, or restarting one of these
-containers, would disrupt a real service. A verification server needs its **own**
-isolated Docker Compose config — new server name, new port, no `nwsync` URL, no
-public-facing anything, NWNX plugins limited to what the check scripts actually need
-(`NWNX_EVENTS`, `NWNX_UTIL`, `NWNX_JSON` if the spec ends up JSON-based; skip `SQL`,
-`REDIS`, `METRICS_INFLUXDB` entirely) — modeled on `erithorn`'s config as a template, not
-a fork of it.
+DNS host, "The Frozen North" is described elsewhere in this repo as "actively-hosted"). At
+the time of writing several of these (`server_tfn-server_1`, `uoa_nwserver_1`, ...) were
+confirmed live via `docker ps`. Pointing one of these at an nwn-mcp-generated test module,
+or restarting one of these containers, would disrupt a real service.
+
+**Done — an isolated Docker Compose config now exists and has been proven to boot.** Every
+config above (`erithorn`, `equinox`, `castledefense2`, `gve3`, `ilmara`, `uoa`, `adventure`,
+`BuilderTony`, `GvE3misc`) is itself a clone of the same upstream template, currently named
+[`urothis/nwnxee-docker-template`](https://github.com/urothis/nwnxee-docker-template) (the
+older clone URL, `Urothis/nwnxee-template`, redirects to the same repo — GitHub rename).
+That template was cloned fresh to `~/nwn-mcp-verify-server` — a sibling of `~/git/`, **not**
+inside this repo's git tree, so it can never end up committed here — and trimmed down:
+
+- `docker-compose.yml` keeps only the `nwserver` service. The template's `db`/`redis`/
+  `influxdb`/`grafana` services (and their `config/*.env` files, `grafana-provisioning/`)
+  were deleted outright: `inc_spec_check.nss` calls zero `NWNX_*` functions — every builtin
+  it uses (`GetLocalInt`, `GetKnownSpellCount`, `GetCreatureStartingPackage`, `GetHitDice`,
+  `GetHasFeat`, `WriteTimestampedLogEntry`, ...) is vanilla `nwscript.nss` — so there is
+  nothing for those services to support yet. Add them back only if a future check genuinely
+  needs a specific `NWNX_*` plugin.
+  `restart: "no"` (not `unless-stopped`) — a throwaway verification run should never
+  linger; `docker ps` during this work turned up a real orphaned
+  `nwnxee-docker-template-master_redis_1` container still running two weeks after whoever
+  last used that Downloads-folder copy, which is exactly the failure mode to avoid here.
+- `config/nwserver.env`: `NWN_PORT=6199` (checked against every other config's port —
+  6031-6045, 5121, 6099, none collide), `NWN_PUBLICSERVER=0`, `NWN_MAXCLIENTS=1`,
+  `NWN_PLAYERPASSWORD`/`NWN_DMPASSWORD` left blank (never goes public, torn down after
+  each run), `NWNX_CORE_SKIP_ALL=yes` with every individual plugin flag simply absent
+  (no services exist for them to talk to). No `nwsync` setting exists in this template at
+  all — nothing to disable.
+- Image pinned to `nwnxee/unified:2f732e7` (already cached locally — same tag `~/tfndev`
+  itself runs), not `:latest`, for reproducibility.
+
+**First real launch, verified end-to-end:** `docker-compose up` with the template's bundled
+`DockerDemo` module produced a clean `Server: Loading...` → `Server: Module loaded` →
+`{Masterserver Advisory} Server hidden: Requested not to be listed.` sequence (confirming
+`NWN_PUBLICSERVER=0` actually took effect), then `docker-compose down` shut it down with no
+containers left behind (`docker ps` confirmed empty afterward). One cosmetic issue found:
+`NWN_DIFFICULTY=0` logs `Server: Invalid argument to -difficulty` — harmless (falls back to
+a default) but should be set to a valid value (the template's own default is `3`) before
+this becomes a real automation loop.
+
+**Still open:** getting an nwn-mcp-generated module (not the bundled demo) into
+`~/nwn-mcp-verify-server/server/modules/` and pointing `NWN_MODULE` at it, and — the
+bigger unresolved question — §5's orchestration loop as originally written only exercises
+`OnSpawn`, not a companion's actual recruit path (`a_hen_join` needs a real PC to click
+through the dialog, and nothing here connects a client). Real BioWare precedent
+(`x0_ch_hen_spawn.nss`, the stock henchman `OnSpawn` handler) calls `LevelUpHenchman()`
+directly from `OnSpawn` on an unrecruited companion in the shipped Undermountain content,
+so a headless `MCP_VERIFY_MODE`-gated self-test hook doing the same thing generally (loop
+every `SPEC_ENABLED` creature, call `LevelUpHenchman()` + `SPEC_VerifyCreature()` with no
+PC involved) is proven safe by the engine's own official content — just not yet built; the
+user asked for this to stay research-only for now, not implementation.
 
 ## 2. The spec: local variables as the source of truth
 

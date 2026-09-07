@@ -97,7 +97,7 @@ is another actor to keep alive, pathed, and balanced against.
 **Idempotency check:** `list_resources(pattern: "a_hen_*")`. If `a_hen_join` already
 exists, skip to Step 3.
 
-Write these six with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
+Write these seven with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
 reports `compiled: true`.
 
 | Resref | Purpose |
@@ -108,6 +108,7 @@ reports `compiled: true`.
 | `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
 | `a_hen_stay` | Stand ground, via `bkRespondToHenchmenShout` |
 | `a_hen_follow` | Follow master, via `bkRespondToHenchmenShout` |
+| `a_hen_spawn` | `#include "inc_spec_check"`, then `ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF)` followed by `SPEC_SelfTestOnSpawn(OBJECT_SELF)` |
 
 Two rules that make or break this — both are silent failures:
 - **`SetMaxHenchmen()` must be raised before `AddHenchman()`.** `AddHenchman` is a
@@ -115,6 +116,18 @@ Two rules that make or break this — both are silent failures:
 - **`SetAssociateListenPatterns()` must be called on recruit.** The engine delivers
   radial follow/stand-ground orders as a silent command shout the companion matches in
   its OnConversation handler. Without this it ignores every order.
+
+**`a_hen_spawn` chains, it never replaces.** The stock henchman `ScriptSpawn`
+(`x0_ch_hen_spawn`) does real work — `SetAssociateListenPatterns`, respawn location,
+identifying starting gear — that must still happen. `a_hen_spawn` calls it first via
+`ExecuteScript`, then calls `SPEC_SelfTestOnSpawn(OBJECT_SELF)`, which is a no-op unless
+`MCP_VERIFY_MODE` is set: during generation it levels the companion straight to its
+`SPEC_LEVEL` and runs `SPEC_VerifyCreature()` with no PC needing to connect and recruit it
+through dialog first, so a stat/appearance mismatch shows up in the log from a plain
+headless module load. This is a safe, precedented pattern — BioWare's own stock
+`x0_ch_hen_spawn.nss` calls `LevelUpHenchman()` straight from `OnSpawn` on an unrecruited
+companion in shipped Undermountain content. In the delivered module (`MCP_VERIFY_MODE=0`)
+this costs nothing beyond one no-op function call.
 
 #### Step 2: Raise the henchman cap at module load
 
@@ -161,6 +174,7 @@ create_creature_blueprint(
   startingPackage: <same value as the class ID above>,
   conversation: "dlg_hen_<resref>",
   soundset: <TYPE 0 row matching gender — see table>,
+  scripts: '{"ScriptSpawn": "a_hen_spawn"}',
   varTable: '[
     {"name": "HENCH_LEVEL", "type": "int", "value": <module target level>},
     {"name": "SPEC_ENABLED", "type": "int", "value": 1},
@@ -178,6 +192,12 @@ The `SPEC_*` vars are the input to `SPEC_VerifyCreature()` (from `inc_spec_check
 at runtime that `LevelUpHenchman()` actually produced what this template asked for. They are
 redundant with the fields already on this call by design — read them off the same values,
 don't compute anything new.
+
+`scripts: '{"ScriptSpawn": "a_hen_spawn"}'` overrides just that one field on top of the
+`henchman: true` preset — the other 12 script fields (`ScriptDialogue`, `ScriptHeartbeat`,
+...) stay wired to the stock `x0_ch_hen_*` associate AI. This is what lets the headless
+self-test (`SPEC_SelfTestOnSpawn`, see "Verify the recruit actually worked, live" below)
+run at all.
 
 **Appearance rule — no chassis needed.** `appearance.2da` rows 0–6 (Dwarf, Elf, Gnome,
 Halfling, Half-Elf, Half-Orc, Human) map 1:1 by label to the same numeric values as the
@@ -228,6 +248,12 @@ problem, `field=spell_count` points at a missing `bReadyAllSpells = TRUE`, and
 `field=race`/`field=appearance` points at `race`/`appearance` not both having been set on
 the blueprint. See `docs/runtime-verification-spec.md` for the full field list and the
 build→run→check→repair loop this is meant to close.
+
+`a_hen_spawn` gets the same check for free, headlessly: `SPEC_SelfTestOnSpawn(OBJECT_SELF)`
+levels the companion straight to `SPEC_LEVEL` and runs the same `SPEC_VerifyCreature()`
+check the moment the area loads — no real PC needs to connect and click through the recruit
+dialog first. This means `[SPEC_OK]`/`[SPEC_FAIL]` lines are already in the log from a plain
+headless module load, before anyone ever plays it.
 
 #### Step 4: Verify before moving on
 

@@ -27,6 +27,27 @@ describe("generateSpecCheckInclude — gating", () => {
     expect(source).not.toMatch(/SPEC_CHECKED|SPEC_ALREADY_RUN|bAlreadyChecked/);
   });
 
+  it("gates the headless self-test the same way as SPEC_VerifyCreature", () => {
+    const source = generateSpecCheckInclude();
+    const fn = source.slice(source.indexOf("void SPEC_SelfTestOnSpawn"));
+    expect(fn).toContain('if (!GetLocalInt(GetModule(), "MCP_VERIFY_MODE")) return;');
+    expect(fn).toContain('if (GetLocalInt(oCreature, "SPEC_ENABLED") != MCP_SPEC_ENABLED_FLAG) return;');
+  });
+
+  it("only levels the creature while it's under its own target level, and bounds the loop", () => {
+    const source = generateSpecCheckInclude();
+    expect(source).toContain("while (GetLevelByClass(nExpectClass, oCreature) < nExpectLevel && nGuard < 40)");
+  });
+
+  it("verifies after leveling, so the self-test actually checks what it just did", () => {
+    const source = generateSpecCheckInclude();
+    const fn = source.slice(
+      source.indexOf("void SPEC_SelfTestOnSpawn"),
+      source.indexOf("void SPEC_SelfTestOnSpawn") + 800,
+    );
+    expect(fn).toContain("SPEC_VerifyCreature(oCreature);");
+  });
+
   it("uses the default include name in the usage comment, or a custom one", () => {
     expect(generateSpecCheckInclude()).toContain('#include "inc_spec_check"');
     expect(generateSpecCheckInclude({ includeName: "inc_spc" })).toContain('#include "inc_spc"');

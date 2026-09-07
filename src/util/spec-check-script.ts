@@ -151,6 +151,16 @@ export function generateSpecCheckInclude(opts: SpecCheckOptions = {}): string {
 // guard: a creature checked after two separate level-ups logs twice, which is
 // expected and correct, not a duplicate to suppress.
 //
+// SPEC_SelfTestOnSpawn(oCreature) is the headless variant: it levels oCreature
+// up to its own SPEC_LEVEL (if it isn't already there) and then calls
+// SPEC_VerifyCreature() — for testing without a real PC ever connecting to
+// recruit a companion through its dialog. Safe precedent: BioWare's own stock
+// x0_ch_hen_spawn.nss calls LevelUpHenchman() straight from OnSpawn on an
+// unrecruited companion in shipped content. Don't replace a companion's
+// ScriptSpawn with this outright — chain it after the stock
+// x0_ch_hen_spawn call instead, so the associate-AI setup that script also
+// does isn't lost.
+//
 // Log protocol (grep the server log for these after a headless run):
 //   [SPEC_OK] tag=<tag>
 //   [SPEC_FAIL] tag=<tag> field=<race|appearance|racial_feat|level|hit_dice|package|class_feat|spell_count> expected=<x> actual=<y>
@@ -282,6 +292,43 @@ void SPEC_VerifyCreature(object oCreature)
     }
 
     if (bPass) WriteTimestampedLogEntry("[SPEC_OK] tag=" + sTag);
+}
+
+// Headless self-test: level oCreature up to its own SPEC_LEVEL and immediately
+// verify it, without needing a real PC to connect and click through a recruit
+// dialog. Safe precedent for calling LevelUpHenchman() straight from OnSpawn,
+// on an unrecruited companion: BioWare's own stock x0_ch_hen_spawn.nss does
+// exactly this (loops LevelUpHenchman() 13 times to pre-level a companion in
+// the Undermountain starting room) in shipped, official content — this
+// generalizes that same pattern to any SPEC_ENABLED creature, gated so it only
+// ever runs during nwn-mcp's own verification pass.
+//
+// The level-up loop only runs while the creature is still under its target
+// level, so calling this more than once (a creature can spawn more than once
+// per module run, or already be leveled via a real recruit) is always safe —
+// a creature already at or above SPEC_LEVEL just goes straight to the verify
+// call with no further leveling.
+//
+// For a companion, do NOT replace ScriptSpawn with this outright — that would
+// drop the stock x0_ch_hen_spawn associate-AI setup (SetAssociateListenPatterns,
+// etc.). Chain instead: a wrapper OnSpawn script calls
+// ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF) first, then this.
+void SPEC_SelfTestOnSpawn(object oCreature)
+{
+    if (!GetLocalInt(GetModule(), "MCP_VERIFY_MODE")) return;
+    if (!GetIsObjectValid(oCreature)) return;
+    if (GetLocalInt(oCreature, "SPEC_ENABLED") != MCP_SPEC_ENABLED_FLAG) return;
+
+    int nExpectClass = GetLocalInt(oCreature, "SPEC_CLASS");
+    int nExpectLevel = GetLocalInt(oCreature, "SPEC_LEVEL");
+    int nGuard = 0;
+    while (GetLevelByClass(nExpectClass, oCreature) < nExpectLevel && nGuard < 40)
+    {
+        LevelUpHenchman(oCreature, CLASS_TYPE_INVALID, TRUE, PACKAGE_INVALID);
+        nGuard++;
+    }
+
+    SPEC_VerifyCreature(oCreature);
 }
 `;
 }

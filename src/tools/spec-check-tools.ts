@@ -31,6 +31,7 @@ async function compileProbe(index: ModuleIndex, includeName: string): Promise<{ 
 void main()
 {
     SPEC_VerifyCreature(OBJECT_SELF);
+    SPEC_SelfTestOnSpawn(OBJECT_SELF);
 }
 `;
   const result = await writeAndCompileScript(index, PROBE_RESREF, source, true);
@@ -57,6 +58,9 @@ export function registerSpecCheckTools(server: McpServer): void {
       "varTable), logging one [SPEC_OK]/[SPEC_FAIL] line per creature per check. Only active when the module local " +
       "MCP_VERIFY_MODE is set (e.g. from a_mod_load) — a no-op in the delivered module. Call SPEC_VerifyCreature() " +
       "from OnSpawn and immediately after any LevelUpHenchman() or other leveling call. " +
+      "SPEC_SelfTestOnSpawn(oCreature) is the headless variant — levels a creature up to its own SPEC_LEVEL and " +
+      "verifies it with no PC needing to connect and recruit it through dialog first (safe per BioWare's own " +
+      "x0_ch_hen_spawn.nss precedent). " +
       "See docs/runtime-verification-spec.md for the full design and how to read the log.",
     {
       resref: z.string().optional().describe("Include resref to write (default inc_spec_check, max 16 chars)"),
@@ -94,7 +98,7 @@ export function registerSpecCheckTools(server: McpServer): void {
                 sizeBytes: written.sizeBytes,
                 compiles: probe.ok,
                 ...(probe.ok ? {} : { compilerOutput: probe.output }),
-                api: ["void SPEC_VerifyCreature(object oCreature)"],
+                api: ["void SPEC_VerifyCreature(object oCreature)", "void SPEC_SelfTestOnSpawn(object oCreature)"],
                 usage: `#include "${includeName}"`,
                 specVars: ["SPEC_ENABLED", "SPEC_RACE", "SPEC_APPEARANCE", "SPEC_CLASS", "SPEC_LEVEL", "SPEC_PACKAGE"],
                 gate: 'Only runs when GetLocalInt(GetModule(), "MCP_VERIFY_MODE") is non-zero.',
