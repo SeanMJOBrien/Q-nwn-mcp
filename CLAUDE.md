@@ -637,6 +637,28 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
 - **Abilities come from vanilla `LevelUpHenchman(oHench, CLASS_TYPE_INVALID, TRUE, PACKAGE_INVALID)`**
   at recruit, looped to the blueprint's `HENCH_LEVEL` local. `bReadyAllSpells = TRUE`
   matters — without it the companion joins with an empty memorized list.
+- **CORRECTION, verified via a live headless server run: `LevelUpHenchman()` grants ZERO
+  automatic/non-chosen feats — not class proficiencies, not racial feats, at any level,
+  for any class.** This directly contradicts the "Class/bonus feats are meant to come
+  entirely from the live `LevelUpHenchman()` call" line two bullets above — that line is
+  now known wrong and needs fixing, not just this note. Confirmed by direct probe: even
+  basic Simple/Martial Weapon Proficiency was absent from a level-5 Fighter after a real,
+  successful `LevelUpHenchman()` leveling pass. Automatic feats are apparently a
+  character-creation-time concept (package application via the toolset's own character
+  creation flow), not something this runtime call ever does for an NPC. **The only proven
+  fix**: populate `FeatList` directly at build time — racial feats unconditionally from
+  `race_feat_<race>.2da` (every row is automatic, no level gating — the table has no
+  `List`/`GrantedOnLevel` columns), class feats from `cls_feat_<class>.2da` filtered to
+  `List=3` and `GrantedOnLevel <=` the target level. Full tables for all 7 standard PC
+  races and 11 base classes were captured and applied to repair a real module this
+  session, but **this fix has not yet been applied to `adventure-actors/SKILL.md`'s
+  actual companion-creation recipe** — every companion built by following that skill as
+  currently written has this same gap. Highest-value next step for this whole track.
+  Separately, also confirmed: `LevelUpHenchman()` silently refuses to grant a level in an
+  alignment-restricted class (`classes.2da`'s `AlignRestrict` — Monk needs Lawful, Paladin
+  needs Lawful Good) when the creature's `LawfulChaotic`/`GoodEvil` don't qualify. A
+  companion built at a generic neutral alignment will silently cap at level 1 forever if
+  its class is Monk or Paladin — set alignment to match the class before leveling.
 - **Static verification can't confirm this actually worked at runtime — `create_spec_verification`
   closes that gap.** It generates `inc_spec_check.nss` (`src/util/spec-check-script.ts`),
   whose `SPEC_VerifyCreature(oCreature)` compares actual runtime race/appearance/class/
