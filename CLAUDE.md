@@ -245,6 +245,119 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 
 ## Known Pitfalls
 
+- **CRITICAL — direct `nwn_gff` file edits and in-memory-index MCP tools silently
+  clobber each other; ordering is load-bearing.** Most placement/equipment/blueprint
+  MCP tools (`set_creature_equipment`, `create_item_blueprint`, `fix_object_heights`,
+  etc.) read and mutate `index.parsedGff` (the server's in-memory copy of each GFF,
+  populated once at `load_module`) and serialize it back to disk via `writeBackGit()`
+  or equivalent. A raw `nwn_gff` round-trip script (the technique used throughout this
+  doc for bulk edits no MCP tool covers) writes **directly to the file on disk** and
+  never touches `index.parsedGff`. Mixing the two on the *same resource* in one
+  session is a real, confirmed data-loss bug, not a theoretical risk: after directly
+  patching 7 creatures' `ClassLevel`/`FeatList`/`SkillList`/stats/spells into
+  `showcase.git` via script, a subsequent `set_creature_equipment` call (MCP tool) on
+  those same creatures read the *stale pre-edit* in-memory GIT, merged equipment into
+  it, and wrote that stale version back — silently reverting every stat/feat/skill/
+  spell change while appearing to succeed (it even reported the right resrefs added).
+  The direct edits weren't lost from a bad write; they were overwritten by a *later,
+  successful* write from the other pathway. **Worse than same-resource collision:
+  confirmed a SECOND time in the same session** — `set_creature_equipment` called
+  for creature A alone reverted creatures A *and* six others in the same `.git` back
+  to their pre-edit state, because the tool serializes the *entire* stale in-memory
+  GIT document back to disk on every call, not just the one creature it targets.
+  Once any direct edit has touched a `.git`/`.utc`, the in-memory index for that
+  resource is permanently stale for the rest of the session — there is no "safe
+  creature" to call an equipment/placement tool on afterward, not even an untouched
+  one. **Rule: once a resource has been edited directly on disk in a session, do not
+  call any further MCP tool that touches that same resource before the final
+  direct-edit pass — do all MCP-tool-based work (equipment, placement, blueprint
+  creation) first, apply direct `nwn_gff` script edits last, then `repack_module`
+  immediately after with nothing in between.** If more MCP-tool work turns out to be
+  needed after a direct edit (e.g. a follow-up gear change), the only safe recovery
+  is `load_module` on the just-repacked `.mod` — re-extracting is safe *here* because
+  it restores the in-memory index to match the last good repack, unlike the
+  documented `load_module`-between-edit-and-repack pitfall above, which loses work
+  that was never repacked at all. Confirmed working recovery sequence, used twice in
+  one session: `repack_module` → (later) `load_module` → do the new MCP-tool work →
+  apply the direct-edit script (again, in full — a partial re-patch of just the new
+  fields leaves everything else reverted) → verify every affected field on disk →
+  `repack_module` → send. **Always read back the on-disk state for every affected
+  creature/field right before `repack_module`** whenever a session has mixed both
+  edit styles — this caught the bug both times, by dumping `ClassLevel`/`FeatList`
+  length/stats/`Equip_ItemList` together and confirming all were simultaneously
+  correct before repacking.
+  after a direct edit is enough. **Always read back the on-disk state right before
+  `repack_module` when a session has mixed both edit styles** — this is what caught
+  the bug here, by dumping `ClassLevel`/`FeatList` length/`Equip_ItemList` together
+  right before the final repack and confirming all three were simultaneously correct.
+- **Armor items (`ModelType` 3 in `baseitems.2da`) need `ArmorPart_*`/`Cloth1Color`/
+  `Cloth2Color`/`Leather1Color`/`Leather2Color`/`Metal1Color`/`Metal2Color` fields to
+  render at all — `create_item_blueprint`/`applyDefaultItemModels()` does NOT set
+  these, unlike its correct handling of composite weapons (`ModelType` 2,
+  `ModelPart1-3`).** `item-models.ts`'s own comment ("Armour — parts come from the
+  creature's body, not the item") is misleading — the fields actually live on the
+  ARMOR ITEM (18 `ArmorPart_<slot>` fields mirroring the creature body-part slot
+  names, e.g. `ArmorPart_Torso`, `ArmorPart_LShoul`, plus `ArmorPart_Robe` for a
+  single-mesh full-body look) and select which visual variant renders per slot when
+  the item is worn — confirmed by pulling two real, designer-authored armor items
+  from `~/tfndev` (`hen_dorna_arm.uti`, `cre_nwchain.uti`), both with all 18 parts
+  populated and `ArmorPart_Robe=0`. **Unlike creature `BodyPart_*` fields, there is
+  NO safe universal default value** — the two real references use completely
+  different, specific numbers per slot (e.g. `ArmorPart_Torso` 36 vs 32), drawn from
+  a real variant catalog (`parts_chest.2da`, `parts_shoulder.2da`, etc.) this project
+  hasn't mapped yet. A from-scratch armor `.uti` built via `create_item_blueprint`
+  renders with no visible model change at all — confirmed directly (7 armor pieces
+  built this way for a gear-up pass all had zero `ArmorPart_*`/`Color` fields).
+  **Current workaround, not a fix: equip a real, pre-existing armor blueprint (base
+  game or already-authored module item) instead of building one from scratch** — see
+  the gear-sourcing rule below. A real code fix needs the `parts_*.2da` variant
+  research first; don't guess numbers into `ArmorPart_*` fields the way `BodyPart_*`
+  could be, since there's no confirmed-safe "1 means normal" baseline here.
+- **Gear-creation rule (user-specified): prefer real, existing blueprints over
+  `create_item_blueprint` from scratch, budgeted by `get_wealth_budget`.** For a
+  weapon/armor/shield/accessory an NPC needs, search for a real blueprint before
+  building one — see the two-tool search discipline below, since `list_blueprints`
+  alone misses most of the base-game "Standard palette" catalog. Use a plain mundane
+  blueprint if one exists (e.g. a base longsword) for gear with no required bonus;
+  use an existing appropriately-valued magic item (costed via `resolve_blueprint`,
+  budgeted against `get_wealth_budget(level, role)`'s per-slot split) when the NPC
+  needs an enchantment. Only synthesize a brand-new item from scratch
+  (`create_item_blueprint`) for something narrative/plot-specific with no real-world
+  equivalent, or a mundane weapon type that genuinely isn't in the base game — and
+  even then, a flavor item with no mechanical property (a keepsake ring, a holy
+  symbol, a personal effect) needs a `description` establishing why it matters;
+  don't generate bare unexplained accessories (a ring, boots, gloves) with neither a
+  property nor a backstory. Sourcing a real item sidesteps the armor-appearance gap
+  above for free, since a real pre-authored item already carries correct
+  `ArmorPart_*`/`Color` data.
+  **`list_blueprints` alone is NOT sufficient to conclude "no real item exists" —
+  confirmed missed real, correct matches twice in one session.** It matches
+  resref/tag/TLK-resolved display name as literal substrings against the search
+  term. The base game's "Standard palette" vanilla items use terse, non-obvious
+  resref codes with NO display-name overlap to an intuitive search term — e.g. a
+  plain mundane Battleaxe is `nw_waxbt001` (magic variants `nw_waxmbt002-011`), a
+  mundane Rapier is `nw_wswrp001`, a mundane Dagger is `nw_wswdg001` — none of which
+  contain "battleaxe"/"rapier"/"dagger" as a substring anywhere `list_blueprints`
+  checks. Real mistake, corrected same session: built three items from scratch
+  (a from-scratch Battleaxe, and mundane Rapier/Dagger) believing no real blueprint
+  existed, after `list_blueprints` returned zero results for all three — all three
+  real items were found immediately once `resman_search` (raw resref substring
+  match across the FULL resman including base BIFs, not just TLK/tag/resref
+  fuzzy-matched) was tried with a guessed short prefix (`wax`, `nw_wsw`). **Rule:
+  before declaring "no real blueprint exists" for a mundane/common item, try
+  `resman_search` with a short, generic prefix guess (weapon-type abbreviations
+  tend to be 2-3 letters: `wsw`=simple/martial sword family, `wax`=axe family) in
+  addition to `list_blueprints` — don't rely on `list_blueprints` alone for
+  anything that isn't a distinctively-named magic item.**
+  **Corollary (user-specified): a weapon-specific feat means the matching weapon,
+  exactly — not just the matching proficiency category.** Weapon Focus/Weapon
+  Specialization/Improved Critical are all per-weapon-type feats (`feat.2da` labels
+  like `WeapFocBAxe`, `WeapSpeBAxe`, `ImpCritBAxe` are Battle-Axe-specific — a
+  different weapon in the same broad category, e.g. a Dwarven Waraxe, does not
+  benefit from them at all). The Dwarf Fighter above was first (wrongly) equipped
+  with a Dwarven Waraxe (`baseitems.2da` row 108, a different weapon from
+  Battleaxe's row 2) precisely because the real Battleaxe wasn't found — check the
+  weapon-search rule above before concluding a substitute is necessary.
 - **`nwn_script_comp` positional arg.** Most nim tools use `-i <file>`, but `nwn_script_comp` takes the source file as a **positional argument** (last): `nwn_script_comp [options] [-o out] file.nss`. Using `-i` silently fails.
 - **`nwn_twoda` no JSON.** Use `-k csv --write-id-column` instead. The CSV parser in `nim-tools.ts` handles it.
 - **Numeric tool params must use `z.string()`.** The MCP SDK validates JSON Schema before Zod transforms execute, so `z.coerce.number()` fails when clients send strings. Use `z.string()` + `toF()`/`toI()` helpers from `src/util/params.ts`. Same for complex array params — use `z.string()` + `JSON.parse()`.
@@ -279,24 +392,46 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 - **Triggers need Geometry in placed instances.** UTT blueprints from resman do NOT contain geometry. When placing triggers, always ensure the `Geometry` list field exists with at least 4 vertices (PointX/PointY/PointZ). Without geometry, the engine won't detect entry and the toolset won't render the trigger.
 - **GIC must be synced with GIT.** The toolset uses the GIC file to index objects in an area. `writeBackGit()` automatically syncs the GIC. Without GIC entries, objects exist in the GIT but the toolset doesn't show them.
 - **A placed instance's `VarTable` (and other per-instance fields) is a separate copy from its UTC blueprint's — editing one does not edit the other.** `place_creature`/`create_creature_blueprint`'s own `varTable` param is unaffected by this (it sets the blueprint before the object is ever placed, so there's only one copy to get right at creation time) — the gap is specific to editing a creature that's *already placed* in a `.git`. Confirmed directly: batch-adding `SPEC_*` local variables to 110 already-placed companions' `.utc` files (verified present there via independent `nwn_gff` extraction) produced total silent failure at runtime — every one read back as unset, because the actual placed instances in the area's `.git` still only carried their original vars. The fix wrote the same entries into the `.git`'s `Creature List` directly. Same family of bug as the previously-found `SoundSetFile` case (a `modify_gff_field` write to a blueprint alone left a placed instance's voice unchanged) — treat any field edit made *after* placement as needing both files, never just the blueprint.
-- **FOUND AND FIXED — creatures with verified-correct `Appearance_Type`/`Race` data
-  rendering invisible, in both the toolset AND a live game session.** Real user report
-  against 110 companions in a real module, with a critical diagnostic: manually changing
-  a henchman's appearance to a different race and back in the toolset UI made it render
-  correctly — and the user confirmed the same invisibility happened in an actual running
-  game, not just the toolset's own editor view, which ruled out a toolset-only display
-  cache. **Root cause: `buildMinimalUtc()` (`git-helpers.ts`) only ever wrote
-  `Tail_New`/`Wings_New`, never the legacy `Tail`/`Wings` fields** — every from-scratch
-  creature built via `create_creature_blueprint` with no `sourceResref` was missing them.
-  Real base-game/toolset-authored creatures carry both pairs; the toolset's own
-  property-editor save round-trip adds the legacy pair as a side effect, which is why
-  toggling appearance "fixed" it. **Fix:** `buildMinimalUtc()` now writes both `Tail`/
-  `Wings` and `Tail_New`/`Wings_New`. This also corrects a previously-wrong "harmless"
-  claim in `adventure-actors/SKILL.md` about this same field difference on cloned
-  chassis creatures. Not yet confirmed by the user visually (I have no way to render or
-  see a 3D model myself) — if a future report shows this wasn't the whole story, the next
-  thing to check is whether it's specific to `Appearance_Type` rendering or any creature
-  field on an already-placed instance.
+- **FOUND AND FIXED (second, corrected root cause) — creatures with verified-correct
+  `Appearance_Type`/`Race` data rendering invisible, in both the toolset AND a live game
+  session.** Real user report against 110 companions in a real module, with two critical
+  diagnostics: (1) manually changing a henchman's appearance to a different race and back
+  in the toolset UI made the *body* render correctly; toggling Gender restored only the
+  *head*; (2) the same invisibility happened in an actual running game, not just the
+  toolset's editor view, ruling out a toolset-only display cache. **A first hypothesis
+  (missing legacy `Tail`/`Wings` fields, diffed against a shopkeeper control creature)
+  was wrong** — the shopkeeper (`Appearance_Type=232`) is a monster-model creature and
+  was the wrong control entirely; the user re-reported the identical symptom after that
+  fix shipped. **Real root cause, found by diffing two genuine, live, actively-hosted-PW
+  henchman blueprints** (`~/tfndev`'s `hen_dorna.utc` [Dwarf] and `hen_linu.utc` [Elf],
+  both real, confirmed-working PC-race henchmen) **against the broken `h_*` creature's
+  raw GFF, full value-level, not just key-presence:** standard-race appearances
+  (`Appearance_Type` 0-6) render as a composite model assembled from per-part index
+  fields, exactly like a PC character in the character creator — `BodyPart_Belt`,
+  `BodyPart_L*`/`BodyPart_R*` (Bicep/FArm/Foot/Hand/Shin/Shoul/Thigh), `BodyPart_Neck`,
+  `BodyPart_Pelvis`, `BodyPart_Torso`, `ArmorPart_RFoot` (note the inconsistent name —
+  there is no `BodyPart_RFoot`), `Appearance_Head`, and `Color_Hair`/`Color_Skin`/
+  `Color_Tattoo1`/`Color_Tattoo2`. Both real samples carried the full set; `buildMinimalUtc()`
+  wrote none of them, leaving the composite model with no parts selected. This exactly
+  explains the two-part symptom: some head-related recompute happens on a Gender toggle,
+  but the body parts only ever populate when the toolset's own Appearance property editor
+  runs. **Separately, the same corpus diff also found `Tail_New`/`Wings_New` were the
+  wrong GFF type** (`byte` instead of the real `dword`) — real henchmen carry no legacy
+  `Tail`/`Wings` fields at all, contradicting the first hypothesis. **Fix:**
+  `buildMinimalUtc()` (`git-helpers.ts`) now writes the full body-part/head/color field
+  set with values matched from both real samples, writes `Tail_New`/`Wings_New` as
+  `dword`, and no longer writes legacy `Tail`/`Wings`. **Verification methodology
+  reinforced again: the first fix's mistake was comparing against a control of the wrong
+  appearance-rendering category (monster-model vs. composite PC-race model) — always
+  confirm the control creature uses the same rendering pathway before trusting a diff
+  against it, the same discipline already established for tile-rotation corpus checks.**
+  **Visually confirmed by the user**: all 7 race-representative test creatures (built
+  from scratch with the corrected `buildMinimalUtc()`, replacing the 110 originally-broken
+  companions) render correctly. Those 7 have no racial/class feats, generic 10-across
+  stats, and no spells — expected and unrelated to this bug (see "Henchmen / Companions"
+  below: empty `FeatList`/static stats on a level-1 from-scratch blueprint is correct
+  until a real `LevelUpHenchman()`/2DA-table population pass is run, which this fix
+  didn't touch).
 - **Placeable display name field is `LocName`**, not `LocalizedName`. Setting `LocalizedName` on a placeable has no effect — the toolset and engine read `LocName` (a cexolocstring).
 - **Placement Z height from walkmesh.** All placement tools automatically set the object's Z position from the walkmesh surface height. The walkmesh check returns the highest walkable face Z at the position. Use `fix_object_heights` to retroactively fix objects placed before this feature.
 - **Zone solver rejects incompatible adjacencies.** `adventure_apply_layout` returns early with zero placements and `INCOMPATIBLE TERRAIN ADJACENCY` errors if the zone layout contains terrain pairs with no transition tiles. Fix the zone layout, don't retry.
@@ -669,9 +804,12 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   `List`/`GrantedOnLevel` columns), class feats from `cls_feat_<class>.2da` filtered to
   `List=3` and `GrantedOnLevel <=` the target level. Full tables for all 7 standard PC
   races and 11 base classes were captured and applied to repair a real module this
-  session, but **this fix has not yet been applied to `adventure-actors/SKILL.md`'s
-  actual companion-creation recipe** — every companion built by following that skill as
-  currently written has this same gap. Highest-value next step for this whole track.
+  session. **Now applied to `adventure-actors/SKILL.md`'s actual companion-creation
+  recipe** — Phase 3b's old "an empty FeatList is expected" claim (and the matching
+  claim that feats come from the live `LevelUpHenchman()` call) was corrected in place
+  with the four-source static-baking approach (racial/automatic-class/generic-schedule/
+  class-bonus-slots), plus new skill-point-baking and equipment-sourcing sections
+  covering everything found in the session that finally closed this gap.
   Separately, also confirmed: `LevelUpHenchman()` silently refuses to grant a level in an
   alignment-restricted class (`classes.2da`'s `AlignRestrict` — Monk needs Lawful, Paladin
   needs Lawful Good) when the creature's `LawfulChaotic`/`GoodEvil` don't qualify. A
@@ -696,6 +834,27 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   a false pass) only for anything outside those 11 classes/7 races.
 - **Companion voices must be TYPE 0 (PC voiceset) rows** from `soundset.2da`. TYPE 3 NPC
   sets are sparse and leave the companion intermittently mute.
+- **Static spell-baking IS possible — the GFF struct format was unknown, now verified.**
+  An earlier session note claimed "no static spell-list structure exists on `ClassList`"
+  and treated spell-granting as solvable only via a live `LevelUpHenchman()` call. That
+  was premature — `ClassList[n]` does carry `MemorizedList0`-`MemorizedList9` (one list
+  per spell level, 0 = orisons), each entry a struct with `Spell` (word, `spells.2da`
+  row), `SpellFlags` (byte, `1` = ready/available), `SpellMetaMagic` (byte, `0` normally).
+  Confirmed against two *never-live-leveled* static NPC blueprints in `~/tfndev`
+  (`guard_cleric.utc`, `devrandomcleric.utc` — ordinary map NPCs, not henchmen that get
+  leveled at recruit) — real BioWare henchmen (Nathyrra, Bim, Valen, checked this same
+  session) are NOT useful references here, since they ship at level 1 in a *non-caster*
+  base class and only gain their real caster levels via a live leveling call at recruit,
+  same as this project's own henchmen. **For a companion, this only helps if you're
+  deliberately baking a static caster (no live leveling planned) — a companion that goes
+  through the normal recruit-time `LevelUpHenchman()` flow should keep using that, not
+  this.** Slot count at level 1 with no metamagic/domain feats: base class table
+  (`cls_spgn_<class>.2da`) gives orisons + 1 known-level slots; a positive ability
+  modifier for the casting stat adds a same-count bonus spell per spell level the class
+  can currently cast (e.g. Wis 16 → +1 first-level slot for a level-1 Cleric). Applied
+  once, to one hand-verified test creature (a Human Cleric in Henchman Gear Showcase) —
+  not yet wired into `create_creature_blueprint` or the `adventure-actors` skill as a
+  general capability.
 
 **TODO — not every NPC should get full PC-class bonus-feat progression.** Everything above
 (`LevelUpHenchman`, `startingPackage`, `SPEC_VerifyCreature`) assumes an NPC is meant to
@@ -723,6 +882,41 @@ part left at 0 renders as a shapeless blob in the creature's hand.
 derived from the resman stack (baseitems.2da carries no variant count), the helper can
 pick a random valid variant per part so generated NPCs stop sharing identical weapons.
 Until then "default model" is correct: a wrong variant index renders as nothing at all.
+
+**TODO — equipment selection through NWScript instead of per-creature LLM/tool-call
+picks.** Today's process (this session) was: for each NPC, search `list_blueprints` +
+`resman_search`, read costs via `resolve_blueprint`, check budget against
+`get_wealth_budget`, and equip via `set_creature_equipment` — repeated by hand per
+creature. This is exactly the kind of deterministic, rule-following work a script
+could do instead of an LLM call per NPC. Two shapes worth considering, not yet
+designed: (a) a **build-time MCP tool** (`equip_npc_by_role`-style, TypeScript) that
+takes `{class, level, role, archetype}` and internally does the search/budget/equip
+sequence deterministically — closer to how `create_reward_system` generates
+`inc_reward.nss` once and every caller just invokes it; (b) a **runtime NWScript
+include**, in the same family as `inc_reward.nss`/`inc_spec_check.nss`, that picks
+gear from a curated resref table keyed by class/level at `OnSpawn` — pushes the
+decision into the game engine entirely, at the cost of needing that table
+hand-curated and kept in sync with the resman stack. Given the armor-appearance gap
+(no safe from-scratch default), a curated table of *known-good real resrefs* per
+archetype is probably required either way, not purely computed from `baseitems.2da`.
+
+**TODO — reduce how much of NPC generation the LLM does by hand vs. deterministic
+code, broadly, not just for gear.** This session's actual work — computing ability
+scores, HP, skill-point totals, feat lists, and spell slots from `classes.2da`/
+`cls_*.2da` formulas — is mechanical, rule-following arithmetic, not creative
+judgment, and every real mistake made this session (a stale skill-point total after
+an Int change, an HP formula that needed a second pass, two "no real item" false
+negatives) was an arithmetic/lookup slip in exactly that kind of work, not a bad
+creative call. A `build_npc_stat_block`-style deterministic tool (given
+race/class/level/role, return a fully-populated ability array, `FeatList`,
+`SkillList`, spell `MemorizedList`s, and HP — same computation this session did by
+hand, moved into tested TypeScript) would remove this whole bug class the same way
+`create_reward_system`/`create_spec_verification` already turned other
+error-prone patterns into generated, reusable code. The LLM's time is better spent on
+what it's actually suited for in this pipeline — plot, dialog, quest design, and
+encounter/narrative judgment calls — not re-deriving D&D 3.5 tables from 2DA files
+per NPC. Not yet scoped or designed; raised by the user, worth a real look before the
+next module that needs more than a handful of statted NPCs.
 
 ## Testing
 
