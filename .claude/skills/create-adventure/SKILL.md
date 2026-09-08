@@ -31,7 +31,9 @@ Before starting the pipeline, resolve these with the user:
 
 4. **Difficulty.** Ask: "Difficulty — Normal or Hard? (default Normal)". If the user doesn't specify, default to Normal.
 
-5. **Adventure title & module creation.** Before invoking any sub-skill:
+5. **Area building mode.** Ask: "How should areas be built — **Full** (the pipeline designs and decorates every area automatically, default) or **Scaffold** (the pipeline lays out correct room shapes and story beats using only the simplest, most reliable tiles, then you finish decorating by hand in the toolset)?" Scaffold is worth recommending when the user mentions they'll be tweaking the module themselves afterward, or that they prefer hand-placed tiles/scenery — undoing a fully solver-decorated area to redo it manually is more work than starting from a plain scaffold. If they pick Scaffold, also ask: "Smallest possible footprint per area, for you to expand outward yourself, or a normal-sized area with the plain scaffold treatment?" Record the answer as `Area Mode: Full`, `Area Mode: Scaffold`, or `Area Mode: Scaffold (Minimal)` in the `## Module` section below — `/adventure-areas` reads this field.
+
+6. **Adventure title & module creation.** Before invoking any sub-skill:
    - Invent a compelling adventure title based on the user's prompt.
    - Pitch it to the user in a casual, enthusiastic way: *"How about **'[Title]'**? If that sounds fun, I'll create the module and we'll get started!"*
    - If the user doesn't like it, propose a different title. Keep iterating until they're happy.
@@ -49,6 +51,7 @@ Before starting the pipeline, resolve these with the user:
        - **Estimated Duration:** [duration]
        - **Party Size:** [1-4]
        - **Difficulty:** [Normal/Hard]
+       - **Area Mode:** [Full / Scaffold / Scaffold (Minimal)]
        ```
      - Call `create_module` with both `name` and `filename` set to the **adventure title exactly as written** (e.g., `name: "The Harvest of Bones"`, `filename: "The Harvest of Bones"`). The .mod file will be saved as `The Harvest of Bones.mod`.
    - If a module is already loaded and the user wants to add to it, skip module creation.

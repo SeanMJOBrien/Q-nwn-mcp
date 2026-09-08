@@ -27,7 +27,29 @@ export interface LayoutStyle {
   clearings?: number;      // alias for rooms (backward compat)
   corridorStyle?: "straight" | "zigzag";
   preferredFeatures?: string[];  // group names to prefer (e.g., ["Farm 1 2x2", "Barn 1 2x2"])
+  /**
+   * "Safe scaffold" mode: disables every variety knob (L-shaped room merges,
+   * S-curve corridors, shortcut corridors, obstacle patches, feature-group
+   * packing) so the result uses only plain rectangular rooms, straight
+   * corridors, and uniform floor/wall zones — the tile classes least likely
+   * to hit a solver fallback. Intended for a human to finish by hand in the
+   * toolset (add scenery, placeables, and terrain variety themselves) rather
+   * than trust the solver for everything. Combine with `rooms: 1` and a small
+   * width/height (see MIN_SINGLE_ROOM_AREA_SIZE) for a minimal-footprint
+   * scaffold the user can expand outward manually.
+   */
+  safeMode?: boolean;
 }
+
+/**
+ * Smallest width/height (in tiles) that can hold a single valid room under
+ * every style preset: 1 tile of playable-area border on each side, the
+ * minimum enforced margin (2, floored in bspPartition regardless of a
+ * style's marginRange) on each side of the room, plus the hard-floor
+ * minimum room size (3x3, also enforced in bspPartition). 1+2+3+2+1 = 9.
+ * Use with `rooms: 1` for the smallest possible `safeMode` scaffold.
+ */
+export const MIN_SINGLE_ROOM_AREA_SIZE = 9;
 
 export interface TransitionPoint {
   x: number;
@@ -191,7 +213,14 @@ export function generateLayout(
   transitionDirections?: string[],
 ): LayoutResult {
   const validPairs = computeValidPairs(tileset);
-  const config = STYLE_PRESETS[style.type] ?? STYLE_PRESETS.dungeon;
+  const basePreset = STYLE_PRESETS[style.type] ?? STYLE_PRESETS.dungeon;
+  // safeMode: zero out every knob that introduces a non-uniform corner
+  // pattern (L-merges, S-curves, shortcuts, obstacle patches) so the result
+  // sticks to plain rectangular rooms and straight corridors — the tile
+  // classes the solver handles most reliably.
+  const config: StyleConfig = style.safeMode
+    ? { ...basePreset, nonRectChance: 0, sCurveChance: 0, shortcutCount: 0, obstacleChance: 0 }
+    : basePreset;
   const roomCount = style.rooms ?? style.clearings ?? 3;
   const defaultTerrain = tileset.defaultTerrain.toLowerCase();
 
@@ -281,8 +310,12 @@ export function generateLayout(
     }
   }
 
-  // ── 6. Feature packing (mandatory — 50%+ coverage per room) ──────────────
-  const suggestedFeatures = packFeatures(rooms, tileset, width, height, floorTerrain, style.preferredFeatures);
+  // ── 6. Feature packing (mandatory — 50%+ coverage per room — unless safeMode) ──
+  // safeMode skips feature groups entirely: they're exactly the multi-tile,
+  // less-uniform tiles a human is expected to add by hand in the toolset.
+  const suggestedFeatures = style.safeMode
+    ? []
+    : packFeatures(rooms, tileset, width, height, floorTerrain, style.preferredFeatures);
 
   // ── 7. Room connections ───────────────────────────────────────────────────
   // Exterior styles (wallKeywords set): connect with floor terrain corridors

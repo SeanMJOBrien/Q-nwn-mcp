@@ -29,7 +29,7 @@ import { snapshotGitForUndo } from "../util/undo.js";
 import { compileScript, jsonToGff, erfPack } from "../nim-tools.js";
 import { checkPlacementWalkable } from "../util/walkmesh.js";
 import { getTilesetInfo } from "../util/tileset.js";
-import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatchesTerrain, resolveFloorTerrain } from "../util/layout-generator.js";
+import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatchesTerrain, resolveFloorTerrain, MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import type { LayoutStyle, SuggestedFeature } from "../util/layout-generator.js";
 import { solveArea } from "../util/zone-solver.js";
 import type { TerrainZone, CrosserPath, FeatureTile } from "../util/zone-solver.js";
@@ -471,12 +471,12 @@ export function registerAdventureTools(server: McpServer): void {
 
   server.tool(
     "adventure_generate_layout",
-    "Generate a procedural area layout with terrain zones, crosser paths, and transition points. Returns data ready to pass to adventure_apply_layout. Encodes all layout rules: perimeter encapsulation, room separation, adjacency validation, walkable ratio. Styles: dungeon (varied rooms + corridors, some L-shapes), cave (smaller rooms, more corridors, maze-like), dwelling (quadrant rooms, fewer corridors, building interior), forest (clearings separated by trees, winding roads), rural (farmland/village, spine roads), city (urban cobblestone, grid roads), plains (open terrain, sparse clearings), desert (arid, cliff borders), castle (fortified exterior, castle walls), tundra (frozen, snow/camp clearings). Returns suggestedFeatures array with pre-validated feature placements.",
+    `Generate a procedural area layout with terrain zones, crosser paths, and transition points. Returns data ready to pass to adventure_apply_layout. Encodes all layout rules: perimeter encapsulation, room separation, adjacency validation, walkable ratio. Styles: dungeon (varied rooms + corridors, some L-shapes), cave (smaller rooms, more corridors, maze-like), dwelling (quadrant rooms, fewer corridors, building interior), forest (clearings separated by trees, winding roads), rural (farmland/village, spine roads), city (urban cobblestone, grid roads), plains (open terrain, sparse clearings), desert (arid, cliff borders), castle (fortified exterior, castle walls), tundra (frozen, snow/camp clearings). Returns suggestedFeatures array with pre-validated feature placements. Set style.safeMode:true for a "safe scaffold" — disables L-shaped rooms, S-curves, shortcut corridors, obstacle patches, and feature packing, leaving only plain rectangular rooms and straight corridors (the tile classes least likely to need a solver fallback). Intended for a user who wants a correct room/story shape to finish by hand in the toolset rather than a fully solver-decorated area. Combine with rooms:1 and width/height:${MIN_SINGLE_ROOM_AREA_SIZE} for the smallest possible single-room scaffold, expandable later.`,
     {
       tileset: z.string().describe("Tileset resref (e.g., 'tdc01' for crypt, 'ttf01' for forest)"),
       width: z.string().describe("Area width in tiles (8-32)"),
       height: z.string().describe("Area height in tiles (8-32)"),
-      style: z.string().describe("JSON style object: {type: 'dungeon'|'cave'|'dwelling'|'forest'|'rural'|'city'|'plains'|'desert'|'castle'|'tundra', rooms?: number, clearings?: number, corridorStyle?: 'straight'|'zigzag', roadStyle?: 'spine'|'grid'|'winding', preferredFeatures?: string[]} — preferredFeatures is an array of tileset group names (from get_tileset_details) to prioritize when placing features. Preferred groups are tried first before falling back to random selection."),
+      style: z.string().describe("JSON style object: {type: 'dungeon'|'cave'|'dwelling'|'forest'|'rural'|'city'|'plains'|'desert'|'castle'|'tundra', rooms?: number, clearings?: number, corridorStyle?: 'straight'|'zigzag', roadStyle?: 'spine'|'grid'|'winding', preferredFeatures?: string[], safeMode?: boolean} — preferredFeatures is an array of tileset group names (from get_tileset_details) to prioritize when placing features (ignored when safeMode is true — safeMode always returns an empty suggestedFeatures array). Preferred groups are tried first before falling back to random selection."),
       transitionCount: z.string().optional().describe("Number of transition points to generate (default 1)"),
       transitionDirections: z.string().optional().describe("JSON array of directions: ['south', 'north', 'east', 'west']"),
     },
@@ -516,7 +516,7 @@ export function registerAdventureTools(server: McpServer): void {
       return {
         content: [{
           type: "text",
-          text: JSON.stringify(result, null, 2),
+          text: JSON.stringify(result),
         }],
       };
     },
