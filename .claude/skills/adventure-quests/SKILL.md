@@ -119,8 +119,7 @@ For each quest stage that needs a dialog condition check, write a script using `
 ```nwscript
 // c_qrescue_s1.nss — checks if quest "q_rescue" is at stage 1
 int StartingConditional() {
-    object oPC = GetPCSpeaker();
-    return GetLocalInt(oPC, "q_rescue") == 1;
+    return GetLocalInt(GetModule(), "q_rescue") == 1;
 }
 ```
 
@@ -137,13 +136,26 @@ int StartingConditional() {
 ```nwscript
 // c_qrescue_s2.nss — stage 2 AND has the item
 int StartingConditional() {
+    if (GetLocalInt(GetModule(), "q_rescue") != 2) return FALSE;
     object oPC = GetPCSpeaker();
-    if (GetLocalInt(oPC, "q_rescue") != 2) return FALSE;
     return GetIsObjectValid(GetItemPossessedBy(oPC, "qi_herbs"));
 }
 ```
 
-**Important:** Always use `GetPCSpeaker()` (not `OBJECT_SELF`) for state storage. This enables cross-NPC quest state — NPC A sets a variable that NPC B checks.
+**Important:** Quest **stage** state always lives on `GetModule()`, never on
+`GetPCSpeaker()` or `OBJECT_SELF`. This is co-op safe (one shared copy, not one per
+party member — see `CLAUDE.md`'s Co-op Rules) and it's what makes cross-NPC quest
+state work at all: `GetModule()` is reachable from any script regardless of which
+NPC's dialog it runs in, so NPC A can set a stage that NPC B's condition script
+checks. Storing it on the PC instead is the exact bug this replaced: only the PC who
+triggered the action script had their own copy advance, so a second party member
+approaching the same NPC would fail every stage check and see the original greeting
+even though their journal already showed the quest in progress. **Item possession
+checks are different and correctly stay on `GetPCSpeaker()`** — whether a specific
+PC is carrying a specific item is a genuinely per-PC fact, not shared quest
+progress. (This does mean a combined stage+item check only passes for whichever
+party member is both talking to the NPC *and* holding the item — acceptable for a
+single-item turn-in quest, since that's the PC who needs to interact anyway.)
 
 **Error recovery:** If `write_script` returns a compile error:
 1. Read the error message. Fix the syntax issue in the source.
@@ -166,7 +178,7 @@ For each quest state transition, write an action script using `write_script`.
 // a_qrescue_s1.nss — player accepts the rescue quest
 void main() {
     object oPC = GetPCSpeaker();
-    SetLocalInt(oPC, "q_rescue", 1);
+    SetLocalInt(GetModule(), "q_rescue", 1);
     AddJournalQuestEntry("q_rescue", 1, oPC);
 }
 ```
@@ -176,7 +188,7 @@ void main() {
 // a_qrescue_s2.nss — advance to stage 2
 void main() {
     object oPC = GetPCSpeaker();
-    SetLocalInt(oPC, "q_rescue", 2);
+    SetLocalInt(GetModule(), "q_rescue", 2);
     AddJournalQuestEntry("q_rescue", 2, oPC);
 }
 ```
@@ -186,7 +198,7 @@ void main() {
 // a_qrescue_s1.nss — accept quest + receive item
 void main() {
     object oPC = GetPCSpeaker();
-    SetLocalInt(oPC, "q_rescue", 1);
+    SetLocalInt(GetModule(), "q_rescue", 1);
     AddJournalQuestEntry("q_rescue", 1, oPC);
     CreateItemOnObject("qi_letter", oPC);
 }
@@ -199,7 +211,7 @@ void main() {
     object oPC = GetPCSpeaker();
     object oItem = GetItemPossessedBy(oPC, "qi_herbs");
     if (GetIsObjectValid(oItem)) DestroyObject(oItem);
-    SetLocalInt(oPC, "q_rescue", 3);
+    SetLocalInt(GetModule(), "q_rescue", 3);
     AddJournalQuestEntry("q_rescue", 3, oPC);
 }
 ```
@@ -208,12 +220,21 @@ void main() {
 ```nwscript
 void main() {
     object oPC = GetPCSpeaker();
-    SetLocalInt(oPC, "q_rescue", 99);
+    SetLocalInt(GetModule(), "q_rescue", 99);
     AddJournalQuestEntry("q_rescue", 4, oPC);
     GiveXPToCreature(oPC, 200);
     GiveGoldToCreature(oPC, 50);
 }
 ```
+
+`oPC` (`GetPCSpeaker()`) still gets used in every pattern above — for
+`AddJournalQuestEntry`'s speaker arg, `CreateItemOnObject`, `GetItemPossessedBy`,
+and the reward calls — only the **quest stage** moved to `GetModule()`. Note the
+reward pattern only pays `oPC`, the triggering PC, XP/gold directly: that's fine
+*only* when this action script is itself gated by a combined stage+item check (so
+it only fires for the PC turning in the item) — a reward meant for the whole party
+regardless of who's speaking still needs the fan-out pattern from `create_reward_system`
+(see Co-op Rules in `CLAUDE.md`), not a bare `GiveXPToCreature(oPC, n)`.
 
 **Every call above relies on `AddJournalQuestEntry`'s default `bAllPartyMembers=TRUE`
 — never pass `FALSE` here.** This is scope-specific, not a universal NWN rule:
@@ -406,10 +427,22 @@ Call `repack_module()` to save all changes.
 
 ## Quest State Model
 
-**All quest state is stored on the PC object** (not on NPCs) using `SetLocalInt` / `GetLocalInt`. This enables:
-- Cross-NPC quests (NPC A sets state, NPC B checks it)
+**Quest stage is stored on `GetModule()`** (not on the PC, not on NPCs) using
+`SetLocalInt` / `GetLocalInt`. This enables:
+- Cross-NPC quests (NPC A sets state, NPC B checks it — `GetModule()` is reachable
+  from any script, same as a PC-local var was, so this property doesn't change)
 - Multiple quests tracked simultaneously
 - Persistent state across area transitions
+- **Co-op safety** — every party member shares the one copy, instead of each having
+  their own that only the PC who triggered the last action script actually advanced.
+  This *was* stored on the PC object; that was a real bug (see `CLAUDE.md`'s Co-op
+  Rules and the `quest_state_on_single_pc` finding it names) — a second party member
+  re-approaching an NPC would fail every stage check against their own never-set
+  copy and see the original greeting, even with their journal already showing
+  progress. Fixed by moving to `GetModule()`.
+
+Item-possession checks (`GetItemPossessedBy(oPC, ...)`) are a separate, correctly
+per-PC concern — see Phase 4 — and still use `GetPCSpeaker()`.
 
 **Variable naming:** `q_[tag]` where `[tag]` is the quest tag (e.g., `q_rescue`)
 **Stage values:** 0 = not started (default), 1+ = quest stages, 99 = fully complete
@@ -435,7 +468,7 @@ Call `repack_module()` to save all changes.
 
 - **Modify existing dialogs first.** Only create new dialogs as a fallback when semantic incompatibility makes modification infeasible.
 - **StartingList order is critical.** Higher quest stages first, original greeting last. The unconditioned entry MUST be the last StartingList entry — otherwise it will always match.
-- **Use PC-local variables.** Always `GetPCSpeaker()` for state, never `OBJECT_SELF`. This enables cross-NPC state sharing.
+- **Quest stage lives on `GetModule()`.** Never `GetPCSpeaker()` (per-PC — desyncs the party) or `OBJECT_SELF` (per-NPC — breaks cross-NPC quests). Item-possession checks are the one thing that still correctly uses `GetPCSpeaker()`.
 - **All scripts must compile.** If `write_script` reports errors, fix and retry.
 - **16-character resref limit.** Plan quest names to be short: `rescue`, `herbs`, `curse`, `bones`.
 - **Tile coordinates:** Column = x (left to right), Row = y (bottom to top). World position = tile * 10.0 + 5.0 for center.
