@@ -35,6 +35,27 @@ else story-related (an overview/orientation line is fine; plot content is not �
 1. Rebuild `_start` as a small real area (or repaint the existing stub) sized for one merchant
    NPC + the store — this stays `Mod_Entry_Area` and `Mod_Entry_X`/`Mod_Entry_Y` point into it,
    unchanged from the module template's own entry point.
+   - **Build it flat, through the normal pipeline** (`adventure_generate_layout` +
+     `adventure_apply_layout`, or a manual `paint_group`/`paint_tiles` fill) — not left at
+     whatever `create_area`'s raw default fill happens to be. Confirmed a real starting area
+     shipped covered in visually-ramped tiles despite the solver pipeline itself being
+     flat-tile-only by construction (`tile-solver.ts`/`zone-solver.ts` both filter to
+     `tile.flat`), meaning the ramp tiles were selected deliberately rather than defaulted —
+     most likely a Vertical/connective feature group (see below) picked by mistake for what
+     should have been plain floor.
+   - **Only request Structural/Camp-category feature groups here, never
+     Vertical/connective ones.** `get_tileset_details`/`adventure_list_features` group
+     names like `Ramp`, `Cave`, or a gate/tower piece exist specifically for height
+     transitions and area entry/exit points elsewhere in a dungeon or exterior layout —
+     they are not floor filler and will not read as "a flat camp with a wagon in the
+     corner." For a wagon/camp-themed start area, look for `plc_emptywagon`/
+     `plc_fullwagon`/`CaravanWagon2`-style groups instead.
+   - **Centering a placement (the store NPC, a central fire pit, etc.) in the room:** use
+     the tile-center formula already established in `adventure-actors/SKILL.md`
+     ("World position = tile * 10.0 + 5.0 for center") against the *average* of the
+     room's tile bounds — `((minCol+maxCol)/2)*10+5` and `((minRow+maxRow)/2)*10+5` —
+     not a guessed coordinate. Read the room's actual tile bounds from
+     `visualize_area`'s spatial payload before computing this.
 2. The first *story* area is a separate area, built normally, connected from the start area via
    `adventure_create_transition` (Phase 7's standard mechanism) — the player steps through it
    once they've geared up, and that's where the plot actually opens.

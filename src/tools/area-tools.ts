@@ -1,9 +1,10 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireIndex } from "../module-loader.js";
+import { requireIndex, indexAreaCreatures } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
+import type { CreatureRecord } from "../types/module.js";
 
 export function registerAreaTools(server: McpServer): void {
 
@@ -93,7 +94,15 @@ export function registerAreaTools(server: McpServer): void {
     { readOnlyHint: true, idempotentHint: true },
     async ({ area }) => {
       const index = requireIndex();
-      const areaCreatures = index.creatures.filter(c => c.area === area);
+      // Read live from the area's GIT rather than index.creatures — that summary
+      // array is built once at load_module time and never refreshed, so it goes
+      // stale the moment any creature is placed/removed afterward (confirmed real
+      // bug: get_area_creatures returned [] for areas with creatures placed
+      // mid-session, while get_creature_details, which already reads parsedGff
+      // live, found them fine).
+      const gitDoc = index.parsedGff.get(`${area}.git`);
+      const areaCreatures: CreatureRecord[] = [];
+      if (gitDoc) indexAreaCreatures(area, gitDoc, areaCreatures);
       return { content: [{ type: "text", text: JSON.stringify(areaCreatures, null, 2) }] };
     }
   );

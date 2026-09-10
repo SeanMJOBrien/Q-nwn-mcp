@@ -19,6 +19,7 @@ import path from "path";
 import fsPromises from "fs/promises";
 
 import { numParam, optNumParam, toF, toI } from "../util/params.js";
+import { markDirty } from "../util/dirty-state.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { GIT_STRUCT_ID } from "../config.js";
@@ -98,6 +99,7 @@ export function registerAdventureTools(server: McpServer): void {
       async function writeScript(resref: string, source: string): Promise<{ success: boolean; output?: string }> {
         const nssPath = path.join(index.tempDir, `${resref}.nss`);
         await fsPromises.writeFile(nssPath, source, "utf-8");
+        markDirty(nssPath);
         const nssStat = await fsPromises.stat(nssPath);
         index.resources.set(`${resref}.nss`, { resref, extension: "nss", filePath: nssPath, sizeBytes: nssStat.size });
         const ncsPath = nssPath.replace(/\.nss$/i, ".ncs");

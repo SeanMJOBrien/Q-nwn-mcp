@@ -188,7 +188,7 @@ export function buildMinimalUtm(): GffDocument {
     MarkDown: { type: "int", value: 100 },
     MarkUp: { type: "int", value: 100 },
     MaxBuyPrice: { type: "int", value: 0 },
-    OnClosStore: { type: "resref", value: "" },
+    OnStoreClosed: { type: "resref", value: "" },
     OnOpenStore: { type: "resref", value: "" },
     PaletteID: { type: "byte", value: 0 },
     StoreGold: { type: "int", value: -1 },

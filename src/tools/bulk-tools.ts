@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex } from "../module-loader.js";
 import { jsonToGff, readTextFile } from "../nim-tools.js";
 import { numParam, optNumParam, toF } from "../util/params.js";
+import { markDirty } from "../util/dirty-state.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
 import { getGitDoc, writeBackGit, updateAreaCounts } from "../util/git-helpers.js";
@@ -87,6 +88,7 @@ export function registerBulkTools(server: McpServer): void {
             if (source.includes(`"${oldTag}"`)) {
               const newSource = source.replaceAll(`"${oldTag}"`, `"${newTag}"`);
               await fs.writeFile(entry.filePath, newSource, "utf-8");
+              markDirty(entry.filePath);
               scriptChanged++;
             }
           } catch { /* skip */ }

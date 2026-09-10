@@ -215,6 +215,148 @@ sequencing, the exact deliverable a hand-built prefab source area should look
 like, and a concrete starter-library TODO (specific prefabs for the *user* to
 hand-build in the toolset, two batches, priority order) are all in that doc.
 
+**TODO — reserve guaranteed flat, mutually-matching space for a multi-tile
+feature before packing it (user-raised).** Surfaced directly by the Frostmarch
+cave fix in "The Six-Fold Trial": `feature-collars.ts` gives a *known*
+height-transition feature a correct 1-tile collar, but nothing in the BSP/room
+layout stage reserves a larger flat region *around* where that feature will land
+— so extending a collar into a believable raised plateau (or any multi-tile
+feature that needs several flat, corner-matching tiles on all four sides to sit
+in cleanly) is always a manual post-hoc patch, not something the generator
+planned room shape/size around. Worth a real look: could `packFeatures` (or the
+room-sizing pass before it) query a feature's real footprint + collar
+requirement and bias BSP room dimensions/placement to guarantee a flat,
+same-terrain, same-height buffer of the right size before ever attempting to
+place it — closing the gap between "the collar is correct" and "there's
+actually room for the collar." Related to, but distinct from, the area-prefabs
+work above (prefabs solve *authoring* a known-good multi-tile piece once;
+this solves *making room* for one, prefab or procedural, before packing it).
+
+**TODO — rebuild a single area in place from an existing/completed module
+(user-raised).** No current tool lets you regenerate just one area of an
+already-built module using the normal `adventure_generate_layout`/
+`adventure_apply_layout` pipeline when that area's design turns out to not suit
+the player (bad layout, an unfixable structural bug, or simply "player didn't
+like this one") without hand-patching tile-by-tile as this session's Frostmarch/
+keepbailey fixes did. Worth scoping: `delete_area` + `create_area` +
+`adventure_generate_layout`/`adventure_apply_layout` already exist as the raw
+pieces, but re-wiring the area back into the transition graph (doors/portals to
+its neighbors), re-placing everything the deleted area held that other systems
+already reference (quest triggers, companion recruit points, a key NPC's
+dialog-driven state), and deciding what should regenerate vs. carry over
+untouched are all real design questions, not just plumbing. A dedicated
+`rebuild_area`-style capability (or a documented recipe using existing tools)
+would turn "this area has issues" from a multi-hour hand-patch into a
+supported, repeatable operation.
+
+**TODO — a per-module git repo, committing the JSON view of each resource, not
+raw binary GFF (user-raised).** Each module's temp dir is currently disposable
+and regenerable from the packed `.mod` (see the `load_module` re-extraction
+pitfall below) — there's no history, and reverting one bad edit means hand
+re-extracting from the last repack the way this session's recovery from a
+corrupted file did. A real per-module git repo would give that for free, plus
+branching/diffing for the area-rebuild TODO above ("try a regenerated area,
+diff against the old one, revert if the player doesn't like it"). The design
+question the user specifically flagged: commit the **JSON round-trip form**
+this project already produces via `nwn_gff` (or generates for tool output),
+not the raw binary `.git`/`.utc`/etc. — binary GFF diffs as "changed," which
+tells you nothing; the JSON form diffs as "which field on which struct
+changed," which is the whole point of having history at all. Needs real
+scoping before building: where the repo lives (not `/tmp`, which today's temp
+dir intentionally is, for good reason — see the pitfall below), what triggers
+a commit (every `repack_module`? every mutating tool call, git-embedded
+resources included?), and whether the binary form is committed alongside the
+JSON form (probably yes, since the JSON is derived and the binary is what
+actually ships) or regenerated from JSON on demand.
+
+**Tooling to prevent the classes of mistakes found late in one session's own
+work (user-raised: "how do we avoid these in the future, can we add script
+and tooling to keep progress moving forward").** Three real, self-inflicted
+mistakes happened in one session while hand-fixing a shipped module. #1 and
+#2 below are now fixed with real tooling rather than relying on remembering
+prose rules under time pressure; #3 is still open.
+
+1. **FIXED — `setGffByPath`/`modify_gff_field` now coerces a value to the
+   field's real GFF type instead of storing whatever the caller sent
+   verbatim.** Root cause of "modify_gff_field cannot write float fields" and
+   the broader "corruption isn't limited to float fields" pitfall above: MCP
+   clients routinely send numeric-looking params as strings (see
+   `util/params.ts`'s own comment on why every numeric tool param is
+   `z.string()`), and the old `field.value = newValue` had zero type
+   awareness — a float field could end up as `{"type":"float","value":"60"}`,
+   which `nwn_gff` rejects. `coerceGffValue()` in `util/gff-path.ts` now
+   coerces against int/float/string GFF type families on every set (existing
+   field: coerce against its real type; new field: coerce against the
+   supplied `gffType`), and explicitly **refuses** `struct`/`list`/
+   `cexolocstring`/`void` with a clear error rather than attempting and
+   silently corrupting — those need real internal structure a flat
+   path+value+type API can't express safely; use a typed tool instead. 9 new
+   unit tests in `gff-path.test.ts` cover the coercion and the refusal.
+   `modify_gff_field` is the one canonical tool for this class of edit now —
+   there's no need for a parallel raw-script recipe anymore for simple scalar
+   field edits (bulk edits across many structs in a list — the pattern behind
+   this session's own faction-flip and store-field-rename fixes — still has
+   no dedicated tool; that's real future work, not covered by this fix).
+2. **FIXED — `load_module` now refuses to reload/switch when the current
+   module has unpacked changes, instead of silently discarding them.** Root
+   cause of the "never call load_module between an edit and its repack"
+   pitfall being violated anyway: nothing enforced it. `util/dirty-state.ts`
+   tracks which temp directories have been written to since their last clean
+   point (scoped per-directory, not a single global flag — a global flag
+   would make `create_module`'s own throwaway assembly-directory writes look
+   like they dirtied whatever *other* module happened to already be loaded,
+   a real cross-contamination bug caught while building this). `jsonToGff`
+   (the near-universal write path — 30+ call sites across the codebase) and
+   `writeAndCompileScript` both mark their target directory dirty on every
+   write; `repack_module` and a fresh extraction both clear it. `load_module`
+   now checks `isDirtyUnder(currentIndex.tempDir)` before re-extracting and
+   throws a clear error naming the fix (`repack_module` first, or pass
+   `force: true` to `load_module` to discard deliberately) — covers both
+   reloading the *same* module and switching to a *different* one while the
+   current module is dirty (switching wipes the old temp dir the same way a
+   reload overwrites it). Verified end-to-end against a real module (not just
+   unit tests): a scratch write correctly triggers a refusal, and `force:
+   true` correctly re-extracts clean. 5 new unit tests in
+   `dirty-state.test.ts`, including the cross-contamination case.
+3. **FIXED — a race between a dispatched background agent's own
+   `load_module` and concurrent direct edits to the same shared temp dir**
+   from another process. Both a real orchestrator process and an Agent-tool
+   subagent process share one temp dir per module (by design, so sidecar
+   files like `adventure.md` persist) — confirmed genuinely separate OS
+   processes, not shared in-memory state (a subagent's `load_module` really
+   did revert the orchestrator's own pending edits mid-session; if they
+   shared process state, reloading would have reused the same in-memory
+   index instead of re-extracting). `util/module-lock.ts` adds a real
+   file-based lock: a small JSON file (`.mcp-lock`, pid + timestamp) inside
+   the temp dir itself, held for as long as a process has that module
+   loaded — not just for one call. `load_module` acquires it for the temp
+   dir right before extraction and releases the *previous* module's lock
+   when switching to a different one; a process exiting without an explicit
+   release (session just ends) is caught by a `process.on("exit")` handler
+   as a safety net (deliberately not hooking SIGINT/SIGTERM — an MCP stdio
+   server's SDK manages its own shutdown signals, and a competing handler
+   calling `process.exit()` could short-circuit it). A free lock, a stale
+   one (owning pid no longer alive — `process.kill(pid, 0)` liveness check),
+   or one this same process already holds are all claimed immediately; one
+   genuinely held by another live process gets a short bounded wait (3s,
+   for quick transient overlaps) before throwing a clear error naming the
+   holder's pid, rather than blocking indefinitely or silently interleaving.
+   Verified with a real cross-process test (two separate `node` processes,
+   not just unit tests): process A acquires and holds the lock, process B
+   correctly refuses while A is active, and a third attempt after A exits
+   correctly succeeds once the exit handler has released it. 7 new unit
+   tests in `module-lock.test.ts` (the "genuinely locked" case uses an
+   injectable short timeout so it doesn't eat the real multi-second wait in
+   the suite). This closes the gap the dirty-state guard (item 2) couldn't:
+   that guard only sees *this* process's own pending work; this is the
+   cross-process half. Still worth keeping the operational habit from
+   before as a second layer, not a replacement: avoid dispatching a
+   background agent for a module while also doing direct edits on it in the
+   same conversation when it's easy to avoid — the lock turns a silent
+   revert into a loud, actionable refusal, but a loud refusal mid-workflow
+   is still friction worth sidestepping when there's no real need to run
+   both at once.
+
 `get_tileset_details` defaults to `detail: "summary"` (~2KB) which includes terrain types, crosser types, valid terrain adjacencies, and group names. Use `detail: "full"` for the complete 60-100KB tile catalog.
 
 ### Tile Matching Rules
@@ -245,6 +387,68 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 
 ## Known Pitfalls
 
+- **FIXED — the equipped-item resref field was read as `EquippedRes` everywhere in
+  this codebase; no real equipped item struct carries that field name, so every
+  check depending on it was silent dead code.** The real field is `TemplateResRef`
+  (same name an *inventory*, non-equipped item uses — confirmed by dumping a real
+  equipped `Equip_ItemList` entry: it carries `TemplateResRef`, `BaseItem`,
+  `StackSize`, etc. directly, with no `EquippedRes` field at all). Three call sites
+  had this typo: `get_creature_details`'s equipment display (`creature-tools.ts`,
+  always showed `resref: ""` for every equipped item — dismissed as a display quirk
+  more than once before the real cause was found), `validate_module`'s missing-
+  equipped-item-blueprint checker (`analysis-tools.ts`, never actually flagged
+  anything, ever), and — most consequential — `verify_creature`'s
+  `ranged_weapon_no_ammo` check (`util/verify/blueprints.ts`), which exists
+  specifically to catch an archer equipped with a bow and no arrows. Confirmed via
+  a real build ("The Six-Fold Trial"): 3 creatures (2 archers + 1 key NPC) shipped
+  with a bow and zero ammo, undetected through the actors, challenges, polish, and
+  rewards phases despite `verify_all`/`verify_creature` reporting `shippable: true`
+  at every one of those checkpoints — the check that should have caught it had
+  never once actually executed its logic, on any creature, in this project's
+  history. **Fix:** corrected the field name at all three sites, and rewrote the
+  ammo check to read `BaseItem`/`StackSize` directly off the embedded equipped-item
+  struct instead of doing an async blueprint re-resolve for `BaseItem` (the
+  embedded struct already carries it — the resolve was unnecessary indirection that
+  also silently no-op'd when `resmanOpts` wasn't passed). Added a companion
+  **`ammo_stack_size_unreasonable`** warning-level check at the same time (see the
+  ammo-quantity convention below) and 3 new unit tests exercising the fixed
+  behavior (present-but-empty ammo, present-but-wrong-family self-ammo, present-
+  and-reasonable). **This is exactly why the "always independently re-verify a
+  phase's `shippable: true` self-report" discipline established elsewhere in this
+  doc exists — but it has a limit: independent re-verification via `verify_all`
+  itself is worthless when the underlying check is dead code. The only thing that
+  actually caught this was a human playing the finished module.**
+- **Ammo-quantity convention (user-specified).** A ranged-weapon creature needs not
+  just *some* ammo equipped but a *plausible combat load* — 99 (the GFF stack-size
+  ceiling) is exactly as wrong as 0, just less obviously broken. Target ranges,
+  now enforced by `verify_creature`'s `ammo_stack_size_unreasonable` warning
+  (`AMMO_STACK_RANGE` in `util/verify/blueprints.ts`): **arrows/bolts** (bow/
+  crossbow) ~a dozen, checked as 8-16; **sling bullets** 8-20; **darts** ~8,
+  checked as 4-12; **throwing axes** 2-6. Darts/shuriken/throwing axes have no
+  separate ammo slot — the RightHand weapon's own `StackSize` *is* the ammo count
+  (`SELF_AMMO_TYPES` in the same file), so the check reads RightHand's stack
+  directly for those rather than looking for a separate equipped slot. Shuriken
+  (`AmmunitionType` 5) has no user-specified range and is deliberately left
+  unchecked rather than guessed, per this project's "encode unverified data as a
+  skip, never a guess" rule.
+- **FIXED — `get_area_creatures`/`list_creatures` returned `[]` for creatures placed
+  after `load_module`.** Both read `index.creatures`, a summary array built once at
+  `load_module` time and never refreshed — any creature placed afterward (the normal
+  case, since `/create-adventure`'s `/adventure-actors` phase runs well after module
+  load) was invisible to these two tools while genuinely present in the GIT.
+  Confirmed real, not a false alarm: `get_creature_details(area, tag)` — which
+  already reads live from `index.parsedGff` — found a freshly-placed companion fine
+  on the same area where `get_area_creatures` returned empty. Root cause and fix
+  were symmetric with `get_area_placeables`, which was already correct — it reads
+  the `Placeable List` live from `parsedGff` on every call instead of caching.
+  **Fix:** exported `indexAreaCreatures()` (`module-loader.ts`, already existed,
+  just unexported) and had both tools call it live against current `parsedGff`
+  data instead of touching `index.creatures` at all. Needs an MCP server restart to
+  take effect. **This is a real risk for any skill/phase whose idempotency checks
+  say "call `get_area_creatures` first, skip if already placed"** (`adventure-actors`,
+  `adventure-challenges`, others) — before this fix, that check would silently
+  report an area as empty even when it wasn't, causing duplicate placement. If a
+  module built before this fix shows unexpectedly duplicated creatures, this is why.
 - **CRITICAL — direct `nwn_gff` file edits and in-memory-index MCP tools silently
   clobber each other; ordering is load-bearing.** Most placement/equipment/blueprint
   MCP tools (`set_creature_equipment`, `create_item_blueprint`, `fix_object_heights`,
@@ -687,6 +891,103 @@ into nwn-mcp's repair tools is all still done by hand — the orchestration loop
 persistent campaign database this project has no way to invoke — out of scope for
 `inc_spec_check.nss`, which deliberately uses zero `NWNX_*` functions.
 
+**TODO — what's script-verified today vs. what still relies on LLM self-report,
+surveyed against a real large custom-adventure build** ("The Six-Fold Trial": a
+single-PC + 5-henchmen module with bespoke mechanics — paired companion recruiting,
+1gp hire cost, 6 skill-check-or-combat-fallback gates, a scripted web-ambush with a
+destructible early-termination placeable, an orc-captain persuade-to-flee dialog, an
+enemy that converts to a follower, per-area weather, a dual-path lockpick-or-destroy
+gate). Verified today, real infrastructure: `verify_*` (static GFF structure),
+`verify_quest_completability` (journal/dialog reachability), `check_area_connectivity`,
+script compilation, and — when the live verify-server is actually stood up —
+`SPEC_VerifyCreature`/`SPEC_SelfTestOnSpawn` for companion stat/appearance/feat/spell
+correctness. **Not verified by anything, confirmed by direct experience building this
+module — every one of these was either manually checked by the orchestrator (this
+session) or simply trusted from a sub-skill's self-report:**
+- **Runtime behavior of bespoke NWScript mechanics.** Whether the orc-captain's DC 15
+  Persuade branch actually fires correctly, whether the web-ambush trigger applies a
+  real 5-round effect and the destructible placeable actually cancels it early,
+  whether a skill-check gate's combat fallback actually spawns/triggers on failure —
+  all of this is "compiles + structurally present," never actually executed. The
+  `SPEC_*` pattern only covers companion stats; nothing generalizes it to arbitrary
+  custom quest/encounter scripts.
+- **Encounter balance and composition tallying.** "Balanced for the PC and all 5
+  henchmen" (an effective-party-size override from the default) was reasoned about
+  by the LLM per-encounter, never computed by a tool. Nothing tallies "how many
+  battles are humanoid," "does every fight have a caster," or CR-vs-effective-party-
+  size automatically — a human (or the orchestrator) has to manually audit the
+  built module against the numbered requirements.
+- **Loot-drop runtime overrides.** `Lootable`/`Dropable` GFF flags are structurally
+  checkable, but an `OnSpawn` script calling `SetLootable(FALSE)`/
+  `SetDroppableFlag(..., FALSE)` at runtime silently wins and isn't caught by
+  anything — a documented existing blind spot (see the `Dropable`/`Lootable`
+  pitfall above), not new, but re-confirmed relevant here.
+- **Cross-phase state coordination.** E.g. "the friendly recruit shouldn't be
+  visible until the player has survived the encounter with their hostile
+  counterpart" was passed as an instruction to one sub-skill's prompt and trusted
+  from its self-report — nothing independently confirms the gating variable is
+  actually read/written correctly on both ends.
+- **Weather/area-property variance.** "Give each area different weather" is neither
+  computed nor diffed — a sub-skill could set every area to the same values and
+  nothing would catch it.
+  **TODO (user-raised, 2026-09-09): weather variance is story-dependent, not just a
+  "make adjacent areas differ" rule.** A flat "flag identical weather on adjacent
+  areas" check (see item 4 below) would false-positive on two areas that are
+  genuinely meant to share weather (a short walk between them, same climate) and
+  miss cases where weather *should* differ for reasons a plain adjacency diff can't
+  see. Before building this check for real, the design needs to account for: does
+  the transition between these two areas represent many hours of travel (weather
+  should plausibly have changed) or a near-instant arrival (should usually match)?
+  Does the transition move the party to a meaningfully different location/climate
+  (mountain pass vs. coastal town) that would affect weather regardless of travel
+  time? A real implementation likely needs a per-transition "travel time" and/or
+  "climate change" signal — from `adventure_create_transition`'s own data, or a
+  new field the area-design phase sets — rather than only comparing the two areas'
+  `ChanceRain`/`ChanceSnow`/etc. fields directly.
+- **This project's own MCP tool correctness.** The `get_area_creatures`/
+  `list_creatures` stale-cache bug (see the pitfall above, found and fixed this same
+  session) was caught by manual cross-checking against `get_creature_details`, not
+  by any test — there's no meta-check that the tools' own read paths agree with each
+  other or with ground truth.
+- **Narrative distinctness** (five backstories actually being different, not
+  near-duplicates) is inherently a judgment call, not realistically script-
+  verifiable — noting it here for completeness, not as a gap to close.
+
+**What should be built, roughly in priority order:**
+(1) **BUILT** — a static analyzer that greps every placed creature's `OnSpawn` source
+for lootable/droppable-overriding calls and cross-references against the GFF flags.
+`validate_module`'s `onspawn_overrides_lootable`/`onspawn_overrides_droppable`
+warnings (`src/tools/analysis-tools.ts`) — pure static analysis (regex over the
+script's own source via `loadScriptSources`), no runtime server needed. Cannot trace
+`ExecuteScript()` call chains into a different script.
+(2) **BUILT (partial)** — `get_balance_report` now includes a per-area `composition`
+block: class-count tally and a `casterPresent` flag, explicitly informational (a
+caster is not a hard requirement — user-specified: "it does sometimes improve the
+encounter mechanics and experience", so this is a note, never a warning/error). The
+monster-type/humanoid-count breakdown from the original idea was dropped — no
+reliable data source was found for "is this race humanoid" without guessing, and
+this project's convention is to skip rather than guess. `effectivePartySize` param
+adds a per-member CR figure when passed.
+(3) **BUILT** — a door/gate dual-path checker. `verifyDoor`'s `door_leads_nowhere`
+warning (`src/util/verify/blueprints.ts`), extended per user spec: a real lock/key
+obstacle (`Lockable` + `OpenLockDC>0` or `KeyRequired`) should be wired as a
+transition (`LinkedToFlags != 0`) or have at least one Waypoint in the same area
+marking a destination — advisory only, since a deliberate dead-end gate the plot
+never means to open is a legitimate design choice. Only runs when verifying a placed
+instance (`area`+`tag` passed to `verify_door`), not a standalone blueprint, since
+"leads somewhere" is meaningless before the door is placed. Note: this checks
+*lock/key obstacle → real destination*, not "sane `OpenLockDC` AND real breakable HP
+with `Plot` unset" as originally scoped — that formulation conflated normal
+door-breakability (true of nearly every door by default) with the actual concern
+(does this obstacle lead anywhere), so the check was redesigned around the latter.
+(4) **NOT BUILT — design open**, see the weather TODO immediately above this list;
+a flat adjacent-area diff was rejected as too naive before writing any code.
+(5) the big one — generalizing the `SPEC_*` runtime-verification pattern beyond
+companion stats to arbitrary custom quest/encounter scripts, so a bespoke mechanic
+like a scripted web ambush gets an actual headless-server pass/fail instead of
+"it compiled and looks right." (1)-(4) are pure static analysis, buildable without
+the live verify-server; (5) needs it.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
@@ -855,6 +1156,73 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   once, to one hand-verified test creature (a Human Cleric in Henchman Gear Showcase) —
   not yet wired into `create_creature_blueprint` or the `adventure-actors` skill as a
   general capability.
+- **FIXED — the feat/spell/equipment bug class (no feats, no spells, wrong equip slot,
+  wrong-weight armor, no melee backup, inconsistent cross-area appearance) is now
+  caught automatically, and the actual root cause was a documentation gap, not a code
+  gap.** A real bug report against a freshly-built module found six non-companion Key
+  NPCs (a wizard, an adept, two named humans, a sorcerer, a cleric) all shipped with a
+  totally empty `FeatList` and no spells. Root cause, confirmed by reading
+  `adventure-actors/SKILL.md` directly: the 4-source static `FeatList` bake (racial +
+  automatic class feats + generic schedule + bonus slots, documented above) was written
+  entirely inside Phase 3b ("Create Companions"), which opens with "Skip this phase
+  entirely if the plot has no companion characters" — a non-companion combat-capable Key
+  NPC reasonably read that line and skipped the whole phase, including the feat-bake
+  recipe that was never actually companion-specific. **Fix:** Phase 3's Key NPC section
+  now cross-references Phase 3b's Ability-scores/FeatList/Skill-points/Equipment
+  subsections explicitly for any combat-capable Key NPC, and Phase 3b's own opening note
+  now clarifies which parts are henchman-only (dialog/scripts/`HENCH_LEVEL`) vs. reusable
+  by any combat-capable creature. Also closed: a non-companion Key NPC never gets a live
+  `LevelUpHenchman()` call at all (there's no recruit event), so a caster Key NPC needs
+  its `spells` (`SpecAbilityList`) param populated at build time — this is now documented
+  explicitly, since it's a real, separate gap from the companion spell path
+  (`bReadyAllSpells` at recruit).
+  **Four new `verify_creature` checks close the detection gap** (`src/util/verify/blueprints.ts`):
+  `empty_featlist` (class levels with zero FeatList), `caster_no_spells` (a spellcasting
+  class at/past `classes.2da`'s `MinCastingLevel` with nothing in either `MemorizedList`
+  or `SpecAbilityList`), `weapon_proficiency_mismatch` (RightHand/LeftHand item whose
+  `baseitems.2da` `ReqFeat0-4` — verified live to be an OR-set of satisfying feats, e.g.
+  a Shortbow's `ReqFeat0-2` are Martial Weapon Proficiency/Rogue's bonus proficiency/
+  Elf's bonus proficiency, any one sufficing — has no match in `FeatList`), and
+  `ranged_weapon_no_melee_backup` (a ranged weapon equipped with no melee-capable weapon
+  anywhere in equipment or inventory — NWN's base AI, `ActionEquipMostDamagingMelee` off
+  `nw_c2_default9`, auto-switches on ammo depletion but only if one exists to find).
+  **FIXED (originally shipped as a weaker `armor_no_proficiency` warning, since
+  upgraded to a precise `armor_proficiency_mismatch` error) — the armor weight-class
+  precision gap is closed.** The dead end wasn't wrong about where to look
+  (`baseitems.2da` really does have a single generic body-armor row (16) shared by
+  every weight class, with no `ReqFeat` data or weight-class column of its own), it was
+  looking in the wrong place entirely: weight class isn't stored on the base item, it's
+  derived from the *equipped item's own AC Bonus item property*
+  (`ITEM_PROPERTY_AC_BONUS = 1` in `nwscript.nss`; a `PropertiesList` entry with
+  `PropertyName=1`, `CostValue` = the AC bonus amount 0-8 — confirmed directly against a
+  real armor item, `crn_stdlthrarmr2.uti`, which carries exactly this). Cross-referenced
+  against two more real sources: `armor.2da`'s 9-row `ACBONUS`/`DEXBONUS`/`ACCHECK`/
+  `ARCANEFAILURE%`/`WEIGHT` table (row index = AC bonus value, 0-8), and a real, verified
+  community equipment-randomizer script (`inc_rand_equip.nss`'s `GetACOfArmorToEquip`,
+  found in the `~/tfndev` corpus), whose proficiency-capping logic gives the exact tier
+  boundaries: AC bonus 0 needs no proficiency; 1-3 is Light armor (feat 3, ArmProfLgt);
+  4-5 is Medium (feat 4, ArmProfMed); 6-8 is Heavy (feat 2, ArmProfHvy) — matching this
+  project's already-verified `feat.2da` row numbers exactly. `armorTierFeat()`
+  (`src/util/verify/blueprints.ts`) implements the mapping; `armor_proficiency_mismatch`
+  reads the Chest-slot item's AC Bonus property, derives its tier, and checks for the
+  one matching feat — this is the literal Corin Vale bug (a Rogue with only Light Armor
+  Proficiency from its automatic class feats, equipped with Medium armor). An item with
+  no AC Bonus property at all degrades to skip (AC bonus treated as 0), not a guess. The
+  previous archaeology attempt correctly ruled out `iprp_costtable.2da`/
+  `baseitems.2da` as dead ends — the fix came from a different table (`armor.2da`) plus
+  a real script, not from either of those.
+  **Also fixed at the write path, not just verification**: `set_creature_equipment`
+  (`src/tools/creature-tools.ts`) now checks the item's `baseitems.2da` `EquipableSlots`
+  hex bitmask against the target slot before writing — confirmed via a live table that
+  this bitmask uses the exact same bit values as this project's own `EQUIP_SLOT_MAP`
+  (e.g. Cloak = 0x40/64, matching `EQUIP_SLOT_MAP.cloak`) — so a cloak written into the
+  chest slot (the literal reported bug) is now a rejected call naming the item's real
+  valid slot(s), not a silent success. **Cross-area appearance consistency** is a new
+  `validate_module` check (`cross_area_appearance_mismatch`, `src/tools/analysis-tools.ts`):
+  groups placed creatures by `Tag` across all areas and warns when the same tag's
+  `Race`/`Appearance_Type`/primary class disagree between placements — closes the
+  "same named NPC renders differently in two areas" bug class. All five checks and the
+  slot-write validation have unit/integration test coverage; `npm run verify` passes.
 
 **TODO — not every NPC should get full PC-class bonus-feat progression.** Everything above
 (`LevelUpHenchman`, `startingPackage`, `SPEC_VerifyCreature`) assumes an NPC is meant to
@@ -883,8 +1251,47 @@ derived from the resman stack (baseitems.2da carries no variant count), the help
 pick a random valid variant per part so generated NPCs stop sharing identical weapons.
 Until then "default model" is correct: a wrong variant index renders as nothing at all.
 
-**TODO — equipment selection through NWScript instead of per-creature LLM/tool-call
-picks.** Today's process (this session) was: for each NPC, search `list_blueprints` +
+**BUILT (2026-09-09) — option (a) below, `equip_npc_by_role`, plus `build_npc_stat_block`
+and `respec_weapon_feats`.** All three live in `src/tools/npc-tools.ts`, backed by
+`src/util/npc-stat-block.ts` (pure, unit-tested stat-block computation) and
+`src/util/npc-weapon-preferences.ts` (the curated per-class weapon-preference table
+the "Elaboration" bullets below asked for — real, verified baseitem + feat.2da IDs,
+not guessed). Scope notes, so a future session doesn't re-litigate these:
+- `build_npc_stat_block` writes the mechanical stat block (ability scores, FeatList,
+  SkillList, HP, StartingPackage) onto an *existing* blueprint — it does not create
+  one (`create_creature_blueprint` still does identity/race/appearance/name) and does
+  not compute spells (option (b)'s runtime-include idea and real spellbook baking are
+  both still undone — see the `build_npc_stat_block` design note in the
+  Henchmen/Companions section). Primarily targets Henchmen for now; general-NPC use
+  is a documented future extension, not blocked by anything in the implementation.
+- `equip_npc_by_role` deliberately does **not** do fuzzy blueprint search itself —
+  there's no reusable exported search function to call into (`list_blueprints`/
+  `resman_search` are inline MCP tool handlers), and inventing a resref would violate
+  this project's "never guess" convention. The caller still sources items via
+  `list_blueprints`/`resman_search` as documented; the tool's automation is
+  proficiency validation (slot bitmask + `FeatList` check, reusing the exact
+  `armorTierFeat`/`ReqFeat` logic `verify_creature` uses), a `get_wealth_budget`
+  reference figure, a weapon-type recommendation from the preference table when no
+  `righthand` item was supplied, and — closing the "Verify-after-generate" bullet
+  below — a `verify_creature` pass as its own last step. The **archetype multiplier**
+  bullet below (wealthy-noble vs. bandit budget scaling + magic-item preference) is
+  **not built** — `equip_npc_by_role` only takes `role` (pc/elite/standard/mook), not
+  `archetype`.
+- `respec_weapon_feats` auto-detects a creature's current weapon-specific feats by
+  reverse-scanning every `baseitems.2da` row's `WeaponFocusFeat`/
+  `WeaponSpecializationFeat`/`WeaponImprovedCriticalFeat`/Epic* columns against its
+  `FeatList`, then moves matched tiers onto the target weapon. **Found and fixed a
+  real bug while writing its own tests**: a single-pass scan that mutates the
+  in-progress feat set while iterating *every* baseitems row let the target weapon's
+  own just-added feat get picked up as a spurious "source" match on a later
+  iteration (harmless net effect, since it re-added the same feat, but it polluted
+  the `removed`/`added` report with duplicate entries) — fixed by detecting matches
+  against a frozen snapshot of the *original* `FeatList` in one pass, then applying
+  removals/additions in a second pass, and by excluding the target weapon's own row
+  from source detection. Verified via a dedicated test that reproduces the original
+  bug's exact symptom (spurious entries for the target weapon's own feat IDs).
+
+Today's process (before this) was: for each NPC, search `list_blueprints` +
 `resman_search`, read costs via `resolve_blueprint`, check budget against
 `get_wealth_budget`, and equip via `set_creature_equipment` — repeated by hand per
 creature. This is exactly the kind of deterministic, rule-following work a script
@@ -899,6 +1306,86 @@ decision into the game engine entirely, at the cost of needing that table
 hand-curated and kept in sync with the resman stack. Given the armor-appearance gap
 (no safe from-scratch default), a curated table of *known-good real resrefs* per
 archetype is probably required either way, not purely computed from `baseitems.2da`.
+
+**Elaboration (user-specified, 2026-09-09)** on what the build-time tool's internal
+logic should actually cover — this is the fuller spec for option (a) above, not a
+separate idea:
+- **Feat-driven weapon preference.** Read the creature's `FeatList` first; if it
+  already carries a weapon-specific feat (Weapon Focus/Specialization/Improved
+  Critical — reverse-lookup via `baseitems.2da`'s `WeaponFocusFeat`/
+  `WeaponSpecializationFeat`/`WeaponImprovedCriticalFeat` columns, the same columns
+  the existing "weapon-specific feat means the matching weapon, exactly" rule
+  elsewhere in this doc already uses manually), bias the gear search toward that
+  exact weapon type instead of picking one arbitrarily. The reverse direction
+  (pick a weapon first, then bake the matching proficiency/focus feat chain) is
+  already documented under Henchmen/Companions' static feat-baking — this tool
+  should be able to run either direction depending on whether feats or gear come
+  first for a given NPC.
+- **BUILT** — see `npc-weapon-preferences.ts` above. **A curated per-class/archetype weapon-preference table (user-raised: "add
+  packages.2da files for various class and level progressions — General Fighter
+  focuses on the longsword, while others specialize in other feats and
+  weapons").** `packages.2da` already exists and already gives each base class
+  an iconic package (see the verified row-equals-classId rule under Henchmen/
+  Companions), but it doesn't say *which weapon* that package's feat slots
+  should point at — that's a real design choice per archetype, not something
+  derivable from the 2DA alone. Needs a curated reference table (not a modified
+  copy of the real `packages.2da` — a new project-owned lookup) mapping
+  class/archetype → preferred weapon baseitem, so `create_creature_blueprint`'s
+  static feat-baking and the feat-driven weapon preference above have a real
+  default to fall back on instead of picking arbitrarily when a creature has no
+  feats yet to reverse-lookup from. E.g. a generic Fighter defaults toward
+  Longsword; a generic Rogue toward Rapier/Shortsword (finesse); a generic
+  Ranger toward Longbow — one entry per class to start, expandable to
+  sub-archetypes (dual-wielder, archer, tank) later. This is what makes the
+  "pick a weapon first, then bake matching feats" direction above actually
+  usable without per-NPC guessing.
+- **BUILT** — see `respec_weapon_feats` above. **A `respec_weapon_feats`-style tool to swap an already-built creature's
+  weapon-specific feats onto a different weapon (user-raised).** Today,
+  changing a creature's specialized weapon after the fact means manually
+  finding and removing the old weapon's `WeaponFocusFeat`/
+  `WeaponSpecializationFeat`/`WeaponImprovedCriticalFeat` (and epic variants)
+  from `FeatList` and adding the new weapon's equivalents — easy to get wrong
+  by hand, and exactly the kind of mechanical, rule-following swap a script
+  should do instead of an LLM editing a feat list field by field. E.g. a
+  generic Fighter built with Longsword-focused feats (the class's default per
+  the packages-preference table above) should be re-targetable to any other
+  weapon — Battleaxe, Rapier, whatever the user wants for that specific NPC —
+  via one call: given a creature + a target weapon baseitem, look up which
+  weapon-specific feats it currently holds (reverse-lookup via the same
+  `baseitems.2da` feat columns used elsewhere), remove them, and add the
+  equivalent feats for the new weapon at the same tiers (Focus only, or
+  Focus+Specialization+Improved Critical, matching whatever tier the creature
+  actually qualifies for/already had). Pairs directly with the feat-driven
+  weapon preference and packages-preference-table ideas above — this is the
+  "change your mind after the fact" tool to their "get it right the first
+  time" tools.
+- **Wealth-budget check with an archetype multiplier.** `get_wealth_budget(level,
+  role)` already exists and is already used manually for this — the new piece is
+  an `archetype` parameter that scales the budget and shifts the item search
+  itself (not just a post-hoc affordability check): a "Prince"/wealthy-noble
+  archetype should multiply the budget up and *prefer* magic/enchanted variants
+  over mundane ones when both exist, while a "bandit"/impoverished archetype
+  should do the opposite. This is the concrete meaning `{class, level, role,
+  archetype}`'s `archetype` field (already in the signature sketch above) was
+  left vague on.
+- **BUILT** — see `equip_npc_by_role` above. **Verify-after-generate, closing the loop.** Once equipped, run `verify_creature`
+  (now that the `EquippedRes`/`TemplateResRef` bug is fixed — see the Known
+  Pitfalls entry — its ranged/ammo and stack-size checks actually fire) as the
+  tool's own last step, so "generate gear for this NPC" and "confirm the gear is
+  legitimate for their level and class" are one pipeline instead of two separate
+  manual steps an LLM has to remember to chain itself.
+
+**BUILT (2026-09-09) — `build_npc_stat_block`, per the TODO immediately below.**
+`src/util/npc-stat-block.ts` computes ability scores (Elite Array or a real D&D 3.5
+point-buy allocator), the full 4-source `FeatList` bake, `SkillList` (round-robin
+spend across real class skills, capped at level+3), and HP — all read live from
+`classes.2da`/`racialtypes.2da`/`cls_feat_*`/`cls_bfeat_*`/`cls_skill_*` rather than
+re-derived by hand per NPC, closing exactly the bug class described below (verified
+by a dedicated unit test suite built against real-data-shaped 2DA fixtures, not just
+plausible-looking numbers). **Spell `MemorizedList`s are still not computed** — real
+spellbook baking remains deferred (see the Henchmen/Companions section); a companion
+still gets spells from the live `LevelUpHenchman()` call at recruit, matching the
+existing, unchanged convention.
 
 **TODO — reduce how much of NPC generation the LLM does by hand vs. deterministic
 code, broadly, not just for gear.** This session's actual work — computing ability
@@ -915,8 +1402,53 @@ hand, moved into tested TypeScript) would remove this whole bug class the same w
 error-prone patterns into generated, reusable code. The LLM's time is better spent on
 what it's actually suited for in this pipeline — plot, dialog, quest design, and
 encounter/narrative judgment calls — not re-deriving D&D 3.5 tables from 2DA files
-per NPC. Not yet scoped or designed; raised by the user, worth a real look before the
-next module that needs more than a handful of statted NPCs.
+per NPC. **BUILT except spell `MemorizedList`s — see the note immediately above.**
+
+**Alternative approach worth evaluating alongside the above (user-raised): build
+one level-20 "master" creature per race/class and level it *down* by truncation,
+instead of computing each target level's stats from formulas every time.** Today's
+(and the `build_npc_stat_block` TODO's) model computes forward: given a target
+level, derive ability scores/feats/skills/spells from `classes.2da`/`cls_*.2da`
+formulas. The user's proposal inverts this: build a single level-20 reference
+creature per race/class once (maximal `FeatList`/`SkillList`/spell
+`MemorizedList`s, fully baked), dump it to JSON, and produce any lower level by
+mechanically truncating that JSON — drop `ClassList` levels above the target,
+drop `FeatList` entries whose granting level (cross-referenced the same way the
+static feat-baking recipe already does) exceeds the target, cap `SkillList`
+ranks and spell slots to what the target level would have earned. Worth real
+comparison against the forward-computation approach: truncation only needs to
+get the level-20 reference right *once* per race/class (a fixed, auditable
+artifact, not a formula that has to stay correct for every level 1-20), and the
+"raw file in JSON, altered by a script tool" step the user describes is exactly
+this project's already-established safe-edit pattern (JSON round-trip via
+`nwn_gff`) applied to a new purpose. The open question is whether truncation is
+actually simpler than forward computation once feat/skill/spell prerequisites
+that only make sense at the *achieved* level are accounted for (e.g. a spell
+memorized at level 20 that depends on a metamagic feat also granted along the
+way) — needs a real prototype on one race/class pair before deciding this
+replaces, rather than complements, `build_npc_stat_block`.
+
+**Canonical creation order + stat-generation arrays for `build_npc_stat_block`
+(user-specified, design-only — not implemented yet).** When this tool gets built, the
+user's specified pipeline order is: **Race → bake racial feats
+(`race_feat_<race>.2da`, unconditional) → generate ability scores (array below, by
+target power level) → assign Class → bake class feats (`cls_feat_<class>.2da` +
+generic schedule + `cls_bfeat_<class>.2da` bonus slots, all already-verified sources —
+see the Henchmen/Companions section above) → determine equipment, filtered by the
+proficiency feats just baked** (`verify_creature`'s `weapon_proficiency_mismatch`/
+`armor_proficiency_mismatch` checks exist specifically so a tool built to this order can
+never reproduce a "Rogue equipped with medium armor"-class bug — equipment selection
+comes last, informed by feats, never the other way around).
+
+Stat arrays (D&D 3.5, deterministic — no dice rolling, since generated content in this
+project must stay reproducible):
+- **Elite Array** `15,14,13,12,10,8` — default for ordinary NPCs with class levels
+  (~25-point buy equivalent).
+- **Point-buy bands**, for explicitly scaling a unique/named NPC's power level instead
+  of always using the Elite Array: Low 15, Standard 25, Challenging 22-28, Tougher 32,
+  Epic 36+.
+- Classic 4d6-drop-lowest rolling is noted but not recommended for this tool — it's
+  non-deterministic.
 
 ## Testing
 

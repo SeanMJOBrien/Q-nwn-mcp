@@ -29,6 +29,7 @@ import { registerVerifyTools } from "./tools/verify-tools.js";
 import { registerRewardTools } from "./tools/reward-tools.js";
 import { registerGearTools } from "./tools/gear-tools.js";
 import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
+import { registerNpcTools } from "./tools/npc-tools.js";
 
 const server = new McpServer({
   name: "nwn-mcp",
@@ -65,6 +66,7 @@ registerUndoTools(server);
 registerRewardTools(server);
 registerGearTools(server);
 registerSpecCheckTools(server);
+registerNpcTools(server);
 
 // ── Adventure creator tools ─────────────────────────────────────────────
 registerAdventureTools(server);

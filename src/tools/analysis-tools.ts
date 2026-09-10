@@ -1,13 +1,14 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireIndex } from "../module-loader.js";
+import { requireIndex, indexAreaCreatures } from "../module-loader.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "../types/gff.js";
 import type { GffObj, GffDocument } from "../types/gff.js";
 import { buildTagToAreaMap, buildAreaTransitions } from "./tileset-tools.js";
-import { isBaseGameResource, isBaseGameScript } from "../util/verify/common.js";
+import { isBaseGameResource, isBaseGameScript, loadScriptSources } from "../util/verify/common.js";
 import { flattenDialog } from "../util/dialog-walker.js";
 import type { FlatDialogNode } from "../types/dialog.js";
+import type { CreatureRecord } from "../types/module.js";
 
 export function registerAnalysisTools(server: McpServer): void {
 
@@ -129,18 +130,43 @@ export function registerAnalysisTools(server: McpServer): void {
 
   server.tool(
     "get_balance_report",
-    "Analyze creature difficulty and item values per area.",
-    {},
+    "Analyze creature difficulty and item values per area. Includes a per-area class-composition tally (caster presence, class counts) — informational only: a caster is not a hard requirement for a good encounter, just something that sometimes improves the mechanics/variety. Pass effectivePartySize to also see total CR per party member.",
+    { effectivePartySize: optNumParam("Party size to divide each area's total CR by, for a rough per-member difficulty figure") },
     { readOnlyHint: true, idempotentHint: true },
-    async () => {
+    async ({ effectivePartySize }) => {
       const index = requireIndex();
+      const partySize = effectivePartySize !== undefined ? toI(effectivePartySize) : undefined;
+
+      // Classes whose classes.2da SpellCaster column is "1" — used only for the
+      // informational casterPresent flag below, never a pass/fail requirement.
+      const casterClassIds = new Set<number>();
+      for (const [rowIdx, row] of index.twodaTables.get("classes")?.rows ?? []) {
+        if (row.SpellCaster === "1") casterClassIds.add(rowIdx);
+      }
 
       const areaReports: Array<Record<string, unknown>> = [];
 
       for (const [areaResref, summary] of index.areas) {
-        const areaCreatures = index.creatures.filter(c => c.area === areaResref);
+        // Read live from parsedGff rather than the load-time index.creatures
+        // snapshot — a creature placed after load_module (the normal case
+        // mid-pipeline) would otherwise be invisible here, the same staleness
+        // bug already fixed for get_area_creatures/list_creatures.
+        const gitDoc = index.parsedGff.get(`${areaResref}.git`);
+        const areaCreatures: CreatureRecord[] = [];
+        if (gitDoc) indexAreaCreatures(areaResref, gitDoc, areaCreatures);
+
         const crs = areaCreatures.map(c => c.cr);
         const hps = areaCreatures.map(c => c.hp);
+        const totalCR = crs.reduce((a, b) => a + b, 0);
+
+        const classCounts: Record<number, number> = {};
+        let casterPresent = false;
+        for (const c of areaCreatures) {
+          for (const cls of c.classes) {
+            classCounts[cls.classId] = (classCounts[cls.classId] ?? 0) + 1;
+            if (casterClassIds.has(cls.classId)) casterPresent = true;
+          }
+        }
 
         areaReports.push({
           area: areaResref,
@@ -150,13 +176,19 @@ export function registerAnalysisTools(server: McpServer): void {
             min: Math.min(...crs),
             max: Math.max(...crs),
             average: crs.reduce((a, b) => a + b, 0) / crs.length,
-            total: crs.reduce((a, b) => a + b, 0),
+            total: totalCR,
+            ...(partySize ? { perPartyMember: totalCR / partySize } : {}),
           } : null,
           hpStats: hps.length > 0 ? {
             min: Math.min(...hps),
             max: Math.max(...hps),
             average: hps.reduce((a, b) => a + b, 0) / hps.length,
           } : null,
+          composition: {
+            classCounts,
+            casterPresent,
+            note: "Informational only — a caster is not a hard requirement, but one often improves encounter mechanics/variety.",
+          },
           creatures: areaCreatures.map(c => ({
             tag: c.tag,
             name: `${c.firstName} ${c.lastName}`.trim(),
@@ -334,13 +366,108 @@ export function registerAnalysisTools(server: McpServer): void {
           const tag = getFieldStr(creature, "Tag");
           const equipItems = getFieldList(creature, "Equip_ItemList");
           for (const item of equipItems) {
-            const resref = getFieldStr(item, "EquippedRes");
+            const resref = getFieldStr(item, "TemplateResRef");
             // Stock equipment carried along by a cloned creature resolves at
             // runtime; flagging it produces two false warnings per creature.
             if (resref && !isBaseGameResource(resref) && !index.resources.has(`${resref}.uti`)) {
               warnings.push({
                 type: "missing_equipped_item",
                 message: `Creature "${tag}" in ${areaResref} has equipped item "${resref}" but no matching .uti blueprint in module`,
+                resource: `${areaResref}.git`,
+              });
+            }
+          }
+        }
+      }
+
+      // Cross-area appearance consistency: the same named NPC placed in more
+      // than one area (same Tag — the normal way a story character stays
+      // addressable by scripts/dialog across areas) should render the same
+      // way everywhere, absent a plot reason for a disguise/transformation.
+      // Real bug this catches: a "Grosh Ironjaw"-style creature built once
+      // per area independently, ending up with two different
+      // Race/Appearance_Type/primary-class combinations for what's meant to
+      // be one character.
+      {
+        interface Identity { area: string; race: number; appearance: number; primaryClass: number | undefined }
+        const byTag = new Map<string, Identity[]>();
+        for (const [areaResref] of index.areas) {
+          const gitDoc = index.parsedGff.get(`${areaResref}.git`);
+          if (!gitDoc) continue;
+          const creatures = getFieldList(gitDoc as GffObj, "Creature List");
+          for (const creature of creatures) {
+            const tag = getFieldStr(creature, "Tag");
+            if (!tag) continue;
+            const classList = getFieldList(creature, "ClassList");
+            const identity: Identity = {
+              area: areaResref,
+              race: getFieldNum(creature, "Race"),
+              appearance: getFieldNum(creature, "Appearance_Type"),
+              primaryClass: classList.length > 0 ? getFieldNum(classList[0], "Class") : undefined,
+            };
+            const list = byTag.get(tag) ?? [];
+            list.push(identity);
+            byTag.set(tag, list);
+          }
+        }
+        for (const [tag, instances] of byTag) {
+          if (instances.length < 2) continue;
+          const first = instances[0];
+          const inconsistent = instances.some(
+            (i) => i.race !== first.race || i.appearance !== first.appearance || i.primaryClass !== first.primaryClass,
+          );
+          if (inconsistent) {
+            warnings.push({
+              type: "cross_area_appearance_mismatch",
+              message:
+                `Creature tag "${tag}" is placed in ${instances.length} areas (${instances.map((i) => i.area).join(", ")}) ` +
+                `with differing Race/Appearance_Type/primary class — likely meant to be the same character rendering ` +
+                `inconsistently, unless the plot specifically calls for a disguise or transformation`,
+            });
+          }
+        }
+      }
+
+      // OnSpawn lootable/droppable override scanner: a creature's Lootable=1
+      // GFF flag (or an equipped/inventory item's Dropable=1) only sets the
+      // *default* engine behavior — an OnSpawn script calling the legacy
+      // native SetLootable(oCreature, FALSE) / SetDroppableFlag(oItem, FALSE)
+      // silently overrides it at runtime, invisible from the GFF alone. See
+      // the "Dropable/Lootable can be silently overridden at runtime" pitfall
+      // in CLAUDE.md — this closes that detection gap. Static analysis only
+      // (regex over the script's own source); it cannot trace ExecuteScript()
+      // call chains into a different script.
+      {
+        const scriptSources = await loadScriptSources(index);
+        const setLootableFalse = /SetLootable\s*\([^,]+,\s*(FALSE|0)\s*\)/i;
+        const setDroppableFalse = /SetDroppableFlag\s*\([^,]+,\s*(FALSE|0)\s*\)/i;
+
+        for (const [areaResref] of index.areas) {
+          const gitDoc = index.parsedGff.get(`${areaResref}.git`);
+          if (!gitDoc) continue;
+          const creatures = getFieldList(gitDoc as GffObj, "Creature List");
+          for (const creature of creatures) {
+            const tag = getFieldStr(creature, "Tag");
+            const spawnScript = getFieldStr(creature, "ScriptSpawn");
+            if (!spawnScript) continue;
+            const source = scriptSources.get(spawnScript.toLowerCase());
+            if (!source) continue;
+
+            if (getFieldNum(creature, "Lootable") === 1 && setLootableFalse.test(source)) {
+              warnings.push({
+                type: "onspawn_overrides_lootable",
+                message: `Creature "${tag}" in ${areaResref} has Lootable=1 but its OnSpawn script "${spawnScript}" calls SetLootable(..., FALSE) — this silently overrides the flag at runtime and nothing will drop`,
+                resource: `${areaResref}.git`,
+              });
+            }
+
+            const equipList = getFieldList(creature, "Equip_ItemList");
+            const invList = getFieldList(creature, "ItemList");
+            const hasDropableItem = [...equipList, ...invList].some((it) => getFieldNum(it, "Dropable") === 1);
+            if (hasDropableItem && setDroppableFalse.test(source)) {
+              warnings.push({
+                type: "onspawn_overrides_droppable",
+                message: `Creature "${tag}" in ${areaResref} carries at least one Dropable=1 item but its OnSpawn script "${spawnScript}" calls SetDroppableFlag(..., FALSE) — this silently overrides the flag at runtime for whatever item(s) it targets`,
                 resource: `${areaResref}.git`,
               });
             }

@@ -711,9 +711,25 @@ export function registerPlacementTools(server: McpServer): void {
       delete obj.__data_type;
       obj.__struct_id = GIT_STRUCT_ID.STORE;
 
+      // Unlike creatures/placeables/doors, a placed store instance names its
+      // template resref "ResRef" (not "TemplateResRef" — that's the UTM
+      // blueprint's own self-referencing field name, meaningless once cloned
+      // into a GIT and left behind here would leave the instance without the
+      // field the engine actually reads). Confirmed against real placed store
+      // instances in a live-hosted PW module corpus (~/tfndev) — every one
+      // uses ResRef, none carries TemplateResRef.
+      const templateResref = getFieldStr(obj, "TemplateResRef") || blueprint.toLowerCase();
+      delete obj.TemplateResRef;
+      obj.ResRef = { type: "resref", value: templateResref };
+
       obj.XPosition = { type: "float", value: xN };
       obj.YPosition = { type: "float", value: yN };
       obj.ZPosition = { type: "float", value: walkCheck.z ?? zN };
+      // Stores also carry XOrientation/YOrientation (confirmed against the
+      // same real corpus) — default to facing "north" since this tool has no
+      // bearing param.
+      obj.XOrientation = { type: "float", value: 0.0 };
+      obj.YOrientation = { type: "float", value: 1.0 };
 
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
       snapshotGitForUndo(gitDoc, area, "place_store", `Place store ${blueprint}`);

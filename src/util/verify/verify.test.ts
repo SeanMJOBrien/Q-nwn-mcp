@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { ResmanOptions } from "../../nim-tools.js";
 import type { GffObj } from "../../types/gff.js";
 import type { ModuleIndex, TwoDATable } from "../../types/module.js";
-import { verifyCreature, verifyItem, verifyPlaceable, verifyTrigger } from "./blueprints.js";
+import { verifyCreature, verifyDoor, verifyItem, verifyPlaceable, verifyTrigger } from "./blueprints.js";
 import { isBaseGameResource, isBaseGameScript, Report } from "./common.js";
 import { verifyDialog } from "./dialog.js";
 import { verifyJournal } from "./journal.js";
@@ -198,39 +197,294 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, EquippedRes: { type: "resref", value: "some_bow" } }],
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
       },
     });
     const index = makeIndex({
-      parsedGff: new Map([["some_bow.uti", { __data_type: "UTI", BaseItem: { type: "int", value: 8 } }]]),
       twodaTables: new Map([
         ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
       ]),
     });
     const report = new Report("t", "utc");
-    await verifyCreature(report, index, obj, { resmanOpts: {} as ResmanOptions });
+    await verifyCreature(report, index, obj);
     expect(report.errors.map((e) => e.code)).toContain("ranged_weapon_no_ammo");
   });
 
-  it("does not flag a ranged weapon with matching ammo equipped", async () => {
+  it("does not flag a ranged weapon with matching, reasonably-stacked ammo equipped", async () => {
     const obj = makeCreature("nw_c2_default", {
       Equip_ItemList: {
         type: "list",
         value: [
-          { __struct_id: 16, EquippedRes: { type: "resref", value: "some_bow" } },
-          { __struct_id: 2048, EquippedRes: { type: "resref", value: "nw_waegar001" } },
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 2048,
+            TemplateResRef: { type: "resref", value: "nw_waegar001" },
+            BaseItem: { type: "int", value: 20 },
+            StackSize: { type: "word", value: 12 },
+          },
         ],
       },
     });
     const index = makeIndex({
-      parsedGff: new Map([["some_bow.uti", { __data_type: "UTI", BaseItem: { type: "int", value: 8 } }]]),
       twodaTables: new Map([
         ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
       ]),
     });
     const report = new Report("t", "utc");
-    await verifyCreature(report, index, obj, { resmanOpts: {} as ResmanOptions });
+    await verifyCreature(report, index, obj);
     expect(report.errors.map((e) => e.code)).not.toContain("ranged_weapon_no_ammo");
+    expect(report.warnings.map((w) => w.code)).not.toContain("ammo_stack_size_unreasonable");
+  });
+
+  it("flags equipped ammo stacked far outside the expected range", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 2048,
+            TemplateResRef: { type: "resref", value: "nw_waegar001" },
+            BaseItem: { type: "int", value: 20 },
+            StackSize: { type: "word", value: 99 },
+          },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("ammo_stack_size_unreasonable");
+  });
+
+  it("checks the RightHand stack itself for a self-ammo thrown weapon (throwing axe)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_axe" },
+            BaseItem: { type: "int", value: 63 },
+            StackSize: { type: "word", value: 50 },
+          },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[63, { RangedWeapon: "63", AmmunitionType: "6" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("ranged_weapon_no_ammo");
+    expect(report.warnings.map((w) => w.code)).toContain("ammo_stack_size_unreasonable");
+  });
+
+  it("flags a creature with class levels and an empty FeatList", async () => {
+    const obj = makeCreature("nw_c2_default"); // default ClassList: Fighter level 3, no FeatList
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).toContain("empty_featlist");
+  });
+
+  it("does not flag a creature with a non-empty FeatList", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("empty_featlist");
+  });
+
+  it("flags a RightHand weapon the creature has no proficiency feat for", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_axe" }, BaseItem: { type: "int", value: 2 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["ReqFeat0"], [[2, { ReqFeat0: "45" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).toContain("weapon_proficiency_mismatch");
+  });
+
+  it("does not flag a RightHand weapon matching one of the creature's proficiency feats", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_axe" }, BaseItem: { type: "int", value: 2 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["ReqFeat0"], [[2, { ReqFeat0: "45" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("weapon_proficiency_mismatch");
+  });
+
+  // AC Bonus item property (PropertyName=1, ITEM_PROPERTY_AC_BONUS) with
+  // CostValue=4 is Medium armor (tier 4-5) per armorTierFeat() — the literal
+  // Corin Vale bug: a Rogue with only Light Armor Proficiency (feat 3) from
+  // its automatic class feats, equipped with Medium armor (needs feat 4).
+  function chestArmor(acBonus: number) {
+    return {
+      __struct_id: 2,
+      TemplateResRef: { type: "resref", value: "some_armor" },
+      BaseItem: { type: "int", value: 16 },
+      PropertiesList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            PropertyName: { type: "word", value: 1 },
+            CostValue: { type: "word", value: acBonus },
+          },
+        ],
+      },
+    };
+  }
+
+  it("flags Chest-slot armor whose weight tier has no matching Armor Proficiency feat", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 3 } }] }, // ArmProfLgt only
+      Equip_ItemList: { type: "list", value: [chestArmor(4)] }, // Medium armor — needs ArmProfMed (4)
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("armor_proficiency_mismatch");
+  });
+
+  it("does not flag Chest-slot armor when the matching weight-tier feat is present", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 4 } }] }, // ArmProfMed
+      Equip_ItemList: { type: "list", value: [chestArmor(4)] }, // Medium armor
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
+  });
+
+  it("does not flag Chest-slot armor with no AC Bonus property at all (unknown tier, degrades to skip)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 2, TemplateResRef: { type: "resref", value: "some_armor" }, BaseItem: { type: "int", value: 16 } }],
+      },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
+  });
+
+  it("flags a caster class at its casting level with no spells in either MemorizedList or SpecAbilityList", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 9 }, ClassLevel: { type: "short", value: 5 } }],
+      },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("caster_no_spells");
+  });
+
+  it("does not flag a caster with a SpecAbilityList spell selection", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 9 }, ClassLevel: { type: "short", value: 5 } }],
+      },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      SpecAbilityList: {
+        type: "list",
+        value: [{ __struct_id: 0, Spell: { type: "word", value: 24 }, SpellCasterLevel: { type: "byte", value: 5 }, SpellFlags: { type: "byte", value: 1 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("caster_no_spells");
+  });
+
+  it("does not flag a caster below its class's MinCastingLevel", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 6 }, ClassLevel: { type: "short", value: 2 } }],
+      },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+    });
+    const index = makeIndex({
+      // Paladin: SpellCaster=1 but doesn't cast until level 4 under 3.5 rules.
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[6, { SpellCaster: "1", MinCastingLevel: "4" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("caster_no_spells");
+  });
+
+  it("flags a ranged weapon with no melee-capable weapon anywhere in equipment or inventory", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["RangedWeapon", "DieToRoll"], [[8, { RangedWeapon: "20", DieToRoll: "6" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("ranged_weapon_no_melee_backup");
+  });
+
+  it("does not flag a ranged weapon when a melee weapon exists in inventory", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+      },
+      ItemList: {
+        type: "list",
+        value: [{ InventoryRes: { type: "resref", value: "some_dagger" }, BaseItem: { type: "int", value: 9 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        [
+          "baseitems",
+          twoDA(
+            ["RangedWeapon", "DieToRoll"],
+            [
+              [8, { RangedWeapon: "20", DieToRoll: "6" }],
+              [9, { DieToRoll: "4" }],
+            ],
+          ),
+        ],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ranged_weapon_no_melee_backup");
   });
 
   describe("henchman rules", () => {
@@ -306,6 +560,9 @@ describe("verifyCreature", () => {
         SoundSetFile: { type: "word", value: 422 },
         Gender: { type: "byte", value: 1 },
         StartingPackage: { type: "byte", value: 4 },
+        // A "fully correct" companion has a baked FeatList — an empty one is
+        // now itself a defect (empty_featlist).
+        FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
         VarTable: {
           type: "list",
           value: [
@@ -515,6 +772,68 @@ describe("verifyTrigger", () => {
     const report = new Report("t", "utt");
     verifyTrigger(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("zero_area_geometry");
+  });
+});
+
+// ─── Doors ────────────────────────────────────────────────────────────────
+
+describe("verifyDoor", () => {
+  function makeLockedDoor(extra: Record<string, unknown> = {}): GffObj {
+    return {
+      Tag: { type: "cexostring", value: "gate01" },
+      Lockable: { type: "byte", value: 1 },
+      OpenLockDC: { type: "byte", value: 25 },
+      LinkedToFlags: { type: "byte", value: 0 },
+      ...extra,
+    } as unknown as GffObj;
+  }
+
+  it("flags a locked door with no transition and no waypoint in the area", () => {
+    const index = makeIndex({
+      parsedGff: new Map([["darea.git", { WaypointList: { type: "list", value: [] } } as unknown as GffObj]]),
+    });
+    const report = new Report("d", "utd");
+    verifyDoor(report, index, makeLockedDoor(), { areaResref: "darea" });
+    expect(report.warnings.map((w) => w.code)).toContain("door_leads_nowhere");
+  });
+
+  it("does not flag a locked door already wired as a transition", () => {
+    const index = makeIndex({
+      parsedGff: new Map([["darea.git", { WaypointList: { type: "list", value: [] } } as unknown as GffObj]]),
+    });
+    const report = new Report("d", "utd");
+    verifyDoor(report, index, makeLockedDoor({ LinkedToFlags: { type: "byte", value: 2 } }), {
+      areaResref: "darea",
+    });
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
+  });
+
+  it("does not flag a locked door when the area has a waypoint", () => {
+    const waypoint = { __struct_id: 5, Tag: { type: "cexostring", value: "wp_behind_gate" } };
+    const index = makeIndex({
+      parsedGff: new Map([
+        ["darea.git", { WaypointList: { type: "list", value: [waypoint] } } as unknown as GffObj],
+      ]),
+    });
+    const report = new Report("d", "utd");
+    verifyDoor(report, index, makeLockedDoor(), { areaResref: "darea" });
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
+  });
+
+  it("skips the check entirely for a standalone blueprint (no areaResref)", () => {
+    const report = new Report("d", "utd");
+    verifyDoor(report, makeIndex(), makeLockedDoor());
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
+  });
+
+  it("does not flag a non-lockable door", () => {
+    const index = makeIndex({
+      parsedGff: new Map([["darea.git", { WaypointList: { type: "list", value: [] } } as unknown as GffObj]]),
+    });
+    const report = new Report("d", "utd");
+    const obj = { Tag: { type: "cexostring", value: "plaindoor" } } as unknown as GffObj;
+    verifyDoor(report, index, obj, { areaResref: "darea" });
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
   });
 });
 

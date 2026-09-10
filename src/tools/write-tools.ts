@@ -7,6 +7,7 @@ import { gffToJson, jsonToGff, erfPack } from "../nim-tools.js";
 import { setGffByPath } from "../util/gff-path.js";
 import { resolveBlueprint } from "../util/git-helpers.js";
 import { applyDefaultItemModels } from "../util/item-models.js";
+import { clearDirtyUnder } from "../util/dirty-state.js";
 import { setField } from "../types/gff.js";
 import { optNumParam, toI, toF } from "../util/params.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
@@ -74,6 +75,9 @@ export function registerWriteTools(server: McpServer): void {
       const outPath = outputPath ? path.resolve(outputPath) : index.modPath;
 
       await erfPack(index.tempDir, outPath);
+      // The packed .mod now matches the temp dir again — the whole point of
+      // this call, and the baseline the load_module dirty guard checks against.
+      clearDirtyUnder(index.tempDir);
 
       const stat = await fs.stat(outPath);
       return {

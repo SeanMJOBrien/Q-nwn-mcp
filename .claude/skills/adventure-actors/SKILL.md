@@ -78,6 +78,24 @@ For each NPC described in the plot's `### Key NPCs` section:
 
 3. **Do NOT modify stats, feats, or equipment** unless the plot specifically describes combat capability. The source blueprint's stats are fine for ambient NPCs. `/adventure-quests` or `/adventure-challenges` can upgrade stats later if needed.
 
+   **When the plot does describe combat capability** (a guard captain, a rival duelist, a
+   hostile cult leader who talks before it fights, etc.), this Key NPC needs the same
+   static bake Phase 3b uses for companions — it is not companion-exclusive, only the
+   henchman dialog/script/`HENCH_LEVEL` wiring in Phase 3b is. Specifically follow
+   Phase 3b's **Ability scores**, **`FeatList` must be populated at build time** (all
+   four sources), **Skill points**, and **Equipment** subsections below. Confirmed real
+   bug this exact gap causes: every non-companion Key NPC bug report this project has
+   seen (a wizard with no spells or racial feats, a fighter given armor she has no
+   proficiency for, a boss with no spells at all) came from a Key NPC skipping straight
+   past Phase 3b because it read "Skip this phase entirely if the plot has no companion
+   characters" and — correctly, for the henchman-specific parts — didn't realize the
+   stat/feat/equipment recipe underneath still applied to them. **Unlike a companion,
+   a Key NPC is never recruited and so never gets a live `LevelUpHenchman()` pass** —
+   it has no HP/BAB/saves/skill-points/spells source at all besides what's baked
+   statically at build time. A caster Key NPC additionally needs a `spells` param
+   (`SpecAbilityList`) selection sized to its level — see "Casters with no recruit
+   event need spells baked statically" under Phase 3b's Equipment section.
+
 ---
 
 ### Phase 3b: Create Companions (henchmen)
@@ -90,7 +108,12 @@ away. This is the single most-reported defect in generated modules.
 leaving one slot spare). Use fewer unless the plot calls for a full party — every companion
 is another actor to keep alive, pathed, and balanced against.
 
-**Skip this phase entirely if the plot has no companion characters.**
+**Skip this phase entirely if the plot has no companion characters.** But if you landed
+here from Phase 3's "combat-capable Key NPC" cross-reference instead, do NOT skip —
+the henchman-only parts (Steps 1-3's dialog/script/`HENCH_LEVEL` wiring) don't apply to
+a non-companion Key NPC, but the **Ability scores**, **`FeatList`**, **Skill points**,
+and **Equipment** subsections below apply to any combat-capable creature regardless of
+whether it's recruitable.
 
 #### Step 1: Shared scripts (once per module)
 
@@ -214,6 +237,18 @@ this rendering path needs — nothing further to set by hand here.
 isn't a valid default. `nw_cloth001` is a real base-game mundane item (1gp) that works for
 anyone not already in armor.
 
+**Faster path: `build_npc_stat_block`.** Everything from here through "Skill points"
+below (ability scores, the 4-source `FeatList` bake, `SkillList`) can be computed and
+written in one call: `build_npc_stat_block(resref, race, classId, level, powerLevel?)`,
+run right after `create_creature_blueprint` and before `place_creature`. It reads the
+same 2DA tables this section describes by hand (live from the loaded module, not
+hardcoded) and applies the same rules — the manual recipe below is still the reference
+for *why* each field ends up the way it does, and is what to fall back on for anything
+the tool doesn't cover (HP is also set by the tool; spells are not — see "Casters with
+no recruit event" below). `powerLevel` defaults to `elite` (the Elite Array `15/14/13/
+12/10/8`, ~25-point-buy equivalent) — pass `low`/`standard`/`tougher`/`epic` for a
+deliberately weaker or stronger named NPC.
+
 **Ability scores.** Apply real racial adjustments (Dwarf +2Con/-2Cha, Elf +2Dex/-2Con,
 Gnome +2Con/-2Str, Halfling +2Dex/-2Str, Half-Orc +2Str/-2Int/-2Cha, Half-Elf/Human none),
 pick a primary stat from `classes.2da`'s `PrimaryAbil` column, and — for a companion built
@@ -295,6 +330,18 @@ Every companion (and any Key NPC given non-default gear) needs a weapon and some
 the chest slot at minimum — bare skin/empty-handed is not a valid default, only ever skip
 gear for an explicit story reason.
 
+**After sourcing real items (below), equip with `equip_npc_by_role`** rather than
+`set_creature_equipment` directly — same slot check, plus it rejects (or with
+`force:true`, equips and warns about) an item the creature's `FeatList` isn't
+proficient with, reports a `get_wealth_budget` reference figure, recommends a weapon
+type from a curated per-class table when no `righthand` item is supplied yet, and
+runs `verify_creature` as its own last step. It does not search for items itself —
+still find real resrefs via `list_blueprints`/`resman_search` first, exactly as
+below. If the story or the user later wants a different weapon type for this
+creature (a General Fighter reassigned from Longsword to Battleaxe, say),
+`respec_weapon_feats` moves the existing Focus/Specialization/Improved Critical
+feats onto the new weapon in one call instead of hand-editing `FeatList`.
+
 **Source real, existing blueprints — do not build from scratch by default.** Two tools,
 used together, not one:
 - `list_blueprints(type: "uti", pattern: "...")` — matches resref/tag/TLK-resolved
@@ -335,6 +382,55 @@ them at all). Check `feat.2da`'s `OrReqFeat0-4` columns on the matching
 `ImpCrit<Weapon>` row to see which specific weapons a proficiency feat actually covers
 before equipping — this is also how to catch a class/weapon proficiency mismatch (e.g. a
 Rogue or Bard equipped with a Longsword neither is proficient with in this ruleset).
+
+**Base proficiency, not just Focus-feat matching — verified via a live `baseitems.2da`.**
+The weapon-specific-feat check above answers "does this Focus/Specialization feat apply
+to this exact weapon" — it does not answer the more basic "is this creature proficient
+with this weapon/armor/shield at all." That's a separate, simpler, fully-checkable
+lookup: `baseitems.2da`'s `ReqFeat0`-`ReqFeat4` columns on the equipped item's `BaseItem`
+row list every feat that individually grants proficiency with it (an OR-set — e.g. a
+Shortbow's `ReqFeat0-2` are Martial Weapon Proficiency, Rogue's bonus weapon
+proficiency, and Elf's bonus weapon proficiency; any one suffices). Before equipping a
+weapon or shield, confirm the creature's baked `FeatList` contains at least one of that
+item's `ReqFeat` values — this is the actual mechanism behind "Rogues cannot use medium
+armor"-class bugs. **Armor weight class works differently but is fully checkable**:
+`baseitems.2da` has a single generic armor row (16) shared by every body-armor item
+regardless of weight class, with no `ReqFeat` data of its own — but weight class isn't
+stored on the base item at all. It's derived from the item's own AC Bonus property
+(`PropertiesList` entry with `PropertyName=1`, `CostValue` = the AC bonus amount 0-8):
+AC bonus 0 needs no proficiency, 1-3 is Light armor, 4-5 is Medium, 6-8 is Heavy
+(verified against `armor.2da`'s 9-row ACBONUS table and a real community equipment
+script's tier boundaries). Before equipping armor, check its AC Bonus property against
+the creature's baked `FeatList` for the matching tier feat (Light=3, Medium=4, Heavy=2)
+— `verify_creature`'s `armor_proficiency_mismatch` check enforces this precisely, the
+literal Corin Vale bug (a Rogue in Medium armor with only Light Armor Proficiency).
+When picking armor for a class, prefer what its automatic-class-feat proficiency
+actually covers (Rogue/Bard/Sorcerer/Wizard → light only; most others per their
+`cls_feat_<class>.2da` bake) rather than relying on the check to catch a mismatch after
+the fact.
+
+**Give every ranged-weapon creature a melee weapon too.** NWN's base combat AI
+auto-switches a ranged attacker to melee when it runs out of ammo
+(`ActionEquipMostDamagingMelee`, called from the stock `nw_c2_default9`) — but only if a
+melee-capable weapon exists somewhere in its inventory. An archer/thrower with nothing
+melee-capable anywhere just stops fighting once ammo runs out. Give it a plain melee
+weapon appropriate to the creature (a d6 weapon + a small shield, or a single d8
+weapon) as an unequipped inventory item via `add_items_to_container`-style inventory —
+it does not need to be equipped for the base AI to find and switch to it.
+`verify_creature`'s `ranged_weapon_no_melee_backup` check flags the gap.
+
+**Casters with no recruit event need spells baked statically.** A companion's spells
+come from the live `LevelUpHenchman()` call at recruit (`bReadyAllSpells = TRUE`, per
+the note above) — but a non-companion Key NPC is never recruited and never gets that
+call, so a caster Key NPC with nothing else set is permanently spell-less. Real
+spellbook baking (`ClassList[n].MemorizedList0-9`) isn't wired into any tool yet —
+use `create_creature_blueprint`'s `spells` param instead (writes `SpecAbilityList`,
+NWN's "Special Abilities" system: spell-like castings independent of class levels,
+where each `{spell, level}` entry is one use and repeating an entry grants multiple
+uses per day). Size the selection to the class's spells-per-day at the target level
+(e.g. `cls_spgn_<class>.2da`), picking 1-3 thematically-appropriate spells per level
+rather than one spell repeated many times. `verify_creature`'s `caster_no_spells` check
+flags a spellcasting class at its casting level with nothing in either mechanism.
 
 **Casters who suffer arcane spell failure (Wizard/Sorcerer/Bard) should be in light or no
 armor** — this is the mechanically correct default, not an oversight to fix later.

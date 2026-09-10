@@ -118,4 +118,75 @@ describe("setGffByPath", () => {
     const result = setGffByPath(doc, "Nonexistent.Nested.Field", "value");
     expect("error" in result).toBe(true);
   });
+
+  // Regression coverage for the documented modify_gff_field corruption:
+  // MCP clients routinely send numeric-looking params as strings (see
+  // util/params.ts) — a float/int field must coerce that back to a real
+  // number, not store the string verbatim.
+  it("coerces a string value to a real number on an existing float field", () => {
+    const doc = makeDoc();
+    setGffByPath(doc, "ChallengeRating", "7.5");
+    const field = (doc as GffObj).ChallengeRating as { type: string; value: unknown };
+    expect(field.value).toBe(7.5);
+    expect(typeof field.value).toBe("number");
+  });
+
+  it("coerces a string value to a real integer on an existing int/dword field", () => {
+    const doc = makeDoc();
+    setGffByPath(doc, "FactionID", "2");
+    const field = (doc as GffObj).FactionID as { type: string; value: unknown };
+    expect(field.value).toBe(2);
+    expect(typeof field.value).toBe("number");
+  });
+
+  it("truncates a float passed for an integer-typed field", () => {
+    const doc = makeDoc();
+    setGffByPath(doc, "FactionID", 2.9);
+    const field = (doc as GffObj).FactionID as { type: string; value: unknown };
+    expect(field.value).toBe(2);
+  });
+
+  it("coerces a numeric value to a string on an existing cexostring field", () => {
+    const doc = makeDoc();
+    setGffByPath(doc, "Tag", 123 as unknown as string);
+    const field = (doc as GffObj).Tag as { type: string; value: unknown };
+    expect(field.value).toBe("123");
+  });
+
+  it("returns an error rather than storing NaN for an unparseable number", () => {
+    const doc = makeDoc();
+    const result = setGffByPath(doc, "ChallengeRating", "not-a-number");
+    expect("error" in result).toBe(true);
+    const field = (doc as GffObj).ChallengeRating as { type: string; value: unknown };
+    expect(field.value).toBe(3.5); // unchanged
+  });
+
+  it("coerces a string value on a newly-created float field", () => {
+    const doc = makeDoc();
+    setGffByPath(doc, "NewFloat", "12.5", "float");
+    const field = getGffByPath(doc, "NewFloat");
+    expect(field?.value).toBe(12.5);
+    expect(typeof field?.value).toBe("number");
+  });
+
+  it("refuses to set an existing list-typed field", () => {
+    const doc = makeDoc();
+    const result = setGffByPath(doc, "ClassList", []);
+    expect("error" in result).toBe(true);
+    // Original list must survive untouched.
+    expect(getGffByPath(doc, "ClassList.0.Class")?.value).toBe(1);
+  });
+
+  it("refuses to create a new list-typed field", () => {
+    const doc = makeDoc();
+    const result = setGffByPath(doc, "NewList", [], "list");
+    expect("error" in result).toBe(true);
+    expect(getGffByPath(doc, "NewList")).toBeUndefined();
+  });
+
+  it("refuses to set an existing struct-typed field", () => {
+    const doc = makeDoc();
+    const result = setGffByPath(doc, "Nested", {});
+    expect("error" in result).toBe(true);
+  });
 });
