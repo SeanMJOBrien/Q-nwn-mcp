@@ -19,6 +19,7 @@ import path from "path";
 import fsPromises from "fs/promises";
 
 import { numParam, optNumParam, toF, toI } from "../util/params.js";
+import { markDirty } from "../util/dirty-state.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { GIT_STRUCT_ID } from "../config.js";
@@ -29,10 +30,11 @@ import { snapshotGitForUndo } from "../util/undo.js";
 import { compileScript, jsonToGff, erfPack } from "../nim-tools.js";
 import { checkPlacementWalkable } from "../util/walkmesh.js";
 import { getTilesetInfo } from "../util/tileset.js";
-import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatchesTerrain, resolveFloorTerrain } from "../util/layout-generator.js";
+import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatchesTerrain, resolveFloorTerrain, MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import type { LayoutStyle, SuggestedFeature } from "../util/layout-generator.js";
 import { solveArea } from "../util/zone-solver.js";
 import type { TerrainZone, CrosserPath, FeatureTile } from "../util/zone-solver.js";
+import { getFeatureCollar } from "../util/feature-collars.js";
 
 export function registerAdventureTools(server: McpServer): void {
 
@@ -97,6 +99,7 @@ export function registerAdventureTools(server: McpServer): void {
       async function writeScript(resref: string, source: string): Promise<{ success: boolean; output?: string }> {
         const nssPath = path.join(index.tempDir, `${resref}.nss`);
         await fsPromises.writeFile(nssPath, source, "utf-8");
+        markDirty(nssPath);
         const nssStat = await fsPromises.stat(nssPath);
         index.resources.set(`${resref}.nss`, { resref, extension: "nss", filePath: nssPath, sizeBytes: nssStat.size });
         const ncsPath = nssPath.replace(/\.nss$/i, ".ncs");
@@ -470,12 +473,12 @@ export function registerAdventureTools(server: McpServer): void {
 
   server.tool(
     "adventure_generate_layout",
-    "Generate a procedural area layout with terrain zones, crosser paths, and transition points. Returns data ready to pass to adventure_apply_layout. Encodes all layout rules: perimeter encapsulation, room separation, adjacency validation, walkable ratio. Styles: dungeon (varied rooms + corridors, some L-shapes), cave (smaller rooms, more corridors, maze-like), dwelling (quadrant rooms, fewer corridors, building interior), forest (clearings separated by trees, winding roads), rural (farmland/village, spine roads), city (urban cobblestone, grid roads), plains (open terrain, sparse clearings), desert (arid, cliff borders), castle (fortified exterior, castle walls), tundra (frozen, snow/camp clearings). Returns suggestedFeatures array with pre-validated feature placements.",
+    `Generate a procedural area layout with terrain zones, crosser paths, and transition points. Returns data ready to pass to adventure_apply_layout. Encodes all layout rules: perimeter encapsulation, room separation, adjacency validation, walkable ratio. Styles: dungeon (varied rooms + corridors, some L-shapes), cave (smaller rooms, more corridors, maze-like), dwelling (quadrant rooms, fewer corridors, building interior), forest (clearings separated by trees, winding roads), rural (farmland/village, spine roads), city (urban cobblestone, grid roads), plains (open terrain, sparse clearings), desert (arid, cliff borders), castle (fortified exterior, castle walls), tundra (frozen, snow/camp clearings). Returns suggestedFeatures array with pre-validated feature placements. Set style.safeMode:true for a "safe scaffold" — disables L-shaped rooms, S-curves, shortcut corridors, obstacle patches, and feature packing, leaving only plain rectangular rooms and straight corridors (the tile classes least likely to need a solver fallback). Intended for a user who wants a correct room/story shape to finish by hand in the toolset rather than a fully solver-decorated area. Combine with rooms:1 and width/height:${MIN_SINGLE_ROOM_AREA_SIZE} for the smallest possible single-room scaffold, expandable later.`,
     {
       tileset: z.string().describe("Tileset resref (e.g., 'tdc01' for crypt, 'ttf01' for forest)"),
       width: z.string().describe("Area width in tiles (8-32)"),
       height: z.string().describe("Area height in tiles (8-32)"),
-      style: z.string().describe("JSON style object: {type: 'dungeon'|'cave'|'dwelling'|'forest'|'rural'|'city'|'plains'|'desert'|'castle'|'tundra', rooms?: number, clearings?: number, corridorStyle?: 'straight'|'zigzag', roadStyle?: 'spine'|'grid'|'winding', preferredFeatures?: string[]} — preferredFeatures is an array of tileset group names (from get_tileset_details) to prioritize when placing features. Preferred groups are tried first before falling back to random selection."),
+      style: z.string().describe("JSON style object: {type: 'dungeon'|'cave'|'dwelling'|'forest'|'rural'|'city'|'plains'|'desert'|'castle'|'tundra', rooms?: number, clearings?: number, corridorStyle?: 'straight'|'zigzag', roadStyle?: 'spine'|'grid'|'winding', preferredFeatures?: string[], safeMode?: boolean} — preferredFeatures is an array of tileset group names (from get_tileset_details) to prioritize when placing features (ignored when safeMode is true — safeMode always returns an empty suggestedFeatures array). Preferred groups are tried first before falling back to random selection."),
       transitionCount: z.string().optional().describe("Number of transition points to generate (default 1)"),
       transitionDirections: z.string().optional().describe("JSON array of directions: ['south', 'north', 'east', 'west']"),
     },
@@ -515,7 +518,7 @@ export function registerAdventureTools(server: McpServer): void {
       return {
         content: [{
           type: "text",
-          text: JSON.stringify(result, null, 2),
+          text: JSON.stringify(result),
         }],
       };
     },
@@ -594,14 +597,45 @@ export function registerAdventureTools(server: McpServer): void {
           continue;
         }
         // Reject groups that contain crosser references — crossers on feature tiles
-        // conflict with the solver's crosser grid and create edge mismatches
+        // conflict with the solver's crosser grid and create edge mismatches — UNLESS
+        // a human has already hand-derived and verified a matching collar for this
+        // exact (tileset, group) pair (see feature-collars.ts). A feature's crosser
+        // tile expects a specific neighbor (e.g. a dock tile) on its outer edge; the
+        // solver, unaware a feature is coming, would otherwise place something
+        // incompatible there. The collar mechanism already solves exactly this shape
+        // of problem for height-transition features below — same lookup, same
+        // curated-exception philosophy, just keyed off crossers instead of height.
         const hasCrossers = group.tileIds.some(id => {
           if (id < 0) return false;
           const t = tileset.tiles[id];
           return t && !!(t.crossers.top || t.crossers.right || t.crossers.bottom || t.crossers.left);
         });
-        if (hasCrossers) {
+        // Reject groups containing height-transition tiles (e.g. cave mouths carved
+        // into a rise) UNLESS a human has already hand-derived and verified a
+        // matching collar for this exact (tileset, group) pair — see
+        // feature-collars.ts. The terrain-name check below only compares corner
+        // terrain strings, not corner height, so a tile like tts01's "Cave" (flat
+        // snow/snow/snow/snow by name, but TopLeft/TopRightHeight=1) passes that
+        // check and gets dropped into a dead-flat zone with no elevated neighbors
+        // to meet it — visually a cave mouth floating in an open field with a
+        // cliff-edge seam on every side but the entrance. The zone solver already
+        // excludes non-flat tiles from its own placements (see tileset.ts's `flat`
+        // field); feature groups need the same exclusion by default, since this
+        // pipeline has no *general* mechanism to auto-terrace matching elevated
+        // terrain — feature-collars.ts is the curated exception list of specific
+        // features this has already been solved for by hand.
+        const hasHeightTransition = group.tileIds.some(id => {
+          if (id < 0) return false;
+          const t = tileset.tiles[id];
+          return t && !t.flat;
+        });
+        const collar = (hasCrossers || hasHeightTransition) ? getFeatureCollar(tilesetResref, sf.feature) : undefined;
+        if (hasCrossers && !collar) {
           featureWarnings.push(`${sf.feature}: skipped (contains crosser tiles — causes edge mismatches)`);
+          continue;
+        }
+        if (hasHeightTransition && !collar) {
+          featureWarnings.push(`${sf.feature}: skipped (height-transition tile — needs hand-terraced elevated terrain, not auto-placeable)`);
           continue;
         }
         // Reject groups whose tile corners don't match the surrounding zone terrain.
@@ -647,6 +681,37 @@ export function registerAdventureTools(server: McpServer): void {
             const tileId = group.tileIds[gr * group.columns + gc];
             if (tileId < 0) continue; // empty slot
             featureTiles.push({ x: sf.x + gc, y: sf.y + gr, tileId, orientation: 0 });
+          }
+        }
+        // Resolve the feature's collar, if it has a curated one (feature-collars.ts).
+        // Each collar tile still gets its own bounds + terrain-name check — the
+        // curated table is trusted for tile ID/orientation, not for whether this
+        // *specific* placement's surroundings still match what it was derived
+        // against. A collar tile that can't be placed is dropped with a warning;
+        // the main feature is not rolled back for it (a feature with a partially
+        // missing collar is still strictly better than the pre-fix behavior of
+        // rejecting the feature outright).
+        if (collar) {
+          for (const ct of collar) {
+            const cx = sf.x + ct.relX, cy = sf.y + ct.relY;
+            if (cx < 0 || cx >= areaWidth || cy < 0 || cy >= areaHeight) {
+              featureWarnings.push(`${sf.feature}: collar tile at (${cx},${cy}) skipped (out of bounds)`);
+              continue;
+            }
+            const collarTile = tileset.tiles[ct.tileId];
+            if (!collarTile) {
+              featureWarnings.push(`${sf.feature}: collar tile id ${ct.tileId} not found in tileset`);
+              continue;
+            }
+            if (featureZoneTerrain &&
+                (collarTile.corners.topLeft.toLowerCase() !== featureZoneTerrain ||
+                 collarTile.corners.topRight.toLowerCase() !== featureZoneTerrain ||
+                 collarTile.corners.bottomLeft.toLowerCase() !== featureZoneTerrain ||
+                 collarTile.corners.bottomRight.toLowerCase() !== featureZoneTerrain)) {
+              featureWarnings.push(`${sf.feature}: collar tile at (${cx},${cy}) skipped (terrain mismatch — this instance's surroundings differ from what the collar was derived against)`);
+              continue;
+            }
+            featureTiles.push({ x: cx, y: cy, tileId: ct.tileId, orientation: ct.orientation });
           }
         }
         featureGroups.push(sf.feature);

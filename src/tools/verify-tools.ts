@@ -129,9 +129,13 @@ export function registerVerifyTools(server: McpServer): void {
   ];
 
   for (const { tool, ext, gitList, label, fn } of simpleCheckers) {
+    const extraDescription =
+      tool === "verify_door"
+        ? " For a placed instance (area+tag), also flags a locked/keyed door that isn't wired as a transition and has no Waypoint anywhere in the same area to mark a destination — advisory, since a deliberate decorative dead end is a legitimate design choice."
+        : "";
     server.tool(
       tool,
-      `Verify a ${label} (.${ext}) blueprint or placed instance is structurally and semantically acceptable. Returns errors (blocking) and warnings (advisory).`,
+      `Verify a ${label} (.${ext}) blueprint or placed instance is structurally and semantically acceptable. Returns errors (blocking) and warnings (advisory).${extraDescription}`,
       targetParams,
       READ_ONLY,
       async ({ resref, area, tag }) => {
@@ -147,7 +151,14 @@ export function registerVerifyTools(server: McpServer): void {
           });
 
         const report = new Report(target, ext);
-        fn(report, index, obj);
+        if (fn === verifyDoor) {
+          // The "leads nowhere" dual-path check needs to know which area this
+          // door sits in, so it only applies to a placed instance, not a
+          // standalone blueprint that isn't placed anywhere yet.
+          verifyDoor(report, index, obj, { areaResref: area });
+        } else {
+          fn(report, index, obj);
+        }
         return payload(report.result());
       },
     );
@@ -157,7 +168,7 @@ export function registerVerifyTools(server: McpServer): void {
 
   server.tool(
     "verify_creature",
-    "Verify a creature (.utc) blueprint or placed instance. Checks identity, appearance, classes, all 13 script fields, conversation, equipment and voice. Pass henchman:true to additionally apply companion rules (associate AI wired, non-Commoner class, HENCH_LEVEL set, voice present).",
+    "Verify a creature (.utc) blueprint or placed instance. Checks identity, appearance (including a Race/Appearance_Type mismatch check for the 7 standard PC races), classes, all 13 script fields, conversation, equipment and voice. Also flags: an empty FeatList on a creature with class levels; a spellcasting class at its casting level with no spells in either ClassList's MemorizedList or SpecAbilityList; a RightHand/LeftHand weapon or shield the creature has none of the required baseitems.2da ReqFeat proficiency feats for; Chest-slot armor whose weight tier (derived from its AC Bonus item property, light/medium/heavy) has no matching Armor Proficiency feat; and a ranged weapon with no melee-capable backup weapon anywhere in equipment or inventory. Pass henchman:true to additionally apply companion rules (associate AI wired, non-Commoner class, StartingPackage set for the companion's class, HENCH_LEVEL set, voice present).",
     {
       ...targetParams,
       henchman: z.boolean().optional().describe("Apply the stricter companion checks"),
@@ -176,7 +187,8 @@ export function registerVerifyTools(server: McpServer): void {
         });
 
       const report = new Report(target, "utc");
-      verifyCreature(report, index, obj, { henchman });
+      const resmanOpts = await buildResmanOptions(index);
+      await verifyCreature(report, index, obj, { henchman, resmanOpts });
       return payload(report.result());
     },
   );
@@ -355,7 +367,7 @@ export function registerVerifyTools(server: McpServer): void {
           // A creature wired with the associate AI is a companion; hold it to
           // the stricter rules automatically.
           const isHenchman = getFieldStr(doc, "ScriptHeartbeat").startsWith("x0_ch_hen_");
-          verifyCreature(report, index, doc, { henchman: isHenchman });
+          await verifyCreature(report, index, doc, { henchman: isHenchman, resmanOpts });
           results.push(report.result());
           continue;
         }

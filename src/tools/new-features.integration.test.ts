@@ -662,6 +662,54 @@ describe("creature equipment tools", () => {
     }
   });
 
+  it("set_creature_equipment rejects an item whose baseitems.2da EquipableSlots doesn't include the target slot", async () => {
+    const { registerCreatureTools } = await import("./creature-tools.js");
+    const { client, cleanup } = await createTestClient(registerCreatureTools);
+
+    const gitDoc = makeGitDoc();
+    const git = gitDoc as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push({
+      __struct_id: 4,
+      Tag: { type: "cexostring", value: "guard1" },
+      FirstName: { type: "cexolocstring", value: { "0": "Guard" } },
+      Equip_ItemList: { type: "list", value: [] },
+      XPosition: { type: "float", value: 5 },
+      YPosition: { type: "float", value: 5 },
+      ZPosition: { type: "float", value: 0 },
+    });
+
+    mockIndex.parsedGff.set("testarea.git", gitDoc);
+    mockIndex.resources.set("testarea.git", { resref: "testarea", extension: "git", filePath: path.join(tempDir, "testarea.git"), sizeBytes: 100 });
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "Test", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    // makeItemDoc always uses BaseItem 4 — declare that row as cloak-only (0x40).
+    const cloakDoc = makeItemDoc("some_cloak", "SOME_CLOAK");
+    mockIndex.parsedGff.set("some_cloak.uti", cloakDoc);
+    mockIndex.twodaTables.set("baseitems", { columns: ["EquipableSlots"], rows: new Map([[4, { EquipableSlots: "0x40" }]]) } as TwoDATable);
+
+    try {
+      const rejected = await client.callTool({
+        name: "set_creature_equipment",
+        arguments: { area: "testarea", tag: "guard1", equipment: '{"chest": "some_cloak"}' },
+      });
+      const rejectedParsed = parseResult(rejected) as Record<string, unknown>;
+      expect(rejectedParsed.success).toBe(true);
+      expect(rejectedParsed.added).toEqual([]);
+      expect((rejectedParsed.failed as string[])[0]).toMatch(/not a valid item for slot "chest"/);
+      expect(rejectedParsed.totalEquipped).toBe(0);
+
+      const accepted = await client.callTool({
+        name: "set_creature_equipment",
+        arguments: { area: "testarea", tag: "guard1", equipment: '{"cloak": "some_cloak"}' },
+      });
+      const acceptedParsed = parseResult(accepted) as Record<string, unknown>;
+      expect(acceptedParsed.failed).toBeUndefined();
+      expect(acceptedParsed.totalEquipped).toBe(1);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("clear_creature_equipment clears all equipment", async () => {
     const { registerCreatureTools } = await import("./creature-tools.js");
     const { client, cleanup } = await createTestClient(registerCreatureTools);
@@ -1226,6 +1274,141 @@ describe("delete_area", () => {
       });
       const text = resultText(result);
       expect(text).toContain("Area not found");
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+// ─── Tests: validate_module cross-area appearance consistency ────────────
+
+describe("validate_module cross-area appearance consistency", () => {
+  function makeNamedCreature(tag: string, race: number, appearance: number, classId: number): GffObj {
+    return {
+      __struct_id: 4,
+      Tag: { type: "cexostring", value: tag },
+      FirstName: { type: "cexolocstring", value: { "0": tag } },
+      Race: { type: "int", value: race },
+      Appearance_Type: { type: "int", value: appearance },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: classId }, ClassLevel: { type: "short", value: 5 } }],
+      },
+      Equip_ItemList: { type: "list", value: [] },
+      XPosition: { type: "float", value: 5 },
+      YPosition: { type: "float", value: 5 },
+      ZPosition: { type: "float", value: 0 },
+    } as unknown as GffObj;
+  }
+
+  it("flags the same creature tag rendering inconsistently across two areas", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    const gitA = makeGitDoc() as GffObj;
+    (gitA["Creature List"] as { value: GffObj[] }).value.push(makeNamedCreature("grosh_ironjaw", 5, 5, 4)); // Half-Orc Fighter
+    const gitB = makeGitDoc() as GffObj;
+    (gitB["Creature List"] as { value: GffObj[] }).value.push(makeNamedCreature("grosh_ironjaw", 6, 0, 4)); // Human but Dwarf appearance
+
+    mockIndex.parsedGff.set("areaa.git", gitA);
+    mockIndex.parsedGff.set("areab.git", gitB);
+    mockIndex.areas.set("areaa", { resref: "areaa", name: "A", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+    mockIndex.areas.set("areab", { resref: "areab", name: "B", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string; message: string }> };
+      const found = parsed.warnings.find((w) => w.type === "cross_area_appearance_mismatch");
+      expect(found).toBeDefined();
+      expect(found?.message).toContain("grosh_ironjaw");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag a consistent creature placed in two areas", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    const gitA = makeGitDoc() as GffObj;
+    (gitA["Creature List"] as { value: GffObj[] }).value.push(makeNamedCreature("consistent_npc", 5, 5, 4));
+    const gitB = makeGitDoc() as GffObj;
+    (gitB["Creature List"] as { value: GffObj[] }).value.push(makeNamedCreature("consistent_npc", 5, 5, 4));
+
+    mockIndex.parsedGff.set("areaa.git", gitA);
+    mockIndex.parsedGff.set("areab.git", gitB);
+    mockIndex.areas.set("areaa", { resref: "areaa", name: "A", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+    mockIndex.areas.set("areab", { resref: "areab", name: "B", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "cross_area_appearance_mismatch")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+// ─── Tests: validate_module OnSpawn lootable/droppable override scanner ──
+
+describe("validate_module OnSpawn lootable/droppable override scanner", () => {
+  function makeSpawnCreature(tag: string, spawnScript: string, lootable: boolean): GffObj {
+    return {
+      __struct_id: 4,
+      Tag: { type: "cexostring", value: tag },
+      FirstName: { type: "cexolocstring", value: { "0": tag } },
+      Lootable: { type: "byte", value: lootable ? 1 : 0 },
+      ScriptSpawn: { type: "resref", value: spawnScript },
+      Equip_ItemList: { type: "list", value: [] },
+      ItemList: { type: "list", value: [] },
+      XPosition: { type: "float", value: 5 },
+      YPosition: { type: "float", value: 5 },
+      ZPosition: { type: "float", value: 0 },
+    } as unknown as GffObj;
+  }
+
+  async function writeScript(resref: string, source: string): Promise<void> {
+    const filePath = path.join(tempDir, `${resref}.nss`);
+    await fs.writeFile(filePath, source);
+    mockIndex.resources.set(`${resref}.nss`, { resref, extension: "nss", filePath, sizeBytes: source.length });
+  }
+
+  it("flags Lootable=1 overridden by SetLootable(..., FALSE) in OnSpawn", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    await writeScript("a_spawn_off", "void main() { SetLootable(OBJECT_SELF, FALSE); }");
+    const git = makeGitDoc() as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push(makeSpawnCreature("looter", "a_spawn_off", true));
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string; message: string }> };
+      const found = parsed.warnings.find((w) => w.type === "onspawn_overrides_lootable");
+      expect(found).toBeDefined();
+      expect(found?.message).toContain("looter");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag a creature whose OnSpawn script never touches SetLootable", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    await writeScript("a_spawn_plain", "void main() { }");
+    const git = makeGitDoc() as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push(makeSpawnCreature("clean_looter", "a_spawn_plain", true));
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "onspawn_overrides_lootable")).toBeUndefined();
     } finally {
       await cleanup();
     }

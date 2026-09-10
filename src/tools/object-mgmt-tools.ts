@@ -13,6 +13,7 @@ import path from "path";
 import fsPromises from "fs/promises";
 
 import { numParam, optNumParam, toF, toI } from "../util/params.js";
+import { markDirty } from "../util/dirty-state.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { GIT_STRUCT_ID } from "../config.js";
@@ -178,6 +179,7 @@ export function registerObjectMgmtTools(server: McpServer): void {
 
       const nssPath = path.join(index.tempDir, `${scriptResref}.nss`);
       await fsPromises.writeFile(nssPath, scriptSource, "utf-8");
+      markDirty(nssPath);
 
       const nssStat = await fsPromises.stat(nssPath);
       index.resources.set(`${scriptResref}.nss`, {

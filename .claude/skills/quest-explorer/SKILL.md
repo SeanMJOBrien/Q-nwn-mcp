@@ -117,6 +117,22 @@ rather than write from scratch):
 | `_pqj_finish_20m` (aka `PQJ_AT_FIN`) | Turn-in/reward script — destroys a quest item from inventory, pulls XP via `GetJournalQuestExperience(qTag)`, grants hardcoded gold, propagates both to nearby party | `qTag`, `qItem`, `qState` (end state), `iGold` |
 | `_pqj_item` | Item-based trigger (OnAcquire/OnActivate via `x2_inc_switches`) — advances quest state when player picks up/uses a specific item, self-destructs the item once the quest reaches `qFinish` | `qTag`, `qState`, `qFinish` |
 
+**`bAllPartyMembers=FALSE` (or a PC-only wrapper like `_pqj_set_journal`) is not
+automatically a bug when auditing an existing module — check the persistence model
+before flagging it.** `/create-adventure`'s own rule ("never pass FALSE") assumes a
+fixed party sharing one session, where quest state genuinely is shared. A PW is
+usually a different architecture: quest progress tracked per-player via a persistent
+store (a campaign DB here, or a player-scoped SQL table in other modules —
+`SQLocalsPlayer`-style helpers are common), because a PW can have many unrelated
+concurrent players. In that architecture, writing the journal update to only the
+advancing PC is *correct* — broadcasting it party-wide would falsely update other
+players' journals for a stage they haven't reached in their own persisted record.
+Confirmed against a second, independently-built PW ("The Frozen North") using this
+exact pattern, not just Legacy of Ilmara's PQJ system. Before reporting a `FALSE`
+call as a co-op bug, confirm quest state is actually meant to be shared across
+players in this module — if it's per-player by design, `FALSE` is the right call
+site to leave alone.
+
 **Load-bearing detail:** `GetJournalQuestExperience(qTag)` reads the `xp`
 field set on the journal quest category itself. That means
 `edit_journal_quest(tag: ..., xp: N)` isn't cosmetic — any finish script

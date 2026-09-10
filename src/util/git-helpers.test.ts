@@ -77,6 +77,37 @@ describe("buildMinimalUtc", () => {
     expect((utc.FeatList as { value: unknown[] }).value).toEqual([]);
   });
 
+  it("writes Tail_New/Wings_New as dword, matching real henchman blueprints", () => {
+    // Diffing two real, live henchman blueprints (~/tfndev's hen_dorna.utc,
+    // hen_linu.utc) showed both fields as dword, not byte -- neither real
+    // creature carries the legacy Tail/Wings fields at all.
+    const utc = buildMinimalUtc() as GffObj;
+    expect(utc.Tail).toBeUndefined();
+    expect(utc.Wings).toBeUndefined();
+    expect((utc.Tail_New as { type: string; value: number }).type).toBe("dword");
+    expect((utc.Tail_New as { type: string; value: number }).value).toBe(0);
+    expect((utc.Wings_New as { type: string; value: number }).type).toBe("dword");
+    expect((utc.Wings_New as { type: string; value: number }).value).toBe(0);
+  });
+
+  it("has the standard-race body-part composite fields for PC-race rendering", () => {
+    // Confirmed present on real hen_dorna.utc/hen_linu.utc, absent on a
+    // from-scratch creature that rendered invisible in the toolset and a
+    // live game. Not applicable to monster-model appearances, but harmless
+    // there since buildMinimalUtc() defaults to Appearance_Type 0 (Dwarf).
+    const utc = buildMinimalUtc() as GffObj;
+    for (const field of [
+      "Appearance_Head", "ArmorPart_RFoot", "BodyPart_Belt", "BodyPart_LBicep",
+      "BodyPart_LFArm", "BodyPart_LFoot", "BodyPart_LHand", "BodyPart_LShin",
+      "BodyPart_LShoul", "BodyPart_LThigh", "BodyPart_Neck", "BodyPart_Pelvis",
+      "BodyPart_RBicep", "BodyPart_RFArm", "BodyPart_RHand", "BodyPart_RShin",
+      "BodyPart_RShoul", "BodyPart_RThigh", "BodyPart_Torso",
+      "Color_Hair", "Color_Skin", "Color_Tattoo1", "Color_Tattoo2",
+    ]) {
+      expect(utc[field]).toBeDefined();
+    }
+  });
+
   it("returns independent copies on each call", () => {
     const a = buildMinimalUtc() as GffObj;
     const b = buildMinimalUtc() as GffObj;

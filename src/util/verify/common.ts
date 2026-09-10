@@ -95,6 +95,7 @@ const BASE_GAME_SCRIPT_PREFIXES = [
   "x2_inc_",
   "x2_hen_",
   "x2_d1_",
+  "x2_door_",
   "x3_mod_def_",
 ];
 

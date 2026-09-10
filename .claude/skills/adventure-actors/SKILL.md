@@ -78,6 +78,24 @@ For each NPC described in the plot's `### Key NPCs` section:
 
 3. **Do NOT modify stats, feats, or equipment** unless the plot specifically describes combat capability. The source blueprint's stats are fine for ambient NPCs. `/adventure-quests` or `/adventure-challenges` can upgrade stats later if needed.
 
+   **When the plot does describe combat capability** (a guard captain, a rival duelist, a
+   hostile cult leader who talks before it fights, etc.), this Key NPC needs the same
+   static bake Phase 3b uses for companions — it is not companion-exclusive, only the
+   henchman dialog/script/`HENCH_LEVEL` wiring in Phase 3b is. Specifically follow
+   Phase 3b's **Ability scores**, **`FeatList` must be populated at build time** (all
+   four sources), **Skill points**, and **Equipment** subsections below. Confirmed real
+   bug this exact gap causes: every non-companion Key NPC bug report this project has
+   seen (a wizard with no spells or racial feats, a fighter given armor she has no
+   proficiency for, a boss with no spells at all) came from a Key NPC skipping straight
+   past Phase 3b because it read "Skip this phase entirely if the plot has no companion
+   characters" and — correctly, for the henchman-specific parts — didn't realize the
+   stat/feat/equipment recipe underneath still applied to them. **Unlike a companion,
+   a Key NPC is never recruited and so never gets a live `LevelUpHenchman()` pass** —
+   it has no HP/BAB/saves/skill-points/spells source at all besides what's baked
+   statically at build time. A caster Key NPC additionally needs a `spells` param
+   (`SpecAbilityList`) selection sized to its level — see "Casters with no recruit
+   event need spells baked statically" under Phase 3b's Equipment section.
+
 ---
 
 ### Phase 3b: Create Companions (henchmen)
@@ -90,24 +108,30 @@ away. This is the single most-reported defect in generated modules.
 leaving one slot spare). Use fewer unless the plot calls for a full party — every companion
 is another actor to keep alive, pathed, and balanced against.
 
-**Skip this phase entirely if the plot has no companion characters.**
+**Skip this phase entirely if the plot has no companion characters.** But if you landed
+here from Phase 3's "combat-capable Key NPC" cross-reference instead, do NOT skip —
+the henchman-only parts (Steps 1-3's dialog/script/`HENCH_LEVEL` wiring) don't apply to
+a non-companion Key NPC, but the **Ability scores**, **`FeatList`**, **Skill points**,
+and **Equipment** subsections below apply to any combat-capable creature regardless of
+whether it's recruitable.
 
 #### Step 1: Shared scripts (once per module)
 
 **Idempotency check:** `list_resources(pattern: "a_hen_*")`. If `a_hen_join` already
 exists, skip to Step 3.
 
-Write these six with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
+Write these seven with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
 reports `compiled: true`.
 
 | Resref | Purpose |
 |--------|---------|
 | `c_hen_free` | `StartingConditional` — TRUE when the companion has no master |
 | `c_hen_mine` | `StartingConditional` — TRUE when the PC speaking is its master |
-| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark |
+| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark, call `SPEC_VerifyCreature` (see below) |
 | `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
 | `a_hen_stay` | Stand ground, via `bkRespondToHenchmenShout` |
 | `a_hen_follow` | Follow master, via `bkRespondToHenchmenShout` |
+| `a_hen_spawn` | `#include "inc_spec_check"`, then `ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF)` followed by `SPEC_SelfTestOnSpawn(OBJECT_SELF)` |
 
 Two rules that make or break this — both are silent failures:
 - **`SetMaxHenchmen()` must be raised before `AddHenchman()`.** `AddHenchman` is a
@@ -116,12 +140,31 @@ Two rules that make or break this — both are silent failures:
   radial follow/stand-ground orders as a silent command shout the companion matches in
   its OnConversation handler. Without this it ignores every order.
 
+**`a_hen_spawn` chains, it never replaces.** The stock henchman `ScriptSpawn`
+(`x0_ch_hen_spawn`) does real work — `SetAssociateListenPatterns`, respawn location,
+identifying starting gear — that must still happen. `a_hen_spawn` calls it first via
+`ExecuteScript`, then calls `SPEC_SelfTestOnSpawn(OBJECT_SELF)`, which is a no-op unless
+`MCP_VERIFY_MODE` is set: during generation it levels the companion straight to its
+`SPEC_LEVEL` and runs `SPEC_VerifyCreature()` with no PC needing to connect and recruit it
+through dialog first, so a stat/appearance mismatch shows up in the log from a plain
+headless module load. This is a safe, precedented pattern — BioWare's own stock
+`x0_ch_hen_spawn.nss` calls `LevelUpHenchman()` straight from `OnSpawn` on an unrecruited
+companion in shipped Undermountain content. In the delivered module (`MCP_VERIFY_MODE=0`)
+this costs nothing beyond one no-op function call.
+
 #### Step 2: Raise the henchman cap at module load
 
 `get_module_info` → read `onModLoad`. If it is not already `a_mod_load`:
-- `write_script("a_mod_load")` calling `SetMaxHenchmen(4)` then
+- `create_spec_verification()` once per module, if `inc_spec_check` doesn't already
+  exist — generates the runtime spec-check include `a_hen_join` and `OnSpawn` call into
+  (see "Verify the recruit actually worked, live" below).
+- `write_script("a_mod_load")` calling `SetMaxHenchmen(4)`, then
+  `SetLocalInt(GetModule(), "MCP_VERIFY_MODE", 1)`, then
   `ExecuteScript("<the previous onModLoad value>")` — **chain, do not replace**. Omit
-  the `ExecuteScript` line only if the previous value was empty.
+  the `ExecuteScript` line only if the previous value was empty. The `MCP_VERIFY_MODE`
+  literal is `1` during generation/testing and must be flipped to `0` (recompile, repack)
+  as the very last build step before delivering the module — see
+  `docs/runtime-verification-spec.md` §7.
 - `set_module_scripts(Mod_OnModLoad: "a_mod_load")`
 
 #### Step 3: Per companion — dialog first, then blueprint
@@ -143,20 +186,277 @@ Then `create_creature_blueprint`:
 
 ```
 create_creature_blueprint(
-  sourceResref: "<class chassis — see table below>",
   resref: "<name>", tag: "<name>",
   name: "<display name>",
   faction: 2,
   henchman: true,
+  race: <racialtypes.2da row for the NPC's described race>,
+  appearance: <same numeric value as race, for the 7 standard PC races — see note below>,
+  gender: <0=male, 1=female>,
+  classes: '[{"class": <class ID for the companion's role — 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger 8=Rogue 9=Sorcerer 10=Wizard>, "level": 1}]',
+  startingPackage: <same value as the class ID above>,
   conversation: "dlg_hen_<resref>",
   soundset: <TYPE 0 row matching gender — see table>,
-  varTable: '[{"name": "HENCH_LEVEL", "type": "int", "value": <module target level>}]'
+  scripts: '{"ScriptSpawn": "a_hen_spawn"}',
+  varTable: '[
+    {"name": "HENCH_LEVEL", "type": "int", "value": <module target level>},
+    {"name": "SPEC_ENABLED", "type": "int", "value": 1},
+    {"name": "SPEC_RACE", "type": "int", "value": <same value as race>},
+    {"name": "SPEC_APPEARANCE", "type": "int", "value": <same value as appearance>},
+    {"name": "SPEC_CLASS", "type": "int", "value": <same value as the classes[0].class above>},
+    {"name": "SPEC_LEVEL", "type": "int", "value": <same value as HENCH_LEVEL>},
+    {"name": "SPEC_PACKAGE", "type": "int", "value": <same value as startingPackage>}
+  ]'
 )
 ```
+
+The `SPEC_*` vars are the input to `SPEC_VerifyCreature()` (from `inc_spec_check`, see Step 2)
+— cheap, inert local data that costs nothing to carry and lets `a_hen_join`/`OnSpawn` confirm
+at runtime that `LevelUpHenchman()` actually produced what this template asked for. They are
+redundant with the fields already on this call by design — read them off the same values,
+don't compute anything new.
+
+`scripts: '{"ScriptSpawn": "a_hen_spawn"}'` overrides just that one field on top of the
+`henchman: true` preset — the other 12 script fields (`ScriptDialogue`, `ScriptHeartbeat`,
+...) stay wired to the stock `x0_ch_hen_*` associate AI. This is what lets the headless
+self-test (`SPEC_SelfTestOnSpawn`, see "Verify the recruit actually worked, live" below)
+run at all.
+
+**Appearance rule — no chassis needed.** `appearance.2da` rows 0–6 (Dwarf, Elf, Gnome,
+Halfling, Half-Elf, Half-Orc, Human) map 1:1 by label to the same numeric values as the
+`race` parameter for the 7 standard PC races (verified directly against `appearance.2da`).
+Set `race` and `appearance` to the same value and the companion renders correctly with no
+`sourceResref` cloning required — this covers all 11 classes, not just the 5 with a
+verified chassis in the fallback table below. Skip `sourceResref` entirely unless the plot
+calls for a specific non-standard look (see "Companion source blueprints" below for that
+fallback path, and its caveats). `buildMinimalUtc()` now writes the full composite
+body-part field set (`BodyPart_*`, `ArmorPart_RFoot`, `Appearance_Head`, `Color_*`)
+this rendering path needs — nothing further to set by hand here.
+
+**Give every companion clothing, even with no mechanical property.** An empty chest slot
+isn't a valid default. `nw_cloth001` is a real base-game mundane item (1gp) that works for
+anyone not already in armor.
+
+**Faster path: `build_npc_stat_block`.** Everything from here through "Skill points"
+below (ability scores, the 4-source `FeatList` bake, `SkillList`) can be computed and
+written in one call: `build_npc_stat_block(resref, race, classId, level, powerLevel?)`,
+run right after `create_creature_blueprint` and before `place_creature`. It reads the
+same 2DA tables this section describes by hand (live from the loaded module, not
+hardcoded) and applies the same rules — the manual recipe below is still the reference
+for *why* each field ends up the way it does, and is what to fall back on for anything
+the tool doesn't cover (HP is also set by the tool; spells are not — see "Casters with
+no recruit event" below). `powerLevel` defaults to `elite` (the Elite Array `15/14/13/
+12/10/8`, ~25-point-buy equivalent) — pass `low`/`standard`/`tougher`/`epic` for a
+deliberately weaker or stronger named NPC.
+
+**Ability scores.** Apply real racial adjustments (Dwarf +2Con/-2Cha, Elf +2Dex/-2Con,
+Gnome +2Con/-2Str, Halfling +2Dex/-2Str, Half-Orc +2Str/-2Int/-2Cha, Half-Elf/Human none),
+pick a primary stat from `classes.2da`'s `PrimaryAbil` column, and — for a companion built
+above level 1 — add +1 to it at levels 4 and 8 (the real ability-increase rule). **Floor
+rule:** a racial penalty should never push a mental stat below what the character needs to
+function narratively — Cha ≥ 6 and Int ≥ 8 are reasonable minimums even for a race with a
+-2 to that stat, unless the plot specifically calls for a dim/inarticulate character.
+
+**`startingPackage` must be set — this is not optional.** `LevelUpHenchman()` reads the
+companion's `StartingPackage` (a `packages.2da` row) to decide which feats, skills, and
+spells to grant at each level. Left unset it defaults to GFF row `0`, which is Barbarian's
+package — silently *correct* only if the companion actually is a Barbarian, and silently
+*wrong* for every other class. **Verified rule: for every base class's iconic package,
+`packages.2da` row index equals class ID** (Bard=1, Cleric=2, Druid=3, Fighter=4, Monk=5,
+Paladin=6, Ranger=7, Rogue=8, Sorcerer=9, Wizard=10, Barbarian=0) — so `startingPackage`
+should always be set to the same number as the `classes` entry's `class` value.
+
+**Always pass `classes` explicitly, starting at level 1** — the companion levels up live to
+`HENCH_LEVEL` via `LevelUpHenchman()` when `a_hen_join` fires on recruit. This live call
+correctly grants HP, BAB, saves, skill points, and spells (`bReadyAllSpells = TRUE`
+matters — without it the companion joins with an empty memorized list). **It does NOT
+grant feats of any kind** — see the corrected `FeatList` guidance below; bake those
+statically at build time regardless of this live-leveling path. Do not pre-set a higher
+static `ClassLevel` here — a companion built at level 1 and leveled live (for
+everything except feats) is the difference between this working correctly and the
+"cleric henchman has no spells" bug.
+
+**CORRECTED — an empty `FeatList` is a real defect, not expected behavior.** This section
+previously claimed racial and class feats come from the engine/`LevelUpHenchman()`
+automatically. **Confirmed false by direct probe on a live headless server**:
+`LevelUpHenchman()` grants ZERO automatic feats — not racial, not class proficiencies,
+not bonus feats — at any level, for any class. A level-5 Fighter leveled live through a
+real recruit still lacked basic Simple/Martial Weapon Proficiency. Automatic feats are
+apparently a character-creation-time concept (the toolset's own character-creation UI),
+not something a runtime `LevelUpHenchman()` call ever performs. **`FeatList` must be
+populated at build time, before `place_creature`**, from four sources — do this for
+every companion and every combat-capable Key NPC, regardless of whether they'll also be
+live-leveled for HP/BAB/saves/skills/spells (those four ARE engine-computed or
+live-granted correctly; only feats need this static workaround):
+
+1. **Racial** — every row in `race_feat_<race>.2da` is unconditionally granted (no level
+   gate; that table has no `List`/`GrantedOnLevel` columns at all).
+2. **Automatic class feats** — `cls_feat_<class>.2da` rows with `List=3`, filtered to
+   `GrantedOnLevel <=` the target level (weapon/armor proficiencies, Turn Undead, Sneak
+   Attack progression, Bardic Knowledge, etc.).
+3. **Generic feat slots** — every class gets a freely-chosen feat at levels 1, 3, 6, 9,
+   12... (hardcoded D&D 3.5 rule, not table-driven). Pick something sensible for the
+   role (Toughness, Iron Will, a relevant Skill Focus) — there's no known eligibility
+   table for this slot in the 2DA stack, so this is a judgment call, not a lookup.
+4. **Class-specific bonus feat slots** — `cls_bfeat_<class>.2da`'s single `Bonus` column
+   (row index = level−1, `1` = a slot opens that level) tells you WHEN a slot opens:
+   Fighter fires at 1,2,4,6,8,10 (6 slots by level 10); Ranger at 1,5,10; Wizard at 5,10;
+   Rogue at 10 only; Barbarian/Bard/Cleric never. No eligibility-list column exists here
+   either — the legal-feats-per-slot restriction is presumably hardcoded in the engine.
+   Pick a real, class-appropriate feat for each slot (Weapon Focus/Specialization for
+   Fighter, a metamagic/item-creation feat for Wizard, etc.) — see the weapon-feat-match
+   rule below before picking a Focus/Specialization/Improved-Critical feat.
+
+Verify the count is right, but treat the *specific* picks for slots 3 and 4 as a
+reasonable build, not something RAW-audited against every prerequisite — there is no
+live server in this pipeline to confirm legality, and getting the slot *count* right
+from real 2DA data is the load-bearing part.
+
+**Skill points.** Like feats, live `LevelUpHenchman()` has not been confirmed to grant
+these correctly and there's no reason to assume it's exempt from the same gap — bake
+`SkillList` at build time too. Points per level = `classes.2da`'s `SkillPointBase` + Int
+modifier, **×4 at level 1**, ×1 per level after (floor of 1/level if the total would go
+non-positive — recompute this whenever Int changes, a wrong-cached total from an earlier
+Int value is a real mistake this project has made). Human gets its own +1/level bonus by
+the same ×4/×1 rule. Spend only on skills where `cls_skill_<class>.2da` has
+`ClassSkill=1`; cap per skill at `level + 3` ranks. `SkillList` is a fixed 28-entry list
+(`__struct_id: 0`, `Rank` byte per entry) indexed by `skills.2da` row order — a
+from-scratch blueprint's `SkillList` defaults to empty/all-zero, which is a real defect
+for anyone above level 1, not a placeholder to leave alone.
+
+#### Equipment
+
+Every companion (and any Key NPC given non-default gear) needs a weapon and something in
+the chest slot at minimum — bare skin/empty-handed is not a valid default, only ever skip
+gear for an explicit story reason.
+
+**After sourcing real items (below), equip with `equip_npc_by_role`** rather than
+`set_creature_equipment` directly — same slot check, plus it rejects (or with
+`force:true`, equips and warns about) an item the creature's `FeatList` isn't
+proficient with, reports a `get_wealth_budget` reference figure, recommends a weapon
+type from a curated per-class table when no `righthand` item is supplied yet, and
+runs `verify_creature` as its own last step. It does not search for items itself —
+still find real resrefs via `list_blueprints`/`resman_search` first, exactly as
+below. If the story or the user later wants a different weapon type for this
+creature (a General Fighter reassigned from Longsword to Battleaxe, say),
+`respec_weapon_feats` moves the existing Focus/Specialization/Improved Critical
+feats onto the new weapon in one call instead of hand-editing `FeatList`.
+
+**Source real, existing blueprints — do not build from scratch by default.** Two tools,
+used together, not one:
+- `list_blueprints(type: "uti", pattern: "...")` — matches resref/tag/TLK-resolved
+  display name. Good for named magic items ("Cloak of Elvenkind", "Half Plate +3").
+- `resman_search(pattern: "...")` — raw resref substring match across the **entire**
+  resman stack, base BIFs included. **Required before concluding "no real item exists"
+  for anything mundane** — the base game's "Standard palette" vanilla weapons use terse,
+  non-obvious resref codes with no display-name overlap to an intuitive search term
+  (a plain Battleaxe is `nw_waxbt001`, a Rapier is `nw_wswrp001`, a Dagger is
+  `nw_wswdg001` — none contain "battleaxe"/"rapier"/"dagger"). `list_blueprints` alone
+  missed all three of these in one real session; `resman_search` with a short prefix
+  guess (`wax`=axe family, `wsw`=sword family) found them immediately. Try both before
+  building anything from scratch.
+
+**What to build vs. source:**
+- No bonus needed → a plain mundane blueprint (found via the two tools above), or a
+  from-scratch weapon (`create_item_blueprint`) only if genuinely nothing real matches —
+  safe for weapons (`ModelType` 2 in `baseitems.2da`), since `create_item_blueprint`
+  correctly defaults `ModelPart1-3`.
+- Needs a bonus → an existing, appropriately-valued magic item, costed with
+  `resolve_blueprint` and budgeted against `get_wealth_budget(level, role)`'s per-slot
+  split.
+- Armor (`ModelType` 3) — **always source from a real existing blueprint, never build
+  from scratch.** Armor needs 18 `ArmorPart_<slot>` fields + 6 `Cloth/Leather/MetalColor`
+  fields that `create_item_blueprint` does not set at all, and unlike creature body
+  parts there's no safe universal default number — a from-scratch armor item renders
+  with no visible model change. A real blueprint already carries correct data.
+- Pure narrative/flavor item (a keepsake, a holy symbol, a personal effect) with no
+  mechanical property → fine to build from scratch, but it needs a `description`
+  establishing why it matters. Don't generate a bare, unexplained accessory (a ring,
+  boots, gloves) with neither a property nor a backstory.
+
+**A weapon-specific feat means the matching weapon, exactly — not just the matching
+proficiency category.** Weapon Focus/Weapon Specialization/Improved Critical are all
+per-weapon-type feats (`feat.2da` labels like `WeapFocBAxe` are Battle-Axe-specific — a
+different weapon in the same broad category, e.g. a Dwarven Waraxe, gets no benefit from
+them at all). Check `feat.2da`'s `OrReqFeat0-4` columns on the matching
+`ImpCrit<Weapon>` row to see which specific weapons a proficiency feat actually covers
+before equipping — this is also how to catch a class/weapon proficiency mismatch (e.g. a
+Rogue or Bard equipped with a Longsword neither is proficient with in this ruleset).
+
+**Base proficiency, not just Focus-feat matching — verified via a live `baseitems.2da`.**
+The weapon-specific-feat check above answers "does this Focus/Specialization feat apply
+to this exact weapon" — it does not answer the more basic "is this creature proficient
+with this weapon/armor/shield at all." That's a separate, simpler, fully-checkable
+lookup: `baseitems.2da`'s `ReqFeat0`-`ReqFeat4` columns on the equipped item's `BaseItem`
+row list every feat that individually grants proficiency with it (an OR-set — e.g. a
+Shortbow's `ReqFeat0-2` are Martial Weapon Proficiency, Rogue's bonus weapon
+proficiency, and Elf's bonus weapon proficiency; any one suffices). Before equipping a
+weapon or shield, confirm the creature's baked `FeatList` contains at least one of that
+item's `ReqFeat` values — this is the actual mechanism behind "Rogues cannot use medium
+armor"-class bugs. **Armor weight class works differently but is fully checkable**:
+`baseitems.2da` has a single generic armor row (16) shared by every body-armor item
+regardless of weight class, with no `ReqFeat` data of its own — but weight class isn't
+stored on the base item at all. It's derived from the item's own AC Bonus property
+(`PropertiesList` entry with `PropertyName=1`, `CostValue` = the AC bonus amount 0-8):
+AC bonus 0 needs no proficiency, 1-3 is Light armor, 4-5 is Medium, 6-8 is Heavy
+(verified against `armor.2da`'s 9-row ACBONUS table and a real community equipment
+script's tier boundaries). Before equipping armor, check its AC Bonus property against
+the creature's baked `FeatList` for the matching tier feat (Light=3, Medium=4, Heavy=2)
+— `verify_creature`'s `armor_proficiency_mismatch` check enforces this precisely, the
+literal Corin Vale bug (a Rogue in Medium armor with only Light Armor Proficiency).
+When picking armor for a class, prefer what its automatic-class-feat proficiency
+actually covers (Rogue/Bard/Sorcerer/Wizard → light only; most others per their
+`cls_feat_<class>.2da` bake) rather than relying on the check to catch a mismatch after
+the fact.
+
+**Give every ranged-weapon creature a melee weapon too.** NWN's base combat AI
+auto-switches a ranged attacker to melee when it runs out of ammo
+(`ActionEquipMostDamagingMelee`, called from the stock `nw_c2_default9`) — but only if a
+melee-capable weapon exists somewhere in its inventory. An archer/thrower with nothing
+melee-capable anywhere just stops fighting once ammo runs out. Give it a plain melee
+weapon appropriate to the creature (a d6 weapon + a small shield, or a single d8
+weapon) as an unequipped inventory item via `add_items_to_container`-style inventory —
+it does not need to be equipped for the base AI to find and switch to it.
+`verify_creature`'s `ranged_weapon_no_melee_backup` check flags the gap.
+
+**Casters with no recruit event need spells baked statically.** A companion's spells
+come from the live `LevelUpHenchman()` call at recruit (`bReadyAllSpells = TRUE`, per
+the note above) — but a non-companion Key NPC is never recruited and never gets that
+call, so a caster Key NPC with nothing else set is permanently spell-less. Real
+spellbook baking (`ClassList[n].MemorizedList0-9`) isn't wired into any tool yet —
+use `create_creature_blueprint`'s `spells` param instead (writes `SpecAbilityList`,
+NWN's "Special Abilities" system: spell-like castings independent of class levels,
+where each `{spell, level}` entry is one use and repeating an entry grants multiple
+uses per day). Size the selection to the class's spells-per-day at the target level
+(e.g. `cls_spgn_<class>.2da`), picking 1-3 thematically-appropriate spells per level
+rather than one spell repeated many times. `verify_creature`'s `caster_no_spells` check
+flags a spellcasting class at its casting level with nothing in either mechanism.
+
+**Casters who suffer arcane spell failure (Wizard/Sorcerer/Bard) should be in light or no
+armor** — this is the mechanically correct default, not an oversight to fix later.
 
 `henchman: true` wires all 13 script fields to the stock `x0_ch_hen_*` associate AI.
 These are base-game resources resolved at runtime — **never write them into the module**,
 and expect `validate_module` to report them as missing (a false positive).
+
+**Verify the recruit actually worked, live.** `verify_creature`/`verify_dialog` (Step 4
+below) only check static GFF preconditions — they cannot confirm `LevelUpHenchman()`
+behaved correctly at runtime. `a_hen_join` must `#include "inc_spec_check"` (generated by
+`create_spec_verification`, Step 2) and call `SPEC_VerifyCreature(oHenchman)` as its last
+line, after the level-up loop and `AddHenchman()` succeed. This is a no-op unless
+`MCP_VERIFY_MODE` is set (it is, during generation — see Step 2), so it costs nothing in
+the delivered module. Read `[SPEC_OK]`/`[SPEC_FAIL]` lines from the server log after a real
+in-game recruit test: `[SPEC_FAIL] ... field=level` points at a package/recruit-script
+problem, `field=spell_count` points at a missing `bReadyAllSpells = TRUE`, and
+`field=race`/`field=appearance` points at `race`/`appearance` not both having been set on
+the blueprint. See `docs/runtime-verification-spec.md` for the full field list and the
+build→run→check→repair loop this is meant to close.
+
+`a_hen_spawn` gets the same check for free, headlessly: `SPEC_SelfTestOnSpawn(OBJECT_SELF)`
+levels the companion straight to `SPEC_LEVEL` and runs the same `SPEC_VerifyCreature()`
+check the moment the area loads — no real PC needs to connect and click through the recruit
+dialog first. This means `[SPEC_OK]`/`[SPEC_FAIL]` lines are already in the log from a plain
+headless module load, before anyone ever plays it.
 
 #### Step 4: Verify before moving on
 
@@ -165,21 +465,58 @@ For each companion: `verify_creature(resref: "<resref>", henchman: true)` and
 re-verify; after two failed attempts record `"status": "partial"` in
 `adventure-status.json` with the error list rather than reporting success.
 
-#### Companion source blueprints — class chassis only
+#### Companion source blueprints — fallback only, for a specific non-standard look
+
+The default path above (`race` + matching `appearance`, no `sourceResref`) covers all 11
+classes and every standard PC race with no lookup table needed. Use `sourceResref`
+cloning **only** when the plot calls for a specific named look this doesn't cover (e.g. a
+particular named-NPC face/model). If you do clone a chassis:
 
 **Never build a companion on a Commoner blueprint.** `nw_bartender`, `nw_oldman`,
 `nw_convict` and `nw_shopkeep` are all Commoner (class 20): levelling one grants no
 feats, no spellbook and no BAB, so the companion joins with no abilities at all. This is
 the exact cause of the "Cleric NPC has no spells" bug.
 
+**Verified against the actual blueprint `ClassList`, not assumed from the name** —
+three entries in this table used to be wrong (`nw_humanmerc002` labeled Fighter is
+really Cleric; `nw_elfmerc001` labeled Ranger is really Wizard; `nw_halfcel001`
+labeled Cleric is really Fighter), which would silently build a companion with the
+wrong spellbook/proficiencies if you trusted the source chassis's native class. Always
+cross-check with `resolve_blueprint(resource: "<resref>.utc")` → `classes` before using
+any *new* source not in this table, and **pass `classes` (and `startingPackage`)
+explicitly on the `create_creature_blueprint` call regardless** — appearance and combat
+class are independent, so never rely on a chassis's native `ClassList` by omission. Note
+that cloning also carries over whatever legacy/current field set (`Phenotype`, existing
+`FeatList`/`SkillList`) the source NPC happens to have — another reason to prefer the
+chassis-free default path unless you specifically need one of these looks.
+
+**CORRECTION (superseded twice — read the final state, not the history): the invisible
+companion bug was NOT the `Tail`/`Wings` field pair.** A from-scratch companion (built
+via the chassis-free default path) rendered invisible, both in the toolset and in a live
+game session, until the toolset's own property editor touched it. A first hypothesis —
+diffing against a shopkeeper control creature and finding it had legacy `Tail`/`Wings`
+that a from-scratch companion lacked — was wrong: the shopkeeper uses a monster-model
+appearance (a single fixed model), the wrong rendering category to compare against, and
+the user re-reported the identical symptom after that "fix" shipped. **The real cause,
+found by diffing two genuine, live, actively-hosted-PW henchman blueprints
+(`~/tfndev`'s `hen_dorna.utc`/`hen_linu.utc`) against the broken creature's raw GFF:**
+standard-race appearances render as a composite model assembled from per-part fields
+(`BodyPart_*`, `ArmorPart_RFoot`, `Appearance_Head`, `Color_*`) that `buildMinimalUtc()`
+never wrote at all — real henchmen carry the full set, real henchmen carry NO legacy
+`Tail`/`Wings` fields, and `Tail_New`/`Wings_New` should be `dword` not `byte`.
+`buildMinimalUtc()` now writes the correct field set and types. **Lesson: when diffing
+against a "known-working" control creature to root-cause a rendering bug, first confirm
+the control uses the same appearance-rendering category (composite PC-race model vs.
+single monster model) as the broken creature** — same discipline as the tile-rotation
+corpus-verification rule elsewhere in this project.
+
 | Archetype | Resref | Class |
 |-----------|--------|-------|
-| Fighter | `nw_humanmerc002` / `nw_dwarfmerc002` | Fighter |
-| Ranger / archer | `nw_elfmerc001` | Ranger |
-| Cleric / healer | `nw_halfcel001` | Cleric |
-| Wizard | `nw_elfmage001` | Wizard |
-| Rogue | `nw_halfmerc001` | Rogue |
-| Bandit-turned-ally | `nw_bandit001` | Fighter |
+| Fighter | `nw_dwarfmerc002` / `nw_bandit001` | Fighter (class 4) |
+| Ranger / archer | `nw_elfranger001` | Ranger (class 7) |
+| Cleric / healer | `nw_halfcel001` | Native class is Fighter — **must** override `classes` to `[{"class": 2, "level": <target>}]` explicitly; use this resref for its half-elf-cleric appearance only |
+| Wizard | `nw_elfmage001` / `nw_elfmerc001` | Wizard (class 10) |
+| Rogue | `nw_halfmerc001` | Rogue (class 8) |
 
 #### Companion soundsets — TYPE 0 (PC voicesets) only
 
@@ -519,3 +856,17 @@ Clone each type once with `create_creature_blueprint`, setting `faction=2`.
   `validate_module` reporting them as missing is a false positive.
 - **Verify before reporting success.** Every companion must pass `verify_creature(henchman: true)`
   and `verify_dialog` with zero errors.
+- **`FeatList` and `SkillList` must be baked at build time** — `LevelUpHenchman()`
+  grants neither, confirmed by direct probe. See the corrected guidance in Phase 3b.
+- **Source equipment from real blueprints first** (`list_blueprints` AND `resman_search`
+  — the latter catches base-game "Standard palette" items the former misses), budgeted
+  via `get_wealth_budget`. Only build from scratch when nothing real matches, and never
+  build armor from scratch (missing visual data — see Phase 3b Equipment).
+- **A weapon-specific feat (Weapon Focus/Specialization/Improved Critical) needs the
+  exact matching weapon**, not just a same-category one — a Dwarven Waraxe gets no
+  benefit from Battleaxe-specific feats despite both being martial axes.
+- **Mixing direct `nwn_gff` file edits with MCP tools on the same resource in one
+  session is a confirmed data-loss bug** (an equipment tool call can silently revert
+  the *entire* file to a stale in-memory snapshot). If a repair task needs raw
+  `nwn_gff` scripting on top of this skill's normal MCP-tool flow, see the ordering
+  rule in the main project `CLAUDE.md`'s Known Pitfalls before mixing the two.

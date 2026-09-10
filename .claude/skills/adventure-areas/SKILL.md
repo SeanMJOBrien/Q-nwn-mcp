@@ -21,10 +21,46 @@ Fully autonomous. Make all decisions based on the plot document — do NOT ask t
 
 ### Phase 0: Clean Up Starter Area
 
-If the module was created by `create_module`, it contains a temporary `_start` area (MicroSet 3x3). Before building real areas:
+If the module was created by `create_module`, it contains a temporary `_start` area (MicroSet 3x3). Before building real areas, check whether `adventure.md`'s `## Plot` notes a "Starter" store (see `adventure-affordances/SKILL.md`'s "Optional: the Starter store" — a pre-story shop where the player spends a gold allowance on gear of their choosing before the adventure begins).
+
+**No Starter store planned:**
 1. Call `remove_object` to remove `_start` from the GIT if needed
 2. The first real area you create will become the new entry area — after creating it, update the IFO entry point: use `modify_gff_field` to set `Mod_Entry_Area` to the new area's resref, and set `Mod_Entry_X`/`Mod_Entry_Y` to a walkable position in that area
 3. Remove `_start` from `Mod_Area_list` in the IFO, and delete `_start.are`, `_start.git`, `_start.gic` from the temp dir
+
+**Starter store planned:** the start area must be a real, dedicated area, kept — not deleted and
+folded into the first story area the way it is above. It houses the Starter store and nothing
+else story-related (an overview/orientation line is fine; plot content is not — see
+`adventure-affordances/SKILL.md`).
+1. Rebuild `_start` as a small real area (or repaint the existing stub) sized for one merchant
+   NPC + the store — this stays `Mod_Entry_Area` and `Mod_Entry_X`/`Mod_Entry_Y` point into it,
+   unchanged from the module template's own entry point.
+   - **Build it flat, through the normal pipeline** (`adventure_generate_layout` +
+     `adventure_apply_layout`, or a manual `paint_group`/`paint_tiles` fill) — not left at
+     whatever `create_area`'s raw default fill happens to be. Confirmed a real starting area
+     shipped covered in visually-ramped tiles despite the solver pipeline itself being
+     flat-tile-only by construction (`tile-solver.ts`/`zone-solver.ts` both filter to
+     `tile.flat`), meaning the ramp tiles were selected deliberately rather than defaulted —
+     most likely a Vertical/connective feature group (see below) picked by mistake for what
+     should have been plain floor.
+   - **Only request Structural/Camp-category feature groups here, never
+     Vertical/connective ones.** `get_tileset_details`/`adventure_list_features` group
+     names like `Ramp`, `Cave`, or a gate/tower piece exist specifically for height
+     transitions and area entry/exit points elsewhere in a dungeon or exterior layout —
+     they are not floor filler and will not read as "a flat camp with a wagon in the
+     corner." For a wagon/camp-themed start area, look for `plc_emptywagon`/
+     `plc_fullwagon`/`CaravanWagon2`-style groups instead.
+   - **Centering a placement (the store NPC, a central fire pit, etc.) in the room:** use
+     the tile-center formula already established in `adventure-actors/SKILL.md`
+     ("World position = tile * 10.0 + 5.0 for center") against the *average* of the
+     room's tile bounds — `((minCol+maxCol)/2)*10+5` and `((minRow+maxRow)/2)*10+5` —
+     not a guessed coordinate. Read the room's actual tile bounds from
+     `visualize_area`'s spatial payload before computing this.
+2. The first *story* area is a separate area, built normally, connected from the start area via
+   `adventure_create_transition` (Phase 7's standard mechanism) — the player steps through it
+   once they've geared up, and that's where the plot actually opens.
+3. Do not remove `_start` from `Mod_Area_list` or delete its files — it remains a real, permanent
+   area for the life of the module.
 
 ---
 
@@ -47,6 +83,8 @@ Read `adventure.md`. Extract from the `## Plot` section:
 - **Mood** — dark, peaceful, eerie, bustling, etc.
 - **Scale** — how large should each area be?
 - **Connections** — which areas connect to which (for door/transition planning)
+
+Also read **Area Mode** from the `## Module` section (`Full`, `Scaffold`, or `Scaffold (Minimal)`). This governs how Phase 3 calls `adventure_generate_layout` for every area — see below.
 
 Build a mental list of all areas to create. Process them one at a time.
 
@@ -117,7 +155,9 @@ Propose area dimensions based on the plot's description of the location's scale.
 
 **Available styles:** `dungeon` (rooms + corridor crossers), `cave` (organic chambers + corridors), `dwelling` (quadrant rooms, building interior), `forest` (clearings in cliff/trees), `rural` (farmland clearings in trees), `city` (urban spaces), `plains` (open terrain, sparse clearings), `desert` (arid, cliff borders), `castle` (fortified exterior, castle walls), `tundra` (frozen, snow clearings).
 
-**MANDATORY: Choose thematic features BEFORE generating layouts.**
+**If Area Mode is `Scaffold` or `Scaffold (Minimal)` (from Phase 1): skip feature selection below entirely.** Pass `safeMode: true` in the style object and omit `preferredFeatures` — `adventure_generate_layout` returns an empty `suggestedFeatures` regardless, and picking features would defeat the point of a plain, hand-finishable scaffold. `safeMode` also disables L-shaped rooms, S-curve corridors, shortcut corridors, and obstacle patches, so the area comes out as plain rectangular rooms and straight corridors — the tile classes least likely to need a solver fallback. For `Scaffold (Minimal)`, also set `rooms: 1` and use the smallest valid width/height (9x9 — see `MIN_SINGLE_ROOM_AREA_SIZE` in `layout-generator.ts`) instead of the size guidance below; the story beat still needs its own area (a king still needs *a* throne room), just the smallest one that holds it, for the user to expand outward by hand. Then skip straight to Phase 4.
+
+**MANDATORY (Area Mode: Full only): Choose thematic features BEFORE generating layouts.**
 1. Call `adventure_list_features` with the tileset resref and style type (e.g., `style: "rural"`, `style: "cave"`, `style: "forest"`). The tool automatically resolves the correct floor terrain and returns ONLY groups safe for the solver — crosser edges and terrain-mismatched groups are filtered out. Freestanding building features (houses, lodges) with doors ARE allowed if all their tiles sit on uniform floor terrain.
 2. Read the plot description for this area — what should the player see? A farmstead needs farms, barns, wells. A graveyard needs graves, ruins, crypts. A military camp needs tents, weapons racks, fortifications.
 3. Pick 3-6 group names from the returned list that match the area's narrative purpose. **Order them by best thematic fit — most important/relevant first, descending.** The solver places exactly one feature per BSP room, trying preferred features in the order you provide. Only preferred features are placed — no random filler. With N rooms, at most N features will appear, so put the most essential ones first.
@@ -140,6 +180,16 @@ adventure_generate_layout(tileset="tdm01", width="10", height="10",
 adventure_generate_layout(tileset="ttf02", width="16", height="16",
   style='{"type":"forest","rooms":4,"preferredFeatures":["Graveyard","Graveyard 1x2","Ruin","Ruin 1 2x2","Webbed Forest"]}',
   transitionCount="2")
+
+# Example: Area Mode "Scaffold" — a castle throne room, normal size, no features
+adventure_generate_layout(tileset="tic01", width="14", height="14",
+  style='{"type":"dungeon","rooms":3,"safeMode":true}',
+  transitionCount="1")
+
+# Example: Area Mode "Scaffold (Minimal)" — same throne room, smallest footprint
+adventure_generate_layout(tileset="tic01", width="9", height="9",
+  style='{"type":"dungeon","rooms":1,"safeMode":true}',
+  transitionCount="1")
 ```
 
 The result contains `zones`, `crossers`, and `suggestedFeatures` ready to pass directly to `adventure_apply_layout`, plus `transitionPoints` with guaranteed in-bounds coordinates. Transition points are automatically:
@@ -214,7 +264,7 @@ Set ambient properties with `set_area_properties`. The reference tables below ar
 - **Day/night cycle** — exteriors: `true`. Interiors: `false`.
 - **Fog** — Do NOT set `sunFogAmount` or `moonFogAmount` (leave at 0). Instead use `fogClipDist` to control fog density: 45 = very foggy, 80 = clear sky. Omit `fogClipDist` for no fog.
 - **Wind** — `windPower`: 0=calm, 1=light, 2=strong.
-- **Weather** — `chanceRain/Snow/Lightning` 0-100. Low values (5-15) for occasional weather.
+- **Weather** — `chanceRain/Snow/Lightning` 0-100. The corpus survey (`area-ambience` skill, 12,507 hand-built areas) found only **3% adoption** overall — weather is the exception, not a routine per-area setting. Reserve it for biomes where it's thematically central (frozen wastes, rural winter, a deliberate storm set-piece); leave it unset (0) for everything else. When it is warranted, use low values (5-15) for occasional weather.
 
 ---
 
@@ -248,6 +298,8 @@ Check `adventure_apply_layout` results for `solverWarnings`. If there are crosse
 ### Phase 7: Link Area Transitions
 
 Use `adventure_create_transition` for ALL area transitions — do NOT use doors, `link_doors`, or `create_area_transition`. The adventure pipeline uses the light-based transition tool exclusively.
+
+**Note — this is a deliberate scope choice, not the corpus-typical pattern.** The `area-connections` skill's survey of 12,507 hand-built areas found doors connect 79% of area pairs, with light-shaft portals used only as a fallback for open terrain with no wall to hang a door on, or for a genuinely magical transition. The pipeline standardizes on portals anyway because they need no matched door pair across two areas and no trigger geometry — see CLAUDE.md's "Doors/gates architecture" pitfall (#5) for the full rationale. If a future iteration wants corpus-typical door/trigger transitions instead, that's a deliberate pipeline change requiring explicit sign-off, not a silent substitution here.
 
 `adventure_create_transition` creates a **bidirectional** transition in a **single call**. It places a useable blue shaft of light AND a landing waypoint at **both** positions simultaneously, guaranteeing the light and waypoint in each area are always at exactly the same coordinates. **Do NOT call twice** — one call handles both directions.
 

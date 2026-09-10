@@ -31,6 +31,13 @@ set, not a city. Budget the interiors before you build the exterior — see `are
 
 Placeable density is low (6.2/100 tiles) for the same reason as Rural: the buildings *are* tiles.
 
+This module's `tcn01` corpus is too thin (n=3) to independently confirm the door figure above, but
+the same "polished builds are door-heavier than the blanket average" pattern held cleanly on every
+other checked tileset, `tno01` (Castle Exterior) included — see `docs/tfn-corpus-survey/areas.md`
+if you want the numbers. Treat 11 as a floor, not a ceiling, for a build meant to feel finished.
+The same linkage rule applies here as in `area-rural`: every door needs `check_area_connectivity`
+to confirm it actually resolves to an interior area — a door to nowhere is worse than no door.
+
 ## Terrain and crossers
 
 - **Terrain:** `cobble`, `water`, `building`, `evilcastle`, `goodcastle`

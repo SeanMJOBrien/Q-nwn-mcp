@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GffObj } from "../../types/gff.js";
 import type { ModuleIndex, TwoDATable } from "../../types/module.js";
-import { verifyCreature, verifyItem, verifyPlaceable, verifyTrigger } from "./blueprints.js";
+import { verifyCreature, verifyDoor, verifyItem, verifyPlaceable, verifyTrigger } from "./blueprints.js";
 import { isBaseGameResource, isBaseGameScript, Report } from "./common.js";
 import { verifyDialog } from "./dialog.js";
 import { verifyJournal } from "./journal.js";
@@ -132,46 +132,371 @@ describe("isBaseGameResource", () => {
 // ─── Creature ─────────────────────────────────────────────────────────────
 
 describe("verifyCreature", () => {
-  it("passes a well-formed creature", () => {
+  it("passes a well-formed creature", async () => {
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"));
+    await verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"));
     expect(report.errors).toHaveLength(0);
   });
 
-  it("flags the ScriptPercption typo", () => {
+  it("flags the ScriptPercption typo", async () => {
     const obj = makeCreature("nw_c2_default", {
       ScriptPercption: { type: "resref", value: "nw_c2_default2" },
     });
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("script_percption_typo");
   });
 
-  it("flags a missing script field", () => {
+  it("flags a missing script field", async () => {
     const obj = makeCreature("nw_c2_default");
     delete obj.ScriptOnNotice;
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("missing_script_field");
   });
 
-  it("flags an empty ClassList", () => {
+  it("flags an Appearance_Type/Race mismatch for a standard PC race", async () => {
+    // buildMinimalUtc()'s own real defaults: Race=6 (Human), Appearance_Type=0 (Dwarf).
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Appearance_Type: { type: "word", value: 0 },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).toContain("appearance_race_mismatch");
+  });
+
+  it("does not flag a matching Appearance_Type/Race pair", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 1 },
+      Appearance_Type: { type: "word", value: 1 },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("appearance_race_mismatch");
+  });
+
+  it("does not flag a non-standard (monster) race/appearance pairing", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 24 },
+      Appearance_Type: { type: "word", value: 350 },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("appearance_race_mismatch");
+  });
+
+  it("flags an empty ClassList", async () => {
     const obj = makeCreature("nw_c2_default", { ClassList: { type: "list", value: [] } });
     const report = new Report("t", "utc");
-    verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("no_classes");
   });
 
+  it("flags a ranged weapon with no matching ammo equipped", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).toContain("ranged_weapon_no_ammo");
+  });
+
+  it("does not flag a ranged weapon with matching, reasonably-stacked ammo equipped", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 2048,
+            TemplateResRef: { type: "resref", value: "nw_waegar001" },
+            BaseItem: { type: "int", value: 20 },
+            StackSize: { type: "word", value: 12 },
+          },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("ranged_weapon_no_ammo");
+    expect(report.warnings.map((w) => w.code)).not.toContain("ammo_stack_size_unreasonable");
+  });
+
+  it("flags equipped ammo stacked far outside the expected range", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 2048,
+            TemplateResRef: { type: "resref", value: "nw_waegar001" },
+            BaseItem: { type: "int", value: 20 },
+            StackSize: { type: "word", value: 99 },
+          },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("ammo_stack_size_unreasonable");
+  });
+
+  it("checks the RightHand stack itself for a self-ammo thrown weapon (throwing axe)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_axe" },
+            BaseItem: { type: "int", value: 63 },
+            StackSize: { type: "word", value: 50 },
+          },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[63, { RangedWeapon: "63", AmmunitionType: "6" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("ranged_weapon_no_ammo");
+    expect(report.warnings.map((w) => w.code)).toContain("ammo_stack_size_unreasonable");
+  });
+
+  it("flags a creature with class levels and an empty FeatList", async () => {
+    const obj = makeCreature("nw_c2_default"); // default ClassList: Fighter level 3, no FeatList
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).toContain("empty_featlist");
+  });
+
+  it("does not flag a creature with a non-empty FeatList", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("empty_featlist");
+  });
+
+  it("flags a RightHand weapon the creature has no proficiency feat for", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_axe" }, BaseItem: { type: "int", value: 2 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["ReqFeat0"], [[2, { ReqFeat0: "45" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).toContain("weapon_proficiency_mismatch");
+  });
+
+  it("does not flag a RightHand weapon matching one of the creature's proficiency feats", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_axe" }, BaseItem: { type: "int", value: 2 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["ReqFeat0"], [[2, { ReqFeat0: "45" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("weapon_proficiency_mismatch");
+  });
+
+  // AC Bonus item property (PropertyName=1, ITEM_PROPERTY_AC_BONUS) with
+  // CostValue=4 is Medium armor (tier 4-5) per armorTierFeat() — the literal
+  // Corin Vale bug: a Rogue with only Light Armor Proficiency (feat 3) from
+  // its automatic class feats, equipped with Medium armor (needs feat 4).
+  function chestArmor(acBonus: number) {
+    return {
+      __struct_id: 2,
+      TemplateResRef: { type: "resref", value: "some_armor" },
+      BaseItem: { type: "int", value: 16 },
+      PropertiesList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            PropertyName: { type: "word", value: 1 },
+            CostValue: { type: "word", value: acBonus },
+          },
+        ],
+      },
+    };
+  }
+
+  it("flags Chest-slot armor whose weight tier has no matching Armor Proficiency feat", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 3 } }] }, // ArmProfLgt only
+      Equip_ItemList: { type: "list", value: [chestArmor(4)] }, // Medium armor — needs ArmProfMed (4)
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).toContain("armor_proficiency_mismatch");
+  });
+
+  it("does not flag Chest-slot armor when the matching weight-tier feat is present", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 4 } }] }, // ArmProfMed
+      Equip_ItemList: { type: "list", value: [chestArmor(4)] }, // Medium armor
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
+  });
+
+  it("does not flag Chest-slot armor with no AC Bonus property at all (unknown tier, degrades to skip)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 2, TemplateResRef: { type: "resref", value: "some_armor" }, BaseItem: { type: "int", value: 16 } }],
+      },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
+  });
+
+  it("flags a caster class at its casting level with no spells in either MemorizedList or SpecAbilityList", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 9 }, ClassLevel: { type: "short", value: 5 } }],
+      },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("caster_no_spells");
+  });
+
+  it("does not flag a caster with a SpecAbilityList spell selection", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 9 }, ClassLevel: { type: "short", value: 5 } }],
+      },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      SpecAbilityList: {
+        type: "list",
+        value: [{ __struct_id: 0, Spell: { type: "word", value: 24 }, SpellCasterLevel: { type: "byte", value: 5 }, SpellFlags: { type: "byte", value: 1 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("caster_no_spells");
+  });
+
+  it("does not flag a caster below its class's MinCastingLevel", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 6 }, ClassLevel: { type: "short", value: 2 } }],
+      },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+    });
+    const index = makeIndex({
+      // Paladin: SpellCaster=1 but doesn't cast until level 4 under 3.5 rules.
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[6, { SpellCaster: "1", MinCastingLevel: "4" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("caster_no_spells");
+  });
+
+  it("flags a ranged weapon with no melee-capable weapon anywhere in equipment or inventory", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["RangedWeapon", "DieToRoll"], [[8, { RangedWeapon: "20", DieToRoll: "6" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("ranged_weapon_no_melee_backup");
+  });
+
+  it("does not flag a ranged weapon when a melee weapon exists in inventory", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+      },
+      ItemList: {
+        type: "list",
+        value: [{ InventoryRes: { type: "resref", value: "some_dagger" }, BaseItem: { type: "int", value: 9 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        [
+          "baseitems",
+          twoDA(
+            ["RangedWeapon", "DieToRoll"],
+            [
+              [8, { RangedWeapon: "20", DieToRoll: "6" }],
+              [9, { DieToRoll: "4" }],
+            ],
+          ),
+        ],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ranged_weapon_no_melee_backup");
+  });
+
   describe("henchman rules", () => {
-    it("flags a companion wired with the standard AI instead of the associate AI", () => {
+    it("flags a companion wired with the standard AI instead of the associate AI", async () => {
       const report = new Report("t", "utc");
-      verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"), { henchman: true });
+      await verifyCreature(report, makeIndex(), makeCreature("nw_c2_default"), { henchman: true });
       const codes = report.errors.map((e) => e.code);
       expect(codes).toContain("henchman_no_command_handler");
       expect(codes).toContain("henchman_no_follow_ai");
     });
 
-    it("flags a Commoner-class companion", () => {
+    it("flags a Commoner-class companion", async () => {
       const obj = makeCreature("x0_ch_hen_", {
         ClassList: {
           type: "list",
@@ -183,29 +508,61 @@ describe("verifyCreature", () => {
         resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
       });
       const report = new Report("t", "utc");
-      verifyCreature(report, index, obj, { henchman: true });
+      await verifyCreature(report, index, obj, { henchman: true });
       expect(report.errors.map((e) => e.code)).toContain("henchman_commoner_class");
     });
 
-    it("flags a companion with no conversation", () => {
+    it("flags a companion with no conversation", async () => {
       const report = new Report("t", "utc");
-      verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
+      await verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
       expect(report.errors.map((e) => e.code)).toContain("henchman_no_dialog");
     });
 
-    it("warns when HENCH_LEVEL and voice are absent", () => {
+    it("warns when HENCH_LEVEL and voice are absent", async () => {
       const report = new Report("t", "utc");
-      verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
+      await verifyCreature(report, makeIndex(), makeCreature("x0_ch_hen_"), { henchman: true });
       const codes = report.warnings.map((w) => w.code);
       expect(codes).toContain("henchman_no_level_var");
       expect(codes).toContain("henchman_no_voice");
     });
 
-    it("accepts a fully-wired companion", () => {
+    it("warns on StartingPackage 0 for a non-Barbarian companion", async () => {
+      // makeCreature defaults to ClassList class 4 (Fighter) with no StartingPackage set,
+      // so it inherits the GFF default of 0 — Barbarian's package, not Fighter's.
+      const obj = makeCreature("x0_ch_hen_", { Conversation: { type: "resref", value: "dlg_x" } });
+      const index = makeIndex({
+        resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
+      });
+      const report = new Report("t", "utc");
+      await verifyCreature(report, index, obj, { henchman: true });
+      expect(report.warnings.map((w) => w.code)).toContain("henchman_no_package");
+    });
+
+    it("does not warn on StartingPackage 0 for an actual Barbarian companion", async () => {
+      const obj = makeCreature("x0_ch_hen_", {
+        Conversation: { type: "resref", value: "dlg_x" },
+        ClassList: {
+          type: "list",
+          value: [{ __struct_id: 2, Class: { type: "int", value: 0 }, ClassLevel: { type: "short", value: 3 } }],
+        },
+      });
+      const index = makeIndex({
+        resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
+      });
+      const report = new Report("t", "utc");
+      await verifyCreature(report, index, obj, { henchman: true });
+      expect(report.warnings.map((w) => w.code)).not.toContain("henchman_no_package");
+    });
+
+    it("accepts a fully-wired companion", async () => {
       const obj = makeCreature("x0_ch_hen_", {
         Conversation: { type: "resref", value: "dlg_x" },
         SoundSetFile: { type: "word", value: 422 },
         Gender: { type: "byte", value: 1 },
+        StartingPackage: { type: "byte", value: 4 },
+        // A "fully correct" companion has a baked FeatList — an empty one is
+        // now itself a defect (empty_featlist).
+        FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
         VarTable: {
           type: "list",
           value: [
@@ -223,7 +580,7 @@ describe("verifyCreature", () => {
         twodaTables: new Map([["soundset", twoDA(["RESREF", "GENDER"], [[422, { RESREF: "healer", GENDER: "1" }]])]]),
       });
       const report = new Report("t", "utc");
-      verifyCreature(report, index, obj, { henchman: true });
+      await verifyCreature(report, index, obj, { henchman: true });
       expect(report.errors).toHaveLength(0);
       expect(report.warnings).toHaveLength(0);
     });
@@ -415,6 +772,68 @@ describe("verifyTrigger", () => {
     const report = new Report("t", "utt");
     verifyTrigger(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("zero_area_geometry");
+  });
+});
+
+// ─── Doors ────────────────────────────────────────────────────────────────
+
+describe("verifyDoor", () => {
+  function makeLockedDoor(extra: Record<string, unknown> = {}): GffObj {
+    return {
+      Tag: { type: "cexostring", value: "gate01" },
+      Lockable: { type: "byte", value: 1 },
+      OpenLockDC: { type: "byte", value: 25 },
+      LinkedToFlags: { type: "byte", value: 0 },
+      ...extra,
+    } as unknown as GffObj;
+  }
+
+  it("flags a locked door with no transition and no waypoint in the area", () => {
+    const index = makeIndex({
+      parsedGff: new Map([["darea.git", { WaypointList: { type: "list", value: [] } } as unknown as GffObj]]),
+    });
+    const report = new Report("d", "utd");
+    verifyDoor(report, index, makeLockedDoor(), { areaResref: "darea" });
+    expect(report.warnings.map((w) => w.code)).toContain("door_leads_nowhere");
+  });
+
+  it("does not flag a locked door already wired as a transition", () => {
+    const index = makeIndex({
+      parsedGff: new Map([["darea.git", { WaypointList: { type: "list", value: [] } } as unknown as GffObj]]),
+    });
+    const report = new Report("d", "utd");
+    verifyDoor(report, index, makeLockedDoor({ LinkedToFlags: { type: "byte", value: 2 } }), {
+      areaResref: "darea",
+    });
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
+  });
+
+  it("does not flag a locked door when the area has a waypoint", () => {
+    const waypoint = { __struct_id: 5, Tag: { type: "cexostring", value: "wp_behind_gate" } };
+    const index = makeIndex({
+      parsedGff: new Map([
+        ["darea.git", { WaypointList: { type: "list", value: [waypoint] } } as unknown as GffObj],
+      ]),
+    });
+    const report = new Report("d", "utd");
+    verifyDoor(report, index, makeLockedDoor(), { areaResref: "darea" });
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
+  });
+
+  it("skips the check entirely for a standalone blueprint (no areaResref)", () => {
+    const report = new Report("d", "utd");
+    verifyDoor(report, makeIndex(), makeLockedDoor());
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
+  });
+
+  it("does not flag a non-lockable door", () => {
+    const index = makeIndex({
+      parsedGff: new Map([["darea.git", { WaypointList: { type: "list", value: [] } } as unknown as GffObj]]),
+    });
+    const report = new Report("d", "utd");
+    const obj = { Tag: { type: "cexostring", value: "plaindoor" } } as unknown as GffObj;
+    verifyDoor(report, index, obj, { areaResref: "darea" });
+    expect(report.warnings.map((w) => w.code)).not.toContain("door_leads_nowhere");
   });
 });
 

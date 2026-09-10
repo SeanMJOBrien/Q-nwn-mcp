@@ -1,0 +1,6858 @@
+{
+  "tic01": [
+    {
+      "template": "bench001",
+      "total": 113,
+      "top_terrains": [
+        [
+          "stone",
+          76
+        ],
+        [
+          "wall",
+          18
+        ],
+        [
+          "rich",
+          15
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_pileskulls",
+      "total": 86,
+      "top_terrains": [
+        [
+          "wall",
+          58
+        ],
+        [
+          "rich",
+          13
+        ],
+        [
+          "jail",
+          8
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_bones",
+      "total": 78,
+      "top_terrains": [
+        [
+          "wall",
+          62
+        ],
+        [
+          "jail",
+          11
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.79
+    },
+    {
+      "template": "treas_barrel",
+      "total": 75,
+      "top_terrains": [
+        [
+          "wall",
+          68
+        ],
+        [
+          "storage",
+          4
+        ],
+        [
+          "jail",
+          3
+        ]
+      ],
+      "dominant_share": 0.91
+    },
+    {
+      "template": "chair001",
+      "total": 74,
+      "top_terrains": [
+        [
+          "wall",
+          42
+        ],
+        [
+          "stone",
+          16
+        ],
+        [
+          "rich",
+          14
+        ]
+      ],
+      "dominant_share": 0.57
+    },
+    {
+      "template": "plc_table",
+      "total": 68,
+      "top_terrains": [
+        [
+          "wall",
+          30
+        ],
+        [
+          "rich",
+          20
+        ],
+        [
+          "stone",
+          18
+        ]
+      ],
+      "dominant_share": 0.44
+    },
+    {
+      "template": "plc_statue1",
+      "total": 65,
+      "top_terrains": [
+        [
+          "wall",
+          38
+        ],
+        [
+          "stone",
+          23
+        ],
+        [
+          "rich",
+          4
+        ]
+      ],
+      "dominant_share": 0.58
+    },
+    {
+      "template": "treas_smallchest",
+      "total": 62,
+      "top_terrains": [
+        [
+          "wall",
+          49
+        ],
+        [
+          "stone",
+          5
+        ],
+        [
+          "rich",
+          5
+        ]
+      ],
+      "dominant_share": 0.79
+    },
+    {
+      "template": "plc_rubble",
+      "total": 61,
+      "top_terrains": [
+        [
+          "wall",
+          52
+        ],
+        [
+          "stone",
+          9
+        ]
+      ],
+      "dominant_share": 0.85
+    },
+    {
+      "template": "treas_chest",
+      "total": 57,
+      "top_terrains": [
+        [
+          "wall",
+          47
+        ],
+        [
+          "stone",
+          5
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.82
+    },
+    {
+      "template": "x0_stonepatch",
+      "total": 53,
+      "top_terrains": [
+        [
+          "wall",
+          42
+        ],
+        [
+          "stone",
+          11
+        ]
+      ],
+      "dominant_share": 0.79
+    },
+    {
+      "template": "treas_box",
+      "total": 50,
+      "top_terrains": [
+        [
+          "wall",
+          42
+        ],
+        [
+          "storage",
+          4
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.84
+    },
+    {
+      "template": "plc_bookshelf",
+      "total": 49,
+      "top_terrains": [
+        [
+          "wall",
+          42
+        ],
+        [
+          "stone",
+          5
+        ],
+        [
+          "library",
+          2
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_candelabra",
+      "total": 48,
+      "top_terrains": [
+        [
+          "wall",
+          25
+        ],
+        [
+          "stone",
+          16
+        ],
+        [
+          "library",
+          5
+        ]
+      ],
+      "dominant_share": 0.52
+    },
+    {
+      "template": "plc_pottedplant",
+      "total": 48,
+      "top_terrains": [
+        [
+          "wall",
+          33
+        ],
+        [
+          "stone",
+          11
+        ],
+        [
+          "rich",
+          4
+        ]
+      ],
+      "dominant_share": 0.69
+    },
+    {
+      "template": "plc_urn",
+      "total": 47,
+      "top_terrains": [
+        [
+          "wall",
+          34
+        ],
+        [
+          "stone",
+          5
+        ],
+        [
+          "storage",
+          3
+        ]
+      ],
+      "dominant_share": 0.72
+    },
+    {
+      "template": "treas_footlocker",
+      "total": 45,
+      "top_terrains": [
+        [
+          "wall",
+          31
+        ],
+        [
+          "stone",
+          7
+        ],
+        [
+          "jail",
+          5
+        ]
+      ],
+      "dominant_share": 0.69
+    },
+    {
+      "template": "plc_altrneutral",
+      "total": 44,
+      "top_terrains": [
+        [
+          "jail",
+          12
+        ],
+        [
+          "rich",
+          8
+        ],
+        [
+          "library",
+          8
+        ]
+      ],
+      "dominant_share": 0.27
+    },
+    {
+      "template": "plc_bookpiles",
+      "total": 43,
+      "top_terrains": [
+        [
+          "wall",
+          31
+        ],
+        [
+          "stone",
+          6
+        ],
+        [
+          "library",
+          4
+        ]
+      ],
+      "dominant_share": 0.72
+    },
+    {
+      "template": "plc_weathmark",
+      "total": 43,
+      "top_terrains": [
+        [
+          "wall",
+          32
+        ],
+        [
+          "jail",
+          6
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.74
+    },
+    {
+      "template": "cat_generalscrol",
+      "total": 43,
+      "top_terrains": [
+        [
+          "wall",
+          43
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_bunkbed",
+      "total": 42,
+      "top_terrains": [
+        [
+          "wall",
+          25
+        ],
+        [
+          "stone",
+          17
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "plc_fern",
+      "total": 37,
+      "top_terrains": [
+        [
+          "stone",
+          17
+        ],
+        [
+          "rich",
+          17
+        ],
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 0.46
+    },
+    {
+      "template": "x0_bookcase2",
+      "total": 36,
+      "top_terrains": [
+        [
+          "wall",
+          29
+        ],
+        [
+          "stone",
+          4
+        ],
+        [
+          "library",
+          3
+        ]
+      ],
+      "dominant_share": 0.81
+    },
+    {
+      "template": "nw_pl_rubble001",
+      "total": 34,
+      "top_terrains": [
+        [
+          "wall",
+          27
+        ],
+        [
+          "stone",
+          7
+        ]
+      ],
+      "dominant_share": 0.79
+    },
+    {
+      "template": "plc_garbage",
+      "total": 34,
+      "top_terrains": [
+        [
+          "wall",
+          31
+        ],
+        [
+          "stone",
+          2
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.91
+    },
+    {
+      "template": "plc_brazier",
+      "total": 31,
+      "top_terrains": [
+        [
+          "wall",
+          15
+        ],
+        [
+          "stone",
+          8
+        ],
+        [
+          "rich",
+          4
+        ]
+      ],
+      "dominant_share": 0.48
+    },
+    {
+      "template": "treas_strongbox",
+      "total": 31,
+      "top_terrains": [
+        [
+          "wall",
+          27
+        ],
+        [
+          "jail",
+          3
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.87
+    },
+    {
+      "template": "plc_chair",
+      "total": 29,
+      "top_terrains": [
+        [
+          "wall",
+          24
+        ],
+        [
+          "stone",
+          4
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.83
+    },
+    {
+      "template": "plc_waterdrip",
+      "total": 29,
+      "top_terrains": [
+        [
+          "wall",
+          18
+        ],
+        [
+          "storage",
+          8
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "plc_barrel",
+      "total": 29,
+      "top_terrains": [
+        [
+          "wall",
+          20
+        ],
+        [
+          "stone",
+          8
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.69
+    },
+    {
+      "template": "plc_desk",
+      "total": 29,
+      "top_terrains": [
+        [
+          "wall",
+          14
+        ],
+        [
+          "rich",
+          10
+        ],
+        [
+          "stone",
+          3
+        ]
+      ],
+      "dominant_share": 0.48
+    },
+    {
+      "template": "plc_fountain",
+      "total": 28,
+      "top_terrains": [
+        [
+          "wall",
+          19
+        ],
+        [
+          "stone",
+          6
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.68
+    },
+    {
+      "template": "plc_pedestal",
+      "total": 28,
+      "top_terrains": [
+        [
+          "wall",
+          14
+        ],
+        [
+          "stone",
+          13
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_bloodstain",
+      "total": 28,
+      "top_terrains": [
+        [
+          "wall",
+          12
+        ],
+        [
+          "stone",
+          11
+        ],
+        [
+          "jail",
+          4
+        ]
+      ],
+      "dominant_share": 0.43
+    },
+    {
+      "template": "plc_keg",
+      "total": 28,
+      "top_terrains": [
+        [
+          "wall",
+          18
+        ],
+        [
+          "stone",
+          8
+        ],
+        [
+          "rich",
+          2
+        ]
+      ],
+      "dominant_share": 0.64
+    },
+    {
+      "template": "x0_cityrubble2",
+      "total": 28,
+      "top_terrains": [
+        [
+          "wall",
+          25
+        ],
+        [
+          "stone",
+          3
+        ]
+      ],
+      "dominant_share": 0.89
+    },
+    {
+      "template": "x2_plc_book2",
+      "total": 26,
+      "top_terrains": [
+        [
+          "wall",
+          20
+        ],
+        [
+          "library",
+          2
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.77
+    },
+    {
+      "template": "plc_cot",
+      "total": 25,
+      "top_terrains": [
+        [
+          "wall",
+          20
+        ],
+        [
+          "stone",
+          5
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x0_bread",
+      "total": 25,
+      "top_terrains": [
+        [
+          "wall",
+          25
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_bones_low",
+      "total": 25,
+      "top_terrains": [
+        [
+          "stone",
+          12
+        ],
+        [
+          "wall",
+          11
+        ],
+        [
+          "storage",
+          2
+        ]
+      ],
+      "dominant_share": 0.48
+    },
+    {
+      "template": "x0_cityrubble1",
+      "total": 24,
+      "top_terrains": [
+        [
+          "wall",
+          19
+        ],
+        [
+          "stone",
+          5
+        ]
+      ],
+      "dominant_share": 0.79
+    },
+    {
+      "template": "barrel001",
+      "total": 24,
+      "top_terrains": [
+        [
+          "wall",
+          19
+        ],
+        [
+          "jail",
+          5
+        ]
+      ],
+      "dominant_share": 0.79
+    },
+    {
+      "template": "treas_crate",
+      "total": 22,
+      "top_terrains": [
+        [
+          "wall",
+          11
+        ],
+        [
+          "storage",
+          5
+        ],
+        [
+          "jail",
+          3
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_bench",
+      "total": 21,
+      "top_terrains": [
+        [
+          "wall",
+          20
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.95
+    },
+    {
+      "template": "plc_statue3",
+      "total": 21,
+      "top_terrains": [
+        [
+          "wall",
+          19
+        ],
+        [
+          "library",
+          1
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.9
+    },
+    {
+      "template": "plc_couch",
+      "total": 20,
+      "top_terrains": [
+        [
+          "wall",
+          9
+        ],
+        [
+          "stone",
+          8
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.45
+    },
+    {
+      "template": "tm_pl_sleepmh2",
+      "total": 20,
+      "top_terrains": [
+        [
+          "stone",
+          12
+        ],
+        [
+          "wall",
+          8
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "plc_chest3",
+      "total": 20,
+      "top_terrains": [
+        [
+          "stone",
+          11
+        ],
+        [
+          "wall",
+          9
+        ]
+      ],
+      "dominant_share": 0.55
+    },
+    {
+      "template": "x0_wizdesk",
+      "total": 19,
+      "top_terrains": [
+        [
+          "wall",
+          11
+        ],
+        [
+          "stone",
+          7
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.58
+    },
+    {
+      "template": "plc_sacks",
+      "total": 19,
+      "top_terrains": [
+        [
+          "wall",
+          14
+        ],
+        [
+          "stone",
+          3
+        ],
+        [
+          "rich",
+          2
+        ]
+      ],
+      "dominant_share": 0.74
+    },
+    {
+      "template": "plc_bltofcloth",
+      "total": 19,
+      "top_terrains": [
+        [
+          "wall",
+          13
+        ],
+        [
+          "rich",
+          4
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.68
+    },
+    {
+      "template": "2q4_burnedbooks",
+      "total": 19,
+      "top_terrains": [
+        [
+          "library",
+          11
+        ],
+        [
+          "wall",
+          8
+        ]
+      ],
+      "dominant_share": 0.58
+    },
+    {
+      "template": "x0_golempartscla",
+      "total": 19,
+      "top_terrains": [
+        [
+          "wall",
+          10
+        ],
+        [
+          "jail",
+          9
+        ]
+      ],
+      "dominant_share": 0.53
+    },
+    {
+      "template": "plc_tree",
+      "total": 18,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "rich",
+          7
+        ],
+        [
+          "stone",
+          3
+        ]
+      ],
+      "dominant_share": 0.44
+    },
+    {
+      "template": "plc_woodpile",
+      "total": 18,
+      "top_terrains": [
+        [
+          "stone",
+          9
+        ],
+        [
+          "wall",
+          9
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "m1q2_shackles",
+      "total": 18,
+      "top_terrains": [
+        [
+          "wall",
+          18
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_box1",
+      "total": 17,
+      "top_terrains": [
+        [
+          "wall",
+          13
+        ],
+        [
+          "rich",
+          2
+        ],
+        [
+          "storage",
+          2
+        ]
+      ],
+      "dominant_share": 0.76
+    },
+    {
+      "template": "x2_medium_crate4",
+      "total": 17,
+      "top_terrains": [
+        [
+          "wall",
+          17
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "invisibleseatobj",
+      "total": 16,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "rich",
+          8
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_anvil",
+      "total": 16,
+      "top_terrains": [
+        [
+          "wall",
+          9
+        ],
+        [
+          "stone",
+          6
+        ],
+        [
+          "storage",
+          1
+        ]
+      ],
+      "dominant_share": 0.56
+    },
+    {
+      "template": "plc_boulder",
+      "total": 15,
+      "top_terrains": [
+        [
+          "rich",
+          10
+        ],
+        [
+          "wall",
+          5
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "seat",
+      "total": 15,
+      "top_terrains": [
+        [
+          "wall",
+          12
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "plc_flamemedium",
+      "total": 15,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "stone",
+          5
+        ],
+        [
+          "jail",
+          3
+        ]
+      ],
+      "dominant_share": 0.47
+    },
+    {
+      "template": "bookpiles001",
+      "total": 15,
+      "top_terrains": [
+        [
+          "library",
+          13
+        ],
+        [
+          "wall",
+          2
+        ]
+      ],
+      "dominant_share": 0.87
+    },
+    {
+      "template": "plc_flrdesigns1",
+      "total": 14,
+      "top_terrains": [
+        [
+          "wall",
+          9
+        ],
+        [
+          "library",
+          2
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.64
+    },
+    {
+      "template": "plc_statue2",
+      "total": 14,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "stone",
+          5
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.43
+    },
+    {
+      "template": "treas_cratelg",
+      "total": 14,
+      "top_terrains": [
+        [
+          "wall",
+          10
+        ],
+        [
+          "jail",
+          3
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "tm_pl_carddown1b",
+      "total": 14,
+      "top_terrains": [
+        [
+          "wall",
+          14
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "cat_sitchair",
+      "total": 14,
+      "top_terrains": [
+        [
+          "wall",
+          14
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "cat_generaltome",
+      "total": 14,
+      "top_terrains": [
+        [
+          "wall",
+          14
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_roundrugorien",
+      "total": 13,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "rich",
+          5
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "x0_tres_goldmed",
+      "total": 13,
+      "top_terrains": [
+        [
+          "wall",
+          11
+        ],
+        [
+          "jail",
+          1
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.85
+    },
+    {
+      "template": "x0_largebench",
+      "total": 13,
+      "top_terrains": [
+        [
+          "wall",
+          9
+        ],
+        [
+          "stone",
+          4
+        ]
+      ],
+      "dominant_share": 0.69
+    },
+    {
+      "template": "x2_easy_barrel",
+      "total": 13,
+      "top_terrains": [
+        [
+          "wall",
+          13
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "nw_plc_dwarfbnch",
+      "total": 12,
+      "top_terrains": [
+        [
+          "stone",
+          12
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_weaponrack",
+      "total": 12,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "stone",
+          4
+        ],
+        [
+          "jail",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_freetorch",
+      "total": 12,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "stone",
+          4
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plx_ppchest",
+      "total": 12,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ],
+        [
+          "rich",
+          4
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.33
+    },
+    {
+      "template": "x3_plc_basket",
+      "total": 12,
+      "top_terrains": [
+        [
+          "wall",
+          12
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_bed",
+      "total": 12,
+      "top_terrains": [
+        [
+          "wall",
+          12
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_crystice01",
+      "total": 12,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "stone",
+          4
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x0_bigvase",
+      "total": 11,
+      "top_terrains": [
+        [
+          "wall",
+          11
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "nw_plc_seatable",
+      "total": 11,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "rich",
+          3
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.64
+    },
+    {
+      "template": "x0_tomepile",
+      "total": 11,
+      "top_terrains": [
+        [
+          "wall",
+          9
+        ],
+        [
+          "library",
+          1
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.82
+    },
+    {
+      "template": "x2_plc_web",
+      "total": 11,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "rich",
+          4
+        ]
+      ],
+      "dominant_share": 0.64
+    },
+    {
+      "template": "x0_cushions",
+      "total": 11,
+      "top_terrains": [
+        [
+          "rich",
+          9
+        ],
+        [
+          "wall",
+          2
+        ]
+      ],
+      "dominant_share": 0.82
+    },
+    {
+      "template": "treas_boxlg",
+      "total": 11,
+      "top_terrains": [
+        [
+          "wall",
+          9
+        ],
+        [
+          "jail",
+          1
+        ],
+        [
+          "storage",
+          1
+        ]
+      ],
+      "dominant_share": 0.82
+    },
+    {
+      "template": "plc_box3",
+      "total": 11,
+      "top_terrains": [
+        [
+          "wall",
+          10
+        ],
+        [
+          "storage",
+          1
+        ]
+      ],
+      "dominant_share": 0.91
+    },
+    {
+      "template": "x0_golempartsiro",
+      "total": 11,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "jail",
+          3
+        ]
+      ],
+      "dominant_share": 0.73
+    },
+    {
+      "template": "plc_throwrug",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "stone",
+          2
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.7
+    },
+    {
+      "template": "plc_chest1",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          10
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_rugoriental",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "stone",
+          2
+        ],
+        [
+          "rich",
+          2
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "x2_plc_psheets",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x2_plc_statue_la",
+      "total": 10,
+      "top_terrains": [
+        [
+          "stone",
+          9
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.9
+    },
+    {
+      "template": "plc_birdcage",
+      "total": 10,
+      "top_terrains": [
+        [
+          "rich",
+          6
+        ],
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "plc_cabinet",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          10
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_throneevil",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "rich",
+          3
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "ir_scroll",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          10
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_ruglarge",
+      "total": 10,
+      "top_terrains": [
+        [
+          "rich",
+          6
+        ],
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "x0_dirtpatch",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "rich",
+          1
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.7
+    },
+    {
+      "template": "plc_forge",
+      "total": 10,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "stone",
+          3
+        ]
+      ],
+      "dominant_share": 0.7
+    },
+    {
+      "template": "plc_altrevil",
+      "total": 9,
+      "top_terrains": [
+        [
+          "stone",
+          6
+        ],
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x0_smalldesk",
+      "total": 9,
+      "top_terrains": [
+        [
+          "rich",
+          6
+        ],
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_alchapprtus",
+      "total": 9,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "rich",
+          1
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.78
+    },
+    {
+      "template": "plc_chstdrwrs",
+      "total": 9,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.89
+    },
+    {
+      "template": "plc_spearcorpse",
+      "total": 9,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "jail",
+          4
+        ]
+      ],
+      "dominant_share": 0.56
+    },
+    {
+      "template": "x0_golempartssto",
+      "total": 9,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "jail",
+          2
+        ]
+      ],
+      "dominant_share": 0.78
+    },
+    {
+      "template": "plc_magicblue",
+      "total": 8,
+      "top_terrains": [
+        [
+          "stone",
+          6
+        ],
+        [
+          "wall",
+          2
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "nw_plc_dwarfchar",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "plc_billboard3",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "x0_vaseflower",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "x0_globe",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "x0_ruinedpillar",
+      "total": 8,
+      "top_terrains": [
+        [
+          "rich",
+          4
+        ],
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x2_plc_mold",
+      "total": 8,
+      "top_terrains": [
+        [
+          "rich",
+          5
+        ],
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "treas_armoire",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.88
+    },
+    {
+      "template": "pla_lever",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "stone",
+          1
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x2_plc_statue_f",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ],
+        [
+          "stone",
+          4
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "corpse002",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "jail",
+          2
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "plc_chest4",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "chair",
+      "total": 8,
+      "top_terrains": [
+        [
+          "rich",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_box4",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "storage",
+          1
+        ]
+      ],
+      "dominant_share": 0.88
+    },
+    {
+      "template": "x0_bookcase03",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.88
+    },
+    {
+      "template": "plc_box2",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "rich",
+          1
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_flrdesigns3",
+      "total": 8,
+      "top_terrains": [
+        [
+          "wall",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_portal",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ],
+        [
+          "stone",
+          1
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.57
+    },
+    {
+      "template": "x0_runepillar",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_flag3",
+      "total": 7,
+      "top_terrains": [
+        [
+          "stone",
+          4
+        ],
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 0.57
+    },
+    {
+      "template": "x0_tres_goldhigh",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_pntingeasel",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_flamesmall",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "stone",
+          2
+        ],
+        [
+          "jail",
+          2
+        ]
+      ],
+      "dominant_share": 0.43
+    },
+    {
+      "template": "nw_plc_candle1na",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_thronegood",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "plc_stocks",
+      "total": 7,
+      "top_terrains": [
+        [
+          "storage",
+          4
+        ],
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 0.57
+    },
+    {
+      "template": "plc_stool",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_woodoven",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "treas_desk",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_armoire",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "lootbag003",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_treasuremed",
+      "total": 7,
+      "top_terrains": [
+        [
+          "wall",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_runestone2",
+      "total": 6,
+      "top_terrains": [
+        [
+          "stone",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_bigchair",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_pillar3",
+      "total": 6,
+      "top_terrains": [
+        [
+          "stone",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_cmbtdummy",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_treeautumn",
+      "total": 6,
+      "top_terrains": [
+        [
+          "rich",
+          4
+        ],
+        [
+          "stone",
+          1
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_altrgood",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "library",
+          2
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_tome",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "library",
+          2
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x2_plc_psheet",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_bedrolls",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_cball",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "stone",
+          2
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.33
+    },
+    {
+      "template": "plx_ppfootlocker",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "rich",
+          2
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x2_easy_crate3",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_chair2",
+      "total": 6,
+      "top_terrains": [
+        [
+          "stone",
+          5
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.83
+    },
+    {
+      "template": "x0_fallentimber",
+      "total": 6,
+      "top_terrains": [
+        [
+          "rich",
+          3
+        ],
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_stonecircle",
+      "total": 6,
+      "top_terrains": [
+        [
+          "stone",
+          3
+        ],
+        [
+          "wall",
+          2
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_hangshield",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ],
+        [
+          "stone",
+          2
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "box002",
+      "total": 6,
+      "top_terrains": [
+        [
+          "wall",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_flamelarge",
+      "total": 5,
+      "top_terrains": [
+        [
+          "storage",
+          4
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x0_desertboulder",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_billboard1",
+      "total": 5,
+      "top_terrains": [
+        [
+          "stone",
+          2
+        ],
+        [
+          "wall",
+          1
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.4
+    },
+    {
+      "template": "x0_librarydesk",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_ballista",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "plc_solwhite",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "rich",
+          1
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "x0_maps",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_mirror",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_stube",
+      "total": 5,
+      "top_terrains": [
+        [
+          "rich",
+          3
+        ],
+        [
+          "wall",
+          2
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "plc_magicred",
+      "total": 5,
+      "top_terrains": [
+        [
+          "stone",
+          2
+        ],
+        [
+          "wall",
+          2
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.4
+    },
+    {
+      "template": "plc_corpse004",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_fplaguecr001",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_lootbag2",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "corpse005",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "library",
+          1
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "plc_spdcocoon",
+      "total": 5,
+      "top_terrains": [
+        [
+          "stone",
+          3
+        ],
+        [
+          "wall",
+          2
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "x2_plc_statue_h",
+      "total": 5,
+      "top_terrains": [
+        [
+          "stone",
+          4
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "plc_sarco2",
+      "total": 5,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "plc_lecturn",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "nw_pl_lostitems",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "rich",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_flrshackles",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "storage",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_archtarget",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "thronegood",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "rich",
+          1
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_painting",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_painting2",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_birdbath",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_flag4",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x2_plc_drowaltar",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "library",
+          1
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_footstool",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x0_thronewood",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x0_ottoman",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x2_plc_drowbar",
+      "total": 4,
+      "top_terrains": [
+        [
+          "rich",
+          3
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x2_plc_chairdrow",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "treas_cabinet",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_drawer",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_lootbag003",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_corpse005",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_corpse003",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_brokenchair1",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_brokenchair2",
+      "total": 4,
+      "top_terrains": [
+        [
+          "stone",
+          2
+        ],
+        [
+          "wall",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_haybundle",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_plaguepyre",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "jail",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "couch001",
+      "total": 4,
+      "top_terrains": [
+        [
+          "stone",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_invisobj",
+      "total": 4,
+      "top_terrains": [
+        [
+          "stone",
+          3
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "corpse004",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ],
+        [
+          "jail",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x0_fenceruined",
+      "total": 4,
+      "top_terrains": [
+        [
+          "stone",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_treasure_h",
+      "total": 4,
+      "top_terrains": [
+        [
+          "stone",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_magicpurple",
+      "total": 4,
+      "top_terrains": [
+        [
+          "wall",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_statue_fl",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_box004",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_magicyellow",
+      "total": 3,
+      "top_terrains": [
+        [
+          "stone",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_gong",
+      "total": 3,
+      "top_terrains": [
+        [
+          "rich",
+          2
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "rtg_veasy_spwn_c",
+      "total": 3,
+      "top_terrains": [
+        [
+          "stone",
+          2
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "nw_plc_dwarftabl",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "nw_plc_seachair",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_tablernd",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_dbookc",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_mfdevice1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "library",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x2_plc_chest_drw",
+      "total": 3,
+      "top_terrains": [
+        [
+          "rich",
+          2
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x0_bearskinrug1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x2_plc_bcrate2",
+      "total": 3,
+      "top_terrains": [
+        [
+          "library",
+          1
+        ],
+        [
+          "rich",
+          1
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.33
+    },
+    {
+      "template": "nw_pl_skeleton",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_torture1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "storage",
+          2
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_cabinet002",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_cabinet001",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_rack",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "nw_plc_seashell3",
+      "total": 3,
+      "top_terrains": [
+        [
+          "rich",
+          2
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "nw_plc_seashell1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "rich",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plx_ppsmallchest",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_solred",
+      "total": 3,
+      "top_terrains": [
+        [
+          "library",
+          1
+        ],
+        [
+          "wall",
+          1
+        ],
+        [
+          "stone",
+          1
+        ]
+      ],
+      "dominant_share": 0.33
+    },
+    {
+      "template": "x2_easy_crate1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_treasuresml",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "rich",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x0_brokenchair4",
+      "total": 3,
+      "top_terrains": [
+        [
+          "stone",
+          2
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_watertrough",
+      "total": 3,
+      "top_terrains": [
+        [
+          "stone",
+          2
+        ],
+        [
+          "wall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_lootbag4",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_chest2",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_ballistabrk",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_grasstuft",
+      "total": 3,
+      "top_terrains": [
+        [
+          "stone",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_sarco1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_bones_h",
+      "total": 3,
+      "top_terrains": [
+        [
+          "wall",
+          2
+        ],
+        [
+          "storage",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    }
+  ],
+  "ttf01": [
+    {
+      "template": "x3_plc_rubble2",
+      "total": 32,
+      "top_terrains": [
+        [
+          "forest",
+          28
+        ],
+        [
+          "pit",
+          2
+        ],
+        [
+          "cliff",
+          2
+        ]
+      ],
+      "dominant_share": 0.88
+    },
+    {
+      "template": "plc_tree",
+      "total": 29,
+      "top_terrains": [
+        [
+          "forest",
+          29
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_impledhead1",
+      "total": 17,
+      "top_terrains": [
+        [
+          "forest",
+          17
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_rubble3",
+      "total": 16,
+      "top_terrains": [
+        [
+          "forest",
+          13
+        ],
+        [
+          "pit",
+          2
+        ],
+        [
+          "cliff",
+          1
+        ]
+      ],
+      "dominant_share": 0.81
+    },
+    {
+      "template": "plc_magicwhite",
+      "total": 15,
+      "top_terrains": [
+        [
+          "forest",
+          6
+        ],
+        [
+          "pit",
+          6
+        ],
+        [
+          "cliff",
+          3
+        ]
+      ],
+      "dominant_share": 0.4
+    },
+    {
+      "template": "treas_smallchest",
+      "total": 15,
+      "top_terrains": [
+        [
+          "forest",
+          15
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_rubble1",
+      "total": 14,
+      "top_terrains": [
+        [
+          "forest",
+          12
+        ],
+        [
+          "cliff",
+          2
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_haybundle",
+      "total": 12,
+      "top_terrains": [
+        [
+          "forest",
+          12
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_bloodstain",
+      "total": 11,
+      "top_terrains": [
+        [
+          "forest",
+          11
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_box",
+      "total": 10,
+      "top_terrains": [
+        [
+          "forest",
+          9
+        ],
+        [
+          "pit",
+          1
+        ]
+      ],
+      "dominant_share": 0.9
+    },
+    {
+      "template": "treas_barrel",
+      "total": 8,
+      "top_terrains": [
+        [
+          "forest",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_barrel",
+      "total": 7,
+      "top_terrains": [
+        [
+          "forest",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_fullwagon",
+      "total": 7,
+      "top_terrains": [
+        [
+          "forest",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_weathmark",
+      "total": 6,
+      "top_terrains": [
+        [
+          "forest",
+          5
+        ],
+        [
+          "cliff",
+          1
+        ]
+      ],
+      "dominant_share": 0.83
+    },
+    {
+      "template": "plc_bedrolls",
+      "total": 6,
+      "top_terrains": [
+        [
+          "forest",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_woodpile",
+      "total": 5,
+      "top_terrains": [
+        [
+          "forest",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "oaktree001",
+      "total": 5,
+      "top_terrains": [
+        [
+          "forest",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_impledcrpse1",
+      "total": 5,
+      "top_terrains": [
+        [
+          "forest",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_campfr",
+      "total": 5,
+      "top_terrains": [
+        [
+          "forest",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_strongbox",
+      "total": 5,
+      "top_terrains": [
+        [
+          "forest",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_sacks",
+      "total": 4,
+      "top_terrains": [
+        [
+          "forest",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_bones",
+      "total": 4,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ],
+        [
+          "cliff",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_altrgood",
+      "total": 4,
+      "top_terrains": [
+        [
+          "forest",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_magicgreen",
+      "total": 4,
+      "top_terrains": [
+        [
+          "forest",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_emptywagon",
+      "total": 3,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "ven_acastleen001",
+      "total": 3,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "oaktree003",
+      "total": 3,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_rubble",
+      "total": 3,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_wagonwheel",
+      "total": 3,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_keg",
+      "total": 3,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_campfrwspit",
+      "total": 3,
+      "top_terrains": [
+        [
+          "forest",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    }
+  ],
+  "tno01": [
+    {
+      "template": "plc_pileskulls",
+      "total": 60,
+      "top_terrains": [
+        [
+          "dirt",
+          49
+        ],
+        [
+          "castlewall",
+          11
+        ]
+      ],
+      "dominant_share": 0.82
+    },
+    {
+      "template": "plx_ballista",
+      "total": 51,
+      "top_terrains": [
+        [
+          "grass",
+          19
+        ],
+        [
+          "castlewall",
+          19
+        ],
+        [
+          "dirt",
+          10
+        ]
+      ],
+      "dominant_share": 0.37
+    },
+    {
+      "template": "tm_pl_treeappls1",
+      "total": 39,
+      "top_terrains": [
+        [
+          "dirt",
+          26
+        ],
+        [
+          "castlewall",
+          7
+        ],
+        [
+          "grass",
+          6
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x2_plc_psheets",
+      "total": 38,
+      "top_terrains": [
+        [
+          "dirt",
+          26
+        ],
+        [
+          "grass",
+          7
+        ],
+        [
+          "castlewall",
+          4
+        ]
+      ],
+      "dominant_share": 0.68
+    },
+    {
+      "template": "plc_plaguepyre",
+      "total": 30,
+      "top_terrains": [
+        [
+          "castlewall",
+          20
+        ],
+        [
+          "dirt",
+          10
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "treas_barrel",
+      "total": 29,
+      "top_terrains": [
+        [
+          "castlewall",
+          9
+        ],
+        [
+          "grass",
+          9
+        ],
+        [
+          "dirt",
+          7
+        ]
+      ],
+      "dominant_share": 0.31
+    },
+    {
+      "template": "x3_plc_bush001",
+      "total": 28,
+      "top_terrains": [
+        [
+          "dirt",
+          24
+        ],
+        [
+          "castlewall",
+          3
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_bones",
+      "total": 27,
+      "top_terrains": [
+        [
+          "dirt",
+          15
+        ],
+        [
+          "grass",
+          7
+        ],
+        [
+          "castlewall",
+          5
+        ]
+      ],
+      "dominant_share": 0.56
+    },
+    {
+      "template": "tm_pl_treeappll1",
+      "total": 27,
+      "top_terrains": [
+        [
+          "grass",
+          15
+        ],
+        [
+          "castlewall",
+          9
+        ],
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 0.56
+    },
+    {
+      "template": "x0_boulder",
+      "total": 26,
+      "top_terrains": [
+        [
+          "dirt",
+          20
+        ],
+        [
+          "castlewall",
+          6
+        ]
+      ],
+      "dominant_share": 0.77
+    },
+    {
+      "template": "x2_plc_psheet",
+      "total": 25,
+      "top_terrains": [
+        [
+          "dirt",
+          15
+        ],
+        [
+          "grass",
+          9
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "x3_plc_rubble3",
+      "total": 23,
+      "top_terrains": [
+        [
+          "grass",
+          9
+        ],
+        [
+          "castlewall",
+          8
+        ],
+        [
+          "keep",
+          5
+        ]
+      ],
+      "dominant_share": 0.39
+    },
+    {
+      "template": "treas_box",
+      "total": 22,
+      "top_terrains": [
+        [
+          "dirt",
+          14
+        ],
+        [
+          "castlewall",
+          5
+        ],
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 0.64
+    },
+    {
+      "template": "x2_plc_ppsheets",
+      "total": 21,
+      "top_terrains": [
+        [
+          "dirt",
+          15
+        ],
+        [
+          "castlewall",
+          4
+        ],
+        [
+          "grass",
+          2
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "x3_plc_wweed006",
+      "total": 21,
+      "top_terrains": [
+        [
+          "dirt",
+          20
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.95
+    },
+    {
+      "template": "tm_pl_barlup1",
+      "total": 21,
+      "top_terrains": [
+        [
+          "dirt",
+          14
+        ],
+        [
+          "grass",
+          5
+        ],
+        [
+          "water",
+          2
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_weathmark",
+      "total": 17,
+      "top_terrains": [
+        [
+          "dirt",
+          14
+        ],
+        [
+          "castlewall",
+          2
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.82
+    },
+    {
+      "template": "x3_plc_cheval",
+      "total": 17,
+      "top_terrains": [
+        [
+          "grass",
+          10
+        ],
+        [
+          "castlewall",
+          5
+        ],
+        [
+          "dirt",
+          2
+        ]
+      ],
+      "dominant_share": 0.59
+    },
+    {
+      "template": "tm_pl_dirtpile01",
+      "total": 16,
+      "top_terrains": [
+        [
+          "dirt",
+          15
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.94
+    },
+    {
+      "template": "plc_cmbtdummy",
+      "total": 16,
+      "top_terrains": [
+        [
+          "grass",
+          8
+        ],
+        [
+          "water",
+          5
+        ],
+        [
+          "castlewall",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x3_plc_wweed002",
+      "total": 13,
+      "top_terrains": [
+        [
+          "dirt",
+          12
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.92
+    },
+    {
+      "template": "x3_plc_bush002",
+      "total": 13,
+      "top_terrains": [
+        [
+          "dirt",
+          13
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_barlside1",
+      "total": 13,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "grass",
+          4
+        ],
+        [
+          "water",
+          3
+        ]
+      ],
+      "dominant_share": 0.31
+    },
+    {
+      "template": "x3_plc_list001",
+      "total": 11,
+      "top_terrains": [
+        [
+          "dirt",
+          10
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.91
+    },
+    {
+      "template": "x3_plc_bench004",
+      "total": 11,
+      "top_terrains": [
+        [
+          "dirt",
+          11
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_brlstack1",
+      "total": 11,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ],
+        [
+          "grass",
+          4
+        ],
+        [
+          "water",
+          2
+        ]
+      ],
+      "dominant_share": 0.45
+    },
+    {
+      "template": "treas_smallchest",
+      "total": 10,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "grass",
+          3
+        ],
+        [
+          "cliff",
+          2
+        ]
+      ],
+      "dominant_share": 0.4
+    },
+    {
+      "template": "treas_crate",
+      "total": 10,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ],
+        [
+          "castlewall",
+          3
+        ],
+        [
+          "grass",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_brokenfurnit1",
+      "total": 10,
+      "top_terrains": [
+        [
+          "dirt",
+          9
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.9
+    },
+    {
+      "template": "x3_plc_wweed003",
+      "total": 10,
+      "top_terrains": [
+        [
+          "dirt",
+          10
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_hayb002",
+      "total": 10,
+      "top_terrains": [
+        [
+          "dirt",
+          10
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_fcrpsewagon",
+      "total": 9,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ],
+        [
+          "castlewall",
+          3
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "tm_pl_cityruin1",
+      "total": 9,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ],
+        [
+          "castlewall",
+          3
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.56
+    },
+    {
+      "template": "nw_pl_rubble001",
+      "total": 9,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ],
+        [
+          "grass",
+          2
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "tm_pl_btlbroken",
+      "total": 9,
+      "top_terrains": [
+        [
+          "dirt",
+          9
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_table003",
+      "total": 9,
+      "top_terrains": [
+        [
+          "dirt",
+          9
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_plate",
+      "total": 9,
+      "top_terrains": [
+        [
+          "dirt",
+          9
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_treeapplm1",
+      "total": 9,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ],
+        [
+          "grass",
+          2
+        ],
+        [
+          "keep",
+          1
+        ]
+      ],
+      "dominant_share": 0.56
+    },
+    {
+      "template": "tm_pl_rackfish01",
+      "total": 9,
+      "top_terrains": [
+        [
+          "water",
+          4
+        ],
+        [
+          "dirt",
+          3
+        ],
+        [
+          "grass",
+          2
+        ]
+      ],
+      "dominant_share": 0.44
+    },
+    {
+      "template": "tm_pl_stallmark1",
+      "total": 8,
+      "top_terrains": [
+        [
+          "dirt",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_wweed005",
+      "total": 8,
+      "top_terrains": [
+        [
+          "dirt",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_tree",
+      "total": 8,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ],
+        [
+          "castlewall",
+          3
+        ]
+      ],
+      "dominant_share": 0.62
+    },
+    {
+      "template": "plc_haybundle",
+      "total": 8,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ],
+        [
+          "grass",
+          2
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "tm_pl_benchwdcln",
+      "total": 8,
+      "top_terrains": [
+        [
+          "dirt",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_flgcyric2",
+      "total": 8,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ],
+        [
+          "castlewall",
+          2
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x3_plc_trees015",
+      "total": 8,
+      "top_terrains": [
+        [
+          "grass",
+          7
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.88
+    },
+    {
+      "template": "plc_garbage",
+      "total": 7,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "x3_plc_wweed008",
+      "total": 7,
+      "top_terrains": [
+        [
+          "dirt",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_woodpile",
+      "total": 7,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 0.57
+    },
+    {
+      "template": "x3_plc_trees011",
+      "total": 7,
+      "top_terrains": [
+        [
+          "castlewall",
+          5
+        ],
+        [
+          "grass",
+          1
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "x3_plc_treel016",
+      "total": 7,
+      "top_terrains": [
+        [
+          "castlewall",
+          5
+        ],
+        [
+          "dirt",
+          1
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "x3_plc_treel012",
+      "total": 7,
+      "top_terrains": [
+        [
+          "castlewall",
+          4
+        ],
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 0.57
+    },
+    {
+      "template": "x3_plc_treel003",
+      "total": 7,
+      "top_terrains": [
+        [
+          "castlewall",
+          5
+        ],
+        [
+          "dirt",
+          2
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "x3_plc_balc015",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_wweed004",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_brokenfurnit2",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ],
+        [
+          "castlewall",
+          2
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "tm_pl_dirtpatch2",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_brokenbrl",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "castlewall",
+          1
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_sacks",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "grass",
+          2
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_stones",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_stone11d",
+      "total": 6,
+      "top_terrains": [
+        [
+          "dirt",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_trees005",
+      "total": 6,
+      "top_terrains": [
+        [
+          "castlewall",
+          4
+        ],
+        [
+          "grass",
+          1
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "tm_pl_graspatch3",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_hayb001",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ],
+        [
+          "dirt",
+          2
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x3_plc_bench003",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_trees016",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.83
+    },
+    {
+      "template": "treas_bones_low",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ],
+        [
+          "cliff",
+          2
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "x3_plc_market",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x3_plc_dirt001",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_rubble4",
+      "total": 5,
+      "top_terrains": [
+        [
+          "castlewall",
+          3
+        ],
+        [
+          "dirt",
+          1
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "nw_plc_net",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "castlewall",
+          1
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.4
+    },
+    {
+      "template": "tm_pl_bushgrs01",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_grndcrop01",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x3_plc_wweed007",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_graspatch1",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ],
+        [
+          "grass",
+          2
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "tm_pl_platesteak",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "tm_pl_bowlwtstew",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_stone11c",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_treel006",
+      "total": 5,
+      "top_terrains": [
+        [
+          "castlewall",
+          4
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x3_plc_trees008",
+      "total": 5,
+      "top_terrains": [
+        [
+          "castlewall",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_trees000",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "tm_pl_vasefwrgrn",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_basket01",
+      "total": 5,
+      "top_terrains": [
+        [
+          "dirt",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_archtarg",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_treel007",
+      "total": 5,
+      "top_terrains": [
+        [
+          "water",
+          2
+        ],
+        [
+          "castlewall",
+          2
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.4
+    },
+    {
+      "template": "x3_plc_trees014",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "treas_chest",
+      "total": 4,
+      "top_terrains": [
+        [
+          "cliff",
+          2
+        ],
+        [
+          "grass",
+          1
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x3_plc_inviswal",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_throwrug",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_rubble2",
+      "total": 4,
+      "top_terrains": [
+        [
+          "castlewall",
+          2
+        ],
+        [
+          "dirt",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_brokentable2",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "tm_pl_brokecrate",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_bushgrs02",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_grasstuft",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_puddle2",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_pillarb3",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_pillarb4",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_pillarb2",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "tm_pl_stone11e",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_stone11b",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_treel005",
+      "total": 4,
+      "top_terrains": [
+        [
+          "castlewall",
+          3
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "x3_plc_trees006",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          2
+        ],
+        [
+          "castlewall",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x3_plc_tree002",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_weaponrack",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "castlewall",
+          1
+        ],
+        [
+          "keep",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_table",
+      "total": 4,
+      "top_terrains": [
+        [
+          "dirt",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_flgcyric3",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_fplaguecrpse",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_brazier",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_housemed05",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_stallmark4",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          1
+        ],
+        [
+          "castlewall",
+          1
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.33
+    },
+    {
+      "template": "tm_pl_btlclear",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_cityrubble1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "castlewall",
+          2
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x3_plc_gravl001",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_stonepatch",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_graspatch2",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x3_plc_dirt002",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_brokenchair3",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          2
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_rubble",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_cushions",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_stool",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_treel011",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          2
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "tm_pl_stone11a",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_trees007",
+      "total": 3,
+      "top_terrains": [
+        [
+          "castlewall",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_treel009",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          1
+        ],
+        [
+          "castlewall",
+          1
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.33
+    },
+    {
+      "template": "x3_plc_trees009",
+      "total": 3,
+      "top_terrains": [
+        [
+          "castlewall",
+          2
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x3_plc_treem017",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tm_pl_mugbrnmt",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "tm_pl_mugbrnfl",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "dirt",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x3_plc_treel010",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          2
+        ],
+        [
+          "castlewall",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "x3_plc_treel017",
+      "total": 3,
+      "top_terrains": [
+        [
+          "dirt",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x3_plc_treel013",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    }
+  ],
+  "ttr01": [
+    {
+      "template": "plc_tree",
+      "total": 88,
+      "top_terrains": [
+        [
+          "grass",
+          78
+        ],
+        [
+          "water",
+          9
+        ],
+        [
+          "trees",
+          1
+        ]
+      ],
+      "dominant_share": 0.89
+    },
+    {
+      "template": "x0_largecactus",
+      "total": 42,
+      "top_terrains": [
+        [
+          "grass",
+          36
+        ],
+        [
+          "water",
+          6
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_keg",
+      "total": 31,
+      "top_terrains": [
+        [
+          "grass",
+          22
+        ],
+        [
+          "water",
+          9
+        ]
+      ],
+      "dominant_share": 0.71
+    },
+    {
+      "template": "plc_boulder",
+      "total": 31,
+      "top_terrains": [
+        [
+          "grass",
+          24
+        ],
+        [
+          "water",
+          7
+        ]
+      ],
+      "dominant_share": 0.77
+    },
+    {
+      "template": "plc_shrub",
+      "total": 30,
+      "top_terrains": [
+        [
+          "grass",
+          30
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_flamelarge",
+      "total": 28,
+      "top_terrains": [
+        [
+          "grass",
+          28
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_dustplume",
+      "total": 28,
+      "top_terrains": [
+        [
+          "grass",
+          28
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_fallentimber",
+      "total": 27,
+      "top_terrains": [
+        [
+          "water",
+          27
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_solyellow",
+      "total": 26,
+      "top_terrains": [
+        [
+          "grass",
+          26
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_pebbles",
+      "total": 25,
+      "top_terrains": [
+        [
+          "grass",
+          20
+        ],
+        [
+          "water",
+          5
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x0_treepalm",
+      "total": 22,
+      "top_terrains": [
+        [
+          "grass",
+          18
+        ],
+        [
+          "water",
+          2
+        ],
+        [
+          "trees",
+          2
+        ]
+      ],
+      "dominant_share": 0.82
+    },
+    {
+      "template": "x0_desertboulder",
+      "total": 21,
+      "top_terrains": [
+        [
+          "grass",
+          14
+        ],
+        [
+          "water",
+          7
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_emptywagon",
+      "total": 20,
+      "top_terrains": [
+        [
+          "grass",
+          16
+        ],
+        [
+          "water",
+          4
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "x0_treepinesnowy",
+      "total": 20,
+      "top_terrains": [
+        [
+          "grass",
+          10
+        ],
+        [
+          "water",
+          8
+        ],
+        [
+          "trees",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_cacti",
+      "total": 19,
+      "top_terrains": [
+        [
+          "grass",
+          15
+        ],
+        [
+          "water",
+          4
+        ]
+      ],
+      "dominant_share": 0.79
+    },
+    {
+      "template": "x0_deadtree",
+      "total": 19,
+      "top_terrains": [
+        [
+          "grass",
+          16
+        ],
+        [
+          "water",
+          3
+        ]
+      ],
+      "dominant_share": 0.84
+    },
+    {
+      "template": "plc_flamemedium",
+      "total": 19,
+      "top_terrains": [
+        [
+          "grass",
+          19
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_lamppost",
+      "total": 19,
+      "top_terrains": [
+        [
+          "grass",
+          18
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.95
+    },
+    {
+      "template": "x0_desertboulde2",
+      "total": 18,
+      "top_terrains": [
+        [
+          "grass",
+          11
+        ],
+        [
+          "water",
+          7
+        ]
+      ],
+      "dominant_share": 0.61
+    },
+    {
+      "template": "plc_treeautumn",
+      "total": 18,
+      "top_terrains": [
+        [
+          "grass",
+          13
+        ],
+        [
+          "water",
+          4
+        ],
+        [
+          "trees",
+          1
+        ]
+      ],
+      "dominant_share": 0.72
+    },
+    {
+      "template": "plc_sacks",
+      "total": 16,
+      "top_terrains": [
+        [
+          "grass",
+          8
+        ],
+        [
+          "water",
+          8
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_haybundle",
+      "total": 15,
+      "top_terrains": [
+        [
+          "grass",
+          10
+        ],
+        [
+          "water",
+          5
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_campfr",
+      "total": 13,
+      "top_terrains": [
+        [
+          "grass",
+          11
+        ],
+        [
+          "trees",
+          1
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.85
+    },
+    {
+      "template": "x2_plc_tent_b",
+      "total": 13,
+      "top_terrains": [
+        [
+          "grass",
+          9
+        ],
+        [
+          "trees",
+          3
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.69
+    },
+    {
+      "template": "bench001",
+      "total": 12,
+      "top_terrains": [
+        [
+          "grass",
+          12
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "nw_pl_rubble001",
+      "total": 11,
+      "top_terrains": [
+        [
+          "grass",
+          10
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.91
+    },
+    {
+      "template": "x0_cityrubble2",
+      "total": 11,
+      "top_terrains": [
+        [
+          "grass",
+          11
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_solblue",
+      "total": 11,
+      "top_terrains": [
+        [
+          "grass",
+          11
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_desertrocks",
+      "total": 10,
+      "top_terrains": [
+        [
+          "grass",
+          9
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.9
+    },
+    {
+      "template": "plc_flamesmall",
+      "total": 9,
+      "top_terrains": [
+        [
+          "grass",
+          9
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_fullwagon",
+      "total": 9,
+      "top_terrains": [
+        [
+          "grass",
+          7
+        ],
+        [
+          "water",
+          2
+        ]
+      ],
+      "dominant_share": 0.78
+    },
+    {
+      "template": "plc_statue1",
+      "total": 8,
+      "top_terrains": [
+        [
+          "grass",
+          8
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_stones",
+      "total": 8,
+      "top_terrains": [
+        [
+          "grass",
+          7
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.88
+    },
+    {
+      "template": "treas_box",
+      "total": 8,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ],
+        [
+          "water",
+          4
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "x0_smallpine",
+      "total": 7,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ],
+        [
+          "trees",
+          1
+        ]
+      ],
+      "dominant_share": 0.86
+    },
+    {
+      "template": "plc_rubble",
+      "total": 7,
+      "top_terrains": [
+        [
+          "grass",
+          7
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_wheelbarrow",
+      "total": 6,
+      "top_terrains": [
+        [
+          "water",
+          5
+        ],
+        [
+          "grass",
+          1
+        ]
+      ],
+      "dominant_share": 0.83
+    },
+    {
+      "template": "plc_woodpile",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_smallchest",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ],
+        [
+          "water",
+          2
+        ],
+        [
+          "trees",
+          1
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_butterflies",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_grasstuft",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_crate",
+      "total": 6,
+      "top_terrains": [
+        [
+          "water",
+          3
+        ],
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_bench",
+      "total": 6,
+      "top_terrains": [
+        [
+          "grass",
+          6
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "tracker",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ],
+        [
+          "trees",
+          1
+        ]
+      ],
+      "dominant_share": 0.8
+    },
+    {
+      "template": "plc_cot",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_box3",
+      "total": 5,
+      "top_terrains": [
+        [
+          "water",
+          3
+        ],
+        [
+          "grass",
+          2
+        ]
+      ],
+      "dominant_share": 0.6
+    },
+    {
+      "template": "plc_bloodstain",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "treas_barrel",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_garbage",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_solred",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_bedrolls",
+      "total": 5,
+      "top_terrains": [
+        [
+          "grass",
+          5
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x2_plc_tent_r",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_watertrough",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_box1",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "water",
+          2
+        ]
+      ],
+      "dominant_share": 0.5
+    },
+    {
+      "template": "plc_placard1",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "plc_freetorch",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.75
+    },
+    {
+      "template": "m2fenberrybush",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_fountain",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "cat_destroycacti",
+      "total": 4,
+      "top_terrains": [
+        [
+          "grass",
+          4
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_wagonwheel",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_sawhorse",
+      "total": 3,
+      "top_terrains": [
+        [
+          "water",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_well",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_burnwagon",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_weathmark",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_gong",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_magicyellow",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_solwhite",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_lecturn",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_campfrwspit",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "plc_chest1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          2
+        ],
+        [
+          "water",
+          1
+        ]
+      ],
+      "dominant_share": 0.67
+    },
+    {
+      "template": "plc_barrel",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_cityrubble1",
+      "total": 3,
+      "top_terrains": [
+        [
+          "water",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "x0_ivy",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    },
+    {
+      "template": "nw_stat_garg",
+      "total": 3,
+      "top_terrains": [
+        [
+          "grass",
+          3
+        ]
+      ],
+      "dominant_share": 1.0
+    }
+  ]
+}

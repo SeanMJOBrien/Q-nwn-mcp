@@ -7,6 +7,8 @@ import { createTempDir, cleanupTempDir } from "./util/temp-dir.js";
 import { clearWokCache, setWokCacheDir } from "./util/walkmesh.js";
 import { clearTilesetCache } from "./util/tileset.js";
 import { clearUndoStack } from "./util/undo.js";
+import { isDirtyUnder, clearDirtyUnder } from "./util/dirty-state.js";
+import { acquireModuleLock, releaseModuleLock } from "./util/module-lock.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "./types/gff.js";
 import type { GffDocument, GffObj } from "./types/gff.js";
 import type {
@@ -59,8 +61,24 @@ export async function buildResmanOptions(index: ModuleIndex): Promise<ResmanOpti
   };
 }
 
-export async function loadModule(modPath: string): Promise<ModuleIndex> {
+export async function loadModule(modPath: string, opts: { force?: boolean } = {}): Promise<ModuleIndex> {
   const absPath = path.resolve(modPath);
+
+  // Re-extracting (below) or wiping the old temp dir (cleanupTempDir, for a
+  // module switch) both silently discard any edit made since the last
+  // repack_module — confirmed real, not theoretical: this exact sequence
+  // reverted a whole batch of equipment/faction fixes mid-session once. Refuse
+  // by default whenever there's unpacked work that a reload is about to throw
+  // away, whether that's the *same* module being reloaded over, or a
+  // *different* module about to have its temp dir wiped out from under it.
+  if (currentIndex && isDirtyUnder(currentIndex.tempDir) && !opts.force) {
+    const sameModule = currentIndex.modPath === absPath;
+    throw new Error(
+      sameModule
+        ? `load_module refused: "${currentIndex.moduleName}" has unpacked changes since the last repack_module — reloading now would silently discard them. Call repack_module first, or pass force:true to load_module to discard the changes and re-extract from the packed .mod.`
+        : `load_module refused: the currently-loaded module "${currentIndex.moduleName}" has unpacked changes since its last repack_module — switching to a different module now would wipe its temp dir and discard them. Call repack_module on the current module first, or pass force:true to load_module to discard the changes and switch anyway.`,
+    );
+  }
 
   // Clean up the previous module's temp dir only when switching to a
   // different module. createTempDir() derives the dir name deterministically
@@ -69,6 +87,7 @@ export async function loadModule(modPath: string): Promise<ModuleIndex> {
   // adventure.md) that skills write there directly with Write/Edit but that
   // aren't part of the .mod archive and can't be reconstructed by re-extracting.
   if (currentIndex && currentIndex.modPath !== absPath) {
+    await releaseModuleLock(currentIndex.tempDir);
     await cleanupTempDir(currentIndex.tempDir).catch(() => {});
   }
   clearWokCache();
@@ -80,8 +99,20 @@ export async function loadModule(modPath: string): Promise<ModuleIndex> {
   const tempDir = await createTempDir(absPath);
   setWokCacheDir(tempDir);
 
+  // Claim this temp dir before touching it — the cross-process half of the
+  // dirty-state guard above: that guard only sees this process's own pending
+  // work, this catches a *different* process (a dispatched background agent
+  // running its own separate MCP server, the real case that motivated this)
+  // already mid-flight on the same module.
+  await acquireModuleLock(tempDir);
+
   // Extract module
   await erfExtract(absPath, tempDir);
+  // The temp dir now matches the packed .mod again, by definition — the
+  // clean baseline for dirty-tracking (also clears any leftover marks from a
+  // reused dir on a same-module reload — createTempDir() reuses the dir for
+  // the same module path, see the comment above).
+  clearDirtyUnder(tempDir);
 
   // List all resources
   const fileNames = await erfList(absPath);
@@ -447,7 +478,7 @@ function buildAreaSummary(
   };
 }
 
-function indexAreaCreatures(areaResref: string, gitDoc: GffDocument, creatures: CreatureRecord[]): void {
+export function indexAreaCreatures(areaResref: string, gitDoc: GffDocument, creatures: CreatureRecord[]): void {
   const git = gitDoc as GffObj;
   const creatureList = getFieldList(git, "Creature List");
 

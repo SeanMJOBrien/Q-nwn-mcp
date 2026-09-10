@@ -160,7 +160,7 @@ export function registerEncounterTools(server: McpServer): void {
         inventory,
         scripts: {
           onOpen: getFieldStr(obj, "OnOpenStore") || getFieldStr(obj, "OnStorOpen"),
-          onClose: getFieldStr(obj, "OnClosStore"),
+          onClose: getFieldStr(obj, "OnStoreClosed") || getFieldStr(obj, "OnClosStore"),
         },
       };
 

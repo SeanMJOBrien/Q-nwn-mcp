@@ -1,11 +1,13 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireIndex, buildResmanOptions } from "../module-loader.js";
+import { requireIndex, buildResmanOptions, indexAreaCreatures } from "../module-loader.js";
 import { resolveBlueprint, getGitDoc, writeBackGit } from "../util/git-helpers.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
+import type { CreatureRecord } from "../types/module.js";
 import { EQUIP_SLOT_MAP, EQUIP_SLOT_NAMES } from "../util/equip-slots.js";
 import { snapshotGitForUndo } from "../util/undo.js";
+import { twoDARow, hasCell } from "../util/verify/common.js";
 
 export function registerCreatureTools(server: McpServer): void {
 
@@ -16,9 +18,15 @@ export function registerCreatureTools(server: McpServer): void {
     { readOnlyHint: true, idempotentHint: true },
     async ({ area }) => {
       const index = requireIndex();
-      let creatures = index.creatures;
-      if (area) {
-        creatures = creatures.filter(c => c.area === area);
+      // Read live from GIT data rather than the index.creatures snapshot — that
+      // array is built once at load_module time and never refreshed, so it goes
+      // stale as soon as any creature is placed/removed afterward (confirmed real
+      // bug: this returned [] for areas with creatures placed mid-session).
+      const creatures: CreatureRecord[] = [];
+      const areaResrefs = area ? [area] : [...index.areas.keys()];
+      for (const areaResref of areaResrefs) {
+        const gitDoc = index.parsedGff.get(`${areaResref}.git`);
+        if (gitDoc) indexAreaCreatures(areaResref, gitDoc, creatures);
       }
       return { content: [{ type: "text", text: JSON.stringify(creatures, null, 2) }] };
     }
@@ -92,7 +100,7 @@ export function registerCreatureTools(server: McpServer): void {
         const structId = (item as GffObj).__struct_id as number;
         const slotName = EQUIP_SLOTS[structId] || `Slot_${structId}`;
         equipList[slotName] = {
-          resref: getFieldStr(item, "EquippedRes"),
+          resref: getFieldStr(item, "TemplateResRef"),
           name: getFieldLocStr(item, "LocalizedName") || getFieldLocStr(item, "LocName"),
           baseItem: getFieldNum(item, "BaseItem"),
         };
@@ -227,6 +235,29 @@ export function registerCreatureTools(server: McpServer): void {
         }
 
         const itemObj = itemDoc as GffObj;
+
+        // Slot-correctness check: baseitems.2da's EquipableSlots is a hex
+        // bitmask using the exact same bit values as EQUIP_SLOT_MAP (verified
+        // against a live baseitems.2da — e.g. a Cloak-type item's
+        // EquipableSlots carries only the cloak bit, 0x40/64). Catches the
+        // real "a cloak was written into the chest slot with no error" bug
+        // class, not just cloaks specifically.
+        const baseItem = getFieldNum(itemObj, "BaseItem");
+        const baseRow = twoDARow(index, "baseitems", baseItem);
+        if (baseRow && hasCell(baseRow, "EquipableSlots")) {
+          const mask = Number(baseRow.EquipableSlots);
+          if (!Number.isNaN(mask) && (mask & slotId) === 0) {
+            const validSlots = Object.entries(EQUIP_SLOT_MAP)
+              .filter(([, bit]) => (mask & bit) !== 0)
+              .map(([name]) => name);
+            failed.push(
+              `${itemResref} (BaseItem ${baseItem}) is not a valid item for slot "${slotName}"` +
+                (validSlots.length > 0 ? ` — valid slot(s): ${validSlots.join(", ")}` : ""),
+            );
+            continue;
+          }
+        }
+
         delete itemObj.__data_type;
         itemObj.__struct_id = slotId;
         setField(itemObj, "Dropable", "byte", 1);

@@ -4,6 +4,8 @@
  * .ute encounters, .utm stores, .utw waypoints, .uts sounds.
  */
 
+import { EQUIP_SLOT_MAP } from "../equip-slots.js";
+import type { ResmanOptions } from "../../nim-tools.js";
 import type { GffObj } from "../../types/gff.js";
 import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
@@ -18,6 +20,41 @@ import {
   type Report,
   twoDARow,
 } from "./common.js";
+
+/**
+ * baseitems.2da's AmmunitionType -> the Equip_ItemList slot that must carry
+ * ammo for the weapon to actually fire. 1=bow/arrows, 2=crossbow/bolts,
+ * 3=sling/bullets. Verified against the live baseitems.2da via this
+ * project's own nwn_twoda CSV pipeline, not by hand-parsing the raw 2DA text.
+ */
+const AMMO_SLOT_BY_TYPE: Record<string, number> = {
+  "1": EQUIP_SLOT_MAP.arrows,
+  "2": EQUIP_SLOT_MAP.bolts,
+  "3": EQUIP_SLOT_MAP.bullets,
+};
+
+/**
+ * AmmunitionType 4/5/6 (dart/shuriken/throwing axe) carry no separate ammo
+ * slot — the RightHand weapon stack IS the ammo, thrown one at a time. These
+ * still need a stack-size check, just against RightHand's own StackSize
+ * rather than a separate slot.
+ */
+const SELF_AMMO_TYPES = new Set(["4", "5", "6"]);
+
+/**
+ * Target stack-size range per AmmunitionType, so a placed archer/thrower
+ * doesn't ship with either 1 shot or an absurd 99-stack. User-specified
+ * convention: "a dozen" arrows/bolts, sling bullets 8-20, darts ~8, throwing
+ * axes 2-6. Shuriken (type 5) has no user-specified range — left unchecked
+ * rather than guessed.
+ */
+const AMMO_STACK_RANGE: Record<string, [number, number]> = {
+  "1": [8, 16], // bow -> arrows
+  "2": [8, 16], // crossbow -> bolts
+  "3": [8, 20], // sling -> bullets
+  "4": [4, 12], // dart
+  "6": [2, 6], // throwing axe
+};
 
 /** The 13 UTC creature script fields the engine dispatches on. */
 const CREATURE_SCRIPT_FIELDS = [
@@ -39,20 +76,85 @@ const CREATURE_SCRIPT_FIELDS = [
 /** NWN's Commoner class. Levelling a Commoner grants no feats and no spellbook. */
 const CLASS_TYPE_COMMONER = 20;
 
+/**
+ * Barbarian. The only class whose packages.2da row happens to equal
+ * StartingPackage's GFF default of 0 — every other class silently gets the
+ * wrong package (and thus wrong LevelUpHenchman() picks) if left unset.
+ */
+const CLASS_TYPE_BARBARIAN = 0;
+
+/**
+ * appearance.2da rows 0-6 (Dwarf, Elf, Gnome, Halfling, Half-Elf, Half-Orc,
+ * Human) map 1:1 by label to the same numeric racialtypes.2da rows used by
+ * the `race` field for the 7 standard PC races — verified directly against
+ * appearance.2da. buildMinimalUtc()'s own defaults (Race=6/Human,
+ * Appearance_Type=0/Dwarf) are a real-world instance of this mismatch, not
+ * hypothetical.
+ */
+const STANDARD_PC_RACE_MAX = 6;
+
 /** Henchman script set — used to detect a partially-wired companion. */
 const HENCHMAN_SCRIPT_PREFIX = "x0_ch_hen_";
+
+/**
+ * Maps an equipped armor item's AC Bonus (ITEM_PROPERTY_AC_BONUS = 1 in
+ * nwscript.nss; PropertiesList entry with PropertyName=1, CostValue = the
+ * AC bonus amount 0-8) to the single feat.2da row (2=ArmProfHvy,
+ * 3=ArmProfLgt, 4=ArmProfMed — verified against a live feat.2da) that grants
+ * proficiency with that weight tier.
+ *
+ * FIXED — this used to be an undeterminable gap: baseitems.2da's single
+ * generic "armor" row (16) carries no ReqFeat data distinguishing
+ * light/medium/heavy the way weapon/shield rows do, so weight class looked
+ * unrecoverable from static data. It isn't stored on the base item at all —
+ * it's derived from the equipped item's own AC Bonus property, cross-
+ * referenced against armor.2da (9 rows, ACBONUS column 0-8, confirmed via a
+ * live table) for the DEX-cap/check-penalty/arcane-failure/weight the engine
+ * applies at that tier, and against a real, verified community equipment
+ * script's tier boundaries (`inc_rand_equip.nss`'s `GetACOfArmorToEquip`,
+ * tfndev corpus): AC bonus 0 needs no proficiency; 1-3 is Light armor; 4-5
+ * is Medium; 6-8 is Heavy.
+ *
+ * Returns undefined for AC bonus <= 0 (no armor, or an item with no AC Bonus
+ * property at all — treated as requiring no proficiency rather than
+ * guessed, per this project's "encode unverified data as a skip" rule).
+ */
+export function armorTierFeat(acBonus: number): number | undefined {
+  if (acBonus <= 0) return undefined;
+  if (acBonus <= 3) return 3; // ArmProfLgt
+  if (acBonus <= 5) return 4; // ArmProfMed
+  return 2; // ArmProfHvy
+}
+
+/**
+ * baseitems.2da's ReqFeat0-4 columns list every feat that INDIVIDUALLY
+ * suffices to be proficient with that base item (an OR-set, not a combined
+ * requirement) — verified against a live baseitems.2da: e.g. shortbow's
+ * ReqFeat0-2 are Martial Weapon Proficiency (45), Rogue's bonus weapon
+ * proficiency (50), and Elf's bonus weapon proficiency (256) — any one of
+ * the three suffices, matching how multiple independent class/race features
+ * grant the same practical proficiency. "****" marks an unused slot.
+ */
+export const REQ_FEAT_COLUMNS = ["ReqFeat0", "ReqFeat1", "ReqFeat2", "ReqFeat3", "ReqFeat4"];
 
 export interface CreatureVerifyOptions {
   /** Apply the stricter companion rules (script set, class, HENCH_LEVEL, voice). */
   henchman?: boolean;
+  /**
+   * When set, the equipped RightHand weapon is resolved to check ranged/ammo
+   * pairing. Omit to skip that check (e.g. when NWN_FOLDER_DATA isn't
+   * configured) — matches verifyArea's "degrade to skip, never to fail"
+   * pattern for checks needing real game data.
+   */
+  resmanOpts?: ResmanOptions;
 }
 
-export function verifyCreature(
+export async function verifyCreature(
   report: Report,
   index: ModuleIndex,
   obj: GffObj,
   opts: CreatureVerifyOptions = {},
-): void {
+): Promise<void> {
   // ─── Identity ───────────────────────────────────────────────────────────
   if (!getFieldStr(obj, "Tag")) {
     report.error("missing_tag", "Creature has no Tag — scripts and dialogs cannot address it", "Tag");
@@ -64,6 +166,22 @@ export function verifyCreature(
   // ─── Appearance ─────────────────────────────────────────────────────────
   const appearance = getFieldNum(obj, "Appearance_Type");
   checkTwoDARef(report, index, "appearance", appearance, "Appearance_Type", "NAME");
+
+  const race = getFieldNum(obj, "Race");
+  if (
+    race >= 0 &&
+    race <= STANDARD_PC_RACE_MAX &&
+    appearance >= 0 &&
+    appearance <= STANDARD_PC_RACE_MAX &&
+    appearance !== race
+  ) {
+    report.warn(
+      "appearance_race_mismatch",
+      `Race is ${race} but Appearance_Type is ${appearance} — for the 7 standard PC races, appearance.2da rows 0-6 match racialtypes.2da rows 0-6, so this creature will render with the wrong body model for its race`,
+      "Appearance_Type",
+      "create_creature_blueprint with appearance set to the same value as race",
+    );
+  }
 
   // ─── Faction ────────────────────────────────────────────────────────────
   const faction = getFieldNum(obj, "FactionID");
@@ -81,11 +199,64 @@ export function verifyCreature(
       "create_creature_blueprint with a `classes` array, or clone a class-bearing chassis",
     );
   }
+  let totalLevel = 0;
+  let hasUncastCaster = false;
   for (const [i, cls] of classList.entries()) {
     const classId = getFieldNum(cls, "Class");
+    const classLevel = getFieldNum(cls, "ClassLevel");
     checkTwoDARef(report, index, "classes", classId, `ClassList.${i}.Class`);
-    if (getFieldNum(cls, "ClassLevel") < 1) {
+    if (classLevel < 1) {
       report.warn("zero_class_level", `ClassList.${i} has level 0`, `ClassList.${i}.ClassLevel`);
+    }
+    totalLevel += classLevel;
+
+    // A class is only expected to have spells once it reaches its own
+    // MinCastingLevel (e.g. Paladin/Ranger are SpellCaster=1 in classes.2da
+    // but grant nothing until level 4/1 respectively under 3.5 rules — NWN
+    // encodes that exact threshold in MinCastingLevel, so this doesn't
+    // false-positive on a low-level partial caster).
+    const classRow = twoDARow(index, "classes", classId);
+    if (classRow?.SpellCaster === "1") {
+      const minCastingLevel = hasCell(classRow, "MinCastingLevel") ? Number(classRow.MinCastingLevel) : 1;
+      if (classLevel >= minCastingLevel) hasUncastCaster = true;
+    }
+  }
+
+  // Empty FeatList is only ever correct at the moment a level-1 blueprint is
+  // built and about to go through a live LevelUpHenchman() pass (companions)
+  // — for anything else (a static Key NPC, a companion past creation time)
+  // it means the 4-source static feat-bake documented in
+  // adventure-actors/SKILL.md was skipped. Verified real-world root cause:
+  // every non-companion Key NPC bug report in this project's history
+  // (Hedge Wizard, Wynn Talsyn, Sera Duskwright, Battle-Cleric, Kaine Vosric)
+  // shipped with a totally empty FeatList because Phase 3 (Key NPCs) never
+  // walked them through the bake that Phase 3b (companions) already does.
+  if (totalLevel > 0 && listOf(obj, "FeatList").length === 0) {
+    report.warn(
+      "empty_featlist",
+      "Creature has class levels but an empty FeatList — it has no proficiencies of any kind and cannot effectively use weapons, armor, or class abilities",
+      "FeatList",
+      "bake racial feats (race_feat_<race>.2da) + automatic class feats (cls_feat_<class>.2da, List=3, GrantedOnLevel <= level) via create_creature_blueprint's `feats` param",
+    );
+  }
+
+  // No real spellbook-baking pathway exists yet (ClassList[n].MemorizedList
+  // is not wired into any tool) — casters are meant to get a `spells`
+  // (SpecAbilityList) selection sized to their level instead. A caster class
+  // at or past its MinCastingLevel with neither mechanism populated ships
+  // silently mute, exactly as several Key NPCs in this bug report did.
+  if (hasUncastCaster) {
+    const hasMemorized = classList.some((cls) =>
+      Array.from({ length: 10 }, (_, lvl) => listOf(cls, `MemorizedList${lvl}`).length > 0).some(Boolean),
+    );
+    const hasSpecAbilities = listOf(obj, "SpecAbilityList").length > 0;
+    if (!hasMemorized && !hasSpecAbilities) {
+      report.warn(
+        "caster_no_spells",
+        "Creature has a spellcasting class at or past its casting level but no spells in either ClassList's MemorizedList or SpecAbilityList — it cannot cast anything",
+        "SpecAbilityList",
+        "create_creature_blueprint with a `spells` array ({spell, level} entries) sized to the class's spells-per-day at this level",
+      );
     }
   }
 
@@ -118,10 +289,153 @@ export function verifyCreature(
   checkResourceRef(report, index, getFieldStr(obj, "Conversation"), "dlg", "Conversation");
 
   // ─── Equipment ──────────────────────────────────────────────────────────
-  for (const [i, item] of listOf(obj, "Equip_ItemList").entries()) {
-    const resref = getFieldStr(item, "EquippedRes");
+  const equipList = listOf(obj, "Equip_ItemList");
+  for (const [i, item] of equipList.entries()) {
+    // FIXED: this used to read "EquippedRes", a field name no real equipped
+    // item struct carries (confirmed against every equipped-item struct this
+    // project has ever dumped — the field is "TemplateResRef", same name an
+    // inventory item uses). That typo meant every check below silently never
+    // fired for any creature, ever — the whole equipment block was dead code.
+    const resref = getFieldStr(item, "TemplateResRef");
     if (resref) {
-      checkResourceRef(report, index, resref, "uti", `Equip_ItemList.${i}.EquippedRes`, "warning");
+      checkResourceRef(report, index, resref, "uti", `Equip_ItemList.${i}.TemplateResRef`, "warning");
+    }
+  }
+
+  // A ranged weapon in RightHand with no matching ammo filled cannot actually
+  // fire — confirmed against a live, played PW module that this exact gap
+  // slipped into 12 of its own creatures (see docs/tfn-corpus-survey/actors.md),
+  // so it's a real, easy-to-miss category and not hypothetical. Re-confirmed
+  // directly in this project's own generated output: 3 creatures (2 archers
+  // + 1 key NPC) shipped with a bow equipped and zero arrows, undetected
+  // because of the EquippedRes/TemplateResRef bug above.
+  {
+    const rightHandEntry = equipList.find((e) => e.__struct_id === EQUIP_SLOT_MAP.righthand);
+    const rightHandBaseItem = rightHandEntry ? getFieldNum(rightHandEntry, "BaseItem") : undefined;
+    const baseRow = rightHandBaseItem !== undefined ? twoDARow(index, "baseitems", rightHandBaseItem) : undefined;
+    if (rightHandEntry && baseRow && hasCell(baseRow, "RangedWeapon")) {
+      const ammoType = baseRow.AmmunitionType;
+      if (ammoType && SELF_AMMO_TYPES.has(ammoType)) {
+        // Dart/shuriken/throwing axe: the RightHand stack IS the ammo.
+        const range = AMMO_STACK_RANGE[ammoType];
+        const stack = getFieldNum(rightHandEntry, "StackSize") || 1;
+        if (range && (stack < range[0] || stack > range[1])) {
+          report.warn(
+            "ammo_stack_size_unreasonable",
+            `RightHand thrown weapon (BaseItem ${rightHandBaseItem}) carries a stack of ${stack} — outside the expected ${range[0]}-${range[1]} range for this weapon type`,
+            "Equip_ItemList",
+            "set_creature_equipment with a stack size in the expected range",
+          );
+        }
+      } else if (ammoType) {
+        const ammoSlot = AMMO_SLOT_BY_TYPE[ammoType];
+        const ammoEntry = ammoSlot !== undefined ? equipList.find((e) => e.__struct_id === ammoSlot) : undefined;
+        if (!ammoEntry) {
+          report.error(
+            "ranged_weapon_no_ammo",
+            `RightHand carries a ranged weapon (BaseItem ${rightHandBaseItem}) but no matching ammo is equipped — it cannot fire`,
+            "Equip_ItemList",
+            "set_creature_equipment with the matching ammo (arrows/bolts/bullets) in the ammo slot",
+          );
+        } else {
+          const range = AMMO_STACK_RANGE[ammoType];
+          const stack = getFieldNum(ammoEntry, "StackSize") || 1;
+          if (range && (stack < range[0] || stack > range[1])) {
+            report.warn(
+              "ammo_stack_size_unreasonable",
+              `Equipped ammo carries a stack of ${stack} — outside the expected ${range[0]}-${range[1]} range`,
+              "Equip_ItemList",
+              "set_creature_equipment with a stack size in the expected range",
+            );
+          }
+        }
+      }
+    }
+  }
+
+  // Reused by the proficiency/melee-backup checks below.
+  const featIds = new Set(listOf(obj, "FeatList").map((f) => getFieldNum(f, "Feat")));
+
+  // A RightHand or LeftHand weapon/shield the creature isn't proficient with
+  // fights at a real mechanical penalty in-engine — this is the weapon-side
+  // analogue of the armor tier check above. baseitems.2da's ReqFeat0-4 name
+  // every feat that individually satisfies
+  // the requirement, verified against a live table for both weapons
+  // (Martial/Simple/Exotic Weapon Proficiency, plus class/race bonus
+  // proficiencies like WeapProfRogue/WeapProfElf) and shields (Shield
+  // Proficiency, feat 32).
+  for (const slot of [EQUIP_SLOT_MAP.righthand, EQUIP_SLOT_MAP.lefthand]) {
+    const entry = equipList.find((e) => e.__struct_id === slot);
+    const baseItem = entry ? getFieldNum(entry, "BaseItem") : undefined;
+    const baseRow = baseItem !== undefined ? twoDARow(index, "baseitems", baseItem) : undefined;
+    if (!entry || !baseRow) continue;
+
+    const reqFeats = REQ_FEAT_COLUMNS.map((col) => baseRow[col])
+      .filter((v) => v !== undefined && v !== "" && v !== "****")
+      .map(Number);
+    if (reqFeats.length === 0) continue; // item needs no proficiency at all
+
+    if (!reqFeats.some((f) => featIds.has(f))) {
+      const slotName = slot === EQUIP_SLOT_MAP.righthand ? "RightHand" : "LeftHand";
+      report.error(
+        "weapon_proficiency_mismatch",
+        `${slotName} carries BaseItem ${baseItem}, but FeatList has none of the feats that grant proficiency with it (feat.2da rows: ${reqFeats.join(", ")}) — it will be used at a real combat penalty`,
+        "Equip_ItemList",
+        "bake the matching proficiency feat via create_creature_blueprint's `feats` param, or equip a weapon this creature is already proficient with",
+      );
+    }
+  }
+
+  // Precise weight-class check (see armorTierFeat() above for the derivation):
+  // reads the equipped Chest item's own AC Bonus item property to determine
+  // whether it's Light/Medium/Heavy armor, then checks for the one matching
+  // proficiency feat — this is the literal Corin Vale bug (a Rogue in medium
+  // armor with only Light Armor Proficiency from its automatic class feats).
+  {
+    const chestEntry = equipList.find((e) => e.__struct_id === EQUIP_SLOT_MAP.chest);
+    const acBonusProp = chestEntry
+      ? listOf(chestEntry, "PropertiesList").find((p) => getFieldNum(p, "PropertyName") === 1)
+      : undefined;
+    const acBonus = acBonusProp ? getFieldNum(acBonusProp, "CostValue") : 0;
+    const requiredFeat = armorTierFeat(acBonus);
+    if (chestEntry && requiredFeat !== undefined && !featIds.has(requiredFeat)) {
+      const tierName = requiredFeat === 3 ? "Light" : requiredFeat === 4 ? "Medium" : "Heavy";
+      report.error(
+        "armor_proficiency_mismatch",
+        `Chest-slot armor grants an AC Bonus of ${acBonus} (${tierName} armor) but FeatList lacks the matching Armor Proficiency feat (feat.2da row ${requiredFeat}) — it will be worn at a real mechanical penalty`,
+        "Equip_ItemList",
+        "bake the matching Armor Proficiency feat via create_creature_blueprint's `feats` param, or equip armor this creature is already proficient with",
+      );
+    }
+  }
+
+  // NWN's base combat AI (nw_c2_default9's DetermineCombatRound, via
+  // ActionEquipMostDamagingMelee) already auto-switches a ranged attacker to
+  // melee when it runs out of ammo — but only if a melee-capable weapon
+  // exists somewhere in its inventory. A creature with a bow/crossbow/thrown
+  // weapon and nothing melee-capable anywhere just stops fighting once ammo
+  // runs out.
+  {
+    const rightHandEntry = equipList.find((e) => e.__struct_id === EQUIP_SLOT_MAP.righthand);
+    const rightHandBaseItem = rightHandEntry ? getFieldNum(rightHandEntry, "BaseItem") : undefined;
+    const rangedRow = rightHandBaseItem !== undefined ? twoDARow(index, "baseitems", rightHandBaseItem) : undefined;
+    if (rightHandEntry && rangedRow && hasCell(rangedRow, "RangedWeapon")) {
+      const candidates = [...equipList, ...listOf(obj, "ItemList")];
+      const hasMelee = candidates.some((it) => {
+        if (it === rightHandEntry) return false;
+        const bi = getFieldNum(it, "BaseItem");
+        const row = twoDARow(index, "baseitems", bi);
+        // "Weapon-shaped" (deals real weapon damage) and not itself ranged.
+        return !!row && !hasCell(row, "RangedWeapon") && Number(row.DieToRoll || 0) > 0;
+      });
+      if (!hasMelee) {
+        report.warn(
+          "ranged_weapon_no_melee_backup",
+          `RightHand carries a ranged weapon (BaseItem ${rightHandBaseItem}) but no melee-capable weapon exists anywhere in equipment or inventory — the creature will simply stop fighting once it runs out of ammo instead of the engine auto-switching to melee`,
+          "ItemList",
+          "give the creature a melee weapon (unequipped inventory item is enough — the base AI equips it automatically on ammo depletion)",
+        );
+      }
     }
   }
 
@@ -179,6 +493,17 @@ export function verifyCreature(
         "Companion is Commoner class only — LevelUpHenchman() will grant no feats and no spellbook, so it will join with no abilities",
         "ClassList",
         "clone a PC-class chassis (nw_halfcel001, nw_elfmage001, nw_humanmerc002, ...) instead of nw_bartender/nw_oldman/nw_convict",
+      );
+    }
+
+    const startingPackage = getFieldNum(obj, "StartingPackage");
+    const primaryClass = classList.length > 0 ? getFieldNum(classList[0], "Class") : undefined;
+    if (primaryClass !== undefined && primaryClass !== CLASS_TYPE_BARBARIAN && startingPackage === 0) {
+      report.warn(
+        "henchman_no_package",
+        `Companion's StartingPackage is 0 (Barbarian's package) but its primary class is ${primaryClass} — LevelUpHenchman() will make Barbarian-appropriate feat/skill/spell picks for the wrong class`,
+        "StartingPackage",
+        `create_creature_blueprint with startingPackage:${primaryClass} (packages.2da row = class ID for each base class's iconic package)`,
       );
     }
 
@@ -451,7 +776,17 @@ export function verifyEncounter(report: Report, index: ModuleIndex, obj: GffObj)
   }
 }
 
-export function verifyDoor(report: Report, index: ModuleIndex, obj: GffObj): void {
+export interface DoorVerifyOptions {
+  /**
+   * The area this door is placed in, when verifying a placed instance (not a
+   * standalone blueprint). Enables the "leads nowhere" dual-path check below —
+   * meaningless for a blueprint that isn't placed anywhere yet, so that check
+   * is skipped entirely when this is omitted.
+   */
+  areaResref?: string;
+}
+
+export function verifyDoor(report: Report, index: ModuleIndex, obj: GffObj, opts: DoorVerifyOptions = {}): void {
   if (!getFieldStr(obj, "Tag")) {
     report.warn("missing_tag", "Door has no Tag — it cannot be a link target", "Tag");
   }
@@ -466,6 +801,29 @@ export function verifyDoor(report: Report, index: ModuleIndex, obj: GffObj): voi
       "LinkedToFlags",
       "link_doors sets both sides correctly",
     );
+  }
+
+  // Dual-path check (user-specified): a door built as a real obstacle — locked
+  // with a DC, or requiring a specific key — should lead somewhere real: either
+  // it's itself wired as a transition (LinkedToFlags != 0), or there's at least
+  // a Waypoint in the same area marking a destination behind it. Advisory only
+  // (warning, not error) — a deliberate decorative dead-end gate the plot never
+  // means to open is a legitimate design choice, not a defect.
+  if (opts.areaResref) {
+    const isLockable = getFieldNum(obj, "Lockable") === 1;
+    const hasRealLock = getFieldNum(obj, "OpenLockDC") > 0 || getFieldNum(obj, "KeyRequired") === 1;
+    if (isLockable && hasRealLock) {
+      const gitDoc = index.parsedGff.get(`${opts.areaResref}.git`);
+      const hasWaypointInArea = gitDoc ? listOf(gitDoc as GffObj, "WaypointList").length > 0 : false;
+      if (linkedToFlags === 0 && !hasWaypointInArea) {
+        report.warn(
+          "door_leads_nowhere",
+          `Door "${getFieldStr(obj, "Tag")}" is a real lock/key obstacle but isn't wired as a transition (LinkedToFlags=0) and area "${opts.areaResref}" has no Waypoint to mark a destination behind it — if this leads to real explorable space, add a transition or at least a waypoint; if it's a deliberate dead end the plot never means to open, this can be ignored`,
+          "LinkedToFlags",
+          "link_doors or adventure_create_transition for a real destination, or place_waypoint to mark one in this area",
+        );
+      }
+    }
   }
 
   for (const field of [

@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs/promises";
 import { nimtool } from "./config.js";
 import type { GffDocument } from "./types/gff.js";
+import { markDirty } from "./util/dirty-state.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -154,6 +155,10 @@ export async function jsonToGff(jsonData: GffDocument, outPath: string): Promise
   } finally {
     await fs.unlink(tempJson).catch(() => {});
   }
+  // This is the near-universal write path for every mutating tool in the
+  // codebase — marking dirty here (rather than at each of the 30+ call
+  // sites) is what makes the load_module dirty guard actually reliable.
+  markDirty(outPath);
 }
 
 // ─── TLK / 2DA ───────────────────────────────────────────────────────────────

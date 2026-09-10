@@ -188,7 +188,7 @@ export function buildMinimalUtm(): GffDocument {
     MarkDown: { type: "int", value: 100 },
     MarkUp: { type: "int", value: 100 },
     MaxBuyPrice: { type: "int", value: 0 },
-    OnClosStore: { type: "resref", value: "" },
+    OnStoreClosed: { type: "resref", value: "" },
     OnOpenStore: { type: "resref", value: "" },
     PaletteID: { type: "byte", value: 0 },
     StoreGold: { type: "int", value: -1 },
@@ -213,6 +213,42 @@ export function buildMinimalUtm(): GffDocument {
 export function buildMinimalUtc(): GffDocument {
   return {
     __data_type: "UTC ",
+    // Standard-race (Appearance_Type 0-6) creatures render as a composite
+    // model assembled from these part-index fields, exactly like a PC
+    // character -- confirmed by diffing two real, live, actively-hosted-PW
+    // henchman blueprints (~/tfndev's hen_dorna.utc [Dwarf] and hen_linu.utc
+    // [Elf]) against a from-scratch h_* creature that rendered invisible in
+    // both the toolset and a live game. Both real creatures carry the full
+    // BodyPart_*/ArmorPart_RFoot/Appearance_Head/Color_* set below; the
+    // from-scratch creature had none of them. Values here (1 = default part,
+    // 0 = no belt/shoulder-guard) match both real samples exactly. This does
+    // NOT apply to monster-model appearances (e.g. Appearance_Type 232) --
+    // a real shopkeeper control creature with that appearance type carries
+    // none of these fields at all, since it uses a single fixed model
+    // instead of the part-assembly system.
+    Appearance_Head: { type: "byte", value: 1 },
+    ArmorPart_RFoot: { type: "byte", value: 1 },
+    BodyPart_Belt: { type: "byte", value: 0 },
+    BodyPart_LBicep: { type: "byte", value: 1 },
+    BodyPart_LFArm: { type: "byte", value: 1 },
+    BodyPart_LFoot: { type: "byte", value: 1 },
+    BodyPart_LHand: { type: "byte", value: 1 },
+    BodyPart_LShin: { type: "byte", value: 1 },
+    BodyPart_LShoul: { type: "byte", value: 0 },
+    BodyPart_LThigh: { type: "byte", value: 1 },
+    BodyPart_Neck: { type: "byte", value: 1 },
+    BodyPart_Pelvis: { type: "byte", value: 1 },
+    BodyPart_RBicep: { type: "byte", value: 1 },
+    BodyPart_RFArm: { type: "byte", value: 1 },
+    BodyPart_RHand: { type: "byte", value: 1 },
+    BodyPart_RShin: { type: "byte", value: 1 },
+    BodyPart_RShoul: { type: "byte", value: 0 },
+    BodyPart_RThigh: { type: "byte", value: 1 },
+    BodyPart_Torso: { type: "byte", value: 1 },
+    Color_Hair: { type: "byte", value: 0 },
+    Color_Skin: { type: "byte", value: 0 },
+    Color_Tattoo1: { type: "byte", value: 0 },
+    Color_Tattoo2: { type: "byte", value: 0 },
     Appearance_Type: { type: "word", value: 0 },
     BodyBag: { type: "byte", value: 0 },
     Cha: { type: "byte", value: 10 },
@@ -274,11 +310,18 @@ export function buildMinimalUtc(): GffDocument {
     Str: { type: "byte", value: 10 },
     Subrace: { type: "cexostring", value: "" },
     Tag: { type: "cexostring", value: "" },
-    Tail_New: { type: "byte", value: 0 },
+    // Real PC-race henchman blueprints carry Tail_New/Wings_New as DWORD,
+    // never the legacy Tail/Wings fields at all (confirmed on both
+    // hen_dorna.utc and hen_linu.utc above) -- an earlier fix here that
+    // added Tail/Wings as byte=0 was based on a bad control (a monster-model
+    // shopkeeper creature) and has been reverted. The real, confirmed bug
+    // was the field TYPE: writing these as "byte" instead of "dword" is a
+    // schema mismatch from every real sample checked.
+    Tail_New: { type: "dword", value: 0 },
     TemplateList: { type: "list", value: [] },
     TemplateResRef: { type: "resref", value: "" },
     WalkRate: { type: "int", value: 4 },
-    Wings_New: { type: "byte", value: 0 },
+    Wings_New: { type: "dword", value: 0 },
     Wis: { type: "byte", value: 10 },
     fortbonus: { type: "short", value: 0 },
     refbonus: { type: "short", value: 0 },

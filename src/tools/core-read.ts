@@ -12,10 +12,13 @@ export function registerCoreReadTools(server: McpServer): void {
 
   server.tool(
     "load_module",
-    "Load and index a NWN module (.mod) file. Must be called before using other tools. If just a filename is given (e.g., 'mymod.mod'), it is resolved from the NWN_FOLDER_USER/modules/ directory.",
-    { modPath: z.string().describe("Module filename (e.g., 'mymod.mod') or absolute path") },
+    "Load and index a NWN module (.mod) file. Must be called before using other tools. If just a filename is given (e.g., 'mymod.mod'), it is resolved from the NWN_FOLDER_USER/modules/ directory. Refuses if the currently-loaded module has unpacked changes since its last repack_module — call repack_module first, or pass force:true to discard them.",
+    {
+      modPath: z.string().describe("Module filename (e.g., 'mymod.mod') or absolute path"),
+      force: z.boolean().optional().describe("Discard any unpacked changes on the currently-loaded module instead of refusing"),
+    },
     { idempotentHint: true },
-    async ({ modPath }) => {
+    async ({ modPath, force }) => {
       // Resolve relative names from NWN_FOLDER_USER/modules/
       let resolvedPath = modPath;
       if (!path.isAbsolute(modPath) && NWN_FOLDER_USER) {
@@ -27,7 +30,7 @@ export function registerCoreReadTools(server: McpServer): void {
           // Fall through — will fail with a clear error from loadModule
         }
       }
-      const index = await loadModule(resolvedPath);
+      const index = await loadModule(resolvedPath, { force });
       const typeCounts: Record<string, number> = {};
       for (const entry of index.resources.values()) {
         typeCounts[entry.extension] = (typeCounts[entry.extension] || 0) + 1;
