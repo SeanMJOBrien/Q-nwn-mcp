@@ -960,6 +960,16 @@ for lootable/droppable-overriding calls and cross-references against the GFF fla
 warnings (`src/tools/analysis-tools.ts`) — pure static analysis (regex over the
 script's own source via `loadScriptSources`), no runtime server needed. Cannot trace
 `ExecuteScript()` call chains into a different script.
+**TODO (user-raised, 2026-09-09): this checker needs a legitimate-exception path.**
+The user may deliberately want to limit loot server-wide — including specific
+creatures the plot means to leave non-lootable/non-droppable on purpose (a mook with
+nothing worth taking, a boss whose real reward is scripted rather than a corpse drop).
+Today's warnings fire unconditionally on any `SetLootable(FALSE)`/
+`SetDroppableFlag(..., FALSE)` call, with no way to mark one as intentional — a real
+fix needs some signal (a local variable convention, a `create_creature_blueprint`
+param, or just documenting "expected, ignore" in the warning text) so the checker can
+tell "silently overridden, unnoticed" apart from "deliberately restricted, expected"
+instead of flagging both the same way.
 (2) **BUILT (partial)** — `get_balance_report` now includes a per-area `composition`
 block: class-count tally and a `casterPresent` flag, explicitly informational (a
 caster is not a hard requirement — user-specified: "it does sometimes improve the
@@ -1250,6 +1260,22 @@ part left at 0 renders as a shapeless blob in the creature's hand.
 derived from the resman stack (baseitems.2da carries no variant count), the helper can
 pick a random valid variant per part so generated NPCs stop sharing identical weapons.
 Until then "default model" is correct: a wrong variant index renders as nothing at all.
+
+**TODO (user-raised, 2026-09-09): weapon *type* selection should also be fairly
+random, not just model-variant appearance.** `CLASS_WEAPON_PREFERENCE`
+(`src/util/npc-weapon-preferences.ts`) maps each class to a single preferred weapon
+(e.g. every generic Fighter → Longsword), and `equip_npc_by_role` recommends that one
+weapon whenever no `righthand` item is supplied — correct for feat-baking (a class
+needs *a* consistent weapon to bake Focus/Specialization feats toward) but it means
+every same-class NPC across a generated module converges on the same weapon, both
+visually and mechanically. A real fix would widen `CLASS_WEAPON_PREFERENCE` to a
+short list of plausible weapons per class (already-proficient types, so no
+proficiency mismatch) and pick among them — deterministically-seeded, matching this
+project's no-dice-rolling convention, e.g. keyed off the creature's tag/resref rather
+than `Math.random()` — instead of always returning the one curated default. Not yet
+scoped or built; `respec_weapon_feats` already exists as the tool to re-target a
+creature at a different weapon after the fact, so this TODO is about the *initial*
+pick being varied, not about the retargeting mechanism itself.
 
 **BUILT (2026-09-09) — option (a) below, `equip_npc_by_role`, plus `build_npc_stat_block`
 and `respec_weapon_feats`.** All three live in `src/tools/npc-tools.ts`, backed by
