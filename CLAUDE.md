@@ -1342,6 +1342,27 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
        resolved the one real instruction-budget bug this project found, and the
        Tier 1 level-2+ ceiling (also above) is a separate, NWNX-confirmed-
        structural limitation unrelated to instruction budget at all.
+    3b. **CONFIRMED (2026-09-11) — the level-2+ ceiling is Wizard-specific, not a
+       general Tier 1 limitation.** Triggered by a real user report: a randomly-
+       generated Cleric NPC in a `~/tfndev` live game cast Hold Person (a level-2
+       Cleric spell) successfully in combat. Re-ran the exact experiment item 3's
+       NWNX investigation had already flagged as the single highest-value next test
+       — a Cleric, leveled the identical way (`LevelUpHenchman()` loop to level 5, no
+       NWNX) — against `~/nwn-mcp-verify-server`. Result: **every level 0-3 came back
+       real and populated** (`L0:slots=5 L1:slots=5 L2:slots=4 L3:slots=3`, all with
+       real readback spell IDs), where the identically-tested Wizard got
+       `L2:slots=0 L3:slots=0`. Full record in `docs/random-abilities-runtime-
+       findings.md`'s "Round 2" section. **Practical consequence: Cleric/Druid/
+       Paladin/Ranger companions get a complete, real, freshly-randomized multi-level
+       spellbook with zero known limitation once the item-2 wiring-timing fix below
+       lands — only Wizard remains capped**, and per the closed NWNX investigation in
+       item 3 there's currently no known fix for Wizard specifically in this engine
+       build. (Druid/Paladin/Ranger weren't individually retested — they share
+       Cleric's lack of `SpellbookRestricted`, so the same result is expected but only
+       Cleric is directly confirmed.) This meaningfully raises the priority of item 2's
+       `a_hen_spawn`→`a_hen_join` timing fix: it's no longer just "gets Wizard to
+       cantrips+1st-level for free," it's "gets four of five Tier 1 classes a fully
+       working random spellbook system for free."
     4. **Fix already shipped regardless of the open root cause**: `RA_RollClass` now
        caps every write to `min(cls_spgn slot count, GetMemorizedSpellCountByLevel())`
        rather than trusting the 2DA blindly, so it degrades gracefully (writes only
