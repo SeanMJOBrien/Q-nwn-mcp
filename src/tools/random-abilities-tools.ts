@@ -65,7 +65,10 @@ export function registerRandomAbilitiesTools(server: McpServer): void {
       "generated file is portable to any other vanilla module verbatim. " +
       "WIRING (chain, never replace): write a tiny per-role wrapper script that calls ExecuteScript() on the " +
       "creature's original ScriptSpawn/ScriptEndRound first, then RA_OnSpawn/RA_OnEndRound, and pass it via " +
-      "create_creature_blueprint's `scripts` param — same pattern already used for inc_spec_check's a_hen_spawn. " +
+      "create_creature_blueprint's `scripts` param — same pattern already used for a Key NPC's a_ra_spawn. " +
+      "For a companion, RA_OnSpawn must instead be called from the RECRUIT script (a_hen_join), after its " +
+      "LevelUpHenchman() loop completes, not from raw ScriptSpawn (a_hen_spawn) — SetMemorizedSpell() silently " +
+      "no-ops on an unleveled creature, so calling RA_OnSpawn before leveling can only ever roll cantrips. " +
       "A caster that needs a fixed, story-specific ability instead: don't wire it this way, use the existing " +
       "`spells` param (SpecAbilityList) as before.",
     {
