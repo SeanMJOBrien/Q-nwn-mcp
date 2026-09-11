@@ -108,6 +108,114 @@ are directly relevant here, beyond just "it's real":
   programmatically in a way this project's tooling could drive (vs. only a live
   script call at runtime). Worth a direct, small experiment before relying on it.
 
+## The NWNX_Creature leveling hypothesis — tested to completion, hypothesis refuted
+
+Ran the "Recommendation" item 2 experiment against `~/nwn-mcp-verify-server`, in two
+rounds. Round 1 (steps 1-7 below) got blocked entirely by infrastructure. Round 2
+(step 8) got a real, clean, conclusive result by testing against a copy of a
+different, already-working module instead of this project's own — **and it refutes
+the leading hypothesis.** Full record kept below so a future session doesn't repeat
+either the debugging or the experiment.
+
+1. Enabling `NWNX_Creature` needs `NWNX_CREATURE_SKIP=n` in `config/nwserver.env`
+   (the per-plugin override pattern — confirmed by reading `~/tfndev/config/
+   common.env`, which does the same thing for its own real deployment; `NWNX_CORE_SKIP_ALL`
+   only sets the *default*).
+2. **Hand-copying tfndev's `nwnx.nss`/`nwnx_creature.nss` (the old `PlaySound(
+   "NWNXEE!ABIv2!...")`-based ABI) compiles fine but is rejected at runtime** —
+   `NWNXCoreVM.cpp` logs "Bad NWNX ABI call detected" for every call. This image's
+   `NWNX_Core` plugin no longer accepts the old ABI.
+3. **The current, correct mechanism is different and much simpler**: modern EE
+   `nwscript.nss` has *native* engine functions for this — `NWNXCall`, `NWNXPushInt`/
+   `NWNXPushObject`/etc., `NWNXPopInt`/etc. (confirmed present in `~/git/nwscript.nss`,
+   and matches the current `nwnx_creature.nss` in the real `nwnxee/unified` GitHub repo,
+   fetched directly via `gh api repos/nwnxee/unified/contents/...` rather than assumed).
+   No shim/include file is needed at all for the ABI layer itself.
+4. **This project's own `nwnsc` compiler doesn't know these functions by default** —
+   compiling against them fails with `UNDEFINED IDENTIFIER (NWNXPushInt)` unless
+   `compile_script`'s `includePaths` param is pointed at a directory containing a
+   current EE `nwscript.nss` (`~/git/nwscript.nss` worked). This is a real, useful,
+   general finding for any future NWNX work from this project, independent of the
+   spell-slot question.
+5. **Even after fixing the ABI and the compile, every NWNX call was still rejected**,
+   including the engine's own automatic `NWNX_Core_PluginExists` handshake (which
+   fires once per session before any of this project's own code runs, confirmed by
+   it appearing even on a script that never calls it). This points to a genuine
+   internal mismatch between the engine binary and the bundled NWNX plugin build in
+   this specific pulled image (`docker exec` into the container found the NWNX
+   plugin build dated `20260705_205353Z`/commit `3d4c4e1`, a separate version marker
+   from the engine's own `8193.37-17 [26c6e573]` build shown in the boot log) — not
+   a NWScript-level bug, and not something fixable by changing the test script
+   further.
+
+6. **Tried pinning to a known-good tag instead of `:latest`**: `~/tfndev`'s own
+   `docker-compose-dev.yml`/`docker-compose-dev-seed.yml` pin `nwnxee/unified:2f732e7`
+   — confirmed not a guess, it's the exact tag the real, currently-running `tfn-server`
+   production container on this machine uses too. Pinning our verify server to it and
+   reverting to the old-ABI `nwnx.nss`/`nwnx_creature.nss` (the ABI `2f732e7` was
+   actually built against) got past the "Bad NWNX ABI call" problem — but hit a
+   **different** wall: `2f732e7` (April 2024) is too old to load a module saved by
+   this project's current tooling at all — `"This module was created with a updated
+   version of Neverwinter Nights."` / `"Unable to load module"`. Tried the next-newest
+   locally-cached tag, `09544eb` (December 2024), same result.
+7. **Every locally-cached tag was checked** (`docker images nwnxee/unified`):
+   `:latest` (2026-07-05) is the *only* one new enough to load the module — every
+   older tag (`09544eb`, `695efc6`, `2f732e7`, `de24514`, `78bd6a4`, `b419e42`,
+   `build8193.34`, `6687fe1`, `ba4646c`) is too old. So the two failure modes bracket
+   every tag actually available here: too new → internal ABI mismatch; old enough to
+   have a consistent ABI → too old to load the module. No currently-cached tag
+   satisfies both.
+
+8. **Round 2 — tested against a copy of `~/uoa`'s own real module instead.**
+   Confirmed via `~/uoa`'s own `docker-compose.yml`/`config/nwserver.env`
+   (a genuinely live production deployment) that it pins `nwnxee/unified:09544eb`
+   with `NWNX_CREATURE_SKIP=no` — meaning `09544eb` is not "too old" in general, it
+   was specifically too old for a module built by *this project's own* `nwn_gff`/
+   `nwn_erf` tooling. Copied `~/uoa/server/modules/UOA.mod` (never touching the
+   original), loaded it via this project's own `load_module`, added one throwaway
+   test creature (tag `zzra_test_nwnx`, a from-scratch level-1 Wizard) with an
+   `OnSpawn` wrapper using the module's own already-present, real, working
+   `nwnx.nss`/`nwnx_creature.nss` (no need to guess an ABI this time — it's the same
+   `NWNX_PushArgumentInt(plugin, function, value)`-per-call style, a third distinct
+   variant from both the old tfndev/`2f732e7` ABI and the modern native one).
+   Repacked, deployed to the verify server pinned to `09544eb` with UOA's real
+   `hak`/`tlk` directories mounted read-only (avoiding a 19GB local copy), and
+   `NWNX_Creature`/`NWNX_Object` enabled. **This finally worked structurally** — the
+   module loaded, the plugin call succeeded, no ABI errors. Result:
+   ```
+   ZZRA_NWNX_A actualLevel=5 L0:engineSlots=4,nwnxMax=4,nwnxRemain=0
+                              L1:engineSlots=3,nwnxMax=3,nwnxRemain=0
+                              L2:engineSlots=0,nwnxMax=0,nwnxRemain=0
+                              L3:engineSlots=0,nwnxMax=0,nwnxRemain=0
+   ```
+   `NWNX_Creature_LevelUp` (called 4 times, bringing the creature from level 1 to a
+   confirmed real level 5) produces **the exact same level-2+ ceiling** vanilla
+   `LevelUpHenchman()` does in this project's own testing
+   (`docs/random-abilities-runtime-findings.md`) — including `nwnxMax` (NWNX's own
+   query for the *theoretical maximum* slots, not just remaining) reporting 0, not
+   just the vanilla `GetMemorizedSpellCountByLevel()`. This rules out "vanilla
+   leveling doesn't initialize slot state correctly, but NWNX's leveling does" as
+   the explanation — **both leveling mechanisms produce an identical ceiling**, so
+   the real cause is something else neither this project's system nor this
+   experiment has isolated yet (candidates: something about how this specific
+   engine build computes/caches per-level Wizard slots regardless of how the level
+   was granted; the Wizard-specific `SpellbookRestricted`/known-spell mechanic
+   after all, just not fixable by `NWNX_Creature_LevelUp` alone; or a `NWNX_Creature`
+   function this experiment didn't try, such as directly forcing known spells via
+   `NWNX_Creature_AddKnownSpell` *before* leveling rather than after).
+
+**Status: the specific hypothesis tested (NWNX-native leveling instead of vanilla
+`LevelUpHenchman()`) is refuted — it does not fix the level-2+ ceiling.** This is a
+real, clean, conclusive negative result, not a blocked experiment. It does *not*
+close off NWNX entirely — `NWNX_Creature_AddKnownSpell` (confirmed to exist and to
+be what tfndev's own code calls for Bard/Sorcerer) was never tried on a Tier 1 class
+in this pass and remains a real, untried next candidate. The verify server was fully
+reverted: `docker-compose.yml` back to `:latest`, the UOA test module and read-only
+hak/tlk mounts removed, `config/nwserver.env`'s `NWNX_CREATURE_SKIP`/
+`NWNX_OBJECT_SKIP` overrides removed and `NWN_MODULE` restored to
+`henchman-gear-showcase` (back to the original all-skipped, zero-NWNX baseline for
+`inc_spec_check.nss`-style testing).
+
 ## The actual answer to "how do they get past what we hit"
 
 This session's own runtime testing (`docs/random-abilities-runtime-findings.md`)
@@ -229,16 +337,25 @@ require that decision:
    in-line call after `ExecuteScript`ing the original default script may make the
    single-pass bucketing fix even more headroom-safe, and is worth testing
    regardless of anything else in this document.
-2. **Test the NWNX_Creature leveling hypothesis on the existing verify server** —
-   cheap, uses infrastructure already in place, and would definitively confirm or
-   rule out the leading theory for this project's own level-2+ gap, purely as
-   research (doesn't obligate adopting NWNX for anything shipped).
-3. **If confirmed, evaluate option 2 above** (use tfndev's system offline as an
-   authoring tool, ship only the resulting static, NWNX-free `.utc` data) as a
-   real path to give this project's own Tier 1 casters full multi-level spellbooks
-   without changing this project's hosting requirements at all. `StoreCampaignObject`
-   (also above) may be a cleaner mechanism for the "export" step than manual GFF
-   struct extraction — worth a small experiment to confirm its encoding before
-   committing to either approach.
+2. **The NWNX_Creature leveling hypothesis — tested to completion, refuted.**
+   `NWNX_Creature_LevelUp` produces the identical level-2+ spell-slot ceiling
+   vanilla `LevelUpHenchman()` does — confirmed against `~/uoa`'s own real, live
+   NWNX setup (see "The NWNX_Creature leveling hypothesis" section above for the
+   full record). Don't re-run this experiment; the leveling mechanism was never the
+   variable that mattered. The one real, untried thread left in the NWNX direction
+   is `NWNX_Creature_AddKnownSpell` on a Tier 1 class (tfndev's own code only calls
+   it for Bard/Sorcerer) — worth one more small experiment before concluding NWNX
+   can't help here at all, using the same `~/uoa`-module-copy technique (the only
+   one confirmed to actually work end-to-end) rather than fighting `nwnxee/unified`
+   tag/ABI compatibility again.
+3. **If that's confirmed too, evaluate option 2 above** (use tfndev's system
+   offline as an authoring tool, ship only the resulting static, NWNX-free `.utc`
+   data) as a real path to give this project's own Tier 1 casters full multi-level
+   spellbooks without changing this project's hosting requirements at all.
+   `StoreCampaignObject` (also above) may be a cleaner
+   mechanism for the "export" step than manual GFF struct extraction — worth a
+   small experiment to confirm its encoding before committing to either approach.
 
-Both are scoped as follow-up research/decisions, not started here.
+All three are scoped as follow-up research/decisions — #1 untried, #2's leveling
+hypothesis tested and refuted (its `AddKnownSpell` follow-up still untried), #3
+gated on that follow-up.

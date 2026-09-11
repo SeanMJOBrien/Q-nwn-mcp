@@ -1277,17 +1277,25 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
        needs real further investigation (see the doc above for the concrete next
        experiments) before Tier 1 can be trusted above cantrip+1st-level.
        **`docs/tfndev-random-npc-system-findings.md` traces how `~/tfndev`'s own
-       mature random-NPC system solves this exact class of problem**: its
-       memorizing-class spell writes are plain `SetMemorizedSpell()` too (no
-       known-spell pre-step), so the likely real fix is upstream, in how a
-       creature gets its class levels — `NWNX_Creature`'s level-manipulation
-       functions (a hard prerequisite for that whole system) may correctly
-       initialize per-level spell-slot state in a way vanilla `LevelUpHenchman()`
-       does not, consistent with this project's own separate, already-documented
-       finding that `LevelUpHenchman()` grants zero automatic feats either. Not
-       yet tested — the existing verify server already runs `nwnxee/unified` and
-       could test this cheaply by enabling `NWNX_Creature` (currently disabled via
-       `NWNX_CORE_SKIP_ALL=yes`). A real, independently-confirmed instruction-
+       mature random-NPC system approaches this exact class of problem, and this
+       project tested the leading hypothesis to completion — it's refuted.**
+       tfndev's memorizing-class spell writes are plain `SetMemorizedSpell()` too
+       (no known-spell pre-step), so the hypothesis was that the real fix is
+       upstream, in how a creature gets its class levels: `NWNX_Creature`'s
+       level-manipulation functions might correctly initialize per-level
+       spell-slot state where vanilla `LevelUpHenchman()` doesn't. **Tested
+       directly against a real, working NWNX setup** (a throwaway copy of
+       `~/uoa`'s own live production module, run on the exact `nwnxee/unified`
+       tag/ABI its real server uses — the project's own module wouldn't load on
+       any tag old enough to have a working NWNX ABI, a separate infrastructure
+       problem documented in the findings doc): `NWNX_Creature_LevelUp` produces
+       **the identical level-2+ ceiling** vanilla `LevelUpHenchman()` does,
+       including NWNX's own `GetMaxSpellSlots()` reporting 0, not just
+       `GetMemorizedSpellCountByLevel()`. The leveling mechanism was never the
+       variable that mattered. One real thread is still untried:
+       `NWNX_Creature_AddKnownSpell` (which tfndev only calls for Bard/Sorcerer)
+       on a Tier 1 class — see the findings doc for why and how to test it. A real,
+       independently-confirmed instruction-
        budget insight from a separate, real, shipped integration of the same
        tfndev system (UniverseOfArlandia, see
        `~/.claude/projects/-home-qlippoth-git-UniverseOfArlandia/memory/
