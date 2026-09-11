@@ -131,8 +131,8 @@ reports `compiled: true`.
 | `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
 | `a_hen_stay` | Stand ground, via `bkRespondToHenchmenShout` |
 | `a_hen_follow` | Follow master, via `bkRespondToHenchmenShout` |
-| `a_hen_spawn` | `#include "inc_spec_check"` and `#include "inc_random_abil"`, then `ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF)` followed by `SPEC_SelfTestOnSpawn(OBJECT_SELF)` and `RA_OnSpawn(OBJECT_SELF)` |
-| `a_hen_endround` | `#include "inc_random_abil"`, then `ExecuteScript("x0_ch_hen_combat", OBJECT_SELF)` followed by `RA_OnEndRound(OBJECT_SELF)` |
+| `a_hen_spawn` | `#include "inc_spec_check"` and `#include "inc_random_abil"`, then `ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF)` followed by `SPEC_SelfTestOnSpawn(OBJECT_SELF)` and `DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))` |
+| `a_hen_endround` | `#include "inc_random_abil"`, then `ExecuteScript("x0_ch_hen_combat", OBJECT_SELF)` followed by `DelayCommand(0.5, RA_OnEndRound(OBJECT_SELF))` |
 
 Two rules that make or break this — both are silent failures:
 - **`SetMaxHenchmen()` must be raised before `AddHenchman()`.** `AddHenchman` is a
@@ -152,17 +152,27 @@ headless module load. This is a safe, precedented pattern — BioWare's own stoc
 `x0_ch_hen_spawn.nss` calls `LevelUpHenchman()` straight from `OnSpawn` on an unrecruited
 companion in shipped Undermountain content. In the delivered module (`MCP_VERIFY_MODE=0`)
 this costs nothing beyond one no-op function call. `a_hen_spawn`'s final line,
-`RA_OnSpawn(OBJECT_SELF)` (from `inc_random_abil`), is the **default random-spellbook
-system** — see "Casters get randomized spells by default, computed at runtime" below.
-It costs nothing for a non-caster companion (every class-position check inside it
-no-ops immediately) so it belongs in `a_hen_spawn` unconditionally, not gated per
-companion.
+`DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))` (from `inc_random_abil`), is the **default
+random-spellbook system** — see "Casters get randomized spells by default, computed at
+runtime" below. It costs nothing for a non-caster companion (every class-position check
+inside it no-ops immediately) so it belongs in `a_hen_spawn` unconditionally, not gated
+per companion. **Wrapped in `DelayCommand`, not called inline** — `ExecuteScript` runs
+in the *caller's own* instruction budget with no reset, while `DelayCommand` genuinely
+hands the delayed call a fresh one. Confirmed as a real, general NWScript fact (not a
+guess) by a separate, real, shipped integration of the same tfndev-derived system
+(UniverseOfArlandia — see `docs/tfndev-random-npc-system-findings.md`), which needed
+exactly this fix for the same reason. `RA_OnSpawn`'s own instruction cost is already
+bounded (single-pass `spells.2da` scan, not per-spell-level rescanning — see that same
+doc), so this is defense-in-depth for a higher-level caster with more populated spell
+levels than this project has directly tested, not a fix for a currently-reproducible
+failure.
 
 **`a_hen_endround` is the same chain-never-replace pattern, for the one part of the
 random-spellbook system that needs a combat-round hook** (Bard/Sorcerer — spontaneous
 casters the engine gives no runtime "known spells" setter, so their random abilities
 are cast via a `ScriptEndRound` check rather than a real spellbook). Like `a_hen_spawn`,
-it's safe and cheap to wire on every companion: `RA_OnEndRound` no-ops instantly for a
+it's safe and cheap to wire on every companion, and wrapped in `DelayCommand` for the
+same reason: `RA_OnEndRound` no-ops instantly for a
 Cleric/Druid/Paladin/Ranger/Wizard (real spellbook, no `ScriptEndRound` involvement
 needed) and for any non-caster.
 
@@ -458,29 +468,36 @@ setter exists) it casts a stored virtual ability list via `ActionCastSpellAtObje
 `bCheat` param from `RA_OnEndRound`. See `src/util/random-abilities-script.ts` for the
 full design and the verified 2DA columns/engine functions it relies on.
 
-**CONFIRMED LIMITATION (real headless server testing, 2026-09-10) — Tier 1 classes
-(Cleric/Druid/Paladin/Ranger/Wizard) only reliably get cantrips right now, not real
-leveled spells.** `SetMemorizedSpell()` silently respects the engine's own
-`GetMemorizedSpellCountByLevel()`, and that count is 0 for every spell level past 0
-on a creature that has never gone through a real `LevelUpHenchman()` pass — this is
-true regardless of what `cls_spgn_<class>.2da` says the creature "should" have.
-**A non-companion Key NPC never gets a `LevelUpHenchman()` call at all**, so a Tier 1
-Key NPC wired this way will only ever roll cantrips. Even a *companion*, which does
-get leveled at recruit, only gets this correctly if `RA_OnSpawn` runs *after* that
-leveling — but it's currently chained into `a_hen_spawn` (`ScriptSpawn`, before
-recruit), so companions built this way are affected too until that's fixed. And even
-after a real leveling pass, testing found spell levels 2+ still don't become
-engine-recognized for a Wizard specifically — root cause not yet isolated. **Until
-this is resolved** (see `docs/random-abilities-runtime-findings.md` for the full
-investigation and open next steps), prefer the static `spells` param over this system
-for any Tier 1 caster whose spells matter above cantrip level — Tier 2 (Bard,
-Sorcerer) has no such limitation and is confirmed fully working.
+**CONFIRMED, DURABLE LIMITATION (real headless server testing, 2026-09-10/11) —
+Tier 1 classes (Cleric/Druid/Paladin/Ranger/Wizard) only reliably get cantrips (or
+cantrips + 1st level, for a companion leveled before `RA_OnSpawn` runs) — not full
+multi-level spellbooks, and this is not a pending TODO.** `SetMemorizedSpell()`
+silently respects the engine's own `GetMemorizedSpellCountByLevel()`, and that count
+is 0 for every spell level past 1 regardless of what `cls_spgn_<class>.2da` says the
+creature "should" have. **A non-companion Key NPC never gets a `LevelUpHenchman()`
+call at all**, so a Tier 1 Key NPC wired this way will only ever roll cantrips. Even
+a *companion*, which does get leveled at recruit, only gets 1st-level spells too if
+`RA_OnSpawn` runs *after* that leveling — but it's currently chained into
+`a_hen_spawn` (`ScriptSpawn`, before recruit), so companions built this way are
+capped at cantrips too until that timing is fixed (a separate, still-open item —
+see `docs/random-abilities-runtime-findings.md`). **The level-2+ ceiling itself is
+now a closed investigation, not an open one**: three independent NWNX approaches
+(`NWNX_Creature_LevelUp`, `NWNX_Creature_AddKnownSpell`, and
+`NWNX_Creature_SetRemainingSpellSlots` — a direct setter for the exact stuck value)
+were all tested against a real, working NWNX deployment and all hit the identical
+ceiling — see `docs/tfndev-random-npc-system-findings.md` for the full investigation.
+**Always prefer the static `spells` param over this system for any Tier 1 caster
+whose spells matter above cantrip level** — this is the settled recommendation, not
+a stopgap. Tier 2 (Bard, Sorcerer) has no such limitation and is confirmed fully
+working.
 
 Wire it the same way `a_hen_spawn`/`a_hen_endround` already do for companions (see
-Phase 3b Step 1/3 above): for a non-companion Key NPC, write a small
-`a_ra_spawn`/`a_ra_endround` pair chaining the plain default scripts instead of the
-henchman ones (`ExecuteScript("nw_c2_default9", OBJECT_SELF)` /
-`ExecuteScript("nw_c2_default3", OBJECT_SELF)`), then `RA_OnSpawn`/`RA_OnEndRound`, and
+Phase 3b Step 1/3 above, including the `DelayCommand` wrapping): for a non-companion
+Key NPC, write a small `a_ra_spawn`/`a_ra_endround` pair chaining the plain default
+scripts instead of the henchman ones (`ExecuteScript("nw_c2_default9", OBJECT_SELF)` /
+`ExecuteScript("nw_c2_default3", OBJECT_SELF)`), then
+`DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))` / `DelayCommand(0.5,
+RA_OnEndRound(OBJECT_SELF))`, and
 pass `scripts: '{"ScriptSpawn": "a_ra_spawn", "ScriptEndRound": "a_ra_endround"}'` to
 `create_creature_blueprint`.
 

@@ -1308,8 +1308,16 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
        tfndev system (UniverseOfArlandia, see
        `~/.claude/projects/-home-qlippoth-git-UniverseOfArlandia/memory/
        random-adventurer-henchman-feature.md`): `ExecuteScript` shares the
-       caller's instruction budget, `DelayCommand` gets a fresh one — worth
-       trying for `RA_OnSpawn`/`RA_OnEndRound` regardless of the NWNX question.
+       caller's instruction budget, `DelayCommand` gets a fresh one. **Applied**:
+       `adventure-actors/SKILL.md`'s `a_hen_spawn`/`a_hen_endround`/`a_ra_spawn`/
+       `a_ra_endround` wrapper templates now call `DelayCommand(0.5,
+       RA_OnSpawn(OBJECT_SELF))`/`DelayCommand(0.5, RA_OnEndRound(OBJECT_SELF))`
+       instead of calling them inline after `ExecuteScript`ing the original
+       default script. This is defense-in-depth, not a fix for a currently-
+       reproducible failure — the single-pass bucketing fix (above) already
+       resolved the one real instruction-budget bug this project found, and the
+       Tier 1 level-2+ ceiling (also above) is a separate, NWNX-confirmed-
+       structural limitation unrelated to instruction budget at all.
     4. **Fix already shipped regardless of the open root cause**: `RA_RollClass` now
        caps every write to `min(cls_spgn slot count, GetMemorizedSpellCountByLevel())`
        rather than trusting the 2DA blindly, so it degrades gracefully (writes only

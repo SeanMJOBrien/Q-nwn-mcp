@@ -360,14 +360,23 @@ decision the user should make deliberately, not something to fold in as a side
 effect of chasing one bug. The two next concrete, bounded, low-risk steps that don't
 require that decision:
 
-1. **Try the `DelayCommand` instruction-budget fix first — cheapest, purely vanilla,
-   no NWNX question involved at all.** UOA's own integration lesson (above) is a
-   real, general NWScript fact this project didn't have documented: `ExecuteScript`
-   shares the caller's instruction budget, `DelayCommand` gets a fresh one. Wiring
-   `RA_OnSpawn`/`RA_OnEndRound` via `DelayCommand(0.0, ...)` instead of a direct
-   in-line call after `ExecuteScript`ing the original default script may make the
-   single-pass bucketing fix even more headroom-safe, and is worth testing
-   regardless of anything else in this document.
+1. **`DelayCommand` instruction-budget fix — applied.** UOA's own integration
+   lesson (above) is a real, general NWScript fact this project didn't have
+   documented: `ExecuteScript` shares the caller's instruction budget,
+   `DelayCommand` gets a fresh one. `adventure-actors/SKILL.md`'s
+   `a_hen_spawn`/`a_hen_endround`/`a_ra_spawn`/`a_ra_endround` wrapper templates
+   now call `DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))`/`DelayCommand(0.5,
+   RA_OnEndRound(OBJECT_SELF))` instead of an inline call after `ExecuteScript`ing
+   the original default script — matching UOA's own proven delay value (their
+   `area_tavernspawn.nss` uses `DelayCommand(0.5, ExecuteScript(...))` for the same
+   reason), not the untested `0.0`. This is defense-in-depth, not a fix for a
+   currently-reproducible failure: the single-pass bucketing fix already resolved
+   the one real instruction-budget bug found in this project's own testing, and
+   it's now independent of character level or how many spell levels are populated
+   (one flat scan regardless). No verify-server retest was done for this change
+   specifically, since there's no currently-failing case to reproduce against —
+   worth a real test if a future session builds a very high-level caster and
+   wants to confirm the margin empirically.
 2. **The NWNX_Creature route is closed — tested to completion, fully refuted.**
    Three independent, well-targeted NWNX avenues (`NWNX_Creature_LevelUp`,
    `NWNX_Creature_AddKnownSpell`, and `NWNX_Creature_SetRemainingSpellSlots` — a
@@ -392,6 +401,9 @@ require that decision:
    (worth remembering for other purposes), but it can't produce something this
    experiment couldn't produce directly.
 
-Status: #1 (the `DelayCommand` instruction-budget fix) is the only item left with
-real, unexplored upside — untried, cheap, purely vanilla. #2 is closed. #3 is closed
-as a consequence of #2, for Tier 1 specifically.
+Status: all three items are now resolved. #1 applied (defense-in-depth, no
+currently-reproducible failure to retest against). #2 closed (refuted). #3 closed as
+a consequence of #2, for Tier 1 specifically. The remaining open, scoped item outside
+this document's three recommendations is the companion `RA_OnSpawn` timing fix (chain
+into `a_hen_join` after `LevelUpHenchman()`, not `a_hen_spawn` before recruit) —
+tracked in `docs/random-abilities-runtime-findings.md`, not started here.
