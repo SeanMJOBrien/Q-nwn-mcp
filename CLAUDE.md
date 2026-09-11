@@ -876,20 +876,44 @@ any other generated file type, so structurally-broken assets shipped silently. T
   friends resolve at runtime and must never be reported as missing.
 
 **A live isolated verification server exists and has run a real end-to-end check
-successfully** (`~/nwn-mcp-verify-server`, outside any git-tracked repo — see
-`docs/runtime-verification-spec.md` §1 for the full setup and findings). `verify_*` can
-only check static GFF preconditions; this closes the gap for behavior that only exists
-once the engine actually runs a script. First real run, against "Henchman Gear Showcase"
-(the module whose bad-stats bug report started this whole effort): 110 companions wired
-with `SPEC_*` vars, run headless, grepped for `[SPEC_FAIL]` — caught the exact bug (empty
-`FeatList`, `StartingPackage` stuck at 0) with zero human interaction. **What's still
-missing is automation**: copying a generated module into the server's `modules/` folder,
-launching, polling for load completion, grepping, tearing down, and feeding failures back
-into nwn-mcp's repair tools is all still done by hand — the orchestration loop is designed
-(`docs/runtime-verification-spec.md` §5) and proven manually, but not built into a tool.
-`randspellbooks` (`~/tfndev/src/nss/inc_rand_spell.nss`) also still depends on NWNX and a
-persistent campaign database this project has no way to invoke — out of scope for
-`inc_spec_check.nss`, which deliberately uses zero `NWNX_*` functions.
+successfully** (`~/nwn-mcp-verify-server` — a fork of
+[`urothis/nwnxee-docker-template`](https://github.com/urothis/nwnxee-docker-template),
+a real git repo, not outside one — see `docs/runtime-verification-spec.md` §1 for the
+full setup and findings). `verify_*` can only check static GFF preconditions; this
+closes the gap for behavior that only exists once the engine actually runs a script.
+First real run, against "Henchman Gear Showcase" (the module whose bad-stats bug
+report started this whole effort): 110 companions wired with `SPEC_*` vars, run
+headless, grepped for `[SPEC_FAIL]` — caught the exact bug (empty `FeatList`,
+`StartingPackage` stuck at 0) with zero human interaction. Reused again in the
+`create_random_abilities_system` work (2026-09-10/11): found and confirmed a real
+instruction-budget bug, verified the fix, and ran three separate NWNX experiments
+against it (see `docs/random-abilities-runtime-findings.md` and
+`docs/tfndev-random-npc-system-findings.md`) — this server's actual, demonstrated
+purpose is exactly "spin up a real engine, load a module built by this project's
+tooling, and observe what really happens," reusable for any future debugging session
+that needs the same.
+- **TODO (user-raised, 2026-09-11) — commit the server's own simplification.**
+  `~/nwn-mcp-verify-server`'s `git status` currently shows uncommitted deletions
+  (`config/db.env`/`grafana.env`/`influxdb.env`, the Grafana provisioning JSON/YAML)
+  and modifications to `config/nwserver.env`/`docker-compose.yml` — a prior session
+  already stripped the template's original Postgres+Redis+InfluxDB+Grafana stack
+  down to the bare single-`nwserver` shape it actually runs as today, but never
+  committed that simplification. Worth committing next time this server is used for
+  real debugging, so the working, minimal configuration is the actual committed
+  state rather than a perpetual uncommitted diff against the original template.
+- **What's still missing is automation**: copying a generated module into the
+  server's `modules/` folder, launching, polling for load completion, grepping,
+  tearing down, and feeding failures back into nwn-mcp's repair tools is all still
+  done by hand — the orchestration loop is designed (`docs/runtime-verification-spec.md`
+  §5) and proven manually (repeatedly, across two separate verification efforts now),
+  but not built into a tool.
+- `randspellbooks` (`~/tfndev/src/nss/inc_rand_spell.nss`) also still depends on
+  NWNX and a persistent campaign database — out of scope for `inc_spec_check.nss`,
+  which deliberately uses zero `NWNX_*` functions. See
+  `docs/tfndev-random-npc-system-findings.md` for the fuller investigation into
+  whether/how NWNX could be used from this project at all (conclusion: usable for
+  research on this same verify server, confirmed workable for real experiments, but
+  not something to adopt into shipped output without deliberate scope sign-off).
 
 **TODO — what's script-verified today vs. what still relies on LLM self-report,
 surveyed against a real large custom-adventure build** ("The Six-Fold Trial": a
@@ -1165,7 +1189,182 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   can currently cast (e.g. Wis 16 → +1 first-level slot for a level-1 Cleric). Applied
   once, to one hand-verified test creature (a Human Cleric in Henchman Gear Showcase) —
   not yet wired into `create_creature_blueprint` or the `adventure-actors` skill as a
-  general capability.
+  general capability. **Superseded by the shipped runtime system below** for the
+  "give a caster NPC spells" problem in general — this GFF-struct finding stays useful
+  background (it's *how* `MemorizedList` is shaped, which the runtime system below
+  never needs to know since it writes through the engine's own setter instead), but
+  static per-blueprint baking is no longer the recommended path.
+- **BUILT (2026-09-10) — real per-playthrough random caster spellbooks, computed
+  entirely in NWScript at `OnSpawn`, no MCP/build-time baking.** User-specified design:
+  a caster NPC's spells should be different every time the module loads, calculated by
+  NWScript alone, applied by default to every caster NPC this project generates unless
+  a story/plot reason calls for a fixed loadout. The previous assumption in this doc
+  (echoed above) was that no vanilla-NWScript path exists to mutate a creature's real
+  spellbook at runtime — **that assumption was wrong**, found by re-reading the real
+  `nwscript.nss` (EE) rather than trusting the earlier note: the engine has native
+  `SetMemorizedSpell(object oCreature, int nClassType, int nSpellLevel, int nIndex, int
+  nSpellId, int bReady=TRUE, ...)` plus `GetMemorizedSpellCountByLevel`/
+  `ClearMemorizedSpell`, gated only to classes where `classes.2da`'s `MemorizesSpells`
+  column is `1`. Verified against the real `classes.2da`
+  (`/var/www/storage/2DAs/8193.35_2dasource_full/classes.2da`): `MemorizesSpells=1` for
+  **Cleric, Druid, Paladin, Ranger, Wizard**; `=0` for **Bard, Sorcerer** (spontaneous
+  casters use `SpellbookRestricted=1` instead) — and there is **no runtime setter for
+  "known spells"** (`GetKnownSpellCount`/`GetKnownSpellId`/`GetIsInKnownSpellList` exist,
+  no `Set`/`Add` equivalent), so true native spellbook randomization only reaches 5 of
+  the 7 caster classes.
+  - **Tier 1 (Cleric/Druid/Paladin/Ranger/Wizard):** `RA_OnSpawn` builds an eligible
+    spell pool per spell level via the real engine function `GetSpellLevelByClass(
+    nClassType, nSpellId)` (never hand-parses `spells.2da`'s per-class column text),
+    bounded by the real `Get2DARowCount("spells")`, shuffles it with the native
+    `JsonArrayTransform(jArr, JSON_ARRAY_SHUFFLE)`, and writes the result via the real
+    `SetMemorizedSpell()`. Slot counts per spell level come from `cls_spgn_<class>.2da`
+    — confirmed the table's `Level` column is that class's own level directly (row
+    index = level − 1) even for a late-casting class: `cls_spgn_pal.2da` rows for
+    Paladin levels 1-3 are all `****`, and level 4 (row 3) is the first row with a real
+    `SpellLevel1` value, matching Paladin's `MinCastingLevel=4`. Nothing else needs to
+    change — the creature's existing, untouched default/henchman combat AI already
+    casts from a real memorized spellbook automatically.
+  - **Tier 2 (Bard, Sorcerer):** same pool/count logic, but since there's no runtime
+    known-spell setter, the chosen spell ids are stored as one `SetLocalJson(oCreature,
+    "RA_L<level>", jArr)` per populated spell level instead. `RA_OnEndRound` (wired onto
+    `ScriptEndRound`) has a tunable per-round chance to cast one via
+    `ActionCastSpellAtObject`'s real, documented `bCheat=TRUE` param, which lets a
+    creature cast a spell it doesn't officially know — targets the creature's real
+    `GetAttackTarget()`. Known simplification: doesn't distinguish an offensive spell
+    from a self/ally-targeted one; low risk since Tier 2 is only two classes whose
+    low-level lists skew offensive. **Confirmed fully working end-to-end against a
+    real headless server** — no known limitations.
+  - **Implementation:** `src/util/random-abilities-script.ts`
+    (`generateRandomAbilitiesInclude`) + `src/tools/random-abilities-tools.ts`
+    (`create_random_abilities_system` MCP tool), following the exact generator/probe-
+    compile pattern `create_reward_system`/`create_spec_verification` already
+    established (`writeAndCompileScript` + a throwaway probe script, since an include
+    has no `main()`). 24 unit tests in `random-abilities-script.test.ts` (no
+    integration test, matching `create_reward_system`/`create_spec_verification`'s own
+    precedent — their compile-probe needs a real nim toolchain/resman this suite
+    doesn't mock, so generator unit tests are the established coverage bar for this
+    tool class).
+  - **Wiring is skill-level, not a `create_creature_blueprint` default** — this matches
+    the *existing* convention `inc_spec_check`'s `a_hen_spawn` already uses (see
+    `adventure-actors/SKILL.md`), not a new mechanism: a small per-role wrapper script
+    (`ExecuteScript()` on the creature's original `ScriptSpawn`/`ScriptEndRound`, then
+    `RA_OnSpawn`/`RA_OnEndRound`) is written via `write_script` and pointed at by
+    `create_creature_blueprint`'s existing `scripts` param override — never touching
+    the tool's own default-resolution logic. This is intentionally the safer,
+    lower-risk integration point: a direct/human tool caller editing a module by hand
+    sees no surprise behavior change, and the "opt-out for a story-specific fixed
+    ability" escape hatch is simply *not writing the wrapper* for that one NPC (keep
+    using the existing `spells`/`SpecAbilityList` param instead).
+  - **Portable by construction**: depends on nothing but base-game 2DAs
+    (`classes.2da`, `cls_spgn_*.2da`, `spells.2da`) and base-game engine functions — no
+    project-specific table, no MCP dependency, no NWNX. The generated file(s) can be
+    copied into any other vanilla module's script resources verbatim, matching the
+    portability bar `inc_reward.nss`/`inc_spec_check.nss` already meet.
+  - **Wired into the pipeline**: `adventure-actors/SKILL.md` calls
+    `create_random_abilities_system` once per module (Phase 3b Step 2, alongside
+    `create_spec_verification`), and both the companion recipe (`a_hen_spawn`/
+    `a_hen_endround`, chaining the henchman AI) and the Key NPC recipe (`a_ra_spawn`/
+    `a_ra_endround`, chaining the plain default AI) wire it in — see the "Tier 1
+    real-runtime findings" item immediately below for why this wiring is now known to
+    be incomplete for Tier 1 specifically. The `spells`/`SpecAbilityList` param
+    remains the documented opt-out for one specific NPC.
+  - **CONFIRMED VIA REAL HEADLESS SERVER TESTING (2026-09-10) — Tier 1 has two real,
+    unresolved limitations; Tier 2 has none.** A dedicated verification pass (own
+    docker `nwnxee/unified` instance, `~/nwn-mcp-verify-server`, module copied in and
+    restarted per iteration — see `docs/random-abilities-runtime-findings.md` for the
+    full blow-by-blow) found:
+    1. **The original per-level-rescan design really did exceed the script
+       instruction budget**, exactly as flagged as a risk before shipping: a level 5
+       Wizard's first (cheapest) scan succeeded (orisons written) while every later
+       spell level silently got nothing, no error logged. Fixed by restructuring to a
+       single pass over `spells.2da`, bucketing into ten independent flat JSON arrays
+       selected by if/else-if (not nested-array indexing, and not a `switch` — see
+       `random-abilities-script.ts`'s header comment for why both alternatives were
+       tried and rejected). This fix is confirmed correct and shipped.
+    2. **A from-scratch, never-live-leveled blueprint only ever gets level 0
+       (cantrip) slots for Tier 1, no matter how good the pool logic is.**
+       `GetMemorizedSpellCountByLevel()` — the real bound `SetMemorizedSpell()`
+       silently respects — reports 0 for every spell level past 0 on such a
+       blueprint, regardless of what `cls_spgn_<class>.2da` states. Since a companion
+       doesn't get `LevelUpHenchman()`'d until recruit (`a_hen_join`), which fires
+       well after `ScriptSpawn`, wiring `RA_OnSpawn` at `a_hen_spawn` (raw spawn) is
+       the wrong timing for Tier 1 — it can only ever roll cantrips. **Not yet fixed**:
+       `RA_OnSpawn` should be called after `LevelUpHenchman()` for companions
+       (chained into `a_hen_join`), not at `a_hen_spawn`.
+    3. **Even after a real `LevelUpHenchman()` pass, a level 5 Wizard's level 2-3
+       slots still report 0 from the engine**, while level 0 and level 1 correctly
+       became real, populated, readable-back slots. Root cause not isolated — the
+       leading candidate is Wizards' `SpellbookRestricted` scribing mechanic (a
+       Wizard must "know" a spell before memorizing it, unlike the other four Tier 1
+       classes) combined with `LevelUpHenchman()`'s automatic AI possibly not
+       populating known spells the way the toolset's own level-up UI would. This
+       needs real further investigation (see the doc above for the concrete next
+       experiments) before Tier 1 can be trusted above cantrip+1st-level.
+       **`docs/tfndev-random-npc-system-findings.md` traces how `~/tfndev`'s own
+       mature random-NPC system approaches this exact class of problem, and this
+       project tested the leading hypothesis to completion — it's refuted.**
+       tfndev's memorizing-class spell writes are plain `SetMemorizedSpell()` too
+       (no known-spell pre-step), so the hypothesis was that the real fix is
+       upstream, in how a creature gets its class levels: `NWNX_Creature`'s
+       level-manipulation functions might correctly initialize per-level
+       spell-slot state where vanilla `LevelUpHenchman()` doesn't. **Tested
+       directly against a real, working NWNX setup** (a throwaway copy of
+       `~/uoa`'s own live production module, run on the exact `nwnxee/unified`
+       tag/ABI its real server uses — the project's own module wouldn't load on
+       any tag old enough to have a working NWNX ABI, a separate infrastructure
+       problem documented in the findings doc): `NWNX_Creature_LevelUp` produces
+       **the identical level-2+ ceiling** vanilla `LevelUpHenchman()` does,
+       including NWNX's own `GetMaxSpellSlots()` reporting 0, not just
+       `GetMemorizedSpellCountByLevel()`. The leveling mechanism was never the
+       variable that mattered. **Followed up and also refuted**:
+       `NWNX_Creature_AddKnownSpell` on the Tier 1 class itself genuinely worked
+       (confirmed via `GetKnownSpellCount` going 0→1) but didn't move the slot
+       ceiling at all — and neither did `NWNX_Creature_SetRemainingSpellSlots`, a
+       *direct* setter for the exact stuck value. **All three NWNX avenues tried
+       hit the identical ceiling — the NWNX route for this specific problem is
+       now closed**, not just this one hypothesis; whatever gates it looks
+       structural (a per-level slot data structure likely only ever allocated for
+       a fixed, small number of levels somewhere in creature initialization, not
+       growable afterward by any scripting call, vanilla or NWNX) rather than
+       "the right call hasn't been found." A real,
+       independently-confirmed instruction-
+       budget insight from a separate, real, shipped integration of the same
+       tfndev system (UniverseOfArlandia, see
+       `~/.claude/projects/-home-qlippoth-git-UniverseOfArlandia/memory/
+       random-adventurer-henchman-feature.md`): `ExecuteScript` shares the
+       caller's instruction budget, `DelayCommand` gets a fresh one. **Applied**:
+       `adventure-actors/SKILL.md`'s `a_hen_spawn`/`a_hen_endround`/`a_ra_spawn`/
+       `a_ra_endround` wrapper templates now call `DelayCommand(0.5,
+       RA_OnSpawn(OBJECT_SELF))`/`DelayCommand(0.5, RA_OnEndRound(OBJECT_SELF))`
+       instead of calling them inline after `ExecuteScript`ing the original
+       default script. This is defense-in-depth, not a fix for a currently-
+       reproducible failure — the single-pass bucketing fix (above) already
+       resolved the one real instruction-budget bug this project found, and the
+       Tier 1 level-2+ ceiling (also above) is a separate, NWNX-confirmed-
+       structural limitation unrelated to instruction budget at all.
+    4. **Fix already shipped regardless of the open root cause**: `RA_RollClass` now
+       caps every write to `min(cls_spgn slot count, GetMemorizedSpellCountByLevel())`
+       rather than trusting the 2DA blindly, so it degrades gracefully (writes only
+       what the engine will actually accept, silently skipping the rest) instead of
+       wastefully attempting writes that do nothing.
+  - **Known follow-up gap**: `verify_creature`'s `caster_no_spells` check only reads
+    static build-time state (`MemorizedList`/`SpecAbilityList`) — it has no way to see
+    what `RA_OnSpawn` rolls at runtime, so it now false-positives on every caster
+    wired to this system (documented as expected in `adventure-actors/SKILL.md`, but
+    not actually fixed at the check itself). A real fix would need the check to
+    recognize the `RA_OnSpawn`/`RA_OnEndRound` wiring on `ScriptSpawn` and skip itself
+    for that creature, rather than relying on the skill doc alone to explain away the
+    false positive.
+  - **Process pitfall worth remembering for any future work touching this include**:
+    NWScript's `#include` resolves at compile time, baked into the including script's
+    `.ncs` bytecode, exactly like a C header. Regenerating `inc_random_abil.nss`'s
+    *source* via `create_random_abilities_system` (which deliberately never compiles
+    it, since an include has no `main()`) has zero runtime effect until every script
+    that `#include`s it is *recompiled*. Several rounds of this session's live
+    debugging were silently testing stale bytecode from an old compile of the wrapper
+    script, because only the include's source was being regenerated between test
+    iterations — always recompile every wrapper script after changing an include it
+    depends on, not just the include itself.
 - **FIXED — the feat/spell/equipment bug class (no feats, no spells, wrong equip slot,
   wrong-weight armor, no melee backup, inconsistent cross-area appearance) is now
   caught automatically, and the actual root cause was a documentation gap, not a code
@@ -1286,10 +1485,13 @@ not guessed). Scope notes, so a future session doesn't re-litigate these:
 - `build_npc_stat_block` writes the mechanical stat block (ability scores, FeatList,
   SkillList, HP, StartingPackage) onto an *existing* blueprint — it does not create
   one (`create_creature_blueprint` still does identity/race/appearance/name) and does
-  not compute spells (option (b)'s runtime-include idea and real spellbook baking are
-  both still undone — see the `build_npc_stat_block` design note in the
-  Henchmen/Companions section). Primarily targets Henchmen for now; general-NPC use
-  is a documented future extension, not blocked by anything in the implementation.
+  not compute spells itself. Spells are no longer this tool's gap to close, though —
+  see "BUILT (2026-09-10) — real per-playthrough random caster spellbooks" under
+  Henchmen/Companions below: option (b)'s runtime-include idea shipped, just as its
+  own separate system (`create_random_abilities_system`) rather than as part of this
+  tool, since it needs to run fresh at `OnSpawn` every playthrough rather than be
+  baked once at build time. Primarily targets Henchmen for now; general-NPC use is a
+  documented future extension, not blocked by anything in the implementation.
 - `equip_npc_by_role` deliberately does **not** do fuzzy blueprint search itself —
   there's no reusable exported search function to call into (`list_blueprints`/
   `resman_search` are inline MCP tool handlers), and inventing a resref would violate
@@ -1408,10 +1610,15 @@ spend across real class skills, capped at level+3), and HP — all read live fro
 `classes.2da`/`racialtypes.2da`/`cls_feat_*`/`cls_bfeat_*`/`cls_skill_*` rather than
 re-derived by hand per NPC, closing exactly the bug class described below (verified
 by a dedicated unit test suite built against real-data-shaped 2DA fixtures, not just
-plausible-looking numbers). **Spell `MemorizedList`s are still not computed** — real
-spellbook baking remains deferred (see the Henchmen/Companions section); a companion
-still gets spells from the live `LevelUpHenchman()` call at recruit, matching the
-existing, unchanged convention.
+plausible-looking numbers). **This tool still does not compute spell `MemorizedList`s
+itself** — a companion still gets spells from the live `LevelUpHenchman()` call at
+recruit, matching the existing, unchanged convention, and a non-companion caster Key
+NPC still uses `create_creature_blueprint`'s `spells` param for a fixed loadout when
+one is wanted. But "real spellbook baking" as a general problem is no longer deferred
+— see "BUILT (2026-09-10) — real per-playthrough random caster spellbooks" above: it
+shipped as its own runtime NWScript system (`create_random_abilities_system`) rather
+than as static baking inside this tool, since the whole point is rolling fresh every
+time the module loads rather than being fixed once at build time.
 
 **TODO — reduce how much of NPC generation the LLM does by hand vs. deterministic
 code, broadly, not just for gear.** This session's actual work — computing ability

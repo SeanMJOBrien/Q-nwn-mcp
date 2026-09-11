@@ -30,6 +30,7 @@ import { registerRewardTools } from "./tools/reward-tools.js";
 import { registerGearTools } from "./tools/gear-tools.js";
 import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
 import { registerNpcTools } from "./tools/npc-tools.js";
+import { registerRandomAbilitiesTools } from "./tools/random-abilities-tools.js";
 
 const server = new McpServer({
   name: "nwn-mcp",
@@ -67,6 +68,7 @@ registerRewardTools(server);
 registerGearTools(server);
 registerSpecCheckTools(server);
 registerNpcTools(server);
+registerRandomAbilitiesTools(server);
 
 // ── Adventure creator tools ─────────────────────────────────────────────
 registerAdventureTools(server);
