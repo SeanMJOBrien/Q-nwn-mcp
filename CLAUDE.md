@@ -1276,6 +1276,24 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
        populating known spells the way the toolset's own level-up UI would. This
        needs real further investigation (see the doc above for the concrete next
        experiments) before Tier 1 can be trusted above cantrip+1st-level.
+       **`docs/tfndev-random-npc-system-findings.md` traces how `~/tfndev`'s own
+       mature random-NPC system solves this exact class of problem**: its
+       memorizing-class spell writes are plain `SetMemorizedSpell()` too (no
+       known-spell pre-step), so the likely real fix is upstream, in how a
+       creature gets its class levels — `NWNX_Creature`'s level-manipulation
+       functions (a hard prerequisite for that whole system) may correctly
+       initialize per-level spell-slot state in a way vanilla `LevelUpHenchman()`
+       does not, consistent with this project's own separate, already-documented
+       finding that `LevelUpHenchman()` grants zero automatic feats either. Not
+       yet tested — the existing verify server already runs `nwnxee/unified` and
+       could test this cheaply by enabling `NWNX_Creature` (currently disabled via
+       `NWNX_CORE_SKIP_ALL=yes`). A real, independently-confirmed instruction-
+       budget insight from a separate, real, shipped integration of the same
+       tfndev system (UniverseOfArlandia, see
+       `~/.claude/projects/-home-qlippoth-git-UniverseOfArlandia/memory/
+       random-adventurer-henchman-feature.md`): `ExecuteScript` shares the
+       caller's instruction budget, `DelayCommand` gets a fresh one — worth
+       trying for `RA_OnSpawn`/`RA_OnEndRound` regardless of the NWNX question.
     4. **Fix already shipped regardless of the open root cause**: `RA_RollClass` now
        caps every write to `min(cls_spgn slot count, GetMemorizedSpellCountByLevel())`
        rather than trusting the 2DA blindly, so it degrades gracefully (writes only
