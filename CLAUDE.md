@@ -1292,9 +1292,17 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
        **the identical level-2+ ceiling** vanilla `LevelUpHenchman()` does,
        including NWNX's own `GetMaxSpellSlots()` reporting 0, not just
        `GetMemorizedSpellCountByLevel()`. The leveling mechanism was never the
-       variable that mattered. One real thread is still untried:
-       `NWNX_Creature_AddKnownSpell` (which tfndev only calls for Bard/Sorcerer)
-       on a Tier 1 class — see the findings doc for why and how to test it. A real,
+       variable that mattered. **Followed up and also refuted**:
+       `NWNX_Creature_AddKnownSpell` on the Tier 1 class itself genuinely worked
+       (confirmed via `GetKnownSpellCount` going 0→1) but didn't move the slot
+       ceiling at all — and neither did `NWNX_Creature_SetRemainingSpellSlots`, a
+       *direct* setter for the exact stuck value. **All three NWNX avenues tried
+       hit the identical ceiling — the NWNX route for this specific problem is
+       now closed**, not just this one hypothesis; whatever gates it looks
+       structural (a per-level slot data structure likely only ever allocated for
+       a fixed, small number of levels somewhere in creature initialization, not
+       growable afterward by any scripting call, vanilla or NWNX) rather than
+       "the right call hasn't been found." A real,
        independently-confirmed instruction-
        budget insight from a separate, real, shipped integration of the same
        tfndev system (UniverseOfArlandia, see

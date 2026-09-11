@@ -204,17 +204,48 @@ either the debugging or the experiment.
    function this experiment didn't try, such as directly forcing known spells via
    `NWNX_Creature_AddKnownSpell` *before* leveling rather than after).
 
-**Status: the specific hypothesis tested (NWNX-native leveling instead of vanilla
-`LevelUpHenchman()`) is refuted — it does not fix the level-2+ ceiling.** This is a
-real, clean, conclusive negative result, not a blocked experiment. It does *not*
-close off NWNX entirely — `NWNX_Creature_AddKnownSpell` (confirmed to exist and to
-be what tfndev's own code calls for Bard/Sorcerer) was never tried on a Tier 1 class
-in this pass and remains a real, untried next candidate. The verify server was fully
-reverted: `docker-compose.yml` back to `:latest`, the UOA test module and read-only
-hak/tlk mounts removed, `config/nwserver.env`'s `NWNX_CREATURE_SKIP`/
-`NWNX_OBJECT_SKIP` overrides removed and `NWN_MODULE` restored to
-`henchman-gear-showcase` (back to the original all-skipped, zero-NWNX baseline for
-`inc_spec_check.nss`-style testing).
+9. **Round 3 — `NWNX_Creature_AddKnownSpell` on the Tier 1 class itself, tested and
+   also refuted.** Same `UOA_test_copy` technique (a fresh copy, never the
+   original), same `09544eb` tag. A level-5 Wizard, before any known-spell call:
+   `L2:engineSlots=0,nwnxMax=0,known=0 L3:engineSlots=0,nwnxMax=0,known=0`. Found a
+   real level-2 spell (id 8) and level-3 spell (id 20) live via
+   `GetSpellLevelByClass` (not guessed), then called
+   `NWNX_Creature_AddKnownSpell(oCreature, CLASS_TYPE_WIZARD, 2, 8)` and the level-3
+   equivalent. Result immediately after:
+   `L2:engineSlots=0,nwnxMax=0,known=1 L3:engineSlots=0,nwnxMax=0,known=1` —
+   **`AddKnownSpell` genuinely worked** (`GetKnownSpellCount` went from 0 to 1 at
+   both levels, proving the call took effect), **but the slot ceiling didn't move at
+   all** — `engineSlots`/`nwnxMax` stayed exactly 0. `SetMemorizedSpell` still
+   silently failed (`readback=-1`) at both levels.
+10. **Went one step further than planned**: also called
+    `NWNX_Creature_SetRemainingSpellSlots(oCreature, CLASS_TYPE_WIZARD, level, 1)`
+    directly — a genuine, direct setter for exactly the value that's stuck at 0 —
+    immediately before the `SetMemorizedSpell` retry. **`GetMemorizedSpellCountByLevel`
+    still read back 0 afterward**, and the `SetMemorizedSpell` retry still failed
+    the same way. A function whose entire documented purpose is "set this exact
+    value" did not change what the query for that same value returns.
+
+**Status: fully resolved, and the finding is stronger than a single refuted
+hypothesis.** All three real NWNX avenues tried — native leveling
+(`NWNX_Creature_LevelUp`), adding known spells (`NWNX_Creature_AddKnownSpell`), and
+directly forcing the slot count (`NWNX_Creature_SetRemainingSpellSlots`) — hit the
+**identical** zero ceiling at spell levels 2+ for a Wizard on this engine build. That
+a *direct setter* for the exact value in question doesn't move it points away from
+"the right NWNX call hasn't been found yet" and toward something more structural:
+most likely a per-level spell-slot data structure that's only ever allocated for a
+fixed, small number of levels (matching what both vanilla and NWNX leveling
+successfully unlock — levels 0-1) at some point in creature initialization this
+project hasn't identified, with no scripting-level call (vanilla or NWNX) able to
+grow it afterward. Confirming that would need source-level investigation of
+NWNX_Creature's C++ implementation or the engine itself — out of scope for this
+project's own tooling. **Recommend not pursuing further NWNX avenues for this
+specific problem** without a new, concrete lead — three independent, well-targeted
+attempts at the same underlying value all failed identically. The verify server was
+fully reverted after each round: `docker-compose.yml` back to `:latest`, the UOA
+test module and read-only hak/tlk mounts removed, `config/nwserver.env`'s
+`NWNX_CREATURE_SKIP`/`NWNX_OBJECT_SKIP` overrides removed and `NWN_MODULE` restored
+to `henchman-gear-showcase` (back to the original all-skipped, zero-NWNX baseline
+for `inc_spec_check.nss`-style testing).
 
 ## The actual answer to "how do they get past what we hit"
 
@@ -337,25 +368,30 @@ require that decision:
    in-line call after `ExecuteScript`ing the original default script may make the
    single-pass bucketing fix even more headroom-safe, and is worth testing
    regardless of anything else in this document.
-2. **The NWNX_Creature leveling hypothesis — tested to completion, refuted.**
-   `NWNX_Creature_LevelUp` produces the identical level-2+ spell-slot ceiling
-   vanilla `LevelUpHenchman()` does — confirmed against `~/uoa`'s own real, live
+2. **The NWNX_Creature route is closed — tested to completion, fully refuted.**
+   Three independent, well-targeted NWNX avenues (`NWNX_Creature_LevelUp`,
+   `NWNX_Creature_AddKnownSpell`, and `NWNX_Creature_SetRemainingSpellSlots` — a
+   *direct* setter for the exact value in question) all hit the identical
+   level-2+ zero ceiling on a Wizard, confirmed against `~/uoa`'s own real, live
    NWNX setup (see "The NWNX_Creature leveling hypothesis" section above for the
-   full record). Don't re-run this experiment; the leveling mechanism was never the
-   variable that mattered. The one real, untried thread left in the NWNX direction
-   is `NWNX_Creature_AddKnownSpell` on a Tier 1 class (tfndev's own code only calls
-   it for Bard/Sorcerer) — worth one more small experiment before concluding NWNX
-   can't help here at all, using the same `~/uoa`-module-copy technique (the only
-   one confirmed to actually work end-to-end) rather than fighting `nwnxee/unified`
-   tag/ABI compatibility again.
-3. **If that's confirmed too, evaluate option 2 above** (use tfndev's system
-   offline as an authoring tool, ship only the resulting static, NWNX-free `.utc`
-   data) as a real path to give this project's own Tier 1 casters full multi-level
-   spellbooks without changing this project's hosting requirements at all.
-   `StoreCampaignObject` (also above) may be a cleaner
-   mechanism for the "export" step than manual GFF struct extraction — worth a
-   small experiment to confirm its encoding before committing to either approach.
+   full record). Don't re-run any of these three; none of them is the missing
+   piece. Whatever gates this is more structural than "the right script call
+   hasn't been tried yet" — likely a per-level spell-slot data structure only
+   ever allocated for a fixed number of levels somewhere in creature
+   initialization, not growable afterward by any scripting-level call. Confirming
+   that would need NWNX_Creature's C++ source or engine-level investigation, out
+   of scope for this project.
+3. **Given #2 is now closed, option 2 above (use tfndev's system offline as an
+   authoring tool, ship only the resulting static, NWNX-free `.utc` data) is no
+   longer viable as originally scoped** — it depended on NWNX successfully
+   producing a real multi-level spellbook to snapshot, which it can't for Tier 1
+   classes past level 1 on this engine build. Tier 2 (Bard/Sorcerer) is
+   unaffected — `AddKnownSpell` is confirmed real and working there, matching
+   this project's own already-working, NWNX-free Tier 2 design. `StoreCampaignObject`
+   remains a real, general mechanism for snapshotting a creature's runtime state
+   (worth remembering for other purposes), but it can't produce something this
+   experiment couldn't produce directly.
 
-All three are scoped as follow-up research/decisions — #1 untried, #2's leveling
-hypothesis tested and refuted (its `AddKnownSpell` follow-up still untried), #3
-gated on that follow-up.
+Status: #1 (the `DelayCommand` instruction-budget fix) is the only item left with
+real, unexplored upside — untried, cheap, purely vanilla. #2 is closed. #3 is closed
+as a consequence of #2, for Tier 1 specifically.
