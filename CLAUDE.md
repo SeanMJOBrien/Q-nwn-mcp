@@ -876,20 +876,44 @@ any other generated file type, so structurally-broken assets shipped silently. T
   friends resolve at runtime and must never be reported as missing.
 
 **A live isolated verification server exists and has run a real end-to-end check
-successfully** (`~/nwn-mcp-verify-server`, outside any git-tracked repo — see
-`docs/runtime-verification-spec.md` §1 for the full setup and findings). `verify_*` can
-only check static GFF preconditions; this closes the gap for behavior that only exists
-once the engine actually runs a script. First real run, against "Henchman Gear Showcase"
-(the module whose bad-stats bug report started this whole effort): 110 companions wired
-with `SPEC_*` vars, run headless, grepped for `[SPEC_FAIL]` — caught the exact bug (empty
-`FeatList`, `StartingPackage` stuck at 0) with zero human interaction. **What's still
-missing is automation**: copying a generated module into the server's `modules/` folder,
-launching, polling for load completion, grepping, tearing down, and feeding failures back
-into nwn-mcp's repair tools is all still done by hand — the orchestration loop is designed
-(`docs/runtime-verification-spec.md` §5) and proven manually, but not built into a tool.
-`randspellbooks` (`~/tfndev/src/nss/inc_rand_spell.nss`) also still depends on NWNX and a
-persistent campaign database this project has no way to invoke — out of scope for
-`inc_spec_check.nss`, which deliberately uses zero `NWNX_*` functions.
+successfully** (`~/nwn-mcp-verify-server` — a fork of
+[`urothis/nwnxee-docker-template`](https://github.com/urothis/nwnxee-docker-template),
+a real git repo, not outside one — see `docs/runtime-verification-spec.md` §1 for the
+full setup and findings). `verify_*` can only check static GFF preconditions; this
+closes the gap for behavior that only exists once the engine actually runs a script.
+First real run, against "Henchman Gear Showcase" (the module whose bad-stats bug
+report started this whole effort): 110 companions wired with `SPEC_*` vars, run
+headless, grepped for `[SPEC_FAIL]` — caught the exact bug (empty `FeatList`,
+`StartingPackage` stuck at 0) with zero human interaction. Reused again in the
+`create_random_abilities_system` work (2026-09-10/11): found and confirmed a real
+instruction-budget bug, verified the fix, and ran three separate NWNX experiments
+against it (see `docs/random-abilities-runtime-findings.md` and
+`docs/tfndev-random-npc-system-findings.md`) — this server's actual, demonstrated
+purpose is exactly "spin up a real engine, load a module built by this project's
+tooling, and observe what really happens," reusable for any future debugging session
+that needs the same.
+- **TODO (user-raised, 2026-09-11) — commit the server's own simplification.**
+  `~/nwn-mcp-verify-server`'s `git status` currently shows uncommitted deletions
+  (`config/db.env`/`grafana.env`/`influxdb.env`, the Grafana provisioning JSON/YAML)
+  and modifications to `config/nwserver.env`/`docker-compose.yml` — a prior session
+  already stripped the template's original Postgres+Redis+InfluxDB+Grafana stack
+  down to the bare single-`nwserver` shape it actually runs as today, but never
+  committed that simplification. Worth committing next time this server is used for
+  real debugging, so the working, minimal configuration is the actual committed
+  state rather than a perpetual uncommitted diff against the original template.
+- **What's still missing is automation**: copying a generated module into the
+  server's `modules/` folder, launching, polling for load completion, grepping,
+  tearing down, and feeding failures back into nwn-mcp's repair tools is all still
+  done by hand — the orchestration loop is designed (`docs/runtime-verification-spec.md`
+  §5) and proven manually (repeatedly, across two separate verification efforts now),
+  but not built into a tool.
+- `randspellbooks` (`~/tfndev/src/nss/inc_rand_spell.nss`) also still depends on
+  NWNX and a persistent campaign database — out of scope for `inc_spec_check.nss`,
+  which deliberately uses zero `NWNX_*` functions. See
+  `docs/tfndev-random-npc-system-findings.md` for the fuller investigation into
+  whether/how NWNX could be used from this project at all (conclusion: usable for
+  research on this same verify server, confirmed workable for real experiments, but
+  not something to adopt into shipped output without deliberate scope sign-off).
 
 **TODO — what's script-verified today vs. what still relies on LLM self-report,
 surveyed against a real large custom-adventure build** ("The Six-Fold Trial": a
