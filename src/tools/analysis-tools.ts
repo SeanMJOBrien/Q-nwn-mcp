@@ -437,10 +437,25 @@ export function registerAnalysisTools(server: McpServer): void {
       // in CLAUDE.md — this closes that detection gap. Static analysis only
       // (regex over the script's own source); it cannot trace ExecuteScript()
       // call chains into a different script.
+      //
+      // Legitimate-exception path: the user may deliberately want a specific
+      // creature to have no drops (a mook with nothing worth taking, a boss
+      // whose real reward is scripted rather than a corpse drop) — the same
+      // SetLootable(..., FALSE)/SetDroppableFlag(..., FALSE) call that's a bug
+      // everywhere else is expected, deliberate behavior here. A placed
+      // instance carrying a LOOT_INTENTIONAL local variable in its VarTable
+      // (create_creature_blueprint's varTable param — same mechanism as
+      // HENCH_LEVEL/SPEC_* — merged into the blueprint before placement, so
+      // it's present on the placed instance the same way, per the "VarTable is
+      // a separate copy" pitfall in CLAUDE.md) marks the override as intended;
+      // the checker skips the warning for that creature instead of flagging it.
       {
         const scriptSources = await loadScriptSources(index);
         const setLootableFalse = /SetLootable\s*\([^,]+,\s*(FALSE|0)\s*\)/i;
         const setDroppableFalse = /SetDroppableFlag\s*\([^,]+,\s*(FALSE|0)\s*\)/i;
+
+        const hasIntentionalLootFlag = (creature: GffObj): boolean =>
+          getFieldList(creature, "VarTable").some((v) => getFieldStr(v, "Name").toUpperCase() === "LOOT_INTENTIONAL");
 
         for (const [areaResref] of index.areas) {
           const gitDoc = index.parsedGff.get(`${areaResref}.git`);
@@ -452,11 +467,12 @@ export function registerAnalysisTools(server: McpServer): void {
             if (!spawnScript) continue;
             const source = scriptSources.get(spawnScript.toLowerCase());
             if (!source) continue;
+            if (hasIntentionalLootFlag(creature)) continue;
 
             if (getFieldNum(creature, "Lootable") === 1 && setLootableFalse.test(source)) {
               warnings.push({
                 type: "onspawn_overrides_lootable",
-                message: `Creature "${tag}" in ${areaResref} has Lootable=1 but its OnSpawn script "${spawnScript}" calls SetLootable(..., FALSE) — this silently overrides the flag at runtime and nothing will drop`,
+                message: `Creature "${tag}" in ${areaResref} has Lootable=1 but its OnSpawn script "${spawnScript}" calls SetLootable(..., FALSE) — this silently overrides the flag at runtime and nothing will drop. If this is deliberate (e.g. a mook with nothing worth taking), add a LOOT_INTENTIONAL local variable via create_creature_blueprint's varTable param to silence this warning.`,
                 resource: `${areaResref}.git`,
               });
             }
@@ -467,7 +483,7 @@ export function registerAnalysisTools(server: McpServer): void {
             if (hasDropableItem && setDroppableFalse.test(source)) {
               warnings.push({
                 type: "onspawn_overrides_droppable",
-                message: `Creature "${tag}" in ${areaResref} carries at least one Dropable=1 item but its OnSpawn script "${spawnScript}" calls SetDroppableFlag(..., FALSE) — this silently overrides the flag at runtime for whatever item(s) it targets`,
+                message: `Creature "${tag}" in ${areaResref} carries at least one Dropable=1 item but its OnSpawn script "${spawnScript}" calls SetDroppableFlag(..., FALSE) — this silently overrides the flag at runtime for whatever item(s) it targets. If this is deliberate, add a LOOT_INTENTIONAL local variable via create_creature_blueprint's varTable param to silence this warning.`,
                 resource: `${areaResref}.git`,
               });
             }

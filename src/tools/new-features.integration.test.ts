@@ -1353,7 +1353,7 @@ describe("validate_module cross-area appearance consistency", () => {
 // ─── Tests: validate_module OnSpawn lootable/droppable override scanner ──
 
 describe("validate_module OnSpawn lootable/droppable override scanner", () => {
-  function makeSpawnCreature(tag: string, spawnScript: string, lootable: boolean): GffObj {
+  function makeSpawnCreature(tag: string, spawnScript: string, lootable: boolean, intentional = false): GffObj {
     return {
       __struct_id: 4,
       Tag: { type: "cexostring", value: tag },
@@ -1362,6 +1362,9 @@ describe("validate_module OnSpawn lootable/droppable override scanner", () => {
       ScriptSpawn: { type: "resref", value: spawnScript },
       Equip_ItemList: { type: "list", value: [] },
       ItemList: { type: "list", value: [] },
+      VarTable: intentional
+        ? { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "LOOT_INTENTIONAL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 1 } }] }
+        : { type: "list", value: [] },
       XPosition: { type: "float", value: 5 },
       YPosition: { type: "float", value: 5 },
       ZPosition: { type: "float", value: 0 },
@@ -1409,6 +1412,75 @@ describe("validate_module OnSpawn lootable/droppable override scanner", () => {
       const result = await client.callTool({ name: "validate_module", arguments: {} });
       const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
       expect(parsed.warnings.find((w) => w.type === "onspawn_overrides_lootable")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag a Lootable override when the creature carries a LOOT_INTENTIONAL local variable", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    await writeScript("a_spawn_off2", "void main() { SetLootable(OBJECT_SELF, FALSE); }");
+    const git = makeGitDoc() as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push(makeSpawnCreature("intentional_mook", "a_spawn_off2", true, true));
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "onspawn_overrides_lootable")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag a Dropable override when the creature carries a LOOT_INTENTIONAL local variable", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    await writeScript("a_spawn_drop_off", "void main() { SetDroppableFlag(GetFirstItemInInventory(OBJECT_SELF), FALSE); }");
+    const git = makeGitDoc() as GffObj;
+    const creature = makeSpawnCreature("intentional_boss", "a_spawn_drop_off", false, true);
+    (creature.ItemList as { value: GffObj[] }).value.push({
+      __struct_id: 0,
+      Dropable: { type: "byte", value: 1 },
+    } as unknown as GffObj);
+    (git["Creature List"] as { value: GffObj[] }).value.push(creature);
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "onspawn_overrides_droppable")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("still flags a Dropable override on a creature with no LOOT_INTENTIONAL flag", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    await writeScript("a_spawn_drop_off2", "void main() { SetDroppableFlag(GetFirstItemInInventory(OBJECT_SELF), FALSE); }");
+    const git = makeGitDoc() as GffObj;
+    const creature = makeSpawnCreature("unmarked_boss", "a_spawn_drop_off2", false, false);
+    (creature.ItemList as { value: GffObj[] }).value.push({
+      __struct_id: 0,
+      Dropable: { type: "byte", value: 1 },
+    } as unknown as GffObj);
+    (git["Creature List"] as { value: GffObj[] }).value.push(creature);
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string; message: string }> };
+      const found = parsed.warnings.find((w) => w.type === "onspawn_overrides_droppable");
+      expect(found).toBeDefined();
+      expect(found?.message).toContain("unmarked_boss");
     } finally {
       await cleanup();
     }
