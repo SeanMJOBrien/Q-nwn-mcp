@@ -34,7 +34,7 @@ import type { ModuleIndex } from "../types/module.js";
 import { EQUIP_SLOT_MAP } from "../util/equip-slots.js";
 import { getGitDoc, resolveBlueprint, writeBackGit } from "../util/git-helpers.js";
 import { buildNpcStatBlock, type PowerLevel } from "../util/npc-stat-block.js";
-import { CLASS_WEAPON_PREFERENCE } from "../util/npc-weapon-preferences.js";
+import { pickWeaponPreference } from "../util/npc-weapon-preferences.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
 import { snapshotGitForUndo } from "../util/undo.js";
 import { armorTierFeat, REQ_FEAT_COLUMNS, verifyCreature } from "../util/verify/blueprints.js";
@@ -135,6 +135,7 @@ export function registerNpcTools(server: McpServer): void {
         classId: toI(classId),
         level: toI(level),
         powerLevel: (powerLevel as PowerLevel | undefined) ?? "elite",
+        seed: resref,
       });
 
       const existingRace = getFieldNum(obj, "Race");
@@ -227,7 +228,7 @@ export function registerNpcTools(server: McpServer): void {
     "equip_npc_by_role",
     "Equip a creature (blueprint or placed instance) with caller-supplied gear, validated against its baked FeatList proficiencies before equipping — never guesses a real item resref itself (source items with list_blueprints/resman_search first, exactly as documented). " +
       "Rejects (or with force:true, equips anyway and warns) a weapon/shield the creature has none of the baseitems.2da ReqFeat proficiency feats for, and Chest-slot armor whose AC-Bonus-derived weight tier has no matching Armor Proficiency feat. " +
-      "Reports a get_wealth_budget reference figure for the given level/role, recommends a weapon type from a curated per-class preference when no righthand item was supplied, and runs verify_creature as its own last step so gear validity and legitimacy are confirmed in one call.",
+      "Reports a get_wealth_budget reference figure for the given level/role, recommends a weapon type from a curated per-class preference list when no righthand item was supplied (deterministically varied by the creature's own tag/resref, so same-class NPCs don't all converge on one weapon), and runs verify_creature as its own last step so gear validity and legitimacy are confirmed in one call.",
     {
       resref: z.string().optional().describe("Blueprint resref to equip"),
       area: z.string().optional().describe("Area resref, when equipping a placed instance (with `tag`)"),
@@ -358,7 +359,9 @@ export function registerNpcTools(server: McpServer): void {
       await save();
 
       const recommendedWeapon =
-        !equipMap.righthand && resolvedClassId !== undefined ? CLASS_WEAPON_PREFERENCE[resolvedClassId] : undefined;
+        !equipMap.righthand && resolvedClassId !== undefined
+          ? pickWeaponPreference(resolvedClassId, target.label)
+          : undefined;
       const budget =
         resolvedLevel !== undefined ? budgetBreakdown(resolvedLevel, (role as GearRole) ?? "pc") : undefined;
 

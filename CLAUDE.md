@@ -1485,21 +1485,50 @@ derived from the resman stack (baseitems.2da carries no variant count), the help
 pick a random valid variant per part so generated NPCs stop sharing identical weapons.
 Until then "default model" is correct: a wrong variant index renders as nothing at all.
 
-**TODO (user-raised, 2026-09-09): weapon *type* selection should also be fairly
-random, not just model-variant appearance.** `CLASS_WEAPON_PREFERENCE`
-(`src/util/npc-weapon-preferences.ts`) maps each class to a single preferred weapon
-(e.g. every generic Fighter → Longsword), and `equip_npc_by_role` recommends that one
-weapon whenever no `righthand` item is supplied — correct for feat-baking (a class
-needs *a* consistent weapon to bake Focus/Specialization feats toward) but it means
-every same-class NPC across a generated module converges on the same weapon, both
-visually and mechanically. A real fix would widen `CLASS_WEAPON_PREFERENCE` to a
-short list of plausible weapons per class (already-proficient types, so no
-proficiency mismatch) and pick among them — deterministically-seeded, matching this
-project's no-dice-rolling convention, e.g. keyed off the creature's tag/resref rather
-than `Math.random()` — instead of always returning the one curated default. Not yet
-scoped or built; `respec_weapon_feats` already exists as the tool to re-target a
-creature at a different weapon after the fact, so this TODO is about the *initial*
-pick being varied, not about the retargeting mechanism itself.
+**BUILT (2026-09-16) — weapon *type* selection is now varied, deterministically.**
+`CLASS_WEAPON_PREFERENCES` (`src/util/npc-weapon-preferences.ts`, renamed/widened from
+the old singular `CLASS_WEAPON_PREFERENCE`) maps each class to a short list of 2-3
+proficiency-safe candidate weapons instead of one fixed default, and
+`pickWeaponPreference(classId, seed)` chooses among them deterministically by the
+creature's own tag/resref (FNV-1a hash mod list length — no `Math.random()`, matching
+this project's reproducible-content convention: the same creature always gets the same
+weapon, but different same-class NPCs across a module spread across the list instead
+of all converging on one). `build_npc_stat_block` (bonus/generic feat-slot picks, seed
+= its `resref` param) and `equip_npc_by_role` (default weapon recommendation, seed =
+the resolved creature's tag/resref) both switched from the old direct table lookup to
+this picker. `respec_weapon_feats` is unaffected — it doesn't consume this table
+(verified while making this change: only `build_npc_stat_block` and
+`equip_npc_by_role` ever read it), and remains the tool to re-target a creature at a
+different weapon after the fact.
+
+Every candidate weapon in every class's list was verified proficiency-safe against
+real 2DA data, not assumed from general D&D 3.5 rules: each weapon's real
+`baseitems.2da` `ReqFeat0-4` (the same OR-set `verify_creature`'s
+`weapon_proficiency_mismatch` check reads) was cross-checked against that class's real
+automatic weapon-proficiency feat(s) from `cls_feat_<class>.2da` (`List=3`,
+`GrantedOnLevel=1`). **This verification pass found and fixed two real, latent bugs in
+the previous single-entry table**: Cleric's old default (Warhammer) and Bard's old
+default (Rapier) both require Martial Weapon Proficiency (feat 45) — but
+`cls_feat_cler.2da`/`cls_feat_bard.2da` only grant `WeapProfSim` (feat 46, Simple)
+automatically in this engine's tables, no martial or class-specific weapon feat for
+either class. (Tabletop 3.5 gives a Cleric her deity's favored weapon and a Bard a
+small martial exception list; neither exception exists in this engine's automatic
+class-feat rows.) A generic Cleric or Bard built via `build_npc_stat_block` with the
+old defaults and no further bonus feat would have failed `verify_creature`'s own
+`weapon_proficiency_mismatch` check — undetected until this pass, since nothing had
+cross-checked the curated table against the verify check's own data source before.
+Both entries were replaced with real Simple-weapon options (Cleric: Morningstar/Light
+Mace/Quarterstaff; Bard: Sickle/Morningstar/Dagger). Druid (`WeapProfDruid`, feat 48),
+Rogue (`WeapProfRogue`, feat 50), and Wizard (`WeapProfWizard`, feat 51) each have
+their own class-specific proficiency feat rather than generic Simple/Martial — their
+lists are drawn from real weapons whose `ReqFeat0-4` contains that exact feat id,
+which lines up closely with each class's real tabletop weapon list (confirmed, not
+assumed: Druid's candidates — Quarterstaff/Sickle/Scimitar — and Wizard's —
+Quarterstaff/Dagger/Heavy Crossbow — match the tabletop SRD lists almost exactly).
+9 new unit tests in `npc-weapon-preferences.test.ts` (determinism, spread across
+seeds, Monk still `null`, no duplicate `baseItem` within a class, the two corrected
+defaults), plus the existing `npc-stat-block.test.ts`/`npc-tools.integration.test.ts`
+coverage updated to assert against the seeded pick rather than one hardcoded weapon.
 
 **BUILT (2026-09-09) — option (a) below, `equip_npc_by_role`, plus `build_npc_stat_block`
 and `respec_weapon_feats`.** All three live in `src/tools/npc-tools.ts`, backed by

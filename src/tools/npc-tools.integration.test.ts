@@ -323,6 +323,7 @@ describe("equip_npc_by_role", () => {
     mockIndex.resources.set(key, { resref: "fighter_npc", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
 
     const { registerNpcTools } = await import("./npc-tools.js");
+    const { pickWeaponPreference } = await import("../util/npc-weapon-preferences.js");
     const { client, cleanup } = await createTestClient(registerNpcTools);
     try {
       const result = await client.callTool({
@@ -330,10 +331,36 @@ describe("equip_npc_by_role", () => {
         arguments: { resref: "fighter_npc", equipment: JSON.stringify({ chest: "med_armor" }) },
       });
       const parsed = parseResult(result) as { recommendedWeapon?: { label: string } };
-      expect(parsed.recommendedWeapon?.label).toBe("Longsword");
+      // Fighter is fully martial-proficient (feats 45+46), so any of its
+      // candidate weapons is valid — the actual pick is deterministic by the
+      // creature's own tag/resref ("fighter_npc"), not fixed to one weapon.
+      expect(parsed.recommendedWeapon?.label).toBe(pickWeaponPreference(4, "fighter_npc")?.label);
     } finally {
       await cleanup();
     }
+  });
+
+  it("picks the same weapon for the same creature across repeated calls (deterministic, no dice rolling)", async () => {
+    const { pickWeaponPreference } = await import("../util/npc-weapon-preferences.js");
+    const first = pickWeaponPreference(4, "recurring_fighter");
+    const second = pickWeaponPreference(4, "recurring_fighter");
+    expect(first).toEqual(second);
+  });
+
+  it("spreads different same-class creatures across the candidate list instead of one fixed default", async () => {
+    const { pickWeaponPreference } = await import("../util/npc-weapon-preferences.js");
+    const labels = new Set(
+      ["npc_a", "npc_b", "npc_c", "npc_d", "npc_e", "npc_f", "npc_g", "npc_h"].map(
+        (seed) => pickWeaponPreference(4, seed)?.label,
+      ),
+    );
+    // Fighter has 3 candidates; 8 distinct seeds should not all land on one.
+    expect(labels.size).toBeGreaterThan(1);
+  });
+
+  it("returns null for Monk, which has no curated weapon candidates", async () => {
+    const { pickWeaponPreference } = await import("../util/npc-weapon-preferences.js");
+    expect(pickWeaponPreference(5, "any_monk")).toBeNull();
   });
 });
 
