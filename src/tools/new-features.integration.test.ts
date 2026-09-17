@@ -32,19 +32,23 @@ vi.mock("../nim-tools.js", () => ({
 
 let mockIndex: ModuleIndex;
 
-vi.mock("../module-loader.js", () => ({
-  requireIndex: () => mockIndex,
-  buildResmanOptions: async () => ({
-    root: undefined,
-    userDir: undefined,
-    erfs: undefined,
-    dirs: [mockIndex.tempDir],
-  }),
-  buildDialogSummary: () => ({
-    resref: "", entryCount: 0, replyCount: 0, startingNodes: [],
-    scriptsUsed: [], conditionsUsed: [], usedByCreatures: [],
-  }),
-}));
+vi.mock("../module-loader.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../module-loader.js")>();
+  return {
+    ...actual,
+    requireIndex: () => mockIndex,
+    buildResmanOptions: async () => ({
+      root: undefined,
+      userDir: undefined,
+      erfs: undefined,
+      dirs: [mockIndex.tempDir],
+    }),
+    buildDialogSummary: () => ({
+      resref: "", entryCount: 0, replyCount: 0, startingNodes: [],
+      scriptsUsed: [], conditionsUsed: [], usedByCreatures: [],
+    }),
+  };
+});
 
 vi.mock("./tileset-tools.js", () => ({
   invalidateTagToAreaCache: vi.fn(),
@@ -874,6 +878,102 @@ describe("suggest_encounter", () => {
       const text = resultText(result);
       expect(text).toContain("dragon");
       expect(text).toContain("suggestions");
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+// ─── get_balance_report: partyLevel / EL difficulty ──────────────────────
+
+describe("get_balance_report partyLevel difficulty", () => {
+  function makeHostileCreature(tag: string, cr: number, level: number): GffObj {
+    return {
+      __struct_id: 4,
+      Tag: { type: "cexostring", value: tag },
+      FirstName: { type: "cexolocstring", value: { "0": tag } },
+      ChallengeRating: { type: "float", value: cr },
+      FactionID: { type: "word", value: 1 }, // Hostile
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: level } }] },
+      XPosition: { type: "float", value: 5 }, YPosition: { type: "float", value: 5 }, ZPosition: { type: "float", value: 0 },
+    } as unknown as GffObj;
+  }
+
+  function makeFriendlyCreature(tag: string): GffObj {
+    return {
+      __struct_id: 4,
+      Tag: { type: "cexostring", value: tag },
+      FirstName: { type: "cexolocstring", value: { "0": tag } },
+      ChallengeRating: { type: "float", value: 10 }, // should never count toward difficulty — not Hostile
+      FactionID: { type: "word", value: 2 }, // Commoner
+      ClassList: { type: "list", value: [] },
+      XPosition: { type: "float", value: 5 }, YPosition: { type: "float", value: 5 }, ZPosition: { type: "float", value: 0 },
+    } as unknown as GffObj;
+  }
+
+  it("clusters same-CR hostiles, bands against partyLevel, and ignores non-Hostile creatures", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    const git = makeGitDoc() as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push(
+      makeHostileCreature("orc1", 3, 3),
+      makeHostileCreature("orc2", 3, 3),
+      makeFriendlyCreature("innkeeper"),
+    );
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 3, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "get_balance_report", arguments: { partyLevel: "3" } });
+      const parsed = parseResult(result) as { areas: Array<{ area: string; difficulty?: { hostileCount: number; clusters: Array<{ cr: number; count: number; el: number; band: string; crEstimated: boolean }> } }> };
+      const area = parsed.areas.find((a) => a.area === "testarea")!;
+      expect(area.difficulty?.hostileCount).toBe(2); // the friendly innkeeper is excluded
+      expect(area.difficulty?.clusters).toHaveLength(1);
+      const cluster = area.difficulty!.clusters[0];
+      expect(cluster.cr).toBe(3);
+      expect(cluster.count).toBe(2);
+      expect(cluster.el).toBe(5); // CR 3, 2 creatures -> +2 per the verified DMG rule
+      expect(cluster.band).toBe("hard"); // EL 5 vs APL 3 = +2
+      expect(cluster.crEstimated).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("estimates CR from character level when ChallengeRating is unset, and flags it", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    const git = makeGitDoc() as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push(makeHostileCreature("guard", 0, 5));
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "get_balance_report", arguments: { partyLevel: "5" } });
+      const parsed = parseResult(result) as { areas: Array<{ difficulty?: { clusters: Array<{ cr: number; crEstimated: boolean }> } }> };
+      const cluster = parsed.areas[0].difficulty!.clusters[0];
+      expect(cluster.cr).toBe(5); // estimated from ClassLevel, not the real 0
+      expect(cluster.crEstimated).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("omits the difficulty block entirely when partyLevel is not passed", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    const git = makeGitDoc() as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push(makeHostileCreature("orc1", 3, 3));
+    mockIndex.parsedGff.set("testarea.git", git);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "get_balance_report", arguments: {} });
+      const parsed = parseResult(result) as { areas: Array<{ difficulty?: unknown }> };
+      expect(parsed.areas[0].difficulty).toBeUndefined();
     } finally {
       await cleanup();
     }
