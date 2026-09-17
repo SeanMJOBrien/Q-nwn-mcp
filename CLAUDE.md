@@ -940,7 +940,10 @@ session) or simply trusted from a sub-skill's self-report:**
   by the LLM per-encounter, never computed by a tool. Nothing tallies "how many
   battles are humanoid," "does every fight have a caster," or CR-vs-effective-party-
   size automatically — a human (or the orchestrator) has to manually audit the
-  built module against the numbered requirements.
+  built module against the numbered requirements. **The CR-vs-party-size piece is now
+  closed** — see `get_balance_report`'s `partyLevel` param under "What should be
+  built" (2) below. "How many battles are humanoid"/composition tallying beyond CR
+  is still open.
 - **Loot-drop runtime overrides.** `Lootable`/`Dropable` GFF flags are structurally
   checkable, but an `OnSpawn` script calling `SetLootable(FALSE)`/
   `SetDroppableFlag(..., FALSE)` at runtime silently wins and isn't caught by
@@ -998,7 +1001,7 @@ and "deliberately restricted, expected" the same way. Both warning messages now
 name the fix directly. 3 new tests in `new-features.integration.test.ts` cover the
 suppressed case (lootable and droppable) and confirm an unmarked creature still
 flags normally.
-(2) **BUILT (partial)** — `get_balance_report` now includes a per-area `composition`
+(2) **BUILT** — `get_balance_report` now includes a per-area `composition`
 block: class-count tally and a `casterPresent` flag, explicitly informational (a
 caster is not a hard requirement — user-specified: "it does sometimes improve the
 encounter mechanics and experience", so this is a note, never a warning/error). The
@@ -1006,6 +1009,55 @@ monster-type/humanoid-count breakdown from the original idea was dropped — no
 reliable data source was found for "is this race humanoid" without guessing, and
 this project's convention is to skip rather than guess. `effectivePartySize` param
 adds a per-member CR figure when passed.
+
+**BUILT (2026-09-17) — the CR-vs-effective-party-size gap this section originally
+flagged is closed.** `get_balance_report`'s new `partyLevel` param adds a real D&D
+3.5 Encounter Level (EL) difficulty read, in `src/util/encounter-difficulty.ts` — see
+`docs/encounter-difficulty-findings.md` for the full research trail. Two things
+needed real verification before this could be built (this project's own
+"never guess" rule), both sourced rather than assumed:
+- **The EL combination formula for identical creatures** — confirmed via a literal
+  DMG quote surfaced through search ("two creatures of the same CR = EL+2", from the
+  real "Table 3-1: Encounter Numbers"), matching `adventure-challenges/SKILL.md`'s
+  own already-stated rule. Primary sources (d20srd.org, d20pfsrd.com, dandwiki.com,
+  pathfinder.d20srd.org, web.archive.org, giantitp.com) all blocked automated
+  fetches, so the exact table came from cross-validating two independent
+  secondary-source tables against each other and against the confirmed DMG quote —
+  both are reproduced exactly by `combineSameCREL()`'s closed-form formula
+  (`cr + round(2 * log2(count))`). **Scope limit, stated plainly in the code and the
+  tool's own output**: only verified for same-CR groups — a mixed-CR group is
+  reported as one EL per CR cluster, not collapsed into a single fabricated number,
+  since the real DMG mixed-group combination rule wasn't found through any
+  accessible source.
+- **A real fallback for creatures with `ChallengeRating` unset (0)** — the
+  `create_encounter_blueprint` CR-hardcoded-to-0 gap this section already
+  documented (`encounter_cr_unset`). Per the user's direction, verified against 505
+  real creature blueprints from `~/tfndev/src/utc/` (a mature, actively-played PW,
+  every one carrying a real human-assigned CR — not this project's own guess):
+  CR ≈ total character level almost exactly, mean(CR−level) within ±0.3 of zero for
+  every one of the 11 base classes across the reliably-sampled level 1-11 range
+  (n=17-104 per class). `estimateCRFromLevel()` is that correlation; the tool's
+  output flags `crEstimated: true` on any cluster where it was used rather than
+  blending estimated and real CR silently.
+- Difficulty bands (`trivial`/`easy`/`standard`/`hard`/`deadly`) use this project's
+  own two documented anchors from `adventure-challenges/SKILL.md` (EL=APL is
+  standard, EL=APL+4 is deadly/boss-only) — the same file the user's "never guess"
+  discipline was already being followed in before this tool existed, just not
+  computed anywhere.
+- Filtered to Hostile-faction (1) creatures only — the previous `crStats`/
+  `perPartyMember` figures counted every creature in the area regardless of
+  faction, which would inflate difficulty with a friendly NPC's CR.
+- **Per-area, not per-fight, and said so in the output**: this pipeline places
+  hostiles individually rather than via Encounter blueprints
+  (`adventure-challenges/SKILL.md:380` explicitly avoids them for "precise tactical
+  control"), so there's no formal grouping of which creatures in an area are meant
+  to fight together at once. The difficulty block is an upper bound — "if everything
+  here converged" — not a claim about any specific simultaneous fight. Spatial
+  clustering (grouping hostiles by proximity into separate encounter estimates)
+  would need its own real design pass; not attempted here.
+- 12 new unit tests (`encounter-difficulty.test.ts`) plus 3 new integration tests
+  (`new-features.integration.test.ts`) covering same-CR clustering, the estimated-CR
+  fallback and its flag, non-Hostile exclusion, and the no-`partyLevel` no-op case.
 (3) **BUILT** — a door/gate dual-path checker. `verifyDoor`'s `door_leads_nowhere`
 warning (`src/util/verify/blueprints.ts`), extended per user spec: a real lock/key
 obstacle (`Lockable` + `OpenLockDC>0` or `KeyRequired`) should be wired as a

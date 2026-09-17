@@ -9,6 +9,7 @@ import { isBaseGameResource, isBaseGameScript, loadScriptSources } from "../util
 import { flattenDialog } from "../util/dialog-walker.js";
 import type { FlatDialogNode } from "../types/dialog.js";
 import type { CreatureRecord } from "../types/module.js";
+import { bandDifficulty, clusterHostiles } from "../util/encounter-difficulty.js";
 
 export function registerAnalysisTools(server: McpServer): void {
 
@@ -130,12 +131,16 @@ export function registerAnalysisTools(server: McpServer): void {
 
   server.tool(
     "get_balance_report",
-    "Analyze creature difficulty and item values per area. Includes a per-area class-composition tally (caster presence, class counts) — informational only: a caster is not a hard requirement for a good encounter, just something that sometimes improves the mechanics/variety. Pass effectivePartySize to also see total CR per party member.",
-    { effectivePartySize: optNumParam("Party size to divide each area's total CR by, for a rough per-member difficulty figure") },
+    "Analyze creature difficulty and item values per area. Includes a per-area class-composition tally (caster presence, class counts) — informational only: a caster is not a hard requirement for a good encounter, just something that sometimes improves the mechanics/variety. Pass effectivePartySize to also see total CR per party member. Pass partyLevel to additionally get a real D&D 3.5 Encounter Level (EL) difficulty read on the area's Hostile-faction (1) creatures: they're grouped by CR into clusters (EL combination is only verified for same-CR groups — see docs/encounter-difficulty-findings.md), each cluster's EL is banded against partyLevel (trivial/easy/standard/hard/deadly, using this project's own documented EL=APL/EL=APL+4 anchors), and any creature with ChallengeRating unset (0) has its CR estimated from total character level (verified against 505 real creatures from ~/tfndev, flagged in the output as crEstimated rather than blended in silently).",
+    {
+      effectivePartySize: optNumParam("Party size to divide each area's total CR by, for a rough per-member difficulty figure"),
+      partyLevel: optNumParam("Average party level — adds a real EL-based difficulty read on each area's Hostile-faction creatures, clustered by CR (see tool description)"),
+    },
     { readOnlyHint: true, idempotentHint: true },
-    async ({ effectivePartySize }) => {
+    async ({ effectivePartySize, partyLevel }) => {
       const index = requireIndex();
       const partySize = effectivePartySize !== undefined ? toI(effectivePartySize) : undefined;
+      const apl = partyLevel !== undefined ? toI(partyLevel) : undefined;
 
       // Classes whose classes.2da SpellCaster column is "1" — used only for the
       // informational casterPresent flag below, never a pass/fail requirement.
@@ -168,6 +173,26 @@ export function registerAnalysisTools(server: McpServer): void {
           }
         }
 
+        let difficulty: Record<string, unknown> | undefined;
+        if (apl !== undefined) {
+          const hostiles = areaCreatures.filter(c => c.faction === 1);
+          const clusters = clusterHostiles(hostiles);
+          difficulty = {
+            partyLevel: apl,
+            hostileCount: hostiles.length,
+            clusters: clusters.map(cl => ({
+              cr: cl.cr,
+              count: cl.count,
+              el: cl.el,
+              band: bandDifficulty(cl.el, apl),
+              crEstimated: cl.anyEstimatedCR,
+              tags: cl.tags,
+            })),
+            note:
+              "One EL per same-CR cluster, not a single collapsed area figure — mixed-CR combination isn't verified yet (docs/encounter-difficulty-findings.md). This is per-area, not per-fight: this pipeline places hostiles individually rather than via Encounter blueprints, so there's no formal grouping of which creatures are meant to fight together at once.",
+          };
+        }
+
         areaReports.push({
           area: areaResref,
           areaName: summary.name,
@@ -179,6 +204,7 @@ export function registerAnalysisTools(server: McpServer): void {
             total: totalCR,
             ...(partySize ? { perPartyMember: totalCR / partySize } : {}),
           } : null,
+          ...(difficulty ? { difficulty } : {}),
           hpStats: hps.length > 0 ? {
             min: Math.min(...hps),
             max: Math.max(...hps),
