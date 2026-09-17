@@ -106,16 +106,17 @@ module's real content.
 
 | | From-scratch (never leveled) | Leveled live via `LevelUpHenchman()` |
 |---|---|---|
-| **Tier 1 level 0 (cantrips)** | ✅ works | ✅ works |
-| **Tier 1 level 1** | ❌ engine reports 0 slots | ✅ works |
-| **Tier 1 level 2+** | ❌ engine reports 0 slots | ❌ **still** reports 0 slots |
+| **Tier 1 level 0 (cantrips), any class** | ✅ works | ✅ works |
+| **Tier 1 level 1, Wizard** | ❌ engine reports 0 slots | ✅ works |
+| **Tier 1 level 2+, Wizard** | ❌ engine reports 0 slots | ❌ **still** reports 0 slots — confirmed Wizard-specific, see "Round 2" below |
+| **Tier 1 level 0-3, Cleric** | not tested | ✅ **works at every level** (Round 2, 2026-09-11) — WIS-based, no `SpellbookRestricted` |
 | **Tier 2 (Bard/Sorcerer), any populated level** | ✅ works | (not retested leveled; no reason to expect a difference — Tier 2 never touches `SetMemorizedSpell`) |
 
 The pool-selection, slot-count-lookup, and shuffle logic are proven correct at every
 level tested (the debug trace showed correct data flowing in for levels 1-3 even when
-the write silently failed) — **the remaining gap is entirely on the engine's
-willingness to accept `SetMemorizedSpell` writes past a certain point**, not in this
-project's NWScript.
+the write silently failed). **The remaining gap is Wizard-specific**, not a general
+Tier 1 or engine-wide `SetMemorizedSpell` limitation — see "Round 2" below, where an
+identically-leveled Cleric got real, populated slots at every level 0-3.
 
 ## Fixes already shipped from this pass
 
@@ -130,17 +131,71 @@ project's NWScript.
 - All temporary `WriteTimestampedLogEntry` debug instrumentation removed from the
   shipped file before this was committed.
 
+## Round 2 — Cleric test confirms the ceiling is Wizard-specific (2026-09-11)
+
+Triggered by a real user combat report: a randomly-generated Cleric NPC in a
+**`~/tfndev`** live game (a different project, using its own NWNX-based system — see
+`docs/tfndev-random-npc-system-findings.md`) successfully cast Hold Person, a level-2
+Cleric spell, in actual combat. tfndev's own write path for Cleric goes through the
+same vanilla `SetMemorizedSpell()` this project uses (only Sorcerer/Bard route through
+NWNX there), so a live level-2 Cleric cast was real evidence against "every Tier 1
+class hits a level-2+ ceiling" and for "it's specific to Wizard."
+
+Ran the exact experiment the "Concrete next experiments" list below already
+prioritized as highest-value, on this project's own **vanilla-only** system (no
+NWNX involved) against `~/nwn-mcp-verify-server`: a from-scratch level-1 Cleric
+(`ra_test_cler`, WIS 16, `startingPackage=2`), `ScriptSpawn` wired to loop
+`LevelUpHenchman(oSelf, CLASS_TYPE_INVALID, TRUE, PACKAGE_INVALID)` up to level 5 —
+identical methodology to the Wizard test (`a_ra_spawn2`/`ra_test_wiz2`) — then
+`RA_OnSpawn` and a diagnostic read of `GetMemorizedSpellCountByLevel`/
+`GetMemorizedSpellId` for levels 0-3.
+
+Result — clean, unambiguous, every level populated:
+
+```
+RA_CLER_CHECK guard=4 actualLevel=5 L0:slots=5 L1:slots=5 L2:slots=4 L3:slots=3
+RA_CLER_CHECK_SPELLS L0=431,33,151,189,100,
+RA_CLER_CHECK_SPELLS L1=155,139,148,32,32,
+RA_CLER_CHECK_SPELLS L2=175,49,83,34,
+RA_CLER_CHECK_SPELLS L3=145,106,434,
+```
+
+Compare to the Wizard's `RA_CHECK7 guard=4 actualLevel=5 L0:slots=4 L1:slots=3
+L2:slots=0 L3:slots=0` from the same rig, same methodology, same `LevelUpHenchman()`
+loop. **The level-2+ ceiling is confirmed Wizard-specific, not a general Tier-1 or
+engine-wide limitation.** This resolves research item 1's leading hypothesis without
+even needing the `GetKnownSpellCount` sub-experiment — a real, live, fully-leveled
+Cleric got real, populated, engine-recognized slots at every level cls_spgn_cler.2da
+says it should have, with no NWNX and no special handling beyond the leveling loop
+every Tier 1 class already gets.
+
+**Practical consequence**: once the companion wiring-timing fix in item 2 below
+lands (`RA_OnSpawn` called after `LevelUpHenchman()`, not before), Cleric/Druid/
+Paladin/Ranger companions get a REAL, complete, multi-level, freshly-randomized
+spellbook — no known limitation left for those four classes. Wizard remains the one
+confirmed exception, and per the closed NWNX investigation
+(`docs/tfndev-random-npc-system-findings.md`) there is currently no known fix for it
+in this engine build, vanilla or NWNX. Druid/Paladin/Ranger were not individually
+retested — they share Cleric's "no `SpellbookRestricted`" trait, so the same result
+is expected, but only Cleric has been directly confirmed.
+
+Verify server was reverted to its clean baseline afterward (`docker-compose down`,
+no config changes retained; the throwaway `ra_test_cler` creature was left in
+`henchman-gear-showcase.mod` alongside the pre-existing `ra_test_wiz`/`ra_test_sorc`/
+`ra_test_wiz2`/`ra_test_wiz` fixtures, matching this project's existing precedent of
+leaving prior test creatures in place rather than cleaning them out of this
+scratch/test module).
+
 ## Plan for further research
 
-1. **Isolate the level-2+ root cause.** Leading candidate: Wizard is the one Tier-1
-   class with `classes.2da`'s `SpellbookRestricted=1` (a Wizard must "know"/scribe a
-   spell into their personal spellbook before it can be memorized — the other four
-   Tier 1 classes, Cleric/Druid/Paladin/Ranger, know their entire class list
-   automatically and never have this restriction). `LevelUpHenchman()`'s automatic AI
-   may not be adding known spells to the Wizard's personal spellbook at every level
-   the way a real player leveling up through the toolset UI would, which could
-   explain why slots that the *class table* says should exist never become
-   engine-recognized. Concrete next experiments, in order of cost:
+1. **Isolate the level-2+ root cause — RESOLVED for the Tier-1-vs-Wizard-specific
+   question (2026-09-11, see "Round 2" above).** Confirmed: Cleric does not hit the
+   ceiling at all through level 3 when leveled the same way. What remains genuinely
+   open is *why* Wizard specifically hits it — the `SpellbookRestricted`/known-spell
+   theory is still unconfirmed (the `GetKnownSpellCount` check below was never run),
+   and the NWNX investigation closed off the leading fix candidates without finding
+   the actual mechanism. Not worth further investment without a new concrete lead —
+   see `docs/tfndev-random-npc-system-findings.md`'s recommendation.
    - Directly check `GetKnownSpellCount(oCreature, CLASS_TYPE_WIZARD, 2)` and
      `GetKnownSpellCount(oCreature, CLASS_TYPE_WIZARD, 3)` on the leveled test
      creature — if these are 0 while level 0/1 are nonzero, that's a strong
@@ -148,18 +203,6 @@ project's NWScript.
      step is finding a way to add known spells (there is no `SetKnownSpell`/
      `AddKnownSpell` in vanilla EE nwscript — this may mean Wizard-specific handling
      needs its own separate mechanism, or NWNX, to ever reach level 2+).
-   - Test a **non-Wizard** Tier 1 class (Cleric, Druid, Paladin, or Ranger — none of
-     which have `SpellbookRestricted=1`) leveled the same way, to see whether *all*
-     Tier 1 classes hit a level-2+ ceiling (pointing at something more fundamental
-     about `LevelUpHenchman()`/engine slot initialization in general) or whether
-     it's specific to Wizard's scribing mechanic (pointing at known-spell gating).
-     This is the single highest-value next experiment — it directly distinguishes
-     the two remaining hypotheses.
-   - If it turns out to be general (not Wizard-specific), test leveling one level at
-     a time with a real spell selection injected between levels (rather than
-     `PACKAGE_INVALID`'s automatic picks) to see whether `LevelUpHenchman()` needs a
-     specific package/spell-selection argument to properly initialize later-level
-     slot state.
 2. **Fix the wiring timing for companions regardless of the level-2+ outcome.**
    `RA_OnSpawn` is currently chained into `a_hen_spawn` (raw `ScriptSpawn`, before
    recruit) — confirmed via this pass's own from-scratch tests that this can only

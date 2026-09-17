@@ -80,7 +80,7 @@
  * several confusing round trips.
  *
  * TIER 1 KNOWN LIMITATIONS — confirmed against a real headless server
- * (2026-09), not yet resolved:
+ * (2026-09), narrowed to Wizard-specific on 2026-09-11:
  *  1. A from-scratch blueprint (built directly via create_creature_blueprint
  *     with classes:[{class,level}], never live-leveled) only gets level 0
  *     (cantrip/orison) slots — GetMemorizedSpellCountByLevel() reports 0 for
@@ -88,32 +88,42 @@
  *     SetMemorizedSpell() silently no-ops past that bound (0 <= nIndex <
  *     GetMemorizedSpellCountByLevel()). This means RA_OnSpawn, called at raw
  *     ScriptSpawn (before any leveling), can only ever populate cantrips for
- *     a companion — companions don't get LevelUpHenchman()'d until recruit
- *     (a_hen_join), which fires well after ScriptSpawn.
- *  2. Leveling a test creature live via LevelUpHenchman() (mirroring
+ *     a companion — companions don't get LevelUpHenchman()'d until recruit.
+ *  2. FIXED (2026-09-11): adventure-actors/SKILL.md's a_hen_join now calls
+ *     RA_OnSpawn (via DelayCommand) immediately after its LevelUpHenchman()
+ *     loop, not from a_hen_spawn before it — see that skill's Phase 3b Step 1
+ *     for the wiring. Non-companion Key NPCs still have no leveling event at
+ *     all, so they remain cantrip-only for every Tier 1 class regardless of
+ *     this fix — keep using the static `spells` param for a Tier 1 Key NPC
+ *     above cantrip level.
+ *  3. Leveling a test creature live via LevelUpHenchman() (mirroring
  *     SPEC_SelfTestOnSpawn's pattern) BEFORE calling RA_OnSpawn fixes level 0
- *     AND level 1 — both confirmed real, correctly populated, and readable
- *     back. But level 2 and 3 STILL report 0 engine slots even after real
- *     leveling, for a level 5 Wizard that cls_spgn_wiz.2da says should have
- *     2 and 1 slots there respectively. Root cause not yet isolated — one
- *     candidate not yet tested is Wizards' SpellbookRestricted mechanic
- *     (Wizards must "know"/scribe a spell before memorizing it, unlike the
- *     other four Tier 1 classes, which know their whole class list
- *     automatically) combined with LevelUpHenchman()'s automatic AI possibly
- *     not adding known spells at every level the way a real player leveling
- *     up through the toolset UI would.
- *  3. Consequence: RA_OnSpawn/RA_RollClass now caps every write to
- *     min(cls_spgn slot count, GetMemorizedSpellCountByLevel()) rather than
- *     trusting the 2DA blindly, so it degrades gracefully (writes what the
- *     engine will actually accept) instead of wastefully attempting writes
- *     that silently do nothing. It does NOT fix limitations 1-2 above.
- *  4. Not yet done: wiring RA_OnSpawn to fire after LevelUpHenchman() for
- *     companions (chained into a_hen_join, not a_hen_spawn) to at least get
- *     limitation 1 for free: level 0-1 spells for every Tier 1 companion.
- *     Non-companion Key NPCs never get a live leveling call at all, so they
- *     are stuck at cantrips-only for Tier 1 classes until limitation 2 is
- *     understood, or they should keep using the static `spells` param
- *     instead for anything above a cantrip.
+ *     AND level 1 for every Tier 1 class — confirmed real, correctly
+ *     populated, and readable back. For WIZARD SPECIFICALLY, level 2 and 3
+ *     still report 0 engine slots even after real leveling (a level 5 Wizard
+ *     that cls_spgn_wiz.2da says should have 2 and 1 slots there
+ *     respectively gets 0 at both). Three independent NWNX avenues
+ *     (NWNX_Creature_LevelUp, NWNX_Creature_AddKnownSpell,
+ *     NWNX_Creature_SetRemainingSpellSlots) were all tested against a real
+ *     NWNX deployment and hit the identical ceiling — see
+ *     docs/tfndev-random-npc-system-findings.md. This is now a closed
+ *     investigation with no known fix, not an open one.
+ *  4. CONFIRMED (2026-09-11): the level-2+ ceiling is Wizard-specific, not a
+ *     general Tier 1 limitation. An identically-leveled Cleric (no
+ *     SpellbookRestricted mechanic, unlike Wizard) got real, populated,
+ *     engine-recognized slots at every level 0-3 — see
+ *     docs/random-abilities-runtime-findings.md's "Round 2" section for the
+ *     full server log. Druid/Paladin/Ranger were not individually retested
+ *     but share Cleric's lack of SpellbookRestricted, so the same result is
+ *     expected. Prefer the static `spells` param over this system only for
+ *     a Wizard whose spells matter above cantrip level — the other four
+ *     Tier 1 classes need no such override once fix #2 above is in place.
+ *  5. RA_OnSpawn/RA_RollClass caps every write to min(cls_spgn slot count,
+ *     GetMemorizedSpellCountByLevel()) rather than trusting the 2DA blindly,
+ *     so it degrades gracefully (writes what the engine will actually
+ *     accept) instead of wastefully attempting writes that silently do
+ *     nothing. This does not fix limitation 3 above — it just makes the
+ *     symptom harmless instead of wasteful.
  *
  * Depends on nothing but base-game 2DAs and base-game engine functions — no
  * project-specific table, no MCP dependency, no NWNX. The compiled/source
