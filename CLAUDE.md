@@ -984,16 +984,20 @@ for lootable/droppable-overriding calls and cross-references against the GFF fla
 warnings (`src/tools/analysis-tools.ts`) — pure static analysis (regex over the
 script's own source via `loadScriptSources`), no runtime server needed. Cannot trace
 `ExecuteScript()` call chains into a different script.
-**TODO (user-raised, 2026-09-09): this checker needs a legitimate-exception path.**
-The user may deliberately want to limit loot server-wide — including specific
-creatures the plot means to leave non-lootable/non-droppable on purpose (a mook with
-nothing worth taking, a boss whose real reward is scripted rather than a corpse drop).
-Today's warnings fire unconditionally on any `SetLootable(FALSE)`/
-`SetDroppableFlag(..., FALSE)` call, with no way to mark one as intentional — a real
-fix needs some signal (a local variable convention, a `create_creature_blueprint`
-param, or just documenting "expected, ignore" in the warning text) so the checker can
-tell "silently overridden, unnoticed" apart from "deliberately restricted, expected"
-instead of flagging both the same way.
+**BUILT (2026-09-16) — the checker has a legitimate-exception path.** The user may
+deliberately want to limit loot server-wide — including specific creatures the plot
+means to leave non-lootable/non-droppable on purpose (a mook with nothing worth
+taking, a boss whose real reward is scripted rather than a corpse drop). A placed
+creature carrying a `LOOT_INTENTIONAL` local variable in its `VarTable`
+(`create_creature_blueprint`'s `varTable` param — same mechanism as `HENCH_LEVEL`/
+`SPEC_*`, merged into the blueprint before placement so it survives onto the placed
+instance the same way, per the "VarTable is a separate copy" pitfall above) now
+silences both `onspawn_overrides_lootable` and `onspawn_overrides_droppable` for
+that creature entirely, instead of flagging both "silently overridden, unnoticed"
+and "deliberately restricted, expected" the same way. Both warning messages now
+name the fix directly. 3 new tests in `new-features.integration.test.ts` cover the
+suppressed case (lootable and droppable) and confirm an unmarked creature still
+flags normally.
 (2) **BUILT (partial)** — `get_balance_report` now includes a per-area `composition`
 block: class-count tally and a `casterPresent` flag, explicitly informational (a
 caster is not a hard requirement — user-specified: "it does sometimes improve the
