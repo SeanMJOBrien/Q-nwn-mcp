@@ -19,7 +19,7 @@
  */
 
 import type { ModuleIndex } from "../types/module.js";
-import { CLASS_WEAPON_PREFERENCE, CLEAVE_FEAT, DODGE_FEAT, TOUGHNESS_FEAT } from "./npc-weapon-preferences.js";
+import { CLEAVE_FEAT, DODGE_FEAT, pickWeaponPreference, TOUGHNESS_FEAT } from "./npc-weapon-preferences.js";
 import { twoDARow } from "./verify/common.js";
 
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
@@ -76,6 +76,15 @@ export interface StatBlockParams {
   classId: number;
   level: number;
   powerLevel?: PowerLevel;
+  /**
+   * Seed for the deterministic weapon-preference pick (the creature's own
+   * tag/resref) — same seed always picks the same weapon, but different
+   * same-class creatures spread across the class's candidate list instead of
+   * all converging on one default. Falls back to a fixed string when omitted
+   * (a direct/unit-test caller with no creature identity yet), which is fine
+   * since determinism only matters relative to the creature it's for.
+   */
+  seed?: string;
 }
 
 export interface AbilityScores {
@@ -234,7 +243,7 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
   // universal filler set. Slots beyond this queue are left unfilled with a
   // warning rather than guessing — this project's "encode unverified data as
   // a skip, never a guess" convention.
-  const weaponPref = CLASS_WEAPON_PREFERENCE[params.classId];
+  const weaponPref = pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed");
   const candidateQueue: number[] = [
     ...(weaponPref
       ? [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]

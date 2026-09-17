@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ModuleIndex, TwoDATable } from "../types/module.js";
 import { buildNpcStatBlock } from "./npc-stat-block.js";
+import { pickWeaponPreference } from "./npc-weapon-preferences.js";
 
 function twoDA(columns: string[], rows: Array<[number, Record<string, string>]>): TwoDATable {
   return { columns, rows: new Map(rows) };
@@ -180,7 +181,7 @@ function makeIndex(): ModuleIndex {
 describe("buildNpcStatBlock", () => {
   it("computes a level-5 Human Fighter's full stat block deterministically", () => {
     const index = makeIndex();
-    const result = buildNpcStatBlock(index, { race: 6, classId: 4, level: 5, powerLevel: "elite" });
+    const result = buildNpcStatBlock(index, { race: 6, classId: 4, level: 5, powerLevel: "elite", seed: "fighter_test_seed" });
 
     // Ability scores: elite array [15,14,13,12,10,8] assigned str,con,dex,wis,int,cha
     // (primary=STR first, then generic secondary order), +1 to STR at level 4.
@@ -195,8 +196,12 @@ describe("buildNpcStatBlock", () => {
     // Not-automatic (List=1) row must never appear.
     expect(featIds).not.toContain(47);
     // Generic slots (1 baseline + 1 ExtraFeatsAtFirstLevel + 1 at level 3 = 3) filled with
-    // the Fighter weapon preference chain: Longsword Focus/Spec/ImpCrit.
-    for (const f of [106, 144, 68]) expect(featIds).toContain(f);
+    // the seeded Fighter weapon preference chain (Focus/Spec/ImpCrit for whichever of
+    // Fighter's proficiency-safe candidates "fighter_test_seed" deterministically picks).
+    const weaponPref = pickWeaponPreference(4, "fighter_test_seed")!;
+    for (const f of [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]) {
+      expect(featIds).toContain(f);
+    }
     // Bonus slots (levels 1,2,4 = 3 slots) filled with the universal filler set.
     for (const f of [40, 6, 10]) expect(featIds).toContain(f);
     expect(result.warnings.filter((w) => w.includes("unfilled"))).toHaveLength(0);
