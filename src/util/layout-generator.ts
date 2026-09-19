@@ -14,7 +14,7 @@
  */
 
 import type { TilesetInfo } from "./tileset.js";
-import { getTileDoorWorldPositions } from "./tileset.js";
+import { getTileDoorWorldPositions, rotatedGroupDimensions, rotateGroupTileIndex } from "./tileset.js";
 import type { TerrainZone, CrosserPath } from "./zone-solver.js";
 import { computeValidPairs } from "./zone-solver.js";
 
@@ -63,11 +63,19 @@ export interface TransitionPoint {
 
 export interface SuggestedFeature {
   feature: string;       // group name from tileset
-  x: number;             // grid column (bottom-left)
-  y: number;             // grid row (bottom-left)
-  columns: number;       // width in tiles
-  rows: number;          // height in tiles
+  x: number;             // grid column (bottom-left), of the PLACED (post-rotation) footprint
+  y: number;             // grid row (bottom-left), of the PLACED (post-rotation) footprint
+  columns: number;       // width in tiles, of the PLACED (post-rotation) footprint
+  rows: number;          // height in tiles, of the PLACED (post-rotation) footprint
   clearingIndex: number; // which room this belongs to
+  /**
+   * Quarter-turns (0-3) to rotate the group before placing, default 0 —
+   * omitted/0 is byte-identical to pre-rotation-support behavior. A feature
+   * with a curated collar (feature-collars.ts) ignores a nonzero rotation —
+   * collar tiles are hand-authored for native placement only; see
+   * adventure_apply_layout's handling.
+   */
+  rotation?: 0 | 1 | 2 | 3;
 }
 
 export interface LayoutResult {
@@ -977,6 +985,17 @@ function packFeatures(
  * whose 3m outward offset lands OUTSIDE the feature footprint (an exterior door).
  * Interior doors (connecting feature tiles to each other) are skipped.
  * Returns null if the feature has no exterior doors.
+ *
+ * Honors `feature.rotation` — iterates the PLACED (post-rotation) footprint
+ * via rotateGroupTileIndex to find each slot's native tileId, then calls
+ * getTileDoorWorldPositions with `rotation` as the tile orientation (correct
+ * since adventure_apply_layout writes every placed tile's own orientation as
+ * `rotation` too, matching a rigid rotation of the whole assembly). Does NOT
+ * delegate to getGroupEntrances (util/tileset.ts) — that function
+ * deliberately only rotates the reported cardinal `side`, not full world
+ * position, since a fast side-only check is what candidate-scoring needs;
+ * this function needs the real rotated position, which is only correct once
+ * a placement (x, y, rotation) is actually being committed to.
  */
 function findFeatureDoorPosition(
   feature: SuggestedFeature,
@@ -985,24 +1004,28 @@ function findFeatureDoorPosition(
   const group = tileset.groups.find(g => g.name === feature.feature);
   if (!group) return null;
 
-  // Build set of feature tile positions for interior-door detection
+  const rotation = feature.rotation ?? 0;
+  const { columns: placedColumns, rows: placedRows } = rotatedGroupDimensions(group.columns, group.rows, rotation);
+
+  // Build set of feature tile positions (world coords, placed footprint) for interior-door detection
   const featureTileSet = new Set<string>();
-  for (let gc = 0; gc < group.columns; gc++) {
-    for (let gr = 0; gr < group.rows; gr++) {
-      featureTileSet.add(`${feature.x + gc},${feature.y + gr}`);
+  for (let ngc = 0; ngc < placedColumns; ngc++) {
+    for (let ngr = 0; ngr < placedRows; ngr++) {
+      featureTileSet.add(`${feature.x + ngc},${feature.y + ngr}`);
     }
   }
 
   const OFFSET = 3.0;
   // Collect all doors, prefer exterior ones
   const allDoors: Array<{ x: number; y: number; bearing: number; tileCol: number; tileRow: number; exterior: boolean }> = [];
-  for (let gr = 0; gr < group.rows; gr++) {
-    for (let gc = 0; gc < group.columns; gc++) {
+  for (let ngr = 0; ngr < placedRows; ngr++) {
+    for (let ngc = 0; ngc < placedColumns; ngc++) {
+      const { gc, gr } = rotateGroupTileIndex(ngc, ngr, group.columns, group.rows, rotation);
       const tileId = group.tileIds[gr * group.columns + gc];
       if (tileId < 0) continue;
       const tile = tileset.tiles[tileId];
       if (!tile || tile.doors === 0) continue;
-      const doorPositions = getTileDoorWorldPositions(tile, feature.x + gc, feature.y + gr, 0);
+      const doorPositions = getTileDoorWorldPositions(tile, feature.x + ngc, feature.y + ngr, rotation);
       for (const door of doorPositions) {
         const rad = (door.bearing * Math.PI) / 180;
         const offsetX = door.x + Math.cos(rad) * OFFSET;
@@ -1015,8 +1038,8 @@ function findFeatureDoorPosition(
           x: Math.round(door.x * 10) / 10,
           y: Math.round(door.y * 10) / 10,
           bearing: door.bearing,
-          tileCol: feature.x + gc,
-          tileRow: feature.y + gr,
+          tileCol: feature.x + ngc,
+          tileRow: feature.y + ngr,
           exterior: isExterior,
         });
       }

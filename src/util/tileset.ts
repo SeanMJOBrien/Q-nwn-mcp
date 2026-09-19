@@ -328,6 +328,53 @@ function forwardRotateDoor(x: number, y: number, orientation: number): [number, 
   }
 }
 
+/**
+ * New-footprint dimensions after rotating a `columns`x`rows` group by
+ * `rotation` quarter-turns. 90°/270° swap columns and rows; 0°/180° don't.
+ */
+export function rotatedGroupDimensions(
+  columns: number,
+  rows: number,
+  rotation: 0 | 1 | 2 | 3,
+): { columns: number; rows: number } {
+  return rotation % 2 === 0 ? { columns, rows } : { columns: rows, rows: columns };
+}
+
+/**
+ * Given a target slot (ngc, ngr) within a group's FOOTPRINT AFTER rotating it
+ * by `rotation` quarter-turns, return which NATIVE (pre-rotation) grid slot's
+ * tileId belongs there — i.e. this is the inverse map a caller writing a
+ * rotated group's tiles needs: iterate the rotated footprint's cells, call
+ * this once per cell, read `group.tileIds[gr * columns + gc]` from the
+ * result.
+ *
+ * Derived by transforming the group footprint's own corners through the same
+ * point-rotation this codebase already uses for doors/corners
+ * (`forwardRotateDoor`'s case 0-3), then inverting. Cross-checked three
+ * independent ways before trusting it (direct per-rotation corner-transform,
+ * and composing the 90° step two/three times to re-derive 180°/270°
+ * algebraically) — all three agreed. Still carries the same handedness
+ * caveat as `getGroupEntrances`: the DIRECTION "rotation=1" turns a group has
+ * not been independently confirmed against a real toolset render of an
+ * actually-rotated multi-tile group, only checked for internal
+ * self-consistency.
+ */
+export function rotateGroupTileIndex(
+  ngc: number,
+  ngr: number,
+  columns: number,
+  rows: number,
+  rotation: 0 | 1 | 2 | 3,
+): { gc: number; gr: number } {
+  switch (rotation) {
+    case 0: return { gc: ngc, gr: ngr };
+    case 1: return { gc: ngr, gr: rows - ngc - 1 };
+    case 2: return { gc: columns - ngc - 1, gr: rows - ngr - 1 };
+    case 3: return { gc: columns - ngr - 1, gr: ngc };
+    default: return { gc: ngc, gr: ngr };
+  }
+}
+
 /** Compute world-space door positions for a tile placed at (col, row) with given orientation. */
 export function getTileDoorWorldPositions(
   tile: TileDefinition,

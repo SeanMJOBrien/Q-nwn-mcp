@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { getRotatedCorners, getRotatedCrossers, getGroupEntrances } from "./tileset.js";
+import {
+  getRotatedCorners,
+  getRotatedCrossers,
+  getGroupEntrances,
+  rotateGroupTileIndex,
+  rotatedGroupDimensions,
+} from "./tileset.js";
 import type { TileDefinition, TileGroup, TilesetInfo } from "./tileset.js";
 
 // Minimal tile fixture with distinct values per corner/edge for clear rotation verification
@@ -206,5 +212,85 @@ describe("getGroupEntrances", () => {
     const tileset = { tiles: [plainTile] } as unknown as TilesetInfo;
     const group: TileGroup = { index: 0, name: "NoDoors_1x1", strref: 0, rows: 1, columns: 1, tileIds: [0] };
     expect(getGroupEntrances(group, tileset, 0)).toEqual([]);
+  });
+});
+
+describe("rotatedGroupDimensions", () => {
+  it("leaves dimensions unchanged at 0 and 180 degrees", () => {
+    expect(rotatedGroupDimensions(2, 3, 0)).toEqual({ columns: 2, rows: 3 });
+    expect(rotatedGroupDimensions(2, 3, 2)).toEqual({ columns: 2, rows: 3 });
+  });
+
+  it("swaps dimensions at 90 and 270 degrees", () => {
+    expect(rotatedGroupDimensions(2, 3, 1)).toEqual({ columns: 3, rows: 2 });
+    expect(rotatedGroupDimensions(2, 3, 3)).toEqual({ columns: 3, rows: 2 });
+  });
+});
+
+describe("rotateGroupTileIndex", () => {
+  it("rotation 0 is the identity map", () => {
+    expect(rotateGroupTileIndex(1, 2, 4, 5, 0)).toEqual({ gc: 1, gr: 2 });
+  });
+
+  it("matches the hand-derived 2-column x 1-row example at rotation 1", () => {
+    // columns=2, rows=1: native A=(0,0), B=(1,0). Rotating 90 degrees turns
+    // this horizontal 2x1 bar into a vertical 1x2 bar: A -> new(0,0),
+    // B -> new(0,1) (verified independently via point-rotation of the
+    // group's own footprint corners before writing this function).
+    expect(rotateGroupTileIndex(0, 0, 2, 1, 1)).toEqual({ gc: 0, gr: 0 }); // -> A
+    expect(rotateGroupTileIndex(0, 1, 2, 1, 1)).toEqual({ gc: 1, gr: 0 }); // -> B
+  });
+
+  it("is a bijection over the rotated footprint for every rotation and several group shapes", () => {
+    for (const [columns, rows] of [[1, 1], [2, 1], [1, 2], [2, 3], [3, 2], [4, 4]] as const) {
+      for (const rotation of [0, 1, 2, 3] as const) {
+        const { columns: newColumns, rows: newRows } = rotatedGroupDimensions(columns, rows, rotation);
+        const seen = new Set<string>();
+        for (let ngr = 0; ngr < newRows; ngr++) {
+          for (let ngc = 0; ngc < newColumns; ngc++) {
+            const { gc, gr } = rotateGroupTileIndex(ngc, ngr, columns, rows, rotation);
+            expect(gc).toBeGreaterThanOrEqual(0);
+            expect(gc).toBeLessThan(columns);
+            expect(gr).toBeGreaterThanOrEqual(0);
+            expect(gr).toBeLessThan(rows);
+            const key = `${gc},${gr}`;
+            expect(seen.has(key)).toBe(false); // every native cell visited at most once
+            seen.add(key);
+          }
+        }
+        expect(seen.size).toBe(columns * rows); // every native cell visited exactly once
+      }
+    }
+  });
+
+  it("applying the 90-degree step four times in a row returns to the identity", () => {
+    // Strong algebraic correctness check independent of any hand-picked example.
+    const columns = 3, rows = 2;
+    for (let gc = 0; gc < columns; gc++) {
+      for (let gr = 0; gr < rows; gr++) {
+        let curCol = gc, curRow = gr, curCols = columns, curRows = rows;
+        for (let step = 0; step < 4; step++) {
+          const { columns: nc, rows: nr } = rotatedGroupDimensions(curCols, curRows, 1);
+          // Forward-apply one 90-degree step by finding the (ngc,ngr) whose
+          // inverse maps back to (curCol,curRow) — i.e. invert the inverse.
+          let found: { ngc: number; ngr: number } | null = null;
+          for (let ngr = 0; ngr < nr && !found; ngr++) {
+            for (let ngc = 0; ngc < nc && !found; ngc++) {
+              const inv = rotateGroupTileIndex(ngc, ngr, curCols, curRows, 1);
+              if (inv.gc === curCol && inv.gr === curRow) found = { ngc, ngr };
+            }
+          }
+          expect(found).not.toBeNull();
+          curCol = found!.ngc;
+          curRow = found!.ngr;
+          curCols = nc;
+          curRows = nr;
+        }
+        expect(curCol).toBe(gc);
+        expect(curRow).toBe(gr);
+        expect(curCols).toBe(columns);
+        expect(curRows).toBe(rows);
+      }
+    }
   });
 });

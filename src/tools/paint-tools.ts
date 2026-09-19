@@ -15,7 +15,7 @@ import fs from "fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
-import { getTilesetInfo } from "../util/tileset.js";
+import { getTilesetInfo, rotatedGroupDimensions, rotateGroupTileIndex } from "../util/tileset.js";
 import { validateTilePlacement, findDefaultTile } from "../util/tile-solver.js";
 import type { TileGridEntry } from "../util/tile-solver.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr, setFieldNum } from "../types/gff.js";
@@ -411,17 +411,22 @@ export function registerPaintTools(server: McpServer): void {
 
   server.tool(
     "paint_group",
-    "Place a multi-tile group (e.g. 'Temple_3x2', 'Lodge_2x2') at a grid position. Validates bounds and edge constraints.",
+    "Place a multi-tile group (e.g. 'Temple_3x2', 'Lodge_2x2') at a grid position. Validates bounds and edge constraints. " +
+      "Optional rotation (0/1/2/3 quarter-turns) rotates the whole group's footprint (swapping width/height at 90/270) " +
+      "and each tile's own orientation — handedness is internally self-consistent (verified by unit test) but not yet " +
+      "independently confirmed against a real toolset render; check visually before relying on it for real content.",
     {
       area: z.string().describe("Area resref"),
       feature: z.string().describe("Group name (e.g. 'Temple_3x2', 'Lodge_2x2') — use get_tileset_details to see available groups"),
-      x: z.string().describe("Bottom-left column of the feature (0-based)"),
-      y: z.string().describe("Bottom-left row of the feature (0-based)"),
+      x: z.string().describe("Bottom-left column of the feature's placed (post-rotation) footprint (0-based)"),
+      y: z.string().describe("Bottom-left row of the feature's placed (post-rotation) footprint (0-based)"),
+      rotation: z.enum(["0", "1", "2", "3"]).optional().describe("Quarter-turns to rotate the group before placing (default 0). 1=90°, 2=180°, 3=270°."),
     },
     { idempotentHint: true },
-    async ({ area, feature, x: xStr, y: yStr }) => {
+    async ({ area, feature, x: xStr, y: yStr, rotation: rotationStr }) => {
       const x = parseInt(xStr, 10);
       const y = parseInt(yStr, 10);
+      const rotation = (rotationStr ? (parseInt(rotationStr, 10) as 0 | 1 | 2 | 3) : 0);
       const index = requireIndex();
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
@@ -445,30 +450,33 @@ export function registerPaintTools(server: McpServer): void {
         return { content: [{ type: "text", text: `Group not found: ${feature}. Available: ${available}` }] };
       }
 
-      // Check bounds
-      if (x < 0 || x + group.columns > areaWidth || y < 0 || y + group.rows > areaHeight) {
-        return { content: [{ type: "text", text: `Feature ${feature} (${group.columns}x${group.rows}) doesn't fit at (${x},${y}) in ${areaWidth}x${areaHeight} area` }] };
+      const { columns: placedColumns, rows: placedRows } = rotatedGroupDimensions(group.columns, group.rows, rotation);
+
+      // Check bounds (against the ROTATED footprint)
+      if (x < 0 || x + placedColumns > areaWidth || y < 0 || y + placedRows > areaHeight) {
+        return { content: [{ type: "text", text: `Feature ${feature} (${placedColumns}x${placedRows} at rotation ${rotation}) doesn't fit at (${x},${y}) in ${areaWidth}x${areaHeight} area` }] };
       }
 
-      // Place tiles — group tileIds are in row-major order, bottom-to-top
-      // Group tile index: row * columns + col
+      // Place tiles — iterate the ROTATED footprint, and for each slot look up
+      // which native (pre-rotation) group cell's tileId belongs there.
       const placements: Array<{ gx: number; gy: number; tileId: number }> = [];
       const warnings: string[] = [];
 
-      for (let gr = 0; gr < group.rows; gr++) {
-        for (let gc = 0; gc < group.columns; gc++) {
+      for (let ngr = 0; ngr < placedRows; ngr++) {
+        for (let ngc = 0; ngc < placedColumns; ngc++) {
+          const { gc, gr } = rotateGroupTileIndex(ngc, ngr, group.columns, group.rows, rotation);
           const groupTileIdx = gr * group.columns + gc;
           const tileId = group.tileIds[groupTileIdx];
           if (tileId < 0) continue; // empty slot in group
 
-          const gx = x + gc;
-          const gy = y + gr;
+          const gx = x + ngc;
+          const gy = y + ngr;
           const areaIdx = gy * areaWidth + gx;
 
           // Update tile list
           const tileEntry = tileList[areaIdx] as GffObj;
           setFieldNum(tileEntry, "Tile_ID", tileId, "int");
-          setFieldNum(tileEntry, "Tile_Orientation", 0, "int");
+          setFieldNum(tileEntry, "Tile_Orientation", rotation, "int");
           setFieldNum(tileEntry, "Tile_Height", 0, "int");
 
           placements.push({ gx, gy, tileId });
@@ -491,7 +499,7 @@ export function registerPaintTools(server: McpServer): void {
 
       for (const p of placements) {
         // Only check edges that border non-feature tiles
-        const isEdge = p.gx === x || p.gx === x + group.columns - 1 || p.gy === y || p.gy === y + group.rows - 1;
+        const isEdge = p.gx === x || p.gx === x + placedColumns - 1 || p.gy === y || p.gy === y + placedRows - 1;
         if (isEdge) {
           const violations = validateTilePlacement(grid, p.gx, p.gy, areaWidth, areaHeight, tileset);
           if (violations.length > 0) {
@@ -534,7 +542,8 @@ export function registerPaintTools(server: McpServer): void {
             area,
             feature: group.name,
             position: { x, y },
-            size: { columns: group.columns, rows: group.rows },
+            rotation,
+            size: { columns: placedColumns, rows: placedRows },
             tilesPlaced: placements.length,
             tileMaterials,
             warnings,
