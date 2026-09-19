@@ -21,7 +21,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex } from "../module-loader.js";
 import { buildResmanOptions } from "../module-loader.js";
 import { MCP_FOLDER_USERREPORTS } from "../config.js";
-import { listAllTilesets, getTilesetInfo } from "../util/tileset.js";
+import { listAllTilesets, getTilesetInfo, getGroupEntrances } from "../util/tileset.js";
 import { analyzeAllGroups, findFlatFillerTiles, checkTilesetIntegrity } from "../util/tileset-rules.js";
 import { computeValidPairs } from "../util/zone-solver.js";
 import { loadAreaWalkmeshData, computeWalkableZones, } from "../util/walkmesh.js";
@@ -180,6 +180,12 @@ export function registerTilesetTools(server: McpServer): void {
           rows: g.rows,
           columns: g.columns,
           tileIds: g.tileIds,
+          // Native-orientation (rotation=0) exterior doors, so a caller can
+          // pick which side of a stamped group to face a road/avenue before
+          // placing it. `side` rotates predictably with a placement rotation
+          // (N->E->S->W->N per quarter-turn) — see getGroupEntrances's own
+          // handedness note for the current verification status.
+          entrances: getGroupEntrances(g, info, 0),
         })),
         tileCatalog: Object.fromEntries(
           [...tilesByPattern.entries()].map(([pattern, tiles]) => [pattern, tiles]),

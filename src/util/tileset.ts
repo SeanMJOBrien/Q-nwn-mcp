@@ -346,6 +346,108 @@ export function getTileDoorWorldPositions(
   });
 }
 
+/** Quantize a bearing (degrees, 0=east/+X, counterclockwise per NWN convention) to the nearest cardinal side. */
+function bearingToSide(bearing: number): "N" | "S" | "E" | "W" {
+  const normalized = ((bearing % 360) + 360) % 360;
+  if (normalized >= 45 && normalized < 135) return "N";
+  if (normalized >= 135 && normalized < 225) return "W";
+  if (normalized >= 225 && normalized < 315) return "S";
+  return "E";
+}
+
+export interface GroupEntrance {
+  /** Native (rotation=0), pre-rotation tile-slot column/row within the group's own grid. */
+  localCol: number;
+  localRow: number;
+  /** Native-space (rotation=0) group-local coordinates — NOT remapped for `rotation`. */
+  x: number;
+  y: number;
+  /** Native-space bearing (rotation=0). */
+  bearing: number;
+  /** Which side of the group's footprint this door opens onto, AFTER applying `rotation`. */
+  side: "N" | "S" | "E" | "W";
+}
+
+const SIDE_ORDER: Array<"N" | "S" | "E" | "W"> = ["N", "E", "S", "W"];
+
+/** Rotate a cardinal side by `steps` quarter-turns, matching this codebase's case-1=90°CW convention. */
+function rotateSide(side: "N" | "S" | "E" | "W", steps: number): "N" | "S" | "E" | "W" {
+  const idx = SIDE_ORDER.indexOf(side);
+  return SIDE_ORDER[(idx + steps) % 4];
+}
+
+/**
+ * Every EXTERIOR door a tile group has — generalizes findFeatureDoorPosition's
+ * (layout-generator.ts) door scan, which only ever returned the first exterior
+ * door for transition-portal placement. Same classification logic (a door is
+ * "exterior" if its outward offset point lands off the group's own footprint),
+ * reused rather than re-derived, now returning all of them plus a cardinal
+ * `side` so a caller can reason about which face of the group to point at a
+ * road/avenue.
+ *
+ * Deliberately does NOT re-derive door world-positions at a rotated tile
+ * placement — that would require the same grid-slot remap
+ * (`rotateGroupTileIndex` in layout-generator.ts) this function would then
+ * have to duplicate, doubling the surface area for a rotation-handedness
+ * mistake. Instead: door geometry (x/y/bearing/localCol/localRow) is always
+ * computed at native orientation (rotation=0, the same math
+ * findFeatureDoorPosition already used and this project already trusts), and
+ * `rotation` only rotates the returned `side` label by simple compass
+ * arithmetic (N->E->S->W->N per quarter-turn) — a much smaller, independently
+ * checkable piece of logic than re-deriving positions.
+ *
+ * HANDEDNESS NOTE: `rotateSide`'s direction (N->E for rotation=1) is chosen to
+ * match this codebase's existing "case 1 = 90° CW" convention
+ * (`forwardRotateDoor`/`getRotatedCorners`), but has NOT been independently
+ * cross-checked against a real multi-tile group placed in the toolset/engine
+ * the way that per-tile convention was (see CLAUDE.md's "Tile rotation"
+ * pitfall for the verification bar this project normally holds itself to).
+ * Treat `side` for a nonzero `rotation` as unverified until checked against a
+ * real toolset render of an actually-rotated group.
+ */
+export function getGroupEntrances(group: TileGroup, tileset: TilesetInfo, rotation: 0 | 1 | 2 | 3 = 0): GroupEntrance[] {
+  const OFFSET = 3.0;
+  const featureTileSet = new Set<string>();
+  for (let gc = 0; gc < group.columns; gc++) {
+    for (let gr = 0; gr < group.rows; gr++) {
+      featureTileSet.add(`${gc},${gr}`);
+    }
+  }
+
+  const entrances: GroupEntrance[] = [];
+  for (let gr = 0; gr < group.rows; gr++) {
+    for (let gc = 0; gc < group.columns; gc++) {
+      const tileId = group.tileIds[gr * group.columns + gc];
+      if (tileId < 0) continue;
+      const tile = tileset.tiles[tileId];
+      if (!tile || tile.doors === 0) continue;
+
+      // Group-local coordinates (origin at (0,0), not world space) — reuse
+      // getTileDoorWorldPositions at native orientation (0) with the group's
+      // own (gc, gr) as the "col/row" args, matching findFeatureDoorPosition.
+      const doorPositions = getTileDoorWorldPositions(tile, gc, gr, 0);
+      for (const door of doorPositions) {
+        const rad = (door.bearing * Math.PI) / 180;
+        const offsetX = door.x + Math.cos(rad) * OFFSET;
+        const offsetY = door.y + Math.sin(rad) * OFFSET;
+        const offsetTileCol = Math.floor(offsetX / 10);
+        const offsetTileRow = Math.floor(offsetY / 10);
+        const isExterior = !featureTileSet.has(`${offsetTileCol},${offsetTileRow}`);
+        if (!isExterior) continue;
+        entrances.push({
+          localCol: gc,
+          localRow: gr,
+          x: Math.round(door.x * 10) / 10,
+          y: Math.round(door.y * 10) / 10,
+          bearing: door.bearing,
+          side: rotateSide(bearingToSide(door.bearing), rotation),
+        });
+      }
+    }
+  }
+  return entrances;
+}
+
 // ─── Tileset Cache ──────────────────────────────────────────────────────────
 
 const tilesetCache = new Map<string, TilesetInfo>();

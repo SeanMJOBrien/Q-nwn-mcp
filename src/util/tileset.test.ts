@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { getRotatedCorners, getRotatedCrossers } from "./tileset.js";
-import type { TileDefinition } from "./tileset.js";
+import { getRotatedCorners, getRotatedCrossers, getGroupEntrances } from "./tileset.js";
+import type { TileDefinition, TileGroup, TilesetInfo } from "./tileset.js";
 
 // Minimal tile fixture with distinct values per corner/edge for clear rotation verification
 function makeTile(): TileDefinition {
@@ -126,5 +126,85 @@ describe("getRotatedCrossers", () => {
     expect(cr.right).toBe("Road"); // was top
     expect(cr.bottom).toBe("Stream"); // was right
     expect(cr.left).toBe("");      // was bottom
+  });
+});
+
+describe("getGroupEntrances", () => {
+  // 1-column x 2-row group. Bottom tile (0,0) has a door on its east edge
+  // (tile-local x=+5, bearing 0) — its 3m outward offset lands off the
+  // group's own footprint (no column 1 exists), so it's exterior/"E".
+  // Top tile (0,1) has a door on its south edge (tile-local y=-5, bearing
+  // 270) pointing straight at the bottom tile — its outward offset lands
+  // back inside the group's own footprint, so it's interior and excluded.
+  function makeDoorTile(id: number, doorX: number, doorY: number, bearing: number): TileDefinition {
+    return {
+      id,
+      model: "test",
+      imageMap2D: "",
+      corners: { topLeft: "Grass", topRight: "Grass", bottomLeft: "Grass", bottomRight: "Grass" },
+      flat: true,
+      crossers: { top: "", right: "", bottom: "", left: "" },
+      pathNode: "",
+      doors: 1,
+      doorPlacements: [{ x: doorX, y: doorY, z: 0, orientation: bearing, type: 0 }],
+      sounds: 0,
+      orientation: 0,
+      groupId: null,
+      groupName: null,
+    } as unknown as TileDefinition;
+  }
+
+  function makeFixture(): { group: TileGroup; tileset: TilesetInfo } {
+    const bottomTile = makeDoorTile(0, 5, 0, 0); // east-facing door
+    const topTile = makeDoorTile(1, 0, -5, 270); // south-facing door (into the group)
+    const tileset = { tiles: [bottomTile, topTile] } as unknown as TilesetInfo;
+    const group: TileGroup = { index: 0, name: "TestGroup_1x2", strref: 0, rows: 2, columns: 1, tileIds: [0, 1] };
+    return { group, tileset };
+  }
+
+  it("classifies an outward-facing door as exterior and an inward-facing one as interior", () => {
+    const { group, tileset } = makeFixture();
+    const entrances = getGroupEntrances(group, tileset, 0);
+    // Only the bottom tile's east door should appear — the top tile's door
+    // points back into the group's own footprint and is excluded.
+    expect(entrances).toHaveLength(1);
+    expect(entrances[0].localCol).toBe(0);
+    expect(entrances[0].localRow).toBe(0);
+    expect(entrances[0].side).toBe("E");
+  });
+
+  it("rotation=0 leaves side unchanged from native bearing", () => {
+    const { group, tileset } = makeFixture();
+    const entrances = getGroupEntrances(group, tileset, 0);
+    expect(entrances[0].side).toBe("E");
+  });
+
+  it("rotation rotates the reported side by simple compass steps (N->E->S->W->N)", () => {
+    const { group, tileset } = makeFixture();
+    // Native side is E (idx 1 in N,E,S,W). Each rotation step should advance
+    // one position in that cycle, deterministically — this is the internal
+    // consistency this function's design relies on (see its handedness note;
+    // real-world direction is unverified, but the composition must be self-consistent).
+    expect(getGroupEntrances(group, tileset, 0)[0].side).toBe("E");
+    expect(getGroupEntrances(group, tileset, 1)[0].side).toBe("S");
+    expect(getGroupEntrances(group, tileset, 2)[0].side).toBe("W");
+    expect(getGroupEntrances(group, tileset, 3)[0].side).toBe("N");
+  });
+
+  it("does not mutate x/y/bearing when rotation is nonzero (native-space geometry, rotated side only)", () => {
+    const { group, tileset } = makeFixture();
+    const native = getGroupEntrances(group, tileset, 0)[0];
+    const rotated = getGroupEntrances(group, tileset, 2)[0];
+    expect(rotated.x).toBe(native.x);
+    expect(rotated.y).toBe(native.y);
+    expect(rotated.bearing).toBe(native.bearing);
+    expect(rotated.side).not.toBe(native.side);
+  });
+
+  it("returns no entrances for a group with no door tiles", () => {
+    const plainTile = { ...makeDoorTile(0, 5, 0, 0), doors: 0, doorPlacements: [] };
+    const tileset = { tiles: [plainTile] } as unknown as TilesetInfo;
+    const group: TileGroup = { index: 0, name: "NoDoors_1x1", strref: 0, rows: 1, columns: 1, tileIds: [0] };
+    expect(getGroupEntrances(group, tileset, 0)).toEqual([]);
   });
 });
