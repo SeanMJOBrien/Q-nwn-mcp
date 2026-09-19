@@ -1084,6 +1084,60 @@ from: a creature built with `feats: [1848]` (the exact historical
 feat" line, `loaded: true`, `timedOut: false`, and the container is
 confirmed torn down afterward (`docker-compose ps -q` returns nothing).
 
+**`systest-module` skill + `create_systest_instrumentation` tool
+(2026-09-19) — a small, disposable module purpose-built to exercise
+nwn-mcp's own systems and prove `run_live_verification` catches real
+problems.** `create_systest_instrumentation` (`src/tools/systest-tools.ts`,
+`src/util/systest-log-script.ts`) generates `inc_systest_log`, the same
+generator/probe-compile shape as `create_spec_verification`/
+`create_random_abilities_system`: `SYSTEST_LogDamage(oCreature)`/
+`SYSTEST_LogDeath(oCreature)`, chained onto `ScriptDamaged`/`ScriptDeath`,
+log `[SYSTEST_DAMAGE] target=<tag> attacker=<tag> amount=<n>`/
+`[SYSTEST_DEATH] tag=<tag> killer=<tag>` via the engine's own OnDamaged/
+OnDeath event context (`GetLastDamager`/`GetTotalDamageDealt`/
+`GetLastHostileActor`) — deliberately taking just `oCreature`, since
+`ExecuteScript()` doesn't forward custom arguments to a chained wrapper.
+Real-compiled and confirmed live (`src/tools/systest-tools.live.test.ts`).
+`run_live_verification`'s `otherTaggedLines` field is what surfaces these
+with zero extra parsing needed — this is the concrete connective tissue
+between the two features.
+
+The `.claude/skills/systest-module/SKILL.md` skill composes existing
+primitive tools (never a new monolithic build-everything tool — matches
+`adventure-actors`' own established pattern of composing primitives rather
+than baking a fixed build into TypeScript) into a 10-NPC roster across two
+minimal `tdm01` areas: one passing regression fixture per bug class fixed
+this session (`weapon_focus_mismatch`, `ranged_feat_no_reload_support`,
+`armor_proficiency_mismatch`, `ammo_stack_size_unreasonable` ×2,
+`invalid_feat_id`, `store_item_miscategorized`), an opposed-faction melee
+pair wired to the new logging instrumentation, and one Tier-1
+(`SetMemorizedSpell`) + one Tier-2 (virtual-ability) caster fixture for
+`create_random_abilities_system`. The caster fixtures need a real
+`LevelUpHenchman()` leveling loop in their own `ScriptSpawn` wrapper before
+calling `RA_OnSpawn` — reusing `SPEC_SelfTestOnSpawn`'s exact,
+BioWare-precedented pattern — since a from-scratch `ClassList` only ever
+yields cantrip-level spell slots until a real leveling call has actually
+run (the documented Tier-1 timing finding under "Random caster abilities"
+below). Never committed to this repo and never sent to the user as a
+deliverable — purely a disposable diagnostic aid, rebuilt fresh by the
+skill whenever needed rather than hand-patched.
+
+NPC-to-NPC dialog (`ActionStartConversation`) is deliberately NOT in this
+roster — flagged as a stretch item pending a first real
+`run_live_verification` pass proving the mechanism actually works (see the
+design discussion this feature's plan recorded: dialogs normally assume a
+PC speaker via `GetPCSpeaker()`, which resolves to `OBJECT_INVALID` with no
+PC involved — untested territory, deliberately not built blind).
+
+**Known gap, honestly recorded rather than glossed over**: the skill has
+been written and its generator tool's probe-compile confirmed live, but the
+skill itself has not yet been run end-to-end to build a real roster and
+run it through `run_live_verification` — that's the natural next real-world
+test of this whole feature, and the strongest form of verification
+available (per this project's own "the only thing that actually caught
+this was a human/engine actually running it" lesson, repeated throughout
+this document). Invoke `/systest-module` to do that.
+
 **A live isolated verification server exists and has run a real end-to-end check
 successfully** (`~/nwn-mcp-verify-server` — a fork of
 [`urothis/nwnxee-docker-template`](https://github.com/urothis/nwnxee-docker-template),
