@@ -51,6 +51,7 @@ npm run start        # Run compiled output
 | `NWN_FOLDER_DATA` | *(empty)* | NWN game install dir — enables base game 2DA/TLK loading via resman |
 | `NWN_FOLDER_USER` | *(empty)* | NWN user documents dir — enables custom TLK, HAK, override/, development/ loading |
 | `MCP_FOLDER_TEMP` | `%TEMP%/nwn-mcp` | Temp directory for extracted modules |
+| `MCP_FOLDER_VERIFYSERVER` | `~/nwn-mcp-verify-server` | Checkout of the throwaway headless-engine verify server, used by `run_live_verification` |
 
 ## Architecture
 
@@ -998,15 +999,90 @@ loaded `feat.2da`'s real row set (`index.twodaTables.get("feat").rows.has(...)`,
 membership rather than a computed bounds check, so gaps in the table are
 handled correctly too) — degrades to skip when `feat.2da` isn't loaded
 (no `NWN_FOLDER_DATA`), never guesses. 3 new unit tests.
-**Process note for next time this server is used**: the orchestration is
-still fully manual, per the "what's still missing" note below — copy the
-`.mod` into `server/modules/`, set `NWN_MODULE` in
-`config/nwserver.env`, `docker-compose down && docker-compose up -d` from
-inside the repo (so `${PWD}` resolves), then `grep -iE "invalid feat|error|
-exception" logs/nwengineLog.txt` and `docker logs <container> | grep
-SPEC_`. Tear the container down again after (`docker-compose down`) —
-this server is throwaway and never player-facing, per its own `nwserver.env`
-header comment.
+**Process note (historical — now automated, see below):** the recipe used to
+find this bug was fully manual — copy the `.mod` into `server/modules/`, set
+`NWN_MODULE` in `config/nwserver.env`, `docker-compose down && docker-compose
+up -d` from inside the repo (so `${PWD}` resolves), grep the logs, tear the
+container down again. **This whole loop is now a real MCP tool,
+`run_live_verification`** (2026-09-19, `src/tools/verify-server-tools.ts`) —
+see the "Live verification automation" entry below for the design and two
+real bugs found building it. The manual recipe stays documented here as
+fallback/reference, not as the recommended path anymore.
+
+**Live verification automation — `run_live_verification`
+(2026-09-19, `src/tools/verify-server-tools.ts`).** Automates the manual
+recipe above end-to-end: repacks the currently-loaded module (or an explicit
+`modulePath`), copies it into `MCP_FOLDER_VERIFYSERVER`'s `server/modules/`,
+patches `NWN_MODULE=` in `config/nwserver.env`, `docker-compose down && up
+-d`, polls the logs until either `expectedCheckLines` bracket-tagged lines
+appear or log growth stalls for a few seconds after the module starts
+loading, then **always** tears the container down (`try/finally` — a thrown
+error or timeout never leaves it running). Returns a structured result:
+`loaded`, `timedOut`, `engineErrors` (line + matched pattern),
+`specResults.{ok,fail}` (parsed `[SPEC_OK]`/`[SPEC_FAIL]` lines),
+`otherTaggedLines` (any other `[TAG_*]` line — this is how a future
+instrumentation include's own tags, e.g. a `systest` module's
+`[SYSTEST_DAMAGE]`, surface with zero extra parsing needed), and a bounded
+`rawLogExcerpt`. Log parsing is pure/unit-tested
+(`src/util/verify-server/result.ts`); the Docker orchestration itself is only
+testable live (`src/tools/verify-server-tools.live.test.ts`,
+`describe.skipIf` gated on the verify-server checkout existing).
+
+**Four real, confirmed bugs found getting this working — none visible from
+reading the manual recipe, all found by actually running it live:**
+1. **`${PWD}` in `docker-compose.yml` reads the literal `PWD` environment
+   variable, not `execFile`'s `cwd` option.** Node's `child_process.execFile`
+   changes the child's real working directory without touching the inherited
+   `PWD` env var, so docker-compose resolved `${PWD}` to whatever directory
+   the calling process happened to inherit — sending it looking for
+   `config/nwserver.env` inside the Q-nwn-mcp repo instead of the
+   verify-server checkout. **Fix:** explicitly pass `env: { ...process.env,
+   PWD: cwd }` on every docker-compose invocation.
+2. **The log files truncate on every container restart — they do NOT append
+   forever across runs**, contradicting an earlier exploration's untested
+   assumption (recorded in an earlier draft of this same feature). Confirmed
+   directly: a fresh `docker-compose down && up -d` produces a log containing
+   only that session's lines, nothing from before. An offset recorded before
+   `down`+`up` (to avoid misreading a stale prior run) was therefore *larger*
+   than the new, truncated file, making every "read new bytes since offset"
+   come back empty on every real run — the tool silently reported
+   `loaded: false` despite the module loading correctly. **Fix:** read each
+   log file's full current content on every poll tick instead of diffing
+   against a pre-recorded offset; safe and cheap since these are small,
+   single-session log files and `down` always precedes `up` in this tool's
+   own flow.
+3. **The MCP SDK's client-side default request timeout is 60s**
+   (`DEFAULT_REQUEST_TIMEOUT_MSEC`) — a `timeoutSeconds: 90` budget (the
+   original design) genuinely exceeded it: the server kept running to
+   completion and tore the container down correctly, but the calling client
+   gave up and reported the request as failed, with no way for the caller to
+   know the server-side work actually succeeded. **Fix:** lowered the tool's
+   own default to 45s (real headroom under 60s including down/up overhead),
+   documented in the tool description that raising `timeoutSeconds` past
+   ~50 only helps if the caller has also raised its own client-side request
+   timeout.
+4. **`EXOWARNING` is too broad as a default error-grep pattern** — even a
+   totally minimal, freshly-created module emits one at startup (`"Filename
+   passed contains an undefined alias"`), unrelated to any real defect.
+   Dropped from `DEFAULT_ERROR_PATTERNS` (`invalid feat`/`error`/`exception`
+   remain); still available as an explicit opt-in via the `errorPatterns`
+   param for a caller who wants that strictness.
+
+Also surfaced, not a tool bug but worth recording: `create_module`'s
+generated `_start` stub area (see the "dead `_start` area" pitfall below) has
+**no walkable interior tiles reachable via the standard 1-tile margin at all**
+— `adventure_find_walkable` returns nothing for it, and even its own reported
+`entryPosition` is `Nonwalk`. A live test needing a real placed, spawned
+creature needs a real generated area (`create_area` +
+`adventure_generate_layout` + `adventure_apply_layout`, same recipe
+`comprehensive-module.live.test.ts` already uses), not the `_start` stub.
+
+End-to-end confirmed working against the real bug this whole effort started
+from: a creature built with `feats: [1848]` (the exact historical
+`hos_cbenf` shape), placed and spawned in a real generated area, run through
+`run_live_verification` — `engineErrors` correctly contains the "invalid
+feat" line, `loaded: true`, `timedOut: false`, and the container is
+confirmed torn down afterward (`docker-compose ps -q` returns nothing).
 
 **A live isolated verification server exists and has run a real end-to-end check
 successfully** (`~/nwn-mcp-verify-server` — a fork of
@@ -1034,12 +1110,15 @@ that needs the same.
   committed that simplification. Worth committing next time this server is used for
   real debugging, so the working, minimal configuration is the actual committed
   state rather than a perpetual uncommitted diff against the original template.
-- **What's still missing is automation**: copying a generated module into the
-  server's `modules/` folder, launching, polling for load completion, grepping,
-  tearing down, and feeding failures back into nwn-mcp's repair tools is all still
-  done by hand — the orchestration loop is designed (`docs/runtime-verification-spec.md`
-  §5) and proven manually (repeatedly, across two separate verification efforts now),
-  but not built into a tool.
+- **BUILT (2026-09-19) — the orchestration loop is now a real tool,
+  `run_live_verification`.** Copying a generated module into the server's
+  `modules/` folder, launching, polling for load completion, grepping, and
+  tearing down is no longer done by hand — see "Live verification automation"
+  below for the full design and the real bugs found getting it working.
+  Feeding failures back into nwn-mcp's repair tools is still a human/LLM step
+  (cross-reference a failing tag via `get_creature_details`/`resolve_blueprint`,
+  fix via the normal typed tools, rerun) — that part was never meant to be
+  automated away, only the mechanical launch/poll/grep/teardown cycle around it.
 - `randspellbooks` (`~/tfndev/src/nss/inc_rand_spell.nss`) also still depends on
   NWNX and a persistent campaign database — out of scope for `inc_spec_check.nss`,
   which deliberately uses zero `NWNX_*` functions. See

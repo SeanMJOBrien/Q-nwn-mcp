@@ -4,6 +4,15 @@ import os from "os";
 /** Path where user-facing reports are saved. When unset, reports go to the module's temp directory. */
 export const MCP_FOLDER_USERREPORTS = process.env.MCP_FOLDER_USERREPORTS || "";
 
+/**
+ * Path to the nwn-mcp-verify-server checkout (a separate git repo — a fork of
+ * urothis/nwnxee-docker-template) used by run_live_verification to run a module
+ * against a real headless NWN engine. Defaults to ~/nwn-mcp-verify-server, the
+ * path this project has used throughout its history.
+ */
+export const MCP_FOLDER_VERIFYSERVER =
+  process.env.MCP_FOLDER_VERIFYSERVER || path.join(os.homedir(), "nwn-mcp-verify-server");
+
 /** Path to neverwinter.nim tool binaries (required) */
 export const NIM_FOLDER_NWTOOLS = process.env.NIM_FOLDER_NWTOOLS || "";
 
