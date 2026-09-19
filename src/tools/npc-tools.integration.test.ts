@@ -188,6 +188,29 @@ describe("build_npc_stat_block", () => {
     }
   });
 
+  it("complexity: 'simple' yields no bonus-feat-slot picks", async () => {
+    loadClassRaceTables(mockIndex);
+    const key = "test_npc_simple.utc";
+    mockIndex.parsedGff.set(key, makeBlueprintUtc() as unknown as GffDocument);
+    mockIndex.resources.set(key, { resref: "test_npc_simple", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_stat_block",
+        arguments: { resref: "test_npc_simple", race: "6", classId: "4", level: "5", powerLevel: "elite", complexity: "simple" },
+      });
+      const parsed = parseResult(result) as { success: boolean; feats: Array<{ feat: number; source: string }>; complexity: string };
+      expect(parsed.success).toBe(true);
+      expect(parsed.complexity).toBe("simple");
+      expect(parsed.feats.some((f) => f.source === "bonus_slot")).toBe(false);
+      expect(parsed.feats.length).toBeGreaterThan(0); // racial/automatic/generic feats still present
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("errors clearly when the target blueprint doesn't exist", async () => {
     const { registerNpcTools } = await import("./npc-tools.js");
     const { client, cleanup } = await createTestClient(registerNpcTools);

@@ -115,9 +115,15 @@ export function registerNpcTools(server: McpServer): void {
         .describe(
           "Ability-score generation band (default elite = literal Elite Array 15/14/13/12/10/8). Others are D&D 3.5 point-buy budgets: low=15, standard=25, tougher=32, epic=36.",
         ),
+      complexity: z
+        .enum(["full", "simple"])
+        .optional()
+        .describe(
+          "'full' (default) computes every feat category including PC-style class bonus-feat slots (Weapon Specialization, Cleave->Great Cleave, metamagic, epic feats). 'simple' skips that category — for a background NPC the plot just calls a plain 'warrior'/'adept' rather than a named PC-progression character: still competent (racial/automatic-class/generic feat slots unaffected), just without the full advancement chain.",
+        ),
     },
     { idempotentHint: true },
-    async ({ resref, race, classId, level, powerLevel }) => {
+    async ({ resref, race, classId, level, powerLevel, complexity }) => {
       const index = requireIndex();
       const key = `${resref.toLowerCase()}.utc`;
       const doc = index.parsedGff.get(key);
@@ -136,6 +142,7 @@ export function registerNpcTools(server: McpServer): void {
         level: toI(level),
         powerLevel: (powerLevel as PowerLevel | undefined) ?? "elite",
         seed: resref,
+        complexity: (complexity as "full" | "simple" | undefined) ?? "full",
       });
 
       const existingRace = getFieldNum(obj, "Race");
@@ -211,6 +218,7 @@ export function registerNpcTools(server: McpServer): void {
                 skillPointsSpent: result.skillRanks.reduce((sum, s) => sum + s.rank, 0),
                 hp: result.hp,
                 startingPackage: result.startingPackage,
+                complexity: (complexity as "full" | "simple" | undefined) ?? "full",
                 warnings: [...raceWarning, ...result.warnings],
               },
               null,

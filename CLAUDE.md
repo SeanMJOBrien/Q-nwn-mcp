@@ -1223,20 +1223,28 @@ session) or simply trusted from a sub-skill's self-report:**
 - **Weather/area-property variance.** "Give each area different weather" is neither
   computed nor diffed — a sub-skill could set every area to the same values and
   nothing would catch it.
-  **TODO (user-raised, 2026-09-09): weather variance is story-dependent, not just a
-  "make adjacent areas differ" rule.** A flat "flag identical weather on adjacent
-  areas" check (see item 4 below) would false-positive on two areas that are
-  genuinely meant to share weather (a short walk between them, same climate) and
-  miss cases where weather *should* differ for reasons a plain adjacency diff can't
-  see. Before building this check for real, the design needs to account for: does
-  the transition between these two areas represent many hours of travel (weather
-  should plausibly have changed) or a near-instant arrival (should usually match)?
-  Does the transition move the party to a meaningfully different location/climate
-  (mountain pass vs. coastal town) that would affect weather regardless of travel
-  time? A real implementation likely needs a per-transition "travel time" and/or
-  "climate change" signal — from `adventure_create_transition`'s own data, or a
-  new field the area-design phase sets — rather than only comparing the two areas'
-  `ChanceRain`/`ChanceSnow`/etc. fields directly.
+  **BUILT (2026-09-19) — resolved exactly along the lines this TODO called for: a
+  real per-transition signal, not a raw adjacency diff.** A flat "flag identical
+  weather on adjacent areas" check (see item 4 below) was rejected here as too
+  naive — it would false-positive on two areas genuinely meant to share weather (a
+  short walk, same climate) and miss cases where weather *should* differ. Fix:
+  `adventure_create_transition` (the one mechanism `/create-adventure` actually
+  uses for inter-area transitions) gained an optional `travelTime?: "short" |
+  "long"` param, stored as an `MCP_TRAVEL_TIME` `VarTable` local on the transition's
+  own light placeable (via `mergeVarTable()`, already used identically by
+  `create_creature_blueprint`'s `varTable` param — no new storage mechanism) —
+  `getVarTableString()` (`src/util/git-helpers.ts`) is the new read-side
+  counterpart. `buildAreaTransitions()` (`src/tools/tileset-tools.ts`) surfaces it
+  on `AreaTransitionInfo.travelTime`. A new `validate_module` check,
+  `weather_variance_implausible` (`src/tools/analysis-tools.ts`, mirroring
+  `cross_area_appearance_mismatch`'s existing cross-area pattern), warns only when
+  a transition is explicitly marked `"short"` AND `ChanceRain`/`ChanceSnow`/
+  `ChanceLightning` differ by more than 30 percentage points between the two
+  areas. `"long"` and — critically — **unset** transitions (every one built before
+  this feature, and the common case) are never flagged: this project's "skip
+  rather than guess" convention, applied directly to close the exact gap this TODO
+  raised, since the check only ever fires where a human explicitly said "this is a
+  quick crossing."
 - **This project's own MCP tool correctness.** The `get_area_creatures`/
   `list_creatures` stale-cache bug (see the pitfall above, found and fixed this same
   session) was caught by manual cross-checking against `get_creature_details`, not
@@ -1336,8 +1344,8 @@ instance (`area`+`tag` passed to `verify_door`), not a standalone blueprint, sin
 with `Plot` unset" as originally scoped — that formulation conflated normal
 door-breakability (true of nearly every door by default) with the actual concern
 (does this obstacle lead anywhere), so the check was redesigned around the latter.
-(4) **NOT BUILT — design open**, see the weather TODO immediately above this list;
-a flat adjacent-area diff was rejected as too naive before writing any code.
+(4) **BUILT (2026-09-19)** — see the weather TODO above: `weather_variance_implausible`,
+gated on an explicit `travelTime` signal rather than a flat adjacent-area diff.
 (5) the big one — generalizing the `SPEC_*` runtime-verification pattern beyond
 companion stats to arbitrary custom quest/encounter scripts, so a bespoke mechanic
 like a scripted web ambush gets an actual headless-server pass/fail instead of
@@ -1776,20 +1784,30 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   "same named NPC renders differently in two areas" bug class. All five checks and the
   slot-write validation have unit/integration test coverage; `npm run verify` passes.
 
-**TODO — not every NPC should get full PC-class bonus-feat progression.** Everything above
+**BUILT (2026-09-19) — a "simple NPC" tier, option (a) below.** Everything above
 (`LevelUpHenchman`, `startingPackage`, `SPEC_VerifyCreature`) assumes an NPC is meant to
 progress exactly like a PC of that class — right for companions, wrong for a background
 NPC the plot describes as a plain "warrior" or "adept" rather than a named Fighter/Cleric
-character. **Confirmed via `nwscript.nss`: NWN ships no separate Warrior/Expert/Adept/
-Aristocrat `CLASS_TYPE_*` the way tabletop D&D 3.5's NPC classes do** — the only true
-non-PC catch-all is `CLASS_TYPE_COMMONER` (20), and that one already grants *no* feats or
-spellbook at all via `LevelUpHenchman` (see the "Commoner chassis" bullet above), which is
-too blunt for an NPC that should still fight competently, just without a PC's full bonus-
-feat chain (Cleave→Great Cleave, Weapon Specialization, metamagic feats, epic feats, ...).
-Needs: a way to mark a creature blueprint as "simple" at creation time, and either (a) a
-curated lighter feat set instead of running it through full `LevelUpHenchman`, or (b) a
-repair tool that strips specific over-advanced bonus feats from a creature that was already
-leveled the normal way. Not designed yet — raised by the user, not yet scoped.
+character. NWN ships no separate Warrior/Expert/Adept/Aristocrat `CLASS_TYPE_*` the way
+tabletop D&D 3.5's NPC classes do, and the only true non-PC catch-all,
+`CLASS_TYPE_COMMONER` (20), already grants *no* feats or spellbook at all via
+`LevelUpHenchman` — too blunt for an NPC that should still fight competently, just without
+a PC's full bonus-feat chain (Cleave→Great Cleave, Weapon Specialization, metamagic feats,
+epic feats, ...). **Fix:** `buildNpcStatBlock()`'s (`src/util/npc-stat-block.ts`) feat
+computation already tagged every pick with a `source` — `"racial"`/`"class_automatic"`/
+`"generic_slot"`/`"bonus_slot"` — and `"bonus_slot"` is exactly the PC-style advancement
+chain (`cls_bfeat_<class>.2da`'s per-level slots) the TODO called out. A new
+`complexity?: "full" | "simple"` param (default `"full"`, identical to prior behavior) on
+both `buildNpcStatBlock()` and the `build_npc_stat_block` tool skips filling bonus-feat
+slots entirely when `"simple"` — racial/automatic-class/generic-slot feats (basic
+proficiencies, the universal "every character gets a feat" slots) are unaffected, so the
+NPC is still mechanically competent, just without the advancement chain. Narrow, low-risk
+change since the source-tagging already existed — no new read logic needed. **Option (b)
+— a repair tool stripping bonus feats from a creature already leveled via a *live*
+`LevelUpHenchman()` call — is deliberately still open**, a different mechanism (runtime
+feat removal vs. build-time generation) with its own design questions; `complexity:
+"simple"` covers the more common case (a background NPC built via `build_npc_stat_block`
+from the start).
 
 ## Gear Appearance
 

@@ -85,6 +85,20 @@ export interface StatBlockParams {
    * since determinism only matters relative to the creature it's for.
    */
   seed?: string;
+  /**
+   * "full" (default) computes every feat category, including PC-style class
+   * bonus-feat slots (cls_bfeat_<class>.2da — Weapon Specialization,
+   * Cleave->Great Cleave, metamagic, epic feats). "simple" skips that
+   * category entirely — for a background NPC the plot just calls a plain
+   * "warrior"/"adept" rather than a named PC-progression character: still
+   * competent (racial feats, automatic class feats, and the universal
+   * generic feat slots are unaffected), just without a PC's full advancement
+   * chain. NWN has no tabletop-style Warrior/Expert NPC class to fall back
+   * on, and CLASS_TYPE_COMMONER grants no feats/spellbook at all — too blunt
+   * for something that should still fight. See CLAUDE.md's "simple NPC
+   * tier" entry.
+   */
+  complexity?: "full" | "simple";
 }
 
 export interface AbilityScores {
@@ -287,26 +301,32 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
 
   // 4. Class-specific bonus feat slots — cls_bfeat_<class>.2da's single
   // "Bonus" column, row index = level-1, 1 = a slot opens that level.
-  const bonusFeatTable = tableFromConstantColumn(index, classRow, "BonusFeatsTable");
-  let bonusSlots = 0;
-  if (bonusFeatTable) {
-    for (let lvl = 1; lvl <= level; lvl++) {
-      if (bonusFeatTable.rows.get(lvl - 1)?.Bonus === "1") bonusSlots++;
+  // Skipped entirely for complexity: "simple" — this is exactly the PC-style
+  // advancement chain a background NPC doesn't need (see StatBlockParams'
+  // complexity doc comment).
+  const complexity = params.complexity ?? "full";
+  if (complexity === "full") {
+    const bonusFeatTable = tableFromConstantColumn(index, classRow, "BonusFeatsTable");
+    let bonusSlots = 0;
+    if (bonusFeatTable) {
+      for (let lvl = 1; lvl <= level; lvl++) {
+        if (bonusFeatTable.rows.get(lvl - 1)?.Bonus === "1") bonusSlots++;
+      }
     }
-  }
-  let unfilledBonus = 0;
-  for (let i = 0; i < bonusSlots; i++) {
-    const c = nextCandidate();
-    if (c === undefined) {
-      unfilledBonus++;
-    } else {
-      addFeat(c, "bonus_slot");
+    let unfilledBonus = 0;
+    for (let i = 0; i < bonusSlots; i++) {
+      const c = nextCandidate();
+      if (c === undefined) {
+        unfilledBonus++;
+      } else {
+        addFeat(c, "bonus_slot");
+      }
     }
-  }
-  if (unfilledBonus > 0) {
-    warnings.push(
-      `${unfilledBonus} class bonus feat slot(s) left unfilled — no more curated candidates, pick manually`,
-    );
+    if (unfilledBonus > 0) {
+      warnings.push(
+        `${unfilledBonus} class bonus feat slot(s) left unfilled — no more curated candidates, pick manually`,
+      );
+    }
   }
 
   // ─── Skill points ─────────────────────────────────────────────────────

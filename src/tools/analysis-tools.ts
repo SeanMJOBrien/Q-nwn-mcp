@@ -454,6 +454,54 @@ export function registerAnalysisTools(server: McpServer): void {
         }
       }
 
+      // Weather-variance plausibility: a transition explicitly marked "short"
+      // travel time (adventure_create_transition's travelTime param) implies
+      // the two areas' weather should stay roughly consistent — flag a large
+      // ChanceRain/ChanceSnow/ChanceLightning gap between them. A transition
+      // with no travelTime set (the default, and every transition built
+      // before this feature existed) or marked "long" is never checked —
+      // this project's "skip rather than guess" convention, and the concrete
+      // fix for an earlier design (see CLAUDE.md) that was rejected for
+      // flagging any adjacent-area weather difference regardless of signal.
+      {
+        const WEATHER_VARIANCE_THRESHOLD = 30; // percentage points
+        const tagToArea = buildTagToAreaMap(index);
+        const reportedPairs = new Set<string>();
+        for (const [areaResref] of index.areas) {
+          const transitions = buildAreaTransitions(index, areaResref, tagToArea);
+          for (const t of transitions) {
+            if (t.travelTime !== "short") continue;
+            const pairKey = [areaResref, t.targetArea].sort().join("|");
+            if (reportedPairs.has(pairKey)) continue;
+
+            const areaA = index.parsedGff.get(`${areaResref}.are`) as GffObj | undefined;
+            const areaB = index.parsedGff.get(`${t.targetArea}.are`) as GffObj | undefined;
+            if (!areaA || !areaB) continue;
+
+            const fields: Array<"ChanceRain" | "ChanceSnow" | "ChanceLightning"> = [
+              "ChanceRain",
+              "ChanceSnow",
+              "ChanceLightning",
+            ];
+            const diffs = fields
+              .map((f) => ({ field: f, a: getFieldNum(areaA, f), b: getFieldNum(areaB, f) }))
+              .filter((d) => Math.abs(d.a - d.b) > WEATHER_VARIANCE_THRESHOLD);
+
+            if (diffs.length > 0) {
+              reportedPairs.add(pairKey);
+              warnings.push({
+                type: "weather_variance_implausible",
+                message:
+                  `${areaResref} and ${t.targetArea} are linked by a transition marked "short" travel time, but ` +
+                  `differ sharply in ${diffs.map((d) => `${d.field} (${d.a} vs ${d.b})`).join(", ")} — implausible ` +
+                  `for a quick crossing`,
+                resource: `${areaResref}.are`,
+              });
+            }
+          }
+        }
+      }
+
       // OnSpawn lootable/droppable override scanner: a creature's Lootable=1
       // GFF flag (or an equipped/inventory item's Dropable=1) only sets the
       // *default* engine behavior — an OnSpawn script calling the legacy

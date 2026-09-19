@@ -50,7 +50,8 @@ vi.mock("../module-loader.js", async (importOriginal) => {
   };
 });
 
-vi.mock("./tileset-tools.js", () => ({
+vi.mock("./tileset-tools.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./tileset-tools.js")>()),
   invalidateTagToAreaCache: vi.fn(),
 }));
 
@@ -1523,6 +1524,124 @@ describe("validate_module cross-area appearance consistency", () => {
       const result = await client.callTool({ name: "validate_module", arguments: {} });
       const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
       expect(parsed.warnings.find((w) => w.type === "cross_area_appearance_mismatch")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+// ─── Tests: validate_module weather-variance plausibility checker ────────
+
+describe("validate_module weather-variance plausibility checker", () => {
+  function makeTransitionPlaceable(linkedTo: string, travelTime?: "short" | "long"): GffObj {
+    return {
+      __struct_id: 9,
+      Tag: { type: "cexostring", value: "at_test" },
+      LinkedTo: { type: "cexostring", value: linkedTo },
+      X: { type: "float", value: 5 },
+      Y: { type: "float", value: 5 },
+      Z: { type: "float", value: 0 },
+      ...(travelTime
+        ? {
+            VarTable: {
+              type: "list",
+              value: [
+                {
+                  __struct_id: 0,
+                  Name: { type: "cexostring", value: "MCP_TRAVEL_TIME" },
+                  Type: { type: "dword", value: 3 },
+                  Value: { type: "cexostring", value: travelTime },
+                },
+              ],
+            },
+          }
+        : {}),
+    } as unknown as GffObj;
+  }
+
+  function makeWaypoint(tag: string): GffObj {
+    return {
+      __struct_id: 5,
+      Tag: { type: "cexostring", value: tag },
+      XPosition: { type: "float", value: 5 },
+      YPosition: { type: "float", value: 5 },
+      ZPosition: { type: "float", value: 0 },
+    } as unknown as GffObj;
+  }
+
+  function setUpTransitionFixture(
+    modPath: string,
+    travelTime: "short" | "long" | undefined,
+    weatherA: { rain: number; snow: number; lightning: number },
+    weatherB: { rain: number; snow: number; lightning: number },
+  ): void {
+    mockIndex = createMockIndex({ modPath });
+
+    const gitA = makeGitDoc() as GffObj;
+    (gitA["Placeable List"] as { value: GffObj[] }).value.push(makeTransitionPlaceable("wp_b", travelTime));
+    const gitB = makeGitDoc() as GffObj;
+    (gitB.WaypointList as { value: GffObj[] }).value.push(makeWaypoint("wp_b"));
+
+    const areA = { ...(makeAreDoc() as GffObj), ChanceRain: { type: "int", value: weatherA.rain }, ChanceSnow: { type: "int", value: weatherA.snow }, ChanceLightning: { type: "int", value: weatherA.lightning } };
+    const areB = { ...(makeAreDoc() as GffObj), ChanceRain: { type: "int", value: weatherB.rain }, ChanceSnow: { type: "int", value: weatherB.snow }, ChanceLightning: { type: "int", value: weatherB.lightning } };
+
+    mockIndex.parsedGff.set("areaa.git", gitA);
+    mockIndex.parsedGff.set("areab.git", gitB);
+    mockIndex.parsedGff.set("areaa.are", areA);
+    mockIndex.parsedGff.set("areab.are", areB);
+    mockIndex.areas.set("areaa", { resref: "areaa", name: "A", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 0, placeableCount: 1, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+    mockIndex.areas.set("areab", { resref: "areab", name: "B", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 0, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 1 });
+  }
+
+  it("flags a short-travel-time transition between areas with sharply different weather", async () => {
+    setUpTransitionFixture("/fake/weather1.mod", "short", { rain: 0, snow: 0, lightning: 0 }, { rain: 80, snow: 0, lightning: 0 });
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string; message: string }> };
+      const found = parsed.warnings.find((w) => w.type === "weather_variance_implausible");
+      expect(found).toBeDefined();
+      expect(found?.message).toContain("ChanceRain");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag a short-travel-time transition with similar weather", async () => {
+    setUpTransitionFixture("/fake/weather2.mod", "short", { rain: 10, snow: 0, lightning: 0 }, { rain: 15, snow: 0, lightning: 0 });
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "weather_variance_implausible")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag a long-travel-time transition even with sharply different weather (opt-in gate)", async () => {
+    setUpTransitionFixture("/fake/weather3.mod", "long", { rain: 0, snow: 0, lightning: 0 }, { rain: 90, snow: 0, lightning: 0 });
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "weather_variance_implausible")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag a transition with no travelTime set at all, even with sharply different weather (skip, never guess)", async () => {
+    setUpTransitionFixture("/fake/weather4.mod", undefined, { rain: 0, snow: 0, lightning: 0 }, { rain: 90, snow: 0, lightning: 0 });
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "weather_variance_implausible")).toBeUndefined();
     } finally {
       await cleanup();
     }

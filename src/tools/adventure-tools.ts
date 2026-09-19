@@ -23,7 +23,7 @@ import { markDirty } from "../util/dirty-state.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { GIT_STRUCT_ID } from "../config.js";
-import { resolveBlueprint, getGitDoc, writeBackGit, updateAreaCounts } from "../util/git-helpers.js";
+import { resolveBlueprint, getGitDoc, writeBackGit, updateAreaCounts, mergeVarTable } from "../util/git-helpers.js";
 import { getFieldStr, getFieldNum, getFieldList, setField, setFieldNum } from "../types/gff.js";
 import type { GffObj, GffDocument } from "../types/gff.js";
 import { snapshotGitForUndo } from "../util/undo.js";
@@ -58,8 +58,14 @@ export function registerAdventureTools(server: McpServer): void {
       bX: numParam("Portal X position in areaB"),
       bY: numParam("Portal Y position in areaB"),
       tag: z.string().describe("Base tag, max 11 chars. Generates: lights 'at_<tag>'/'rt_<tag>', waypoints 'wp_at_<tag>'/'wp_rt_<tag>', scripts 'a_at_<tag>'/'a_rt_<tag>', dialogs 'd_at_<tag>'/'d_rt_<tag>'."),
+      travelTime: z
+        .enum(["short", "long"])
+        .optional()
+        .describe(
+          "How much in-story time this transition represents: 'short' (a walk/quick jump — weather should plausibly stay similar on both sides) or 'long' (many hours/days of travel — weather may plausibly differ). Omit if unknown; validate_module's weather_variance_implausible check only ever fires on a transition explicitly marked 'short' with very different ChanceRain/ChanceSnow/ChanceLightning on the two sides — it never guesses from an unset value.",
+        ),
     },
-    async ({ areaA, aX, aY, areaB, bX, bY, tag }) => {
+    async ({ areaA, aX, aY, areaB, bX, bY, tag, travelTime }) => {
       const axN = toF(aX), ayN = toF(aY);
       const bxN = toF(bX), byN = toF(bY);
       const index = requireIndex();
@@ -279,6 +285,15 @@ export function registerAdventureTools(server: McpServer): void {
       const lightB = await makeLightObj(lightBTag, dlgBA, onUsedBA, wpATag, bxN, byN, bZ);
       const wpB    = makeWaypoint(wpBTag, `Transition: ${tag}`, bxN, byN, bZ);
 
+      // The transition carries one travel-time value for both directions —
+      // stored as a VarTable local on each light, the same object
+      // buildAreaTransitions() already scans for LinkedTo. Omitted (the
+      // default) means "unknown" to weather_variance_implausible, never a guess.
+      if (travelTime) {
+        mergeVarTable(lightA, [{ name: "MCP_TRAVEL_TIME", type: "string", value: travelTime }]);
+        mergeVarTable(lightB, [{ name: "MCP_TRAVEL_TIME", type: "string", value: travelTime }]);
+      }
+
       // 5. Write areaA GIT (light + landing waypoint — both at same aPos)
       const { doc: gitDocA, obj: gitA } = getGitDoc(index, areaA);
       snapshotGitForUndo(gitDocA, areaA, "adventure_create_transition", `Place light ${lightATag} + waypoint ${wpATag}`);
@@ -301,6 +316,7 @@ export function registerAdventureTools(server: McpServer): void {
           text: JSON.stringify({
             success: true,
             transition: {
+              travelTime: travelTime ?? null,
               areaA: {
                 area: areaA,
                 lightTag: lightATag,
