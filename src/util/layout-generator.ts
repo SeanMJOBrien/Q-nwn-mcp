@@ -14,7 +14,7 @@
  */
 
 import type { TilesetInfo } from "./tileset.js";
-import { getTileDoorWorldPositions, rotatedGroupDimensions, rotateGroupTileIndex } from "./tileset.js";
+import { getTileDoorWorldPositions, rotatedGroupDimensions, rotateGroupTileIndex, getGroupEntrances } from "./tileset.js";
 import type { TerrainZone, CrosserPath } from "./zone-solver.js";
 import { computeValidPairs } from "./zone-solver.js";
 
@@ -39,6 +39,17 @@ export interface LayoutStyle {
    * scaffold the user can expand outward manually.
    */
   safeMode?: boolean;
+  /**
+   * Reserve the primary room-to-room connectivity spine as a protected
+   * avenue BEFORE packing feature groups, so a stamped group never lands on
+   * it — and bias a feature placed in an avenue-adjacent room toward a
+   * position/rotation whose entrance faces the avenue (best-effort; falls
+   * back to the ordinary uniform-random placement if no facing match fits).
+   * Default false — every existing caller's output is byte-identical
+   * without it. Ignored when `safeMode` is set (no features are packed at
+   * all in that mode, so there is nothing to bias).
+   */
+  avenue?: boolean;
 }
 
 /**
@@ -321,9 +332,24 @@ export function generateLayout(
   // ── 6. Feature packing (mandatory — 50%+ coverage per room — unless safeMode) ──
   // safeMode skips feature groups entirely: they're exactly the multi-tile,
   // less-uniform tiles a human is expected to add by hand in the toolset.
-  const suggestedFeatures = style.safeMode
-    ? []
-    : packFeatures(rooms, tileset, width, height, floorTerrain, style.preferredFeatures);
+  //
+  // When style.avenue is set, this step is DEFERRED to after step 7 (room
+  // connections) instead — packFeatures needs to know where the corridors
+  // are so features never overlap them and can be biased to face one, but
+  // corridors aren't computed until step 7. Deferring the call site (not
+  // moving the corridor-computation code itself, which is intricate and
+  // shared between exterior/interior branches) keeps this a small, safe
+  // reorder: the default (non-avenue) path's call site, arguments, and
+  // ordering relative to everything else are completely unchanged.
+  let suggestedFeatures: SuggestedFeature[] = [];
+  if (!style.avenue) {
+    suggestedFeatures = style.safeMode
+      ? []
+      : packFeatures(rooms, tileset, width, height, floorTerrain, style.preferredFeatures);
+  }
+  // Snapshot floor tiles before corridors run, so the avenue path (below) can
+  // diff out just the newly-carved corridor tiles from room-interior tiles.
+  const floorTilesBeforeCorridors = style.avenue ? new Set(floorTiles) : null;
 
   // ── 7. Room connections ───────────────────────────────────────────────────
   // Exterior styles (wallKeywords set): connect with floor terrain corridors
@@ -461,6 +487,27 @@ export function generateLayout(
   // next to each other. mergeAdjacentDeadEnds() closes that gap post-hoc.
   mergeAdjacentDeadEnds(crossers);
 
+  // ── 6b. Deferred feature packing (avenue mode only) ───────────────────────
+  // Corridors are known now — build the avenue exclusion/bias tile set and
+  // pack features against it. Exterior corridors are the tiles floorTiles
+  // gained since the pre-corridor snapshot (room interiors were already in
+  // floorTiles before step 7; corridors are the delta). Interior corridors
+  // never touch floorTiles at all (crossers cover wall tiles specifically),
+  // so their avenue tiles come from the crosser paths directly.
+  if (style.avenue && !style.safeMode) {
+    const avenueTiles = new Set<string>();
+    if (isExterior && floorTilesBeforeCorridors) {
+      for (const t of floorTiles) {
+        if (!floorTilesBeforeCorridors.has(t)) avenueTiles.add(t);
+      }
+    } else {
+      for (const c of crossers) {
+        for (const p of c.path) avenueTiles.add(`${p.x},${p.y}`);
+      }
+    }
+    suggestedFeatures = packFeatures(rooms, tileset, width, height, floorTerrain, style.preferredFeatures, avenueTiles);
+  }
+
   // ── 9. Transitions & description ─────────────────────────────────────────
   const transitionPoints = computeTransitions(rooms, width, height, transitionCount, transitionDirections, suggestedFeatures, floorTiles, tileset);
 
@@ -476,9 +523,27 @@ export function generateLayout(
 
 function bspPartition(x: number, y: number, w: number, h: number,
                       targetRooms: number, config: StyleConfig): Room[] {
-  // Minimum leaf = 6 tiles (room 3 + margin 2 on one side + 1 buffer).
-  // Guarantees 2-tile wall gaps between adjacent rooms for visual separation.
-  // A 12x12 area (10x10 playable) splits into 4 leaves of 5x5 each.
+  // Minimum leaf = 6 tiles (room 3 + margin 2 on one side + 1 buffer),
+  // shared by every style. Guarantees 2-tile wall gaps between adjacent
+  // rooms for visual separation. A 14x14 area (12x12 playable) splits into
+  // 4 leaves of 6x6 each.
+  //
+  // config.splitThreshold is assigned in every StyleConfig preset but
+  // DELIBERATELY NOT read here — confirmed dead config (see CLAUDE.md's
+  // Layout Rules section). It looks like an obvious fix to wire it in as a
+  // real per-style minLeaf, but adventure-areas/SKILL.md's own area-size
+  // guidance ("Interior minimum 12x12 for 4 rooms (splitThreshold 10)",
+  // "Exterior minimum 18x18 (splitThreshold 12)") was written assuming
+  // splitThreshold's VALUE meant something smaller than what wiring it in
+  // as minLeaf actually requires — at splitThreshold=10, a real minLeaf=10
+  // needs 20 playable tiles per axis for a 4-room split (22x22 total), not
+  // the skill's documented 12x12; at splitThreshold=12, exterior styles
+  // would need 26x26 total, not 18x18. Wiring this in would silently break
+  // the pipeline's own already-shipped, already-relied-upon minimum-size
+  // guidance (areas built at the documented "minimum" would silently
+  // collapse to 1 room instead of 4). Left hardcoded on purpose; the
+  // documentation fix here is correcting CLAUDE.md/this comment to state
+  // reality, not changing the actual generation behavior.
   const minLeaf = 6;
   const canSplitH = h >= minLeaf * 2;
   const canSplitW = w >= minLeaf * 2;
@@ -899,14 +964,38 @@ export function groupMatchesTerrain(group: { tileIds: number[] }, tileset: Tiles
   return true;
 }
 
+/** Which cardinal sides of `room` are immediately adjacent to a tile in `avenueTiles`. */
+function roomAvenueAdjacency(room: Room, avenueTiles: Set<string>): Set<"N" | "S" | "E" | "W"> {
+  const sides = new Set<"N" | "S" | "E" | "W">();
+  for (let x = room.x; x < room.x + room.w; x++) {
+    if (avenueTiles.has(`${x},${room.y - 1}`)) sides.add("S");
+    if (avenueTiles.has(`${x},${room.y + room.h}`)) sides.add("N");
+  }
+  for (let y = room.y; y < room.y + room.h; y++) {
+    if (avenueTiles.has(`${room.x - 1},${y}`)) sides.add("W");
+    if (avenueTiles.has(`${room.x + room.w},${y}`)) sides.add("E");
+  }
+  return sides;
+}
+
 function packFeatures(
   rooms: Room[], tileset: TilesetInfo,
   areaWidth: number, areaHeight: number,
   floorTerrain: string,
   preferredFeatures?: string[],
+  /**
+   * Tile coordinates ("x,y") already claimed by the avenue's primary
+   * connectivity spine (see generateLayout's `avenue` option) — pre-seeded
+   * into `occupied` so features never land on it. Features in a room
+   * adjacent to one of these tiles are also biased (not forced) toward a
+   * position/rotation whose entrance (getGroupEntrances) faces the avenue —
+   * see PACK-4 below. Omitted entirely for the default (non-avenue) path,
+   * which is byte-identical to pre-avenue-feature behavior.
+   */
+  avenueTiles?: Set<string>,
 ): SuggestedFeature[] {
   const suggestions: SuggestedFeature[] = [];
-  const occupied = new Set<string>();
+  const occupied = new Set<string>(avenueTiles ?? []);
 
   // Ordered preferred list — preserves LLM rank order (best fit first).
   // Only preferred features are placed; no random filler. One feature per room.
@@ -916,6 +1005,7 @@ function packFeatures(
 
   for (let i = 0; i < rooms.length; i++) {
     const room = rooms[i];
+    const avenueSides = avenueTiles ? roomAvenueAdjacency(room, avenueTiles) : new Set<"N" | "S" | "E" | "W">();
 
     // Get all groups that have valid tile IDs, exclude groups with unsupported doors,
     // crossers, or mismatched terrain corners
@@ -933,44 +1023,86 @@ function packFeatures(
     for (const prefName of preferredOrder) {
       if (usedFeatures.has(prefName.toLowerCase())) continue;
       const group = validGroups.find(g => g.name.toLowerCase() === prefName.toLowerCase());
-      if (!group || group.columns > room.w || group.rows > room.h) continue;
+      if (!group) continue;
+      // Fits natively, or fits rotated 90 — otherwise no orientation works, skip early.
+      const fitsNative = group.columns <= room.w && group.rows <= room.h;
+      const fitsRotated = group.rows <= room.w && group.columns <= room.h;
+      if (!fitsNative && !fitsRotated) continue;
+
+      // PACK-4: rotations to try per position attempt. With no avenue
+      // adjacency, only rotation 0 is tried — identical to pre-avenue-feature
+      // behavior. With adjacency, try every rotation whose footprint fits,
+      // preferring (not requiring) one whose entrance faces the avenue.
+      const candidateRotations: Array<0 | 1 | 2 | 3> = avenueSides.size > 0 ? [0, 1, 2, 3] : [0];
+
+      type PlacementCandidate = { fx: number; fy: number; rotation: 0 | 1 | 2 | 3; columns: number; rows: number };
+      let fallback: PlacementCandidate | null = null;
+      let bestMatch: PlacementCandidate | null = null;
 
       // Try multiple positions within the room
-      for (let attempt = 0; attempt < 20; attempt++) {
+      for (let attempt = 0; attempt < 20 && !bestMatch; attempt++) {
         const maxFx = room.x + room.w - group.columns;
         const maxFy = room.y + room.h - group.rows;
-        const fx = room.x + Math.floor(Math.random() * (maxFx - room.x + 1));
-        const fy = room.y + Math.floor(Math.random() * (maxFy - room.y + 1));
+        const fx0 = room.x + Math.floor(Math.random() * (maxFx - room.x + 1));
+        const fy0 = room.y + Math.floor(Math.random() * (maxFy - room.y + 1));
 
-        // Validate: within area bounds, not on perimeter
-        if (fx < 1 || fy < 1 || fx + group.columns > areaWidth - 1 || fy + group.rows > areaHeight - 1) continue;
+        for (const rotation of candidateRotations) {
+          const { columns: pc, rows: pr } = rotatedGroupDimensions(group.columns, group.rows, rotation);
+          // Re-derive a position that fits THIS rotation's footprint within the room,
+          // anchored near the same random spot rather than a second independent roll.
+          const maxFxR = room.x + room.w - pc;
+          const maxFyR = room.y + room.h - pr;
+          if (maxFxR < room.x || maxFyR < room.y) continue; // this rotation doesn't fit the room at all
+          const fx = Math.min(Math.max(fx0, room.x), maxFxR);
+          const fy = Math.min(Math.max(fy0, room.y), maxFyR);
 
-        // Check no overlap with already-placed features
-        let overlap = false;
-        for (let gx = fx; gx < fx + group.columns && !overlap; gx++) {
-          for (let gy = fy; gy < fy + group.rows && !overlap; gy++) {
-            if (occupied.has(`${gx},${gy}`)) overlap = true;
+          if (fx < 1 || fy < 1 || fx + pc > areaWidth - 1 || fy + pr > areaHeight - 1) continue;
+
+          let overlap = false;
+          for (let gx = fx; gx < fx + pc && !overlap; gx++) {
+            for (let gy = fy; gy < fy + pr && !overlap; gy++) {
+              if (occupied.has(`${gx},${gy}`)) overlap = true;
+            }
+          }
+          if (overlap) continue;
+
+          const candidate = { fx, fy, rotation, columns: pc, rows: pr };
+          if (!fallback) fallback = candidate;
+
+          if (avenueSides.size > 0) {
+            const entrances = getGroupEntrances(group, tileset, rotation);
+            if (entrances.some(e => avenueSides.has(e.side))) {
+              bestMatch = candidate;
+              break;
+            }
+          } else {
+            // No avenue adjacency to satisfy — first valid fit wins, exactly
+            // matching pre-avenue-feature behavior (single rotation-0 candidate).
+            bestMatch = candidate;
+            break;
           }
         }
-        if (overlap) continue;
-
-        // Place it
-        for (let gx = fx; gx < fx + group.columns; gx++) {
-          for (let gy = fy; gy < fy + group.rows; gy++) {
-            occupied.add(`${gx},${gy}`);
-          }
-        }
-
-        suggestions.push({
-          feature: group.name, x: fx, y: fy,
-          columns: group.columns, rows: group.rows, clearingIndex: i,
-        });
-        usedFeatures.add(prefName.toLowerCase());
-        placed = true;
-        break;
       }
-      if (placed) break; // one feature per room — move to next room
+
+      const chosen = bestMatch ?? fallback;
+      if (!chosen) continue; // no valid position/rotation found for this feature in this room
+
+      for (let gx = chosen.fx; gx < chosen.fx + chosen.columns; gx++) {
+        for (let gy = chosen.fy; gy < chosen.fy + chosen.rows; gy++) {
+          occupied.add(`${gx},${gy}`);
+        }
+      }
+
+      suggestions.push({
+        feature: group.name, x: chosen.fx, y: chosen.fy,
+        columns: chosen.columns, rows: chosen.rows, clearingIndex: i,
+        ...(chosen.rotation !== 0 ? { rotation: chosen.rotation } : {}),
+      });
+      usedFeatures.add(prefName.toLowerCase());
+      placed = true;
+      break;
     }
+    if (placed) break; // one feature per room — move to next room
     } // end pass loop
   }
 

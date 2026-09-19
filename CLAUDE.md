@@ -92,7 +92,7 @@ All 10 styles use a single BSP pipeline, differentiated by `StyleConfig` presets
 
 #### Layout Rules
 
-- **BSP rooms**: minimum 3x3, margin >= 2 (enforced, never collapses to 1). `minLeaf = 6` ensures each leaf can fit a 3-tile room + 2-tile margin. Interior styles use `splitThreshold: 10` — minimum area for 4 rooms is 14x14 (12x12 playable). Exterior styles use `splitThreshold: 12` and `marginRange: [2, 2]` to guarantee rooms large enough for 2x3 building features — minimum area for 4 exterior rooms is 18x18 (16x16 playable). Room size is a random fraction of available leaf space, randomly offset within the leaf.
+- **BSP rooms**: minimum 3x3, margin >= 2 (enforced, never collapses to 1). `minLeaf = 6` ensures each leaf can fit a 3-tile room + 2-tile margin — **this one hardcoded `6` is shared by every style, interior AND exterior.** `StyleConfig.splitThreshold` (10 for most interior styles, 12 for exterior) is assigned in every preset but **confirmed dead — never read anywhere in `bspPartition`** (found 2026-09-19 while designing the avenue-reservation feature below). Wiring it in looks like an obvious fix — DON'T, without also auditing every place that cites it: at a real `splitThreshold=10` minLeaf, a 4-room split needs 20 playable tiles per axis (22x22 total); at 12, exterior styles would need 24 playable (26x26 total) — both far above what's documented and actually relied on today. **The real minimum area for 4 rooms, any style, is 14x14 total (12x12 playable)** — `2 * minLeaf` per axis, off the one true shared constant. `adventure-areas/SKILL.md`'s "Interior minimum 12x12" line is correct (if for the wrong stated reason — its "(splitThreshold 10)" parenthetical describes config that isn't actually consulted); its "Exterior minimum 18x18" line is also correct in practice, but for a *different* reason than splitThreshold: BSP itself would happily hand back four 3x3 leaves at 14x14 for exterior too, but a 3x3 room can't fit any real 2x3+ building feature group — 18x18 is a feature-fit headroom guideline, not a value the code enforces or splitThreshold produces. Room size is a random fraction of available leaf space, randomly offset within the leaf.
 - **L-shaped rooms**: Adjacent BSP siblings may merge into a single zone with probability `nonRectChance`. The zone solver handles arbitrary shapes.
 - **Corridor routing**: axis-overlap detection (straight connection at shared Y/X), L-bend fallback when rooms don't overlap on either axis.
 - **S-curves**: Probability controlled by `sCurveChance`. Offsets middle third by 1 tile perpendicular. Bends only on interior wall tiles (never first/last).
@@ -105,6 +105,78 @@ All 10 styles use a single BSP pipeline, differentiated by `StyleConfig` presets
 - **Solver scan-order**: solves bottom-to-top, left-to-right. Fallback chain: (1) exact corners+crossers, (1.5) adjust free corners+keep crossers, (2) exact corners+drop crossers, (3) adjust free corners+drop crossers, (4) all-default fallback. Step 1.5 finds "corridor mouth" tiles by adjusting room-edge corners. Adjustments are written back to the corner grid so downstream tiles see them.
 - **Feature group filters**: groups with crosser edges or mismatched terrain corners are excluded from feature packing and `adventure_apply_layout`. Door-containing groups are allowed **only if** every door tile has all corners matching the floor terrain and no crosser edges — this lets freestanding buildings (houses, lodges) pass while rejecting corridor doors and transition doors. Terrain mismatch means a feature tile's corners don't all match the room's floor terrain — placing such a feature locks foreign corners into the grid, creating visual seams and forcing solver fallbacks on neighboring tiles.
 - **Feature suggestions**: `suggestedFeatures` array in LayoutResult — packed into rooms targeting 50%+ tile coverage. `adventure_apply_layout` applies zones + crossers + features atomically. Pass `preferredFeatures` (array of group names from `get_tileset_details`) in `LayoutStyle` to prioritize plot-appropriate features over random selection.
+
+#### Stamped-group rotation, entrance detection, and road/avenue preservation (2026-09-19)
+
+User-raised: stamped feature groups (`paint_group`, `adventure_apply_layout`) were placed
+at a single fixed orientation with no concept of facing a road, and roads were purely
+cosmetic (a crosser-tile texture choice, not a protected, reserved corridor). Three
+connected pieces, all in `src/util/tileset.ts` unless noted:
+
+- **`rotateGroupTileIndex(ngc, ngr, columns, rows, rotation)` / `rotatedGroupDimensions()`**
+  — the real grid-slot remap a rotated group needs. Rotating a group isn't just a
+  per-tile orientation flag: it's rotating which native `(col, row)` maps to which
+  `tileId` in the group's own row-major array, plus swapping footprint width/height at
+  90°/270°. Derived by transforming the group footprint's own corners through this
+  codebase's existing `forwardRotateDoor` point-rotation convention, cross-checked three
+  independent ways (direct per-rotation corner-transform, and composing the 90° step
+  two/three times to re-derive 180°/270° algebraically — all three agreed) plus a
+  bijection test (every native cell visited exactly once) and a "four 90° steps returns
+  to identity" algebraic check, both parametrized across multiple group shapes. Wired
+  into `paint_group` (new `rotation` param, 0-3), `adventure_apply_layout`'s real
+  feature-tile write path, and `findFeatureDoorPosition` (previously hardcoded its
+  orientation argument to `0` always). **Handedness caveat, stated plainly at each new
+  function**: internally self-consistent (every check above passed) but not yet
+  independently cross-checked against a real toolset render the way this codebase's
+  per-tile rotation was (see the "Tile rotation" pitfall above) — confirm visually
+  before depending on a specific rotation direction for real content.
+- **Fixed a real correctness gap the rotation work surfaced**: `adventure_apply_layout`'s
+  terrain-corner match check read a tile's *native* corners even for a rotated
+  placement — a rotated tile presents different corners outward. Now uses
+  `getRotatedCorners`. Curated collar tiles (`feature-collars.ts`) are hand-authored for
+  native placement only, so a feature with one clamps `rotation` to 0 with a warning
+  rather than silently misplacing its collar.
+- **`getGroupEntrances(group, tileset, rotation)`** — generalizes the door-classification
+  logic that already existed privately inside `findFeatureDoorPosition` (used only to
+  aim transition portals at a building's front door). Returns every EXTERIOR door a
+  group has (not just the first), each with a cardinal `side` (N/S/E/W). Deliberately
+  computes door geometry at native orientation always and only rotates the reported
+  `side` by simple compass arithmetic (N→E→S→W→N per quarter-turn) rather than
+  re-deriving positions against a rotated grid — a smaller, independently-checkable
+  piece of logic than duplicating the full grid remap. Exposed to callers via
+  `get_tileset_details`'s full-mode `entrances` field per group — this data was
+  previously unreachable outside `layout-generator.ts`'s private scan.
+- **`LayoutStyle.avenue?: boolean`** (`src/util/layout-generator.ts`, default false —
+  every existing caller's output is byte-identical without it). When true,
+  `packFeatures` is deferred from its normal step-6 position to run *after* step 7 (room
+  connections) instead of before — corridors aren't computed until step 7, and
+  `packFeatures` previously had zero visibility into them (confirmed: it only receives
+  `rooms`, never `crossers`/corridor geometry, so a feature could legally land on tiles
+  a corridor also crossed through a room interior). Deferring the *call site* (not
+  moving the intricate, exterior/interior-branching corridor-computation code itself)
+  keeps this a small, safe reorder — the non-avenue path's call site, arguments, and
+  ordering are completely unchanged. The avenue tile set is computed after corridors
+  exist: for exterior styles, whatever `floorTiles` gained since a pre-corridor
+  snapshot (corridors are carved as floor-terrain zones); for interior styles, every
+  crosser path's tiles directly (crossers cover wall tiles specifically, never touching
+  `floorTiles` at all). That set seeds `packFeatures`'s `occupied` exclusion, so a
+  feature never lands on the avenue, and — for a room adjacent to an avenue tile —
+  biases placement toward a position/rotation whose `getGroupEntrances(...).side` faces
+  it, trying all 4 rotations before falling back to the ordinary uniform-random
+  placement if no facing match fits (scored, not forced). No new "protected crosser"
+  solver concept was needed for this: since main connectors, shortcuts, and the
+  secondary stream are still computed in their existing relative order (only
+  `packFeatures`'s position moved around all of them), nothing about their own mutual
+  overlap risk changed — narrower and safer than the original plan's idea of separately
+  flagging just the "primary spine" as protected.
+- **Verified end-to-end against real tileset data**, not just synthetic unit fixtures:
+  `tno01`'s real `Thatch_House_1` group (1x1, one door, native side `N`) run through
+  `adventure_generate_layout({avenue:true, preferredFeatures:["Thatch_House_1"]})` at
+  4 rooms produced 4 placements, 2 of them with a non-zero `rotation` (the facing bias
+  actually engaging), and `adventure_apply_layout` applied all 4 with zero
+  `featureWarnings`. 3 new unit tests confirm the avenue-exclusion property holds across
+  15 real-generation trials (never a false pass — both "a feature was placed" and "a
+  corridor existed" are asserted, not just "no overlap found").
 
 ### Resource Loading
 
@@ -231,6 +303,10 @@ place it — closing the gap between "the collar is correct" and "there's
 actually room for the collar." Related to, but distinct from, the area-prefabs
 work above (prefabs solve *authoring* a known-good multi-tile piece once;
 this solves *making room* for one, prefab or procedural, before packing it).
+Still open. A related but separate gap — *reserving a road/avenue* between
+stamped groups (not a flat buffer around one feature) — is now built; see
+"Stamped-group rotation, entrance detection, and road/avenue preservation"
+under Layout Rules above.
 
 **TODO — rebuild a single area in place from an existing/completed module
 (user-raised).** No current tool lets you regenerate just one area of an

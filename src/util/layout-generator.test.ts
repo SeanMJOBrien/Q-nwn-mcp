@@ -109,3 +109,93 @@ describe("generateLayout without safeMode (regression guard)", () => {
     expect(result.layoutDescription).not.toMatch(/^ERROR/);
   });
 });
+
+describe("generateLayout with avenue: true", () => {
+  // A small interior (dungeon-style) tileset — corridors are crosser paths
+  // for interior styles (unlike exterior styles' terrain-carved corridors),
+  // making "which tiles are corridor tiles" directly readable from
+  // result.crossers with no need to reverse-engineer zone boundaries.
+  function makeDungeonTileset(): TilesetInfo {
+    return {
+      resref: "testdungeon",
+      displayName: "Test Dungeon",
+      interior: true,
+      hasHeightTransition: false,
+      envMap: "",
+      transition: 0,
+      border: "",
+      defaultTerrain: "Wall",
+      floor: "",
+      terrainTypes: [
+        { index: 0, name: "Wall", rawName: "wall", strref: -1 },
+        { index: 1, name: "Floor", rawName: "floor", strref: -1 },
+      ],
+      crosserTypes: [{ index: 0, name: "Corridor", strref: -1 }],
+      primaryRules: [],
+      secondaryRules: [],
+      groups: [
+        // 2x2, all-Floor (matches floor terrain exactly, no doors/crossers) —
+        // always eligible for packing.
+        { index: 0, name: "TestHouse_2x2", strref: 0, rows: 2, columns: 2, tileIds: [1, 1, 1, 1] },
+      ],
+      tiles: [
+        makeTile(0, "Wall", "Wall", "Wall", "Wall"),
+        makeTile(1, "Floor", "Floor", "Floor", "Floor"),
+        makeTile(2, "Wall", "Floor", "Wall", "Floor"),
+        makeTile(3, "Floor", "Wall", "Floor", "Wall"),
+        makeTile(4, "Wall", "Wall", "Floor", "Floor"),
+        makeTile(5, "Floor", "Floor", "Wall", "Wall"),
+        makeTile(6, "Floor", "Floor", "Floor", "Floor", { top: "Corridor", bottom: "Corridor" }),
+      ],
+    };
+  }
+
+  function corridorTileSet(result: ReturnType<typeof generateLayout>): Set<string> {
+    const tiles = new Set<string>();
+    for (const c of result.crossers) {
+      for (const p of c.path) tiles.add(`${p.x},${p.y}`);
+    }
+    return tiles;
+  }
+
+  it("never places a feature group overlapping the avenue's corridor tiles, across many trials", () => {
+    const tileset = makeDungeonTileset();
+    const style: LayoutStyle = { type: "dungeon", rooms: 4, avenue: true, preferredFeatures: ["TestHouse_2x2"] };
+    let sawAnyFeature = false;
+    let sawAnyCorridor = false;
+    for (let trial = 0; trial < 15; trial++) {
+      const result = generateLayout(tileset, 20, 20, style);
+      const corridors = corridorTileSet(result);
+      if (corridors.size > 0) sawAnyCorridor = true;
+      if (result.suggestedFeatures.length === 0) continue;
+      sawAnyFeature = true;
+      for (const sf of result.suggestedFeatures) {
+        for (let gx = sf.x; gx < sf.x + sf.columns; gx++) {
+          for (let gy = sf.y; gy < sf.y + sf.rows; gy++) {
+            expect(corridors.has(`${gx},${gy}`)).toBe(false);
+          }
+        }
+      }
+    }
+    expect(sawAnyFeature).toBe(true); // the test is meaningless if nothing was ever placed
+    expect(sawAnyCorridor).toBe(true); // and meaningless if there was never a corridor to avoid
+  });
+
+  it("produces a result with avenue: true that is structurally valid (regression guard against the reorder)", () => {
+    const tileset = makeDungeonTileset();
+    const style: LayoutStyle = { type: "dungeon", rooms: 4, avenue: true, preferredFeatures: ["TestHouse_2x2"] };
+    const result = generateLayout(tileset, 20, 20, style);
+    expect(result.layoutDescription).not.toMatch(/^ERROR/);
+    expect(result.zones.length).toBeGreaterThan(0);
+  });
+
+  it("avenue: false (default) is unaffected — suggestedFeatures never carry a rotation field", () => {
+    const tileset = makeDungeonTileset();
+    const style: LayoutStyle = { type: "dungeon", rooms: 4, preferredFeatures: ["TestHouse_2x2"] };
+    const result = generateLayout(tileset, 20, 20, style);
+    expect(result.layoutDescription).not.toMatch(/^ERROR/);
+    for (const sf of result.suggestedFeatures) {
+      expect(sf.rotation).toBeUndefined(); // default path never sets rotation
+    }
+  });
+});
