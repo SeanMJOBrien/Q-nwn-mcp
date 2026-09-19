@@ -140,7 +140,12 @@ export function registerEncounterTools(server: McpServer): void {
       const storeList = getFieldList(obj, "StoreList");
       const inventory = storeList.map((category, i) => {
         const items = getFieldList(category, "ItemList").map(item => ({
-          resref: getFieldStr(item, "InventoryRes"),
+          // Store items are embedded full item structs (create_store_blueprint
+          // clones the resolved blueprint in whole), not resref pointers — the
+          // resref lives in TemplateResRef, same as any other item struct.
+          // "InventoryRes" isn't a real field on these; reading it always
+          // silently returned "".
+          resref: getFieldStr(item, "TemplateResRef"),
           name: getFieldLocStr(item, "LocalizedName") || getFieldLocStr(item, "LocName"),
           infinite: getFieldNum(item, "Infinite"),
         }));

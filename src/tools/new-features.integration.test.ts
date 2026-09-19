@@ -1260,6 +1260,85 @@ describe("move_object", () => {
 
 // ─── delete_area ────────────────────────────────────────────────────────
 
+describe("verify_all placed-instance coverage", () => {
+  // Real, shipped bug: verify_all only ever walked index.resources filtered
+  // to .utc — a creature whose only representation is the live placed
+  // instance in an area's GIT (no standalone .utc file backing it, the
+  // normal case for individually-placed hostiles in this project's own
+  // /adventure-challenges pipeline, and also the case whenever a placed
+  // instance's equipment/feats diverge from its original blueprint after
+  // placement) was invisible to every creature check, no matter how broken.
+  // Confirmed directly: a placed Rogue equipped with Chainmail (Medium
+  // armor) but only Light Armor Proficiency in FeatList — the literal
+  // armor_proficiency_mismatch check already existed and would have caught
+  // this immediately had it ever run against the placed copy.
+  it("checks a placed creature instance with no standalone .utc blueprint file", async () => {
+    const gitDoc = makeGitDoc();
+    const gitPath = path.join(tempDir, "testarea.git");
+    await fs.writeFile(gitPath, "{}");
+    (gitDoc as GffObj)["Creature List"] = {
+      type: "list",
+      value: [
+        {
+          __struct_id: 4,
+          Tag: { type: "cexostring", value: "ghost_rogue" }, // no ghost_rogue.utc anywhere in resources
+          FirstName: { type: "cexolocstring", value: { "0": "Ghost Rogue" } },
+          ScriptAttacked: { type: "resref", value: "nw_c2_default5" },
+          ScriptDamaged: { type: "resref", value: "nw_c2_default6" },
+          ScriptDeath: { type: "resref", value: "nw_c2_default7" },
+          ScriptDialogue: { type: "resref", value: "nw_c2_default4" },
+          ScriptDisturbed: { type: "resref", value: "nw_c2_default8" },
+          ScriptEndRound: { type: "resref", value: "nw_c2_default3" },
+          ScriptHeartbeat: { type: "resref", value: "nw_c2_default1" },
+          ScriptOnBlocked: { type: "resref", value: "nw_c2_defaulte" },
+          ScriptOnNotice: { type: "resref", value: "nw_c2_default2" },
+          ScriptRested: { type: "resref", value: "nw_c2_defaulta" },
+          ScriptSpawn: { type: "resref", value: "nw_c2_default9" },
+          ScriptSpellAt: { type: "resref", value: "nw_c2_defaultb" },
+          ScriptUserDefine: { type: "resref", value: "nw_c2_defaultd" },
+          ClassList: {
+            type: "list",
+            value: [{ __struct_id: 2, Class: { type: "int", value: 8 }, ClassLevel: { type: "short", value: 8 } }],
+          },
+          FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 3 } }] }, // ArmProfLgt only
+          Equip_ItemList: {
+            type: "list",
+            value: [
+              {
+                __struct_id: 2, // Chest
+                TemplateResRef: { type: "resref", value: "nw_aarcl004" },
+                BaseItem: { type: "int", value: 16 },
+                PropertiesList: {
+                  type: "list",
+                  value: [{ __struct_id: 0, PropertyName: { type: "word", value: 1 }, CostValue: { type: "word", value: 4 } }], // AC Bonus 4 = Medium
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    mockIndex = createMockIndex({
+      resources: new Map([["testarea.git", { resref: "testarea", extension: "git", filePath: gitPath, sizeBytes: 100 }]]),
+      parsedGff: new Map([["testarea.git", gitDoc]]),
+      areas: new Map([["testarea", { resref: "testarea", name: "Test", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 }]]),
+    });
+
+    const { registerVerifyTools } = await import("./verify-tools.js");
+    const { client, cleanup } = await createTestClient(registerVerifyTools);
+    try {
+      const result = await client.callTool({ name: "verify_all", arguments: {} });
+      const parsed = parseResult(result) as { results: Array<{ target: string; errors: Array<{ code: string }> }> };
+      const placedTarget = parsed.results.find((r) => r.target === "testarea:ghost_rogue");
+      expect(placedTarget).toBeDefined();
+      expect(placedTarget!.errors.map((e) => e.code)).toContain("armor_proficiency_mismatch");
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
 describe("delete_area", () => {
   it("deletes a non-entry area", async () => {
     const areDoc = makeAreDoc();

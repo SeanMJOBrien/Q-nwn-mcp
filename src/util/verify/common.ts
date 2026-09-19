@@ -119,7 +119,16 @@ export function isBaseGameScript(resref: string): boolean {
  * the right trade: the convention is near-universal, and a false negative on one
  * oddly-named custom item costs far less than a report nobody reads.
  */
-const BASE_GAME_RESOURCE_PREFIXES = ["nw_", "x0_", "x1_", "x2_", "x3_"];
+/**
+ * `tm_` added 2026-09-17 after `TemplateResRef` (see the store-item resref
+ * fix in blueprints.ts) started actually resolving store item references for
+ * the first time — surfaced a real false positive: `tm_shield_griffn`, a
+ * genuine base-game item (`nwn_base.key`/`pkg13.bif`, confirmed via
+ * `resman_search`). Not a one-off guess: `resman_search("tm_")` returns
+ * 1600+ base-game resources under this prefix, the same evidentiary bar as
+ * the other entries here.
+ */
+const BASE_GAME_RESOURCE_PREFIXES = ["nw_", "x0_", "x1_", "x2_", "x3_", "tm_"];
 
 /** True if `resref` follows the base-game blueprint naming convention. */
 export function isBaseGameResource(resref: string): boolean {

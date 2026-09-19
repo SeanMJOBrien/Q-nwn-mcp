@@ -536,22 +536,38 @@ export function registerBlueprintTools(server: McpServer): void {
           setField(itemObj, "Infinite", "byte", item.infinite ? 1 : 0);
           delete itemObj.__data_type;
 
-          // Determine category: explicit, or auto-detect from baseItem, or default to 4 (misc)
-          let cat = item.category ?? 4;
-          if (item.category === undefined) {
+          // Determine category: explicit, or read straight from baseitems.2da's
+          // own StorePanel column, or default to 4 (misc).
+          //
+          // StorePanel IS the real answer here — it's the exact 0-4 bucket
+          // index NWN's own toolset/engine already use to sort an item into a
+          // store's tabs, verified directly against a live baseitems.2da: 0
+          // for every armor/shield row checked (body armor, small/large/tower
+          // shield), 1 for every weapon and ammo row checked (rapier, light
+          // mace, warhammer, kukri, dagger, shortsword, longbow, sling, heavy/
+          // light crossbow, arrows, bolts), 2 for potions and scrolls, 3 for
+          // wands, 4 for torch and healer's kit.
+          //
+          // This replaces a prior hand-maintained list of baseitem row
+          // numbers per category, which was wrong in multiple confirmed ways:
+          // row 22 (Dagger, a weapon) was listed under the "armor" bucket
+          // ahead of the weapons check in the if/else-if chain, so every
+          // dagger silently landed in Armor; row 35 (Heavy Flail, a weapon)
+          // was listed under "potions, scrolls, healers kits"; row 42 (Kukri,
+          // a weapon) wasn't listed anywhere at all and fell through to the
+          // Misc default — the literal "weapon showed up in Misc" bug this
+          // was rewritten to fix; rows 19/20 (Amulet, Arrow) were listed in
+          // two different buckets at once, with the first branch silently
+          // winning. StorePanel has none of these problems because it's not
+          // a hand-maintained list at all.
+          let cat = item.category;
+          if (cat === undefined) {
             const baseItem = getFieldNum(itemObj, "BaseItem");
-            // Auto-categorize: armor/shields → 0, weapons → 1, potions/scrolls → 2, wands → 3
-            if ([16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 78, 80].includes(baseItem)) {
-              cat = 0; // Armor-like items
-            } else if ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 37, 40, 41, 47, 48, 49, 50, 51, 95, 108].includes(baseItem)) {
-              cat = 1; // Weapons
-            } else if ([19, 20, 35, 36, 75, 76, 77].includes(baseItem)) {
-              cat = 2; // Potions, scrolls, healers kits
-            } else if ([35, 36].includes(baseItem)) {
-              cat = 3; // Wands, rods
-            }
+            const row = index.twodaTables.get("baseitems")?.rows.get(baseItem);
+            const panel = row?.StorePanel;
+            cat = panel !== undefined && panel !== "****" ? Number(panel) : 4;
           }
-          if (cat > 4) cat = 4;
+          if (cat > 4 || cat < 0 || Number.isNaN(cat)) cat = 4;
 
           const categoryObj = storeList[cat] as GffObj;
           const itemList = getFieldList(categoryObj, "ItemList");

@@ -44,13 +44,15 @@ const SELF_AMMO_TYPES = new Set(["4", "5", "6"]);
 /**
  * Target stack-size range per AmmunitionType, so a placed archer/thrower
  * doesn't ship with either 1 shot or an absurd 99-stack. User-specified
- * convention: "a dozen" arrows/bolts, sling bullets 8-20, darts ~8, throwing
- * axes 2-6. Shuriken (type 5) has no user-specified range — left unchecked
- * rather than guessed.
+ * convention, revised 2026-09-17: bow/crossbow users carry exactly 24
+ * arrows/bolts (was "a dozen", checked as 8-16 — superseded by an explicit
+ * user directive, not a guess). Sling bullets 8-20, darts ~8, throwing axes
+ * 2-6 are unchanged — the revision only named bows and crossbows. Shuriken
+ * (type 5) has no user-specified range — left unchecked rather than guessed.
  */
 const AMMO_STACK_RANGE: Record<string, [number, number]> = {
-  "1": [8, 16], // bow -> arrows
-  "2": [8, 16], // crossbow -> bolts
+  "1": [24, 24], // bow -> arrows (exact, per user directive)
+  "2": [24, 24], // crossbow -> bolts (exact, per user directive)
   "3": [8, 20], // sling -> bullets
   "4": [4, 12], // dart
   "6": [2, 6], // throwing axe
@@ -136,6 +138,28 @@ export function armorTierFeat(acBonus: number): number | undefined {
  * grant the same practical proficiency. "****" marks an unused slot.
  */
 export const REQ_FEAT_COLUMNS = ["ReqFeat0", "ReqFeat1", "ReqFeat2", "ReqFeat3", "ReqFeat4"];
+
+/**
+ * baseitems.2da columns naming the feat granted at each weapon-specific
+ * investment tier (Focus, Specialization, Improved Critical, and their Epic
+ * equivalents) — the same column set respec_weapon_feats reverse-scans to
+ * auto-detect a creature's current weapon investment. Verified live: e.g.
+ * rapier's WeaponFocusFeat/WeaponSpecializationFeat/WeaponImprovedCriticalFeat
+ * are 104/142/66, warhammer's are 115/153/77 — each row's own dedicated feats.
+ */
+const WEAPON_FOCUS_TIER_COLUMNS = [
+  "WeaponFocusFeat",
+  "WeaponSpecializationFeat",
+  "WeaponImprovedCriticalFeat",
+  "EpicWeaponFocusFeat",
+  "EpicWeaponSpecializationFeat",
+] as const;
+
+/** feat.2da row 30, Constant FEAT_RAPID_SHOT — verified live. */
+const FEAT_RAPID_SHOT = 30;
+
+/** feat.2da row 411, Constant FEAT_RAPID_RELOAD — verified live. */
+const FEAT_RAPID_RELOAD = 411;
 
 export interface CreatureVerifyOptions {
   /** Apply the stricter companion rules (script set, class, HENCH_LEVEL, voice). */
@@ -238,6 +262,34 @@ export async function verifyCreature(
       "FeatList",
       "bake racial feats (race_feat_<race>.2da) + automatic class feats (cls_feat_<class>.2da, List=3, GrantedOnLevel <= level) via create_creature_blueprint's `feats` param",
     );
+  }
+
+  // A FeatList entry that isn't a real feat.2da row is silently rejected by
+  // the engine at load time — confirmed live: CNWSCreatureStats::AddFeat()
+  // logs "EXOWARNING: Invalid Feat FALSE" and drops it, no error surfaced
+  // anywhere a static check alone would see. Found the real-world root cause
+  // via a live headless-server load of a shipped module: a creature's
+  // FeatList carried 1848 instead of 115 (Weapon Focus: Warhammer) — 1848 is
+  // feat.2da row 115's own `FEAT` column (a TLK strref for the feat's display
+  // name), not the row/feat ID nwscript and the engine actually expect.
+  // Whatever built that FeatList read the wrong column. This check only runs
+  // when feat.2da is actually loaded (`twodaTables` populated from a real
+  // NWN_FOLDER_DATA) — degrades to skip otherwise, never a guess.
+  {
+    const featTable = index.twodaTables.get("feat");
+    if (featTable) {
+      for (const f of listOf(obj, "FeatList")) {
+        const featId = getFieldNum(f, "Feat");
+        if (!featTable.rows.has(featId)) {
+          report.error(
+            "invalid_feat_id",
+            `FeatList carries feat ${featId}, which is not a real feat.2da row — the engine silently drops it at load (confirmed via CNWSCreatureStats::AddFeat's "Invalid Feat" rejection). If this came from a 2DA lookup, check you used the row index, not the FEAT column (a TLK strref)`,
+            "FeatList",
+            "correct the feat ID to the real feat.2da row",
+          );
+        }
+      }
+    }
   }
 
   // No real spellbook-baking pathway exists yet (ClassList[n].MemorizedList
@@ -405,6 +457,77 @@ export async function verifyCreature(
         `Chest-slot armor grants an AC Bonus of ${acBonus} (${tierName} armor) but FeatList lacks the matching Armor Proficiency feat (feat.2da row ${requiredFeat}) — it will be worn at a real mechanical penalty`,
         "Equip_ItemList",
         "bake the matching Armor Proficiency feat via create_creature_blueprint's `feats` param, or equip armor this creature is already proficient with",
+      );
+    }
+  }
+
+  // A creature can be individually proficient with what's equipped (the
+  // check above) while still carrying dedicated Weapon Focus/Specialization/
+  // Improved Critical feats — real, per-weapon investment, not a generic
+  // proficiency — for a DIFFERENT weapon entirely. Basic proficiency alone
+  // doesn't catch this: the equipped weapon still "works," it's just that
+  // several feat picks are doing nothing. Confirmed as a real, shipped bug in
+  // a real module: a Cleric built with Weapon Focus/Specialization/Improved
+  // Critical: Warhammer (feat.2da rows 115/153/77) was equipped with a Light
+  // Mace instead — mechanically usable (Simple Weapon Proficiency covers
+  // both), but every one of those three feats was doing nothing. Reverse-
+  // scans baseitems.2da's WeaponFocusFeat/WeaponSpecializationFeat/
+  // WeaponImprovedCriticalFeat columns (+ Epic variants) against FeatList —
+  // same technique respec_weapon_feats already uses to auto-detect a
+  // creature's current weapon investment — and warns if a match names a
+  // baseitems row other than what's actually equipped.
+  {
+    const rightHandEntry = equipList.find((e) => e.__struct_id === EQUIP_SLOT_MAP.righthand);
+    const equippedBaseItem = rightHandEntry ? getFieldNum(rightHandEntry, "BaseItem") : undefined;
+    if (equippedBaseItem !== undefined) {
+      const baseitemRows = index.twodaTables.get("baseitems")?.rows;
+      if (baseitemRows) {
+        const mismatched = new Map<number, string[]>(); // baseItem row -> tier labels
+        for (const [row, data] of baseitemRows) {
+          if (row === equippedBaseItem) continue;
+          for (const column of WEAPON_FOCUS_TIER_COLUMNS) {
+            const featVal = data[column];
+            if (!featVal || featVal === "****") continue;
+            if (featIds.has(Number(featVal))) {
+              if (!mismatched.has(row)) mismatched.set(row, []);
+              mismatched.get(row)!.push(column);
+            }
+          }
+        }
+        for (const [row, tiers] of mismatched) {
+          report.warn(
+            "weapon_focus_mismatch",
+            `FeatList has ${tiers.join("/")} for baseitems.2da row ${row}, but RightHand carries a different weapon (BaseItem ${equippedBaseItem}) — those feats grant no benefit here`,
+            "Equip_ItemList",
+            "equip a weapon matching the invested feats (baseitems.2da row " +
+              row +
+              "), or respec_weapon_feats onto the equipped weapon instead",
+          );
+        }
+      }
+    }
+  }
+
+  // Rapid Shot (feat.2da row 30) grants an extra ranged attack per round at
+  // a penalty — but a weapon that needs a full round to reload (WeaponWield
+  // 6 in baseitems.2da: heavy and light crossbow, verified against a live
+  // table; a bow's WeaponWield is 5, a sling's is 10) can't be fired twice in
+  // one round without Rapid Reload (feat.2da row 411) — Rapid Shot is
+  // completely wasted on a crossbowman missing it. Confirmed as a real,
+  // shipped bug: a Salt Gate Crossbowman was built with Point Blank
+  // Shot + Rapid Shot (the generic ranged-combat feat pair) and a crossbow,
+  // with no Rapid Reload — Rapid Shot could never actually trigger.
+  {
+    const rightHandEntry = equipList.find((e) => e.__struct_id === EQUIP_SLOT_MAP.righthand);
+    const rightHandBaseItem = rightHandEntry ? getFieldNum(rightHandEntry, "BaseItem") : undefined;
+    const rightHandRow = rightHandBaseItem !== undefined ? twoDARow(index, "baseitems", rightHandBaseItem) : undefined;
+    const needsReload = rightHandRow?.WeaponWield === "6";
+    if (needsReload && featIds.has(FEAT_RAPID_SHOT) && !featIds.has(FEAT_RAPID_RELOAD)) {
+      report.warn(
+        "ranged_feat_no_reload_support",
+        `FeatList has Rapid Shot (feat 30) but RightHand carries a crossbow (BaseItem ${rightHandBaseItem}, WeaponWield 6) with no Rapid Reload (feat 411) — a crossbow needs a full round to reload without it, so Rapid Shot's extra attack can never trigger`,
+        "FeatList",
+        "bake Rapid Reload (feat 411) via create_creature_blueprint's `feats` param, or equip a bow instead",
       );
     }
   }
@@ -862,14 +985,43 @@ export function verifyStore(report: Report, index: ModuleIndex, obj: GffObj): vo
   for (const [i, category] of listOf(obj, "StoreList").entries()) {
     for (const [j, item] of listOf(category, "ItemList").entries()) {
       itemCount++;
+      // Store items are embedded full item structs (create_store_blueprint
+      // clones the resolved blueprint in whole), not resref pointers — the
+      // resref lives in TemplateResRef, same as any other item struct.
+      // "InventoryRes" was never a real field on these.
       checkResourceRef(
         report,
         index,
-        getFieldStr(item, "InventoryRes"),
+        getFieldStr(item, "TemplateResRef"),
         "uti",
-        `StoreList.${i}.ItemList.${j}.InventoryRes`,
+        `StoreList.${i}.ItemList.${j}.TemplateResRef`,
         "warning",
       );
+
+      // Category placement: baseitems.2da's own StorePanel column is the
+      // real 0-4 bucket index NWN's toolset/engine use to sort an item into
+      // a store's tabs (Armor/Weapons/Potions & Scrolls/Wands/Misc) —
+      // verified directly against a live table (see create_store_blueprint's
+      // auto-categorize logic for the full verification). An item sitting in
+      // a StoreList bucket other than its own StorePanel value is a real,
+      // player-visible misplacement (a weapon under the Misc tab, an amulet
+      // under Armor), not a cosmetic quirk — confirmed as a real, shipped
+      // bug: create_store_blueprint's prior hand-maintained categorization
+      // logic put a Kukri in Misc and a Dagger in Armor.
+      const baseItem = getFieldNum(item, "BaseItem");
+      const row = index.twodaTables.get("baseitems")?.rows.get(baseItem);
+      const panel = row?.StorePanel;
+      if (panel !== undefined && panel !== "****") {
+        const expected = Number(panel);
+        if (!Number.isNaN(expected) && expected !== i) {
+          report.warn(
+            "store_item_miscategorized",
+            `Item at StoreList.${i}.ItemList.${j} (BaseItem ${baseItem}) belongs in category ${expected} per baseitems.2da's StorePanel, not category ${i}`,
+            `StoreList.${i}.ItemList.${j}`,
+            `move the item to StoreList category ${expected}`,
+          );
+        }
+      }
     }
   }
   if (itemCount === 0) {

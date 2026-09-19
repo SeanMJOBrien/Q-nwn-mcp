@@ -484,7 +484,9 @@ export function extractAreaObjects(index: ModuleIndex, areaResref: string): Area
         const storeList = getFieldList(entry, "StoreList");
         obj.inventory = storeList.map((category, i) => {
           const items = getFieldList(category, "ItemList").map(item => ({
-            resref: getFieldStr(item, "InventoryRes") || "",
+            // Embedded full item struct (not a resref pointer) — the resref
+            // lives in TemplateResRef. "InventoryRes" isn't a real field here.
+            resref: getFieldStr(item, "TemplateResRef") || "",
             name: getFieldLocStrResolved(item, "LocalizedName", tlkLookup) || getFieldLocStrResolved(item, "LocName", tlkLookup) || "",
             infinite: getFieldNum(item, "Infinite") === 1,
           }));
