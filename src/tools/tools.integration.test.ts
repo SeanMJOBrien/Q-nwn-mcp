@@ -560,6 +560,50 @@ describe("create_store_blueprint", () => {
       await cleanup();
     }
   });
+
+  // Regression: the prior hand-maintained row-list auto-categorization put a
+  // Kukri (baseitems.2da row 42, real StorePanel 1) in the Misc bucket (4)
+  // because it wasn't listed under "weapons" at all — a real, shipped bug.
+  // Category now comes straight from baseitems.2da's own StorePanel column.
+  it("auto-categorizes an item by its baseitem's real StorePanel when category is omitted", async () => {
+    const { registerBlueprintTools } = await import("./blueprint-tools.js");
+    const { client, cleanup } = await createTestClient(registerBlueprintTools);
+
+    const kukriDoc: GffDocument = {
+      __data_type: "UTI ",
+      BaseItem: { type: "int", value: 42 },
+      Tag: { type: "cexostring", value: "nw_wspku001" },
+      LocalizedName: { type: "cexolocstring", value: { "0": "Kukri" } },
+      TemplateResRef: { type: "resref", value: "nw_wspku001" },
+      Cost: { type: "dword", value: 16 },
+      PropertiesList: { type: "list", value: [] },
+    } as unknown as GffDocument;
+    mockIndex.parsedGff.set("nw_wspku001.uti", kukriDoc);
+    mockIndex.twodaTables.set("baseitems", {
+      columns: ["StorePanel"],
+      rows: new Map([[42, { StorePanel: "1" }]]),
+    });
+
+    try {
+      const inventory = JSON.stringify([{ resref: "nw_wspku001", infinite: true }]); // no explicit category
+      const result = await client.callTool({
+        name: "create_store_blueprint",
+        arguments: { resref: "str_weapons", tag: "STR_WEAPONS", name: "Weapon Shop", inventory },
+      });
+
+      const parsed = parseResult(result) as Record<string, unknown>;
+      expect(parsed.success).toBe(true);
+
+      const doc = mockIndex.parsedGff.get("str_weapons.utm") as GffObj;
+      const storeList = (doc.StoreList as { value: Array<GffObj> }).value;
+      const weaponsItems = (storeList[1].ItemList as { value: Array<GffObj> }).value;
+      const miscItems = (storeList[4].ItemList as { value: Array<GffObj> }).value;
+      expect(weaponsItems).toHaveLength(1);
+      expect(miscItems).toHaveLength(0);
+    } finally {
+      await cleanup();
+    }
+  });
 });
 
 // ─── Tests: modify_gff_field ──────────────────────────────────────────────

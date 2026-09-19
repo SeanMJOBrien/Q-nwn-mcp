@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GffObj } from "../../types/gff.js";
 import type { ModuleIndex, TwoDATable } from "../../types/module.js";
-import { verifyCreature, verifyDoor, verifyItem, verifyPlaceable, verifyTrigger } from "./blueprints.js";
+import { verifyCreature, verifyDoor, verifyItem, verifyPlaceable, verifyStore, verifyTrigger } from "./blueprints.js";
 import { isBaseGameResource, isBaseGameScript, Report } from "./common.js";
 import { verifyDialog } from "./dialog.js";
 import { verifyJournal } from "./journal.js";
@@ -220,7 +220,7 @@ describe("verifyCreature", () => {
             __struct_id: 2048,
             TemplateResRef: { type: "resref", value: "nw_waegar001" },
             BaseItem: { type: "int", value: 20 },
-            StackSize: { type: "word", value: 12 },
+            StackSize: { type: "word", value: 24 }, // exactly 24, per the bow/crossbow convention
           },
         ],
       },
@@ -259,6 +259,59 @@ describe("verifyCreature", () => {
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
     expect(report.warnings.map((w) => w.code)).toContain("ammo_stack_size_unreasonable");
+  });
+
+  // User-specified convention (2026-09-17): a bow user carries exactly 24
+  // arrows — the prior "8-16, a dozen" range is superseded for bows/crossbows
+  // specifically. A stack of 12, previously valid, is now flagged.
+  it("flags a bow's ammo stack when it isn't exactly 24 (revised convention)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 2048,
+            TemplateResRef: { type: "resref", value: "nw_waegar001" },
+            BaseItem: { type: "int", value: 20 },
+            StackSize: { type: "word", value: 12 },
+          },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[8, { RangedWeapon: "20", AmmunitionType: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("ammo_stack_size_unreasonable");
+  });
+
+  it("does not flag a crossbow's bolt stack when it's exactly 24", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_xbow" }, BaseItem: { type: "int", value: 7 } },
+          {
+            __struct_id: 8192, // EQUIP_SLOT_MAP.bolts
+            TemplateResRef: { type: "resref", value: "nw_wambo001" },
+            BaseItem: { type: "int", value: 25 },
+            StackSize: { type: "word", value: 24 },
+          },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "AmmunitionType"], [[7, { RangedWeapon: "27", AmmunitionType: "2" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ammo_stack_size_unreasonable");
   });
 
   it("checks the RightHand stack itself for a self-ammo thrown weapon (throwing axe)", async () => {
@@ -331,6 +384,137 @@ describe("verifyCreature", () => {
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
     expect(report.errors.map((e) => e.code)).not.toContain("weapon_proficiency_mismatch");
+  });
+
+  // Real, shipped bug found via a live headless-server load: a creature's
+  // FeatList carried 1848 (feat.2da row 115's own FEAT/TLK-strref column)
+  // instead of 115 (the real row/feat ID) — the engine silently drops an
+  // invalid feat at load with no visible error anywhere else.
+  it("flags a FeatList entry that isn't a real feat.2da row", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 1848 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["feat", twoDA(["LABEL"], [[115, { LABEL: "WeapFocWHam" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).toContain("invalid_feat_id");
+  });
+
+  it("does not flag a FeatList entry matching a real feat.2da row", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["feat", twoDA(["LABEL"], [[115, { LABEL: "WeapFocWHam" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("invalid_feat_id");
+  });
+
+  it("does not flag any feat when feat.2da isn't loaded (degrades to skip)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 1848 } }] },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("invalid_feat_id");
+  });
+
+  // Real, shipped bug: a Cleric built with Weapon Focus/Specialization/
+  // Improved Critical: Warhammer (feat.2da 115/153/77) was equipped with a
+  // Light Mace instead — proficient (Simple Weapon Proficiency covers both),
+  // but every one of those three feats did nothing.
+  it("flags weapon-specific feats invested in a different weapon than what's equipped", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] }, // WeapFocWHam
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "light_mace" }, BaseItem: { type: "int", value: 9 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["WeaponFocusFeat"], [[5, { WeaponFocusFeat: "115" }]])]]), // row 5 = warhammer
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("weapon_focus_mismatch");
+  });
+
+  it("does not flag weapon-specific feats matching the equipped weapon", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "warhammer" }, BaseItem: { type: "int", value: 5 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["WeaponFocusFeat"], [[5, { WeaponFocusFeat: "115" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("weapon_focus_mismatch");
+  });
+
+  // Real, shipped bug: a Salt Gate Crossbowman had Point Blank Shot + Rapid
+  // Shot (the generic ranged-combat feat pair) and a crossbow, with no Rapid
+  // Reload — a crossbow needs a full round to reload without it, so Rapid
+  // Shot's extra attack could never trigger.
+  it("flags Rapid Shot on a crossbow with no Rapid Reload", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 30 } }] }, // Rapid Shot
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "xbow" }, BaseItem: { type: "int", value: 7 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["WeaponWield"], [[7, { WeaponWield: "6" }]])]]), // light crossbow
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("ranged_feat_no_reload_support");
+  });
+
+  it("does not flag Rapid Shot on a crossbow that also has Rapid Reload", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: {
+        type: "list",
+        value: [
+          { __struct_id: 1, Feat: { type: "word", value: 30 } },
+          { __struct_id: 1, Feat: { type: "word", value: 411 } },
+        ],
+      },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "xbow" }, BaseItem: { type: "int", value: 7 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["WeaponWield"], [[7, { WeaponWield: "6" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ranged_feat_no_reload_support");
+  });
+
+  it("does not flag Rapid Shot on a bow (no reload needed)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 30 } }] },
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "longbow" }, BaseItem: { type: "int", value: 8 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["WeaponWield"], [[8, { WeaponWield: "5" }]])]]), // bow, not crossbow
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ranged_feat_no_reload_support");
   });
 
   // AC Bonus item property (PropertyName=1, ITEM_PROPERTY_AC_BONUS) with
@@ -588,6 +772,70 @@ describe("verifyCreature", () => {
 });
 
 // ─── Item ─────────────────────────────────────────────────────────────────
+
+describe("verifyStore", () => {
+  function storeItem(structId: number, baseItem: number, resref = "some_item"): GffObj {
+    return {
+      __struct_id: structId,
+      TemplateResRef: { type: "resref", value: resref },
+      BaseItem: { type: "int", value: baseItem },
+    } as unknown as GffObj;
+  }
+
+  function storeWithItem(categoryIndex: number, item: GffObj): GffObj {
+    const categories = [0, 1, 2, 3, 4].map((i) => ({
+      __struct_id: i,
+      ItemList: { type: "list", value: i === categoryIndex ? [item] : [] },
+    }));
+    return { StoreList: { type: "list", value: categories } } as unknown as GffObj;
+  }
+
+  // Real, shipped bug: create_store_blueprint's prior hand-maintained
+  // categorization logic put a Kukri (baseitems.2da row 42) in the Misc
+  // bucket (4) instead of Weapons — this is the check that would have caught
+  // it directly on the store, independent of what create_store_blueprint did.
+  it("flags an item sitting in the wrong StoreList category per its own StorePanel", () => {
+    const item = storeItem(0, 42); // Kukri, StorePanel 1 (Weapons) per a live baseitems.2da
+    const obj = storeWithItem(4, item); // placed in Misc (4) instead
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["StorePanel"], [[42, { StorePanel: "1" }]])]]),
+    });
+    const report = new Report("t", "utm");
+    verifyStore(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("store_item_miscategorized");
+  });
+
+  it("does not flag an item already in its correct StorePanel category", () => {
+    const item = storeItem(0, 42);
+    const obj = storeWithItem(1, item); // Weapons (1) — correct
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["StorePanel"], [[42, { StorePanel: "1" }]])]]),
+    });
+    const report = new Report("t", "utm");
+    verifyStore(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("store_item_miscategorized");
+  });
+
+  it("does not flag an item whose baseitem has no known StorePanel (degrades to skip)", () => {
+    const item = storeItem(0, 999);
+    const obj = storeWithItem(4, item);
+    const report = new Report("t", "utm");
+    verifyStore(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("store_item_miscategorized");
+  });
+
+  it("resolves an embedded store item's resource ref from TemplateResRef, not InventoryRes", () => {
+    const item = storeItem(0, 42, "nw_wspku001");
+    const obj = storeWithItem(1, item);
+    const index = makeIndex({
+      resources: new Map([["nw_wspku001.uti", { resref: "nw_wspku001", extension: "uti", filePath: "", sizeBytes: 0 }]]),
+    });
+    const report = new Report("t", "utm");
+    verifyStore(report, index, obj);
+    // A resolvable TemplateResRef must not produce a missing-resource warning.
+    expect(report.warnings.map((w) => w.code)).not.toContain("missing_uti");
+  });
+});
 
 describe("verifyItem", () => {
   // A live baseitems row: real label, real Name strref, and an ItemClass the

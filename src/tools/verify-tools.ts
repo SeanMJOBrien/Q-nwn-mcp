@@ -380,6 +380,36 @@ export function registerVerifyTools(server: McpServer): void {
         results.push(report.result());
       }
 
+      // Placed creature instances, straight from each area's live GIT.
+      //
+      // A placed instance's equipment/feats/etc. is a separate copy from its
+      // blueprint's (see CLAUDE.md's "separate copy" pitfall) — a creature
+      // placed by resref reference, or hand-edited after placement via
+      // set_creature_equipment/respec_weapon_feats/a direct GFF edit, can
+      // diverge freely from whatever standalone .utc file it started from (if
+      // any local .utc even exists for it — many placed hostiles in this
+      // pipeline never get one, since /adventure-challenges places individual
+      // creatures directly rather than through create_creature_blueprint for
+      // every single one). The loop above only ever sees a local .utc file;
+      // it silently skips a creature whose only representation is the placed
+      // instance itself, no matter how broken its live equipment/feats are —
+      // confirmed against a real module where a placed instance's armor was
+      // changed after placement and the mismatch was invisible to verify_all
+      // even though the identical check (armor_proficiency_mismatch) already
+      // existed. This loop closes that gap by checking the live placed copy
+      // directly, in addition to whatever blueprint-file check ran above.
+      for (const areaResref of index.areas.keys()) {
+        const gitDoc = index.parsedGff.get(`${areaResref}.git`) as GffObj | undefined;
+        if (!gitDoc) continue;
+        for (const [i, creature] of listOf(gitDoc, "Creature List").entries()) {
+          const tag = getFieldStr(creature, "Tag") || `#${i}`;
+          const report = new Report(`${areaResref}:${tag}`, "utc");
+          const isHenchman = getFieldStr(creature, "ScriptHeartbeat").startsWith("x0_ch_hen_");
+          await verifyCreature(report, index, creature, { henchman: isHenchman, resmanOpts });
+          results.push(report.result());
+        }
+      }
+
       // Dialogs.
       for (const [key, entry] of index.resources) {
         if (entry.extension !== "dlg") continue;

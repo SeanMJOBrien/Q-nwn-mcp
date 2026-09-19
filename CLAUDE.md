@@ -418,19 +418,24 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
   doc exists — but it has a limit: independent re-verification via `verify_all`
   itself is worthless when the underlying check is dead code. The only thing that
   actually caught this was a human playing the finished module.**
-- **Ammo-quantity convention (user-specified).** A ranged-weapon creature needs not
-  just *some* ammo equipped but a *plausible combat load* — 99 (the GFF stack-size
-  ceiling) is exactly as wrong as 0, just less obviously broken. Target ranges,
-  now enforced by `verify_creature`'s `ammo_stack_size_unreasonable` warning
-  (`AMMO_STACK_RANGE` in `util/verify/blueprints.ts`): **arrows/bolts** (bow/
-  crossbow) ~a dozen, checked as 8-16; **sling bullets** 8-20; **darts** ~8,
-  checked as 4-12; **throwing axes** 2-6. Darts/shuriken/throwing axes have no
-  separate ammo slot — the RightHand weapon's own `StackSize` *is* the ammo count
+- **Ammo-quantity convention (user-specified, revised 2026-09-17).** A ranged-weapon
+  creature needs not just *some* ammo equipped but a *plausible combat load* — 99
+  (the GFF stack-size ceiling) is exactly as wrong as 0, just less obviously broken.
+  Target ranges, enforced by `verify_creature`'s `ammo_stack_size_unreasonable`
+  warning (`AMMO_STACK_RANGE` in `util/verify/blueprints.ts`): **arrows/bolts** (bow/
+  crossbow) exactly **24** (originally "a dozen", checked as 8-16 — superseded by an
+  explicit later user directive naming bows and crossbows specifically, not a
+  guess); **sling bullets** 8-20 (unchanged); **darts** ~8, checked as 4-12
+  (unchanged); **throwing axes** 2-6 (unchanged). Darts/shuriken/throwing axes have
+  no separate ammo slot — the RightHand weapon's own `StackSize` *is* the ammo count
   (`SELF_AMMO_TYPES` in the same file), so the check reads RightHand's stack
   directly for those rather than looking for a separate equipped slot. Shuriken
   (`AmmunitionType` 5) has no user-specified range and is deliberately left
   unchecked rather than guessed, per this project's "encode unverified data as a
-  skip, never a guess" rule.
+  skip, never a guess" rule. **Found 5 real, shipped instances of the stale 12-count
+  in "The Salt Gate Conspiracy" while applying this revision** (3 shortbow-armed
+  orc skirmishers, 2 crossbow-armed guards) — hand-patched to 24 via the documented
+  direct-`nwn_gff`-edit recovery sequence, same session the rule itself was revised.
 - **FIXED — `get_area_creatures`/`list_creatures` returned `[]` for creatures placed
   after `load_module`.** Both read `index.creatures`, a summary array built once at
   `load_module` time and never refreshed — any creature placed afterward (the normal
@@ -874,6 +879,134 @@ any other generated file type, so structurally-broken assets shipped silently. T
 - **Base-game scripts are whitelisted by prefix** in `isBaseGameScript()`
   (`src/util/verify/common.ts`) — `nw_c2_default*`, `x0_ch_hen_*`, `nw_ch_ac*` and
   friends resolve at runtime and must never be reported as missing.
+
+**FIXED (2026-09-17) — `verify_all` only ever checked standalone `.utc` blueprint
+files, silently skipping any creature whose only representation is the live placed
+instance in an area's GIT.** Found from a real user bug report against a shipped
+module (six concrete creature/store bugs at once — see the user-corrections entry
+below): a placed Rogue was wearing Chainmail (Medium armor) with only Light Armor
+Proficiency — the exact case `armor_proficiency_mismatch` already existed to catch
+— and `verify_all` reported zero problems for it. Root cause: `verify_all`'s
+creature loop (`src/tools/verify-tools.ts`) iterated `index.resources` filtered to
+`.utc` extension only. A placed instance's equipment/feats are a separate copy from
+its blueprint's (see the "separate copy" pitfall above) — this project's own
+`/adventure-challenges` phase places most hostiles individually rather than via
+`create_creature_blueprint` for every one, and any creature edited post-placement
+via `set_creature_equipment`/`respec_weapon_feats`/a direct GFF edit diverges from
+whatever `.utc` it started from, if one even exists. Neither case was ever checked.
+**Fix:** `verify_all` now additionally walks every area's live `Creature List` GIT
+struct directly and runs `verifyCreature` against each placed instance, target-
+labeled `<area>:<tag>` — in addition to, not instead of, the existing blueprint-file
+loop (the two can genuinely disagree, so both are worth checking). One new
+integration test (`new-features.integration.test.ts`) reproduces the exact bug
+shape (a GIT-only creature with no `.utc` anywhere, wrong armor tier) and confirms
+`verify_all` now catches it.
+
+**User-corrections-turned-into-rules (2026-09-17, six real bugs reported against
+one shipped module, all fixed and all closed with a real script-enforced check per
+the user's explicit request — "corrections should probably be turned into rules
+validated by script where possible").**
+- **A Cleric had Weapon Focus/Specialization/Improved Critical: Warhammer baked
+  (feat.2da 115/153/77) but was equipped with a Light Mace.** Mechanically usable
+  (Simple Weapon Proficiency covers both) so the existing `weapon_proficiency_mismatch`
+  check didn't fire — the gap is one level more specific than basic proficiency.
+  **New check: `weapon_focus_mismatch`** (`verifyCreature`, `src/util/verify/blueprints.ts`)
+  reverse-scans baseitems.2da's `WeaponFocusFeat`/`WeaponSpecializationFeat`/
+  `WeaponImprovedCriticalFeat` columns (+ Epic variants — the same columns
+  `respec_weapon_feats` already reverse-scans to auto-detect a creature's current
+  weapon investment) against `FeatList`, and warns when a match names a baseitems
+  row other than what's actually equipped in RightHand.
+- **A Salt Gate Crossbowman had Point Blank Shot + Rapid Shot (feat.2da 27/30, the
+  generic ranged-combat pair) and a crossbow, with no Rapid Reload (feat 411).** A
+  crossbow needs a full round to reload without Rapid Reload, so Rapid Shot's extra
+  attack could never trigger — a real, verified rules interaction (Rapid Shot works
+  fine on a bow, which doesn't need reloading; `WeaponWield` 6 in baseitems.2da is
+  the verified, crossbow-specific discriminator — a bow's is 5, a sling's is 10).
+  **New check: `ranged_feat_no_reload_support`** flags exactly this combination.
+- **`create_store_blueprint`'s auto-categorization put a real weapon in the wrong
+  StoreList bucket** (a Kukri fell through to the Misc default; a Dagger and Bolts
+  both hit the "armor-like" bucket ahead of the weapons check in the old if/else-if
+  chain; a Heavy Flail landed under "potions, scrolls, healers kits"; Amulet and
+  Arrow were listed in two conflicting buckets at once). Root cause: a hand-
+  maintained list of baseitems.2da row numbers per category, incomplete and
+  internally inconsistent. **Fix:** category now reads straight from baseitems.2da's
+  own `StorePanel` column — verified live to be the exact 0-4 bucket index NWN's own
+  toolset/engine already use (0 armor/shields, 1 weapons+ammo, 2 potions/scrolls, 3
+  wands, 4 misc) — replacing the entire hand-maintained list rather than patching
+  individual rows. **New check: `store_item_miscategorized`** (`verifyStore`) flags
+  any store item whose current bucket disagrees with its own `StorePanel`, so this
+  class of bug is now caught even for items added outside `create_store_blueprint`
+  (direct placement, a different tool, hand-editing).
+- **Found while fixing the above, same store system: embedded store items were
+  read via a field named `InventoryRes`, which doesn't exist on them.**
+  `create_store_blueprint` embeds the full resolved item struct (not a resref
+  pointer) into each `StoreList` category's `ItemList` — its resref lives in
+  `TemplateResRef`, the same field every other item struct uses. This silently
+  returned `""` for every store item's resref in `get_store_details`'s summary
+  (`src/tools/encounter-tools.ts`), the area/store inventory summary
+  (`src/util/area-data.ts`), and `verifyStore`'s own resource-existence check
+  (`checkResourceRef` in `src/util/verify/blueprints.ts`) — the latter meaning
+  `verifyStore` had never actually resolved a single store item's resource ref
+  against the module, in this project's history. Fixed at all three sites.
+- **A Rogue was wearing Chainmail (Medium armor) with only Light Armor Proficiency**
+  — see the `verify_all` placed-instance fix above; this specific instance is what
+  surfaced it.
+- **A non-combat Key NPC (a Barbarian who never fights, per the plot) had empty
+  equipment and an unset `SoundSetFile`, rendering with no gear and a default voice
+  that didn't match her `Gender`.** Not a checker gap — `empty_featlist` and
+  `soundset_gender_mismatch` already fire correctly on a creature like this; the
+  right fix was reclassing her onto the Commoner chassis (`CLASS_TYPE_COMMONER`,
+  already documented above as the correct chassis for a creature that will never
+  enter combat) and equipping real clothing, per the user's own suggestion.
+- **A Halfling Rogue was equipped with a Rapier and had real, matching Weapon Focus/
+  Specialization/Improved Critical feats for it — mechanically consistent, but
+  thematically odd for the character.** Not a bug any checker should catch (a Rapier
+  is a legal, proficient choice for a Rogue) — reflavored to Shortsword via
+  `respec_weapon_feats` per the user's stated preference, a matter of taste rather
+  than correctness. Worth noting for future NPC generation: `Kukri` (baseitems.2da
+  row 42) needs Exotic Weapon Proficiency (feat 44), which a generic Rogue does NOT
+  get automatically — it was the user's first-choice suggestion here but would have
+  introduced a fresh `weapon_proficiency_mismatch` if equipped without also baking
+  that feat; checked before picking a replacement instead of assumed.
+
+**FOUND VIA A REAL LIVE-SERVER LOAD, FIXED, AND CLOSED WITH A STATIC CHECK
+(2026-09-18) — a creature FeatList entry can be structurally well-formed
+(a `word` field, a plausible-looking number) and still not be a real
+feat.2da row at all, and nothing before this caught it.** Spun up
+`~/nwn-mcp-verify-server` against "The Salt Gate Conspiracy" (the same module
+this whole run of user-reported fixes was against) specifically to confirm
+`verify_all` coming back clean actually meant something at the engine level
+— and it immediately surfaced a real engine-level rejection at module load:
+`CNWSCreatureStats::AddFeat() EXOWARNING: Invalid Feat FALSE`, from
+`nwengineLog.txt`, with no creature/feat identity attached to the log line
+at all. Traced by dumping every placed creature's and every blueprint's
+`FeatList` to JSON and checking each `Feat` value against the real,
+loaded `feat.2da`'s row count (1117 rows) — exactly one hit, out of every
+creature in the module: `hos_cbenf` (a Cabal Boarding Enforcer) carried feat
+**1848**. Root cause, confirmed immediately once found: 1848 is feat.2da row
+115's own **`FEAT` column** — a TLK strref for that feat's display-name
+string, `WeapFocWHam` (Weapon Focus: Warhammer) — not the row/feat ID
+nwscript and the engine actually key on. Confirmed by the creature's own
+equipment: `hos_cbenf` carries a real Warhammer (`nw_wblhw001`), so the
+intent was unambiguous. Whatever built this FeatList read the wrong 2DA
+column for at least this one entry. **Fixed** (feat 1848 → 115, both the
+placed instance and the standalone blueprint). **Closed with a real static
+check** so no future module needs a live-server run to catch this class of
+bug: `verify_creature`'s new `invalid_feat_id` error
+(`src/util/verify/blueprints.ts`) checks every `FeatList` entry against the
+loaded `feat.2da`'s real row set (`index.twodaTables.get("feat").rows.has(...)`,
+membership rather than a computed bounds check, so gaps in the table are
+handled correctly too) — degrades to skip when `feat.2da` isn't loaded
+(no `NWN_FOLDER_DATA`), never guesses. 3 new unit tests.
+**Process note for next time this server is used**: the orchestration is
+still fully manual, per the "what's still missing" note below — copy the
+`.mod` into `server/modules/`, set `NWN_MODULE` in
+`config/nwserver.env`, `docker-compose down && docker-compose up -d` from
+inside the repo (so `${PWD}` resolves), then `grep -iE "invalid feat|error|
+exception" logs/nwengineLog.txt` and `docker logs <container> | grep
+SPEC_`. Tear the container down again after (`docker-compose down`) —
+this server is throwaway and never player-facing, per its own `nwserver.env`
+header comment.
 
 **A live isolated verification server exists and has run a real end-to-end check
 successfully** (`~/nwn-mcp-verify-server` — a fork of
