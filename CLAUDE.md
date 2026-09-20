@@ -588,7 +588,19 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
   (every group/rotation/footprint ever placed there, and its real bounding box
   including any rotation-driven width/height swap) and diffing the union against the
   final group's own footprint — slower, but the only way to catch same-group,
-  wrong-slot leftovers. **No code fix applied** — this is a workflow/diagnosis pitfall
+  wrong-slot leftovers. **A second real user report found two more orphans this same
+  check missed** — the manual historical reconstruction used to find the first batch
+  had its own error (misremembered the *original* build's rotation for two specific
+  buildings as 0 when it was actually 1, understating their true historical footprint
+  by one row). **The reliable fix is to stop reconstructing history by hand entirely**:
+  build a full per-cell expected-tile map from the FINAL intended footprint of every
+  building (not just a set of "valid" tile IDs), then scan the whole region for two
+  conditions at once — every footprint cell holds exactly its expected tile, AND no
+  cell outside any footprint (including a hole) holds a tile belonging to ANY known
+  building group. This catches both failure shapes in one pass (a wrong tile inside a
+  footprint, and a stray tile outside one) without needing to know or trust the
+  placement history at all — only the final plan and the tileset's real group catalog.
+  **No code fix applied** — this is a workflow/diagnosis pitfall
   for hand-driven, multi-round `paint_group` repainting of the same origin, not a bug
   in `paint_group` itself (it correctly does exactly what it's asked; nothing asks it
   to clear a *different* group's old footprint first, since it has no way to know what
