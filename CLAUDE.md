@@ -441,6 +441,46 @@ resources included?), and whether the binary form is committed alongside the
 JSON form (probably yes, since the JSON is derived and the binary is what
 actually ships) or regenerated from JSON on demand.
 
+**TODO — a systematic test/analysis pass across every native (base-game) tileset,
+one throwaway single-area module per tileset (user-raised).** Everything this
+project currently knows about a specific tileset's real quirks — `ttf01`'s building
+palette being far smaller than `tno01`'s (surfaced only by trying to avoid rotation
+in "The Twin Villages Waystop"), most named building groups' doors failing the
+`getGroupEntrances` 3m-offset exterior/interior heuristic (found empirically,
+group by group, only when a real build needed it), which groups' corner terrain is
+Grass vs Dirt vs Forest and so seams against a given zone, which multi-tile groups
+are genuinely rotation-safe (single, symmetric-enough models) vs. structurally
+unsafe (a unique mesh per tile — see the rotation-handedness saga above) — has come
+from hand debugging one real build's specific groups, one tileset at a time, after
+something already broke. Doing this proactively, once, for every native tileset
+would turn "discover the gap live, at content-build time" into "already known and
+documented before it can bite a build."
+
+**What such an area/analysis should capture per tileset**, informed directly by the
+gaps this session found the hard way: every named group placed at least once (native
+rotation 0, since that's the only rotation always safe to test) with its full
+`get_tileset_details` `entrances` result recorded next to its REAL door bearing data
+(so the entrance-detection heuristic's actual hit rate per tileset is measured, not
+assumed); each group's own corner-terrain pattern tabulated against the tileset's
+declared floor/wall/border terrains (which ones will seam against which zone types);
+a rough census of building-type variety (how many distinct named groups exist,
+usable as a sanity check before promising a build "N distinct buildings" the way
+`ttf01`'s sparse palette couldn't actually deliver); and, longer-term, some way to
+flag which multi-tile groups are plausibly rotation-safe — there's no automated way
+to tell a symmetric/repeatable piece from a unique-mesh-per-tile one from `.set` data
+alone (per the settileLibrary finding above), so this might start as a manually
+curated allow-list seeded by this pass rather than something fully automatic.
+
+**Not yet scoped — real open questions before building this**: one area per tileset
+vs. several (a tileset with hundreds of groups may not fit every one, unrotated,
+into a single reasonably-sized area); whether this becomes a new MCP tool (a
+`survey_tileset`-style capability that builds the throwaway module itself) or a
+one-off script/skill run manually per tileset and its findings folded into this
+doc; and how the output should be stored so it stays a living reference rather than
+a one-time report — most likely a per-tileset findings doc under `docs/`, in the
+same spirit as `docs/encounter-difficulty-findings.md` and the other verified-finding
+docs this project already keeps, rather than something baked into `tileset.ts` itself.
+
 **Tooling to prevent the classes of mistakes found late in one session's own
 work (user-raised: "how do we avoid these in the future, can we add script
 and tooling to keep progress moving forward").** Three real, self-inflicted
