@@ -177,6 +177,65 @@ connected pieces, all in `src/util/tileset.ts` unless noted:
   `featureWarnings`. 3 new unit tests confirm the avenue-exclusion property holds across
   15 real-generation trials (never a false pass — both "a feature was placed" and "a
   corridor existed" are asserted, not just "no overlap found").
+- **Spacing rule (user-raised, from a real hand-built village pair): buildings should
+  sit within 1-2 tiles of the avenue, not just somewhere in the adjacent room.** Confirmed
+  a real gap in the current design while hand-building "The Twin Villages Waystop": the
+  avenue-adjacency bias (above) only checks whether a room touches the avenue at all and
+  whether a candidate rotation's entrance faces it — it has **no distance preference**,
+  so a feature placed correctly-facing but deep in a large room (e.g. a 3-tile gap to the
+  avenue, found in one hand-authored village's west row) still passes today's check. Two
+  places this needs to land:
+  - **Hand-authoring convention (apply now, no code change needed):** when placing
+    buildings via `paint_group`/`adventure_apply_layout` alongside a hand-built avenue
+    crosser, keep the gap between a building's road-facing edge and the avenue itself to
+    1-2 tiles — enough for a small dooryard, not an open field. Mirror the gap on both
+    sides of the avenue for a consistent street frontage.
+  - **`packFeatures`'s automatic avenue bias (not yet built):** the position search
+    (`layout-generator.ts`) should prefer candidates *closer* to the avenue-adjacent room
+    edge, not just any position with a facing match — e.g. bias the random `fx0`/`fy0`
+    roll toward that edge, or explicitly rank candidates by distance-to-avenue before
+    facing. Not yet implemented; today's automatic placement can legally put a
+    correctly-rotated building far from the road it's supposedly fronting.
+
+- **FIXED — the exact handedness gap flagged (but never checked) in the rotation work
+  above was real: `bearingToSide`/`rotateSide` in `tileset.ts` had two independent,
+  confirmed calibration bugs, found via a real user report against "The Twin Villages
+  Waystop"** ("The buildings should have their doorways facing the road... Almost none
+  of them did") **and fixed by having the user visually check 4 real placed buildings
+  in the toolset against their intended facing** (one per rotation value 0/1/2/3) — the
+  exact corpus-cross-check discipline this doc's "Tile rotation" pitfall already
+  prescribes, applied here via direct human observation instead of an existing corpus,
+  since no pre-existing human-built content uses these specific rotated groups.
+  1. **`bearingToSide()` was a full quadrant (90°) out of phase** — even at rotation 0,
+     with *no* rotation applied at all, its classification of a door's raw `.set`
+     bearing into N/S/E/W didn't match real in-game facing. This alone explained why
+     unrotated buildings were already wrong.
+  2. **`rotateSide()` rotated the wrong direction** — it added rotation steps
+     (N→E→S→W as `rotation` increases); the real direction subtracts. Confirmed
+     together with #1 by fitting all 4 real reports to one formula
+     (`actual = (expected + 1 - 2*rotation) mod 4`, compass steps N=0/E=1/S=2/W=3) —
+     a single clean fit across every rotation value, not four independent mistakes.
+  3. **`rotateGroupTileIndex()`'s cases 1 and 3 were also swapped** (same root cause:
+     the direction assumption was never checked against a real rotated multi-tile
+     group, only for internal self-consistency — bijection + 4-steps-is-identity,
+     which proves *a* valid rotation, not *which way* it turns). Fixed by swapping
+     cases 1/3; cases 0/2 are self-inverse and unaffected, matching the same
+     even-rotation-unaffected/odd-rotation-flipped pattern found in the compass bugs.
+  **None of this touches the separately-verified, pre-existing `getRotatedCorners`/
+  `getRotatedCrossers`/`forwardRotate` convention** ("Tile rotation" pitfall above,
+  corpus-checked against real `~/tfndev` placements) — that solves a different problem
+  (which corner terrain ends up where after a GIT placement) and was never in question;
+  this bug was isolated to the brand-new group/entrance rotation logic added this
+  session, which had only ever been checked against itself. **All 20 buildings across
+  both villages were re-painted in place** (`paint_group` at each building's existing
+  origin, corrected `rotation` only) using the fixed formula and real door bearings
+  re-extracted from each group's `.set` file — `validate_module` and
+  `check_area_connectivity` both came back clean afterward. **Lesson reinforced:** a
+  rotation-handedness assumption is not verified by the code agreeing with itself
+  (bijection tests, algebraic identities, "zero warnings" from the solver) — none of
+  those catch a systematically-wrong-but-still-structurally-valid rotation. It takes a
+  real render or a real human observer; budget for that check before shipping content
+  built on brand-new rotation logic, not just after a user reports it wrong.
 
 ### Resource Loading
 
@@ -1371,6 +1430,26 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   the box, not just an unset field. `verify_creature` now flags
   `appearance_race_mismatch` for any creature (not just henchmen) where these disagree
   within the standard-race range.
+- **TODO — randomize head/hair-color/skin-color for standard PC-race NPC appearances
+  (user-raised).** `buildMinimalUtc()`'s `Appearance_Head`/`Color_Hair`/`Color_Skin`/
+  `Color_Tattoo1`/`Color_Tattoo2` defaults are fixed values matched from two real sample
+  henchmen (`hen_dorna.utc`/`hen_linu.utc`, see the "invisible henchmen" pitfall above) —
+  every generated NPC on a standard PC-race appearance (rows 0-6, the bullet above)
+  currently looks identical unless hand-varied per creature. User wants this randomized,
+  following the same approach an existing sibling project, **GvE3** (`~/git/gve3`,
+  per this project's shared-tooling convention — see the global CLAUDE.md), already uses
+  for its own NPC/PC appearance randomization. **Not yet scoped — GvE3's actual
+  implementation (script/table/value ranges) hasn't been read yet, and nothing here
+  should be guessed at ahead of that** (matches this project's "never guess, verify
+  against real data" discipline — see the 2DA-research-technique memory). Before
+  building: find and read GvE3's real randomization script/include, confirm its real
+  head-count-per-race/gender source (likely `appearance.2da` or a head-count table) and
+  its real `Color_Hair`/`Color_Skin` value ranges (skin-tone ranges plausibly differ by
+  race, so don't assume one universal range), then port the verified mechanism rather
+  than inventing new ranges. Likely landing spot: a `complexity`-style opt-in on
+  `build_npc_stat_block` or a new dedicated appearance-randomization tool, seeded
+  deterministically the same way `pickWeaponPreference` is (by the creature's own
+  tag/resref) to keep generated content reproducible rather than dice-rolled.
 - **An empty `FeatList` on a fresh level-1 blueprint is expected, not a defect** — but
   **verified via a live headless server run: `GetHasFeat()` does NOT reflect any
   engine-computed racial feat set when `FeatList` is empty; it strictly reads the actual

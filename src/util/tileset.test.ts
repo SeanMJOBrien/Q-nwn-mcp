@@ -173,28 +173,29 @@ describe("getGroupEntrances", () => {
     const entrances = getGroupEntrances(group, tileset, 0);
     // Only the bottom tile's east door should appear — the top tile's door
     // points back into the group's own footprint and is excluded.
+    // (bearing 0 -> "S", per the 2026-09-19 calibration fix confirmed
+    // against 4 real in-toolset placements — see bearingToSide's fix note.)
     expect(entrances).toHaveLength(1);
     expect(entrances[0].localCol).toBe(0);
     expect(entrances[0].localRow).toBe(0);
-    expect(entrances[0].side).toBe("E");
+    expect(entrances[0].side).toBe("S");
   });
 
   it("rotation=0 leaves side unchanged from native bearing", () => {
     const { group, tileset } = makeFixture();
     const entrances = getGroupEntrances(group, tileset, 0);
-    expect(entrances[0].side).toBe("E");
+    expect(entrances[0].side).toBe("S");
   });
 
-  it("rotation rotates the reported side by simple compass steps (N->E->S->W->N)", () => {
+  it("rotation rotates the reported side by simple compass steps (S->E->N->W->S)", () => {
     const { group, tileset } = makeFixture();
-    // Native side is E (idx 1 in N,E,S,W). Each rotation step should advance
-    // one position in that cycle, deterministically — this is the internal
-    // consistency this function's design relies on (see its handedness note;
-    // real-world direction is unverified, but the composition must be self-consistent).
-    expect(getGroupEntrances(group, tileset, 0)[0].side).toBe("E");
-    expect(getGroupEntrances(group, tileset, 1)[0].side).toBe("S");
-    expect(getGroupEntrances(group, tileset, 2)[0].side).toBe("W");
-    expect(getGroupEntrances(group, tileset, 3)[0].side).toBe("N");
+    // Native side is S (idx 2 in N,E,S,W). Each rotation step SUBTRACTS one
+    // position in that cycle (2026-09-19 direction fix, confirmed against 4
+    // real in-toolset placements — see rotateSide's fix note).
+    expect(getGroupEntrances(group, tileset, 0)[0].side).toBe("S");
+    expect(getGroupEntrances(group, tileset, 1)[0].side).toBe("E");
+    expect(getGroupEntrances(group, tileset, 2)[0].side).toBe("N");
+    expect(getGroupEntrances(group, tileset, 3)[0].side).toBe("W");
   });
 
   it("does not mutate x/y/bearing when rotation is nonzero (native-space geometry, rotated side only)", () => {
@@ -234,11 +235,12 @@ describe("rotateGroupTileIndex", () => {
 
   it("matches the hand-derived 2-column x 1-row example at rotation 1", () => {
     // columns=2, rows=1: native A=(0,0), B=(1,0). Rotating 90 degrees turns
-    // this horizontal 2x1 bar into a vertical 1x2 bar: A -> new(0,0),
-    // B -> new(0,1) (verified independently via point-rotation of the
-    // group's own footprint corners before writing this function).
-    expect(rotateGroupTileIndex(0, 0, 2, 1, 1)).toEqual({ gc: 0, gr: 0 }); // -> A
-    expect(rotateGroupTileIndex(0, 1, 2, 1, 1)).toEqual({ gc: 1, gr: 0 }); // -> B
+    // this horizontal 2x1 bar into a vertical 1x2 bar: A -> new(0,1),
+    // B -> new(0,0) (direction fixed 2026-09-19 — see rotateGroupTileIndex's
+    // fix note; cases 1/3 were swapped after a real in-toolset check found
+    // the original direction backwards).
+    expect(rotateGroupTileIndex(0, 0, 2, 1, 1)).toEqual({ gc: 1, gr: 0 }); // -> B
+    expect(rotateGroupTileIndex(0, 1, 2, 1, 1)).toEqual({ gc: 0, gr: 0 }); // -> A
   });
 
   it("is a bijection over the rotated footprint for every rotation and several group shapes", () => {

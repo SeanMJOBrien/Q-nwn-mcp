@@ -413,8 +413,8 @@ export function registerPaintTools(server: McpServer): void {
     "paint_group",
     "Place a multi-tile group (e.g. 'Temple_3x2', 'Lodge_2x2') at a grid position. Validates bounds and edge constraints. " +
       "Optional rotation (0/1/2/3 quarter-turns) rotates the whole group's footprint (swapping width/height at 90/270) " +
-      "and each tile's own orientation — handedness is internally self-consistent (verified by unit test) but not yet " +
-      "independently confirmed against a real toolset render; check visually before relying on it for real content.",
+      "and each tile's own orientation — direction confirmed 2026-09-19 against 4 real in-toolset placements " +
+      "(see CLAUDE.md's tileset.ts rotation-fix note).",
     {
       area: z.string().describe("Area resref"),
       feature: z.string().describe("Group name (e.g. 'Temple_3x2', 'Lodge_2x2') — use get_tileset_details to see available groups"),

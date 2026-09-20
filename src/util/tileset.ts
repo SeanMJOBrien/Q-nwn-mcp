@@ -353,11 +353,19 @@ export function rotatedGroupDimensions(
  * (`forwardRotateDoor`'s case 0-3), then inverting. Cross-checked three
  * independent ways before trusting it (direct per-rotation corner-transform,
  * and composing the 90° step two/three times to re-derive 180°/270°
- * algebraically) — all three agreed. Still carries the same handedness
- * caveat as `getGroupEntrances`: the DIRECTION "rotation=1" turns a group has
- * not been independently confirmed against a real toolset render of an
- * actually-rotated multi-tile group, only checked for internal
- * self-consistency.
+ * algebraically) — all three agreed on internal self-consistency (bijection,
+ * 4-steps-is-identity), which only proves this is *a* valid 90° rotation,
+ * not *which way* it turns.
+ *
+ * DIRECTION FIX (2026-09-19): a user's real in-toolset check of 4 placed
+ * buildings (across `getGroupEntrances`/`rotateSide`, which share this
+ * function's derivation and the same untested direction assumption) found
+ * the real rotation direction is the opposite of what was first assumed —
+ * see `rotateSide`'s fix note for the confirming data. Cases 1 and 3 are
+ * swapped from the original derivation to match; 0 and 2 are self-inverse
+ * and unaffected. This does NOT touch the separately-verified, pre-existing
+ * `getRotatedCorners`/`forwardRotate` convention (a different problem,
+ * independently corpus-checked) — only this session's new group-remap logic.
  */
 export function rotateGroupTileIndex(
   ngc: number,
@@ -368,9 +376,9 @@ export function rotateGroupTileIndex(
 ): { gc: number; gr: number } {
   switch (rotation) {
     case 0: return { gc: ngc, gr: ngr };
-    case 1: return { gc: ngr, gr: rows - ngc - 1 };
+    case 1: return { gc: columns - ngr - 1, gr: ngc };
     case 2: return { gc: columns - ngc - 1, gr: rows - ngr - 1 };
-    case 3: return { gc: columns - ngr - 1, gr: ngc };
+    case 3: return { gc: ngr, gr: rows - ngc - 1 };
     default: return { gc: ngc, gr: ngr };
   }
 }
@@ -393,13 +401,24 @@ export function getTileDoorWorldPositions(
   });
 }
 
-/** Quantize a bearing (degrees, 0=east/+X, counterclockwise per NWN convention) to the nearest cardinal side. */
+/**
+ * Quantize a bearing (degrees) to the nearest cardinal side.
+ *
+ * CALIBRATION FIX (2026-09-19): the original bucket assignment here was a
+ * full quadrant (90°) off from real in-game facing, confirmed by a user
+ * visually checking 4 real placed buildings in the toolset against their
+ * intended facing — see the `rotateSide` fix below for the second,
+ * independent bug found in the same report. This mapping was derived by
+ * assumption ("0=east/+X, counterclockwise") and never checked against a
+ * real placement before that report; the corrected buckets below are the
+ * ones that reproduce all 4 real, human-observed results exactly.
+ */
 function bearingToSide(bearing: number): "N" | "S" | "E" | "W" {
   const normalized = ((bearing % 360) + 360) % 360;
-  if (normalized >= 45 && normalized < 135) return "N";
-  if (normalized >= 135 && normalized < 225) return "W";
-  if (normalized >= 225 && normalized < 315) return "S";
-  return "E";
+  if (normalized >= 45 && normalized < 135) return "E";
+  if (normalized >= 135 && normalized < 225) return "N";
+  if (normalized >= 225 && normalized < 315) return "W";
+  return "S";
 }
 
 export interface GroupEntrance {
@@ -417,10 +436,24 @@ export interface GroupEntrance {
 
 const SIDE_ORDER: Array<"N" | "S" | "E" | "W"> = ["N", "E", "S", "W"];
 
-/** Rotate a cardinal side by `steps` quarter-turns, matching this codebase's case-1=90°CW convention. */
+/**
+ * Rotate a cardinal side by `steps` quarter-turns.
+ *
+ * DIRECTION FIX (2026-09-19): this used to ADD steps (N->E->S->W as
+ * `rotation` increases). A user's real in-toolset check of 4 placed
+ * buildings across all 4 rotation values found the real direction is the
+ * opposite — confirmed together with the `bearingToSide` calibration fix
+ * above, since the two errors combined to fit all 4 reports exactly:
+ * `actual = (expected + 1 - 2*rotation) mod 4`. This does not affect or
+ * contradict the separately-verified, PRE-EXISTING tile-corner rotation
+ * convention (`getRotatedCorners`/`forwardRotate`, "case 1 = 90° CW") —
+ * that logic solves a different problem (which corner terrain ends up
+ * where) and was independently corpus-verified; this function's "which
+ * compass direction" calibration was a fresh, never-verified assumption.
+ */
 function rotateSide(side: "N" | "S" | "E" | "W", steps: number): "N" | "S" | "E" | "W" {
   const idx = SIDE_ORDER.indexOf(side);
-  return SIDE_ORDER[(idx + steps) % 4];
+  return SIDE_ORDER[(((idx - steps) % 4) + 4) % 4];
 }
 
 /**
@@ -443,14 +476,11 @@ function rotateSide(side: "N" | "S" | "E" | "W", steps: number): "N" | "S" | "E"
  * arithmetic (N->E->S->W->N per quarter-turn) — a much smaller, independently
  * checkable piece of logic than re-deriving positions.
  *
- * HANDEDNESS NOTE: `rotateSide`'s direction (N->E for rotation=1) is chosen to
- * match this codebase's existing "case 1 = 90° CW" convention
- * (`forwardRotateDoor`/`getRotatedCorners`), but has NOT been independently
- * cross-checked against a real multi-tile group placed in the toolset/engine
- * the way that per-tile convention was (see CLAUDE.md's "Tile rotation"
- * pitfall for the verification bar this project normally holds itself to).
- * Treat `side` for a nonzero `rotation` as unverified until checked against a
- * real toolset render of an actually-rotated group.
+ * HANDEDNESS: fixed 2026-09-19 after a real in-toolset user report found the
+ * original direction/calibration wrong on 4 real placed buildings — see the
+ * fix notes on `bearingToSide`/`rotateSide` for the confirming data. `side`
+ * now matches real in-game facing for both rotation=0 and every nonzero
+ * rotation.
  */
 export function getGroupEntrances(group: TileGroup, tileset: TilesetInfo, rotation: 0 | 1 | 2 | 3 = 0): GroupEntrance[] {
   const OFFSET = 3.0;
