@@ -235,12 +235,13 @@ describe("rotateGroupTileIndex", () => {
 
   it("matches the hand-derived 2-column x 1-row example at rotation 1", () => {
     // columns=2, rows=1: native A=(0,0), B=(1,0). Rotating 90 degrees turns
-    // this horizontal 2x1 bar into a vertical 1x2 bar: A -> new(0,1),
-    // B -> new(0,0) (direction fixed 2026-09-19 — see rotateGroupTileIndex's
-    // fix note; cases 1/3 were swapped after a real in-toolset check found
-    // the original direction backwards).
-    expect(rotateGroupTileIndex(0, 0, 2, 1, 1)).toEqual({ gc: 1, gr: 0 }); // -> B
-    expect(rotateGroupTileIndex(0, 1, 2, 1, 1)).toEqual({ gc: 0, gr: 0 }); // -> A
+    // this horizontal 2x1 bar into a vertical 1x2 bar: A -> new(0,0),
+    // B -> new(0,1) — cross-verified 2026-09-19 against `~/git/settileLibrary`'s
+    // independently-tested TileBlockRotate formula (see rotateGroupTileIndex's
+    // correction note; an earlier same-day swap of cases 1/3 was wrong and is
+    // reverted here).
+    expect(rotateGroupTileIndex(0, 0, 2, 1, 1)).toEqual({ gc: 0, gr: 0 }); // -> A
+    expect(rotateGroupTileIndex(0, 1, 2, 1, 1)).toEqual({ gc: 1, gr: 0 }); // -> B
   });
 
   it("is a bijection over the rotated footprint for every rotation and several group shapes", () => {

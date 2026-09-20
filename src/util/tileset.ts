@@ -357,15 +357,26 @@ export function rotatedGroupDimensions(
  * 4-steps-is-identity), which only proves this is *a* valid 90° rotation,
  * not *which way* it turns.
  *
- * DIRECTION FIX (2026-09-19): a user's real in-toolset check of 4 placed
- * buildings (across `getGroupEntrances`/`rotateSide`, which share this
- * function's derivation and the same untested direction assumption) found
- * the real rotation direction is the opposite of what was first assumed —
- * see `rotateSide`'s fix note for the confirming data. Cases 1 and 3 are
- * swapped from the original derivation to match; 0 and 2 are self-inverse
- * and unaffected. This does NOT touch the separately-verified, pre-existing
- * `getRotatedCorners`/`forwardRotate` convention (a different problem,
- * independently corpus-checked) — only this session's new group-remap logic.
+ * CORRECTION (2026-09-19, second round): an earlier fix this same day swapped
+ * cases 1 and 3 here, based on a wrong assumption that this function shared
+ * the same handedness bug as `bearingToSide`/`rotateSide` below. It does not.
+ * A real user report ("any tile feature larger than one tile is broken")
+ * after that swap shipped — buildings scrambled into wrong pieces, a tile
+ * duplicated into two slots — led to checking this function's formula
+ * directly against `~/git/settileLibrary`'s independently-verified
+ * `TileBlockRotate`/`_TileRotatedOffsetX/Y` (a separate, real, tested NWScript
+ * library for exactly this operation). That reference's forward rotation of
+ * offset `(ox,oy)` by 90° is `(-oy, ox)` — algebraically identical to this
+ * function's ORIGINAL (pre-swap) case 1/3, confirmed by deriving the general
+ * W x H inverse from that same verified point-rotation and checking it cell
+ * by cell against a 2x2 example. The swap was reverted; this is back to the
+ * original, now cross-verified formula. The compass-facing calibration fix in
+ * `bearingToSide`/`rotateSide` below is a SEPARATE, independent piece of
+ * logic (used only for choosing which `rotation` value to request, never for
+ * the actual tile-position write path) and remains correct — see its own
+ * note for why the two are unrelated despite looking like "the same kind of
+ * handedness bug" at a glance. This still does NOT touch the separately-
+ * verified, pre-existing `getRotatedCorners`/`forwardRotate` convention.
  */
 export function rotateGroupTileIndex(
   ngc: number,
@@ -376,9 +387,9 @@ export function rotateGroupTileIndex(
 ): { gc: number; gr: number } {
   switch (rotation) {
     case 0: return { gc: ngc, gr: ngr };
-    case 1: return { gc: columns - ngr - 1, gr: ngc };
+    case 1: return { gc: ngr, gr: rows - ngc - 1 };
     case 2: return { gc: columns - ngc - 1, gr: rows - ngr - 1 };
-    case 3: return { gc: ngr, gr: rows - ngc - 1 };
+    case 3: return { gc: columns - ngr - 1, gr: ngc };
     default: return { gc: ngc, gr: ngr };
   }
 }

@@ -174,10 +174,11 @@ describe("paint_group rotation", () => {
       expect(parsed.size).toEqual({ columns: 1, rows: 2 }); // swapped
 
       // Per rotateGroupTileIndex's own unit-tested example (columns=2,rows=1,
-      // rotation=1, direction fixed 2026-09-19): native tile A=(0,0)=id10 ->
-      // new(0,1); native tile B=(1,0)=id20 -> new(0,0). Placed at origin (1,1):
-      expect(tileAt(are, 4, 1, 1)).toEqual({ id: 20, orientation: 1 }); // new(0,0) -> world (1,1)
-      expect(tileAt(are, 4, 1, 2)).toEqual({ id: 10, orientation: 1 }); // new(0,1) -> world (1,2)
+      // rotation=1, cross-verified 2026-09-19 against ~/git/settileLibrary's
+      // TileBlockRotate formula): native tile A=(0,0)=id10 -> new(0,0);
+      // native tile B=(1,0)=id20 -> new(0,1). Placed at origin (1,1):
+      expect(tileAt(are, 4, 1, 1)).toEqual({ id: 10, orientation: 1 }); // new(0,0) -> world (1,1)
+      expect(tileAt(are, 4, 1, 2)).toEqual({ id: 20, orientation: 1 }); // new(0,1) -> world (1,2)
     } finally {
       await cleanup();
     }

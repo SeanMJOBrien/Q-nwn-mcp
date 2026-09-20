@@ -649,6 +649,21 @@ export function registerAdventureTools(server: McpServer): void {
           featureWarnings.push(`${sf.feature}: rotation ${rotation} requested but this feature has a curated collar (native placement only) — placed at rotation 0`);
           rotation = 0;
         }
+        // Most multi-tile groups are built from a UNIQUE model per tile (a
+        // named house/tower/inn, not a repeatable terrain piece) — rotating
+        // them relocates each tile and bumps its own orientation, but the
+        // underlying mesh at each slot is still whatever was baked for its
+        // ORIGINAL position, so the assembled structure can come out visually
+        // scrambled even though the tile math is a correct rotation. Confirmed
+        // against a real reference implementation (~/git/settileLibrary's
+        // TileBlockRotate docs) and a real user report on this exact class of
+        // content — see CLAUDE.md's tileset.ts rotation note. This is
+        // advisory, not a hard block: some groups (simple repeatable pieces)
+        // genuinely are rotation-safe, and there's no automated way to tell
+        // which from tile data alone.
+        if (rotation !== 0 && group.columns * group.rows > 1) {
+          featureWarnings.push(`${sf.feature}: placed at rotation ${rotation} — multi-tile groups are usually a unique model per tile and may look wrong/scrambled when rotated; prefer a group whose native (rotation 0) facing already matches if this looks broken`);
+        }
         const { columns: placedColumns, rows: placedRows } = rotatedGroupDimensions(group.columns, group.rows, rotation);
         // Reject groups whose tile corners (AS ROTATED — a feature placed at
         // rotation 1/2/3 presents different corners outward than its native

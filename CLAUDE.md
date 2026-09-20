@@ -197,45 +197,82 @@ connected pieces, all in `src/util/tileset.ts` unless noted:
     facing. Not yet implemented; today's automatic placement can legally put a
     correctly-rotated building far from the road it's supposedly fronting.
 
-- **FIXED — the exact handedness gap flagged (but never checked) in the rotation work
-  above was real: `bearingToSide`/`rotateSide` in `tileset.ts` had two independent,
-  confirmed calibration bugs, found via a real user report against "The Twin Villages
-  Waystop"** ("The buildings should have their doorways facing the road... Almost none
-  of them did") **and fixed by having the user visually check 4 real placed buildings
-  in the toolset against their intended facing** (one per rotation value 0/1/2/3) — the
-  exact corpus-cross-check discipline this doc's "Tile rotation" pitfall already
-  prescribes, applied here via direct human observation instead of an existing corpus,
-  since no pre-existing human-built content uses these specific rotated groups.
-  1. **`bearingToSide()` was a full quadrant (90°) out of phase** — even at rotation 0,
-     with *no* rotation applied at all, its classification of a door's raw `.set`
-     bearing into N/S/E/W didn't match real in-game facing. This alone explained why
-     unrotated buildings were already wrong.
-  2. **`rotateSide()` rotated the wrong direction** — it added rotation steps
-     (N→E→S→W as `rotation` increases); the real direction subtracts. Confirmed
-     together with #1 by fitting all 4 real reports to one formula
-     (`actual = (expected + 1 - 2*rotation) mod 4`, compass steps N=0/E=1/S=2/W=3) —
-     a single clean fit across every rotation value, not four independent mistakes.
-  3. **`rotateGroupTileIndex()`'s cases 1 and 3 were also swapped** (same root cause:
-     the direction assumption was never checked against a real rotated multi-tile
-     group, only for internal self-consistency — bijection + 4-steps-is-identity,
-     which proves *a* valid rotation, not *which way* it turns). Fixed by swapping
-     cases 1/3; cases 0/2 are self-inverse and unaffected, matching the same
-     even-rotation-unaffected/odd-rotation-flipped pattern found in the compass bugs.
-  **None of this touches the separately-verified, pre-existing `getRotatedCorners`/
-  `getRotatedCrossers`/`forwardRotate` convention** ("Tile rotation" pitfall above,
-  corpus-checked against real `~/tfndev` placements) — that solves a different problem
-  (which corner terrain ends up where after a GIT placement) and was never in question;
-  this bug was isolated to the brand-new group/entrance rotation logic added this
-  session, which had only ever been checked against itself. **All 20 buildings across
-  both villages were re-painted in place** (`paint_group` at each building's existing
-  origin, corrected `rotation` only) using the fixed formula and real door bearings
-  re-extracted from each group's `.set` file — `validate_module` and
-  `check_area_connectivity` both came back clean afterward. **Lesson reinforced:** a
-  rotation-handedness assumption is not verified by the code agreeing with itself
-  (bijection tests, algebraic identities, "zero warnings" from the solver) — none of
-  those catch a systematically-wrong-but-still-structurally-valid rotation. It takes a
-  real render or a real human observer; budget for that check before shipping content
-  built on brand-new rotation logic, not just after a user reports it wrong.
+- **Rotation-handedness saga, "The Twin Villages Waystop" (2026-09-19) — two separate
+  bugs, found across two rounds of real user checks, plus a fundamental limitation
+  the fix has to work around rather than solve.** Full sequence, since each round's
+  wrong diagnosis is as instructive as the eventual fix:
+  1. **Round 1 — `bearingToSide`/`rotateSide` calibration, CONFIRMED and fixed.** User
+     report: "The buildings should have their doorways facing the road... Almost none
+     of them did." Had the user visually check 4 real placed buildings in the toolset
+     against their intended facing (one per rotation value 0/1/2/3) — the same
+     corpus-cross-check discipline the "Tile rotation" pitfall above prescribes,
+     applied via direct human observation since no pre-existing corpus uses these
+     specific groups. Two real, independent calibration bugs, both in `tileset.ts`:
+     `bearingToSide()` was a full quadrant (90°) out of phase (wrong even at rotation
+     0, no rotation involved at all), and `rotateSide()` composed the rotation in the
+     wrong direction (added steps; the real direction subtracts). Confirmed by fitting
+     all 4 reports to one formula (`actual = (expected + 1 - 2*rotation) mod 4`) —
+     both fixed, and this fix is correct and still in place.
+  2. **Round 2 — `rotateGroupTileIndex()`, WRONGLY "fixed" by the same commit, then
+     reverted.** Round 1's fix also swapped cases 1/3 in `rotateGroupTileIndex()` (the
+     multi-tile grid-slot remap), on the assumption it shared the same handedness bug.
+     It didn't — a second real user report ("any tile feature larger than one tile is
+     broken") showed actual structural corruption (tiles duplicated into two slots,
+     buildings broken into disordered pieces), which a real handedness/direction bug
+     cannot produce (a bijective remap can flip which way something faces, but can
+     never duplicate a tile). Root cause found by cross-checking the formula against
+     `~/git/settileLibrary`, a separate, independently-tested NWScript library for
+     this exact operation (`TileBlockRotate`/`_TileRotatedOffsetX/Y`): its verified
+     90° point-rotation `(ox,oy) -> (-oy,ox)` is algebraically identical to this
+     function's ORIGINAL (pre-swap) case 1/3 — confirmed by deriving the general W x H
+     inverse from that same point-rotation and checking it cell-by-cell against a 2x2
+     example. **The swap was reverted; `rotateGroupTileIndex` is back to its original,
+     now cross-verified formula**, and Round 1's compass-calibration fix stayed
+     unchanged — the two functions solve genuinely independent problems (which tile ID
+     lands in which grid slot, vs. which rotation value to request for a target
+     facing) and don't share a bug just because they're both "rotation code".
+  3. **The real limitation underneath both rounds, confirmed by the same reference
+     library: most multi-tile groups (named houses/inns/towers) cannot be safely
+     rotated via grid-remap + per-tile-orientation-bump AT ALL, regardless of how
+     correct the index math is.** Quoting settileLibrary's own docs: "The four tiles
+     of a tileset tower are four *different* models, one per quadrant... Rotating a
+     tile only spins that quadrant's own model, so rearranging the four and bumping
+     their orientations scrambles the tower instead of turning it. Rotation is correct
+     for tiles whose orientation is meaningful on its own: terrain crossers, roads,
+     **single-tile features**. To reface an authored structure you need a
+     differently-authored group." A 1x1 feature is exactly a single ordinary tile —
+     rotating it via `Tile_Orientation` is the same operation the engine already does
+     for every terrain tile, and is safe. A 2x2+ named building is an assembly of
+     unique, position-specific meshes; relocating and re-spinning them is a
+     structurally valid *tile* rotation that still produces the wrong *building*.
+     **`paint_group` and `adventure_apply_layout` now emit an advisory warning
+     (not a hard block, since there's no way to tell a genuinely rotation-safe
+     multi-tile group from an unsafe one purely from tile data) whenever a rotation
+     other than 0 is requested for a group larger than 1x1.**
+  **Actual fix applied to the shipped content**, once both of the above were
+  understood: rather than rotating multi-tile buildings at all, both villages'
+  10-building layouts were rebuilt using ONLY each group's *native* (rotation 0)
+  facing — surveyed the full `tno01`/`ttf01` group catalogs for real door bearings
+  per group (direct `.set` file reads), and picked whichever named building already
+  faces the needed direction unrotated for each side of the road, swapping any
+  grass-terrain group that mismatched its dirt-zone surroundings for a dirt-terrain
+  equivalent facing the same way. `tno01` had enough variety for a fully-distinct
+  10-building set this way; `ttf01`'s much smaller building palette forced real
+  repetition (most of one village's houses ended up sharing 1-2 models) — a real,
+  visible trade-off of "correct and safe" over "no rotation-scramble risk," not
+  something to silently improve later without noting the cause. **None of this
+  touches the separately-verified, pre-existing `getRotatedCorners`/
+  `getRotatedCrossers`/`forwardRotate` convention** ("Tile rotation" pitfall above) —
+  that solves a different problem (which corner terrain a *terrain* tile presents at
+  a given orientation) and was never in question. **Lesson reinforced twice in one
+  session:** a rotation-handedness or rotation-safety assumption is not verified by
+  the code agreeing with itself (bijection tests, algebraic identities, "zero
+  warnings" from the solver) — none of those catch a systematically-wrong-but-still-
+  structurally-valid rotation, or a mathematically-correct rotation applied to
+  content that can't survive it. It takes a real render, a real human observer, or a
+  real independently-tested reference implementation to check against — and even
+  after finding one bug this way, don't assume every other "rotation-shaped" function
+  nearby shares its root cause without checking each one on its own terms.
 
 ### Resource Loading
 

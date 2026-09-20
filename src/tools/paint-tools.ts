@@ -413,8 +413,10 @@ export function registerPaintTools(server: McpServer): void {
     "paint_group",
     "Place a multi-tile group (e.g. 'Temple_3x2', 'Lodge_2x2') at a grid position. Validates bounds and edge constraints. " +
       "Optional rotation (0/1/2/3 quarter-turns) rotates the whole group's footprint (swapping width/height at 90/270) " +
-      "and each tile's own orientation — direction confirmed 2026-09-19 against 4 real in-toolset placements " +
-      "(see CLAUDE.md's tileset.ts rotation-fix note).",
+      "and each tile's own orientation — position-remap formula cross-verified 2026-09-19 against ~/git/settileLibrary's " +
+      "independently-tested TileBlockRotate; only reliable for groups whose tiles are individually rotation-safe " +
+      "(see CLAUDE.md's tileset.ts rotation-fix note) — most named building/tower-style groups are NOT, since each " +
+      "tile is a unique baked model that doesn't survive being relocated + spun.",
     {
       area: z.string().describe("Area resref"),
       feature: z.string().describe("Group name (e.g. 'Temple_3x2', 'Lodge_2x2') — use get_tileset_details to see available groups"),
@@ -461,6 +463,20 @@ export function registerPaintTools(server: McpServer): void {
       // which native (pre-rotation) group cell's tileId belongs there.
       const placements: Array<{ gx: number; gy: number; tileId: number }> = [];
       const warnings: string[] = [];
+
+      // Most multi-tile groups are a unique model per tile (a named house/
+      // tower/inn, not a repeatable terrain piece) — rotating relocates each
+      // tile and bumps its own orientation, but the mesh at each slot is
+      // still whatever was baked for its ORIGINAL position, so the assembled
+      // structure can come out visually scrambled even though the tile math
+      // is a correct rotation. Confirmed against ~/git/settileLibrary's
+      // TileBlockRotate docs and a real user report on this exact class of
+      // content (see CLAUDE.md's tileset.ts rotation note). Advisory, not a
+      // hard block — some groups genuinely are rotation-safe and there's no
+      // automated way to tell which from tile data alone.
+      if (rotation !== 0 && group.columns * group.rows > 1) {
+        warnings.push(`Multi-tile groups are usually a unique model per tile and may look wrong/scrambled when rotated (rotation ${rotation} requested here) — prefer a group whose native (rotation 0) facing already matches if this looks broken`);
+      }
 
       for (let ngr = 0; ngr < placedRows; ngr++) {
         for (let ngc = 0; ngc < placedColumns; ngc++) {
