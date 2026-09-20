@@ -559,6 +559,44 @@ You cannot skip terrains in the chain. For example, in `tno01` you must place a 
 
 ## Known Pitfalls
 
+- **`paint_group` only ever writes its OWN footprint — repainting the same origin with
+  a different-shaped group (or one with different `-1` holes) leaves the previous
+  group's tiles behind as orphaned fragments, outside the new group's bounds or
+  underneath its holes.** Confirmed real, twice, in "The Twin Villages Waystop": after
+  several rounds of replacing buildings at the same 10-15 origins (different group,
+  different rotation, different footprint each round — the rotation-bug repair saga
+  above), a user report of buildings "still broken into pieces" traced to genuine
+  leftover tiles from 2-3 rounds earlier, not a new bug. Two concrete shapes this
+  takes: (1) a **hole** — a new group's `-1` slot (e.g. `city_house_2x2`'s tileIds
+  `[283,-1,284,285]`) is explicitly skipped by `paint_group`'s write loop
+  (`if (tileId < 0) continue`), so whatever tile occupied that grid cell from an
+  earlier, differently-shaped placement is never overwritten; (2) a **smaller/
+  differently-rotated footprint** — replacing a 2x3 group with a 2x2 one, or a
+  2-row-tall placement with a 1-row one, leaves every cell in the old footprint that
+  isn't in the new one untouched. **Diagnosis method (reusable for any future report
+  like this):** convert the area's `.are` to JSON directly (`nwn_gff -i area.are -o
+  area.json -k json -p` — the temp dir's `.are`/`.git` files are raw binary GFF, not
+  pre-converted), build a `tileID -> owning group name` map from the tileset's full
+  group catalog, and scan the suspect region for any tile ID that belongs to a
+  building group but isn't the one that's *supposed* to be there. **This has a real
+  blind spot**: a tile ID belonging to a group that's ALSO used correctly elsewhere in
+  the same area won't be flagged as foreign by a simple "is this ID in my expected
+  set" check — confirmed in this same session (a stray `Shack 1 2x2` tile sat in a
+  slot that was supposed to become `Shack 2 1x2`, invisible to the scan because
+  `Shack 1 2x2`'s own tiles are legitimately expected elsewhere in the same area).
+  Closing that gap needs reconstructing each origin's *actual* placement history
+  (every group/rotation/footprint ever placed there, and its real bounding box
+  including any rotation-driven width/height swap) and diffing the union against the
+  final group's own footprint — slower, but the only way to catch same-group,
+  wrong-slot leftovers. **No code fix applied** — this is a workflow/diagnosis pitfall
+  for hand-driven, multi-round `paint_group` repainting of the same origin, not a bug
+  in `paint_group` itself (it correctly does exactly what it's asked; nothing asks it
+  to clear a *different* group's old footprint first, since it has no way to know what
+  was there before). If this recurs, consider a `clear_footprint`-style tool that
+  overwrites a rectangular region to a caller-supplied background tile before
+  painting a group, so hand-driven multi-round repainting doesn't need this manual
+  archaeology every time.
+
 - **FIXED — the equipped-item resref field was read as `EquippedRes` everywhere in
   this codebase; no real equipped item struct carries that field name, so every
   check depending on it was silent dead code.** The real field is `TemplateResRef`
