@@ -1,0 +1,22 @@
+<!-- Source: https://nwnlexicon.com/index.php/GetLocation -->
+
+# GetLocation
+
+# GetLocation(object)
+Gets the location of an object. 
+location GetLocation( object oObject);
+#### Parameters
+_oObject_
+The object to get the location of. 
+#### Description
+Returns the location of the object passed. The object can be any valid object. Note: A location is made up of a vector position (X, Y, Z) area (object) and facing (0-360 degrees). All can be got by the different functions, GetFacingFromLocation(), GetAreaFromLocation(), and GetPositionFromLocation(). 
+#### Remarks
+An invalid object will still return a location, of a sort. As you cannot compare a return value from this to, say, LOCATION_INVALID, you must use either an always valid object, or use GetAreaFromLocation() and compare it to OBJECT_INVALID. There is a problem with GetLocation() and it working on the exiting object (PC) of the On Client Exit event. This is easily worked around, and comes on good authority that it works without problems. See the code sample for how it works, using the On Module Heartbeat event, and the On Client Enter (Or other, see the notes below), and On Client Exit events. 
+#### Known Bugs
+There is now a workaround to the old problem of GetLocation() not working in the OnClientLeave event, noted above and below. 
+#### Version
+1.62 
+#### Example
+// This will cause the first player to cast a fake fireball at the NPCvoid main(){ location lTarget = GetLocation(GetObjectByTag("NPC")); AssignCommand(GetFirstPC(), ActionCastFakeSpellAtLocation(SPELL_FIREBALL, lTarget));}// The fix to the GetLocation() and persistent locations in persistent// worlds has many fixes, this one is quite simple for anyone // needing it and has been provided by Muirwen. This is for more// advanced scripters - you have been warned, in case anything// goes wrong!// The modules On Heartbeat event will capture, and set on each // PC, their current location.// - An alternative use of this way (using SetLocalLocation()) might// be in an area's On Enter event, which can be more selective // (you choose which areas have the script) and means the PC// should be in a safer location.// - In addition, using GetLocation() will not be that persistent// over changes in the module. Using vectors, and area's tags// might be better, and can easily be substituted in a similar way.void main(){ // Loop all the PC's object oPC = GetFirstPC(); while(GetIsObjectValid(oPC)) { // Note: Must be in a valid area, not "in transition" between them if(GetIsObjectValid(GetArea(oPC))) { // Save the PC's location to them SetLocalLocation(oPC, "EXIT_LOCATION", GetLocation(oPC)); } oPC = GetNextPC(); }}// The On Client Enter will get the PC's details (the CD key and so// forth) and make a 32 string value to make sure persistent// locations are stored and got correctly.// Big note: I recommend this being put in the On Used event of a// portal, in a separate out-of-character starting area, else this// can go wrong.void main(){ // Get the entering PC object oPC = GetEnteringObject(); // Get the PC's CD key, and character name string sAccountName = GetPCPlayerName(oPC); string sName = GetName(oPC); // If either is over 24 characters, we chop it. There is a // limit of 32 total characters for the database entry. sAccountName = GetStringLeft(sAccountName, 24); sName = GetStringLeft(sName, 24); // Create the string that the database uses // We add a little ` just so it has something to divide it. string sDB = GetStringLeft(sAccountName + "`" + sName, 32); // Set the PC's database name, and also move them to their stored // location. SetLocalString(oPC, "EXIT_DATABASE_LOCATION_NAME", sDB); location lMoveTo = GetCampaignLocation("LOCATION_STORAGE", sDB); // Note: As lMoveTo may well be invalid, we make sure with an area check if(GetIsObjectValid(GetAreaFromLocation(lMoveTo))) { DelayCommand(5.0, AssignCommand(oPC, JumpToLocation(lMoveTo))); }}// This will be put in the On Client Exit event, and will store, in// a database (under the local string set On Client Enter), the// last location done in the heartbeat script, but no more.void main(){ // Get the PC object oPC = GetExitingObject(); // Make sure to save the last location in the database string sDB = GetLocalString(oPC, "EXIT_DATABASE_LOCATION_NAME"); location lStore = GetLocalLocation(oPC, "EXIT_LOCATION"); // Store it SetCampaignLocation("LOCATION_STORAGE", sDB, lStore);}
+#### See Also
+functions:  |   Location
