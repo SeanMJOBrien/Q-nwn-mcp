@@ -25,7 +25,10 @@ biome_available() {
   npx --no-install biome --version >/dev/null 2>&1
 }
 
-echo "==> Typecheck + build"
+echo "==> Typecheck"
+npm run --silent typecheck
+
+echo "==> Build"
 npm run --silent build
 
 echo "==> Lint"

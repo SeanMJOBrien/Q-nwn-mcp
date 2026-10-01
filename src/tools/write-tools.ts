@@ -95,7 +95,9 @@ export function registerWriteTools(server: McpServer): void {
 
   server.tool(
     "create_item_blueprint",
-    "Create a new item blueprint (.uti) in the module. Optionally clone from a base game or module item and apply overrides.",
+    "Create a new item blueprint (.uti) in the module. Optionally clone from a base game or module item and apply overrides. " +
+      "Gear model parts default to the base item's first model variant (no randomised appearance yet) — " +
+      "identical baseItem blueprints will render identically; use create_gear_randomizer for spawn-time visual variety.",
     {
       resref: z.string().describe("New item resref (filename without extension)"),
       tag: z.string().describe("Item tag"),

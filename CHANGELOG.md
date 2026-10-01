@@ -1,5 +1,39 @@
 # Changelog
 
+## [1.3.1] — 2026-04-04
+
+### Transition Placement
+
+- `adventure_create_transition` is now **bidirectional** — one call wires both areas' transitions instead of two.
+- Transition points use edge-proximity targeting, placed near wall/tree/cliff borders rather than anywhere in a zone.
+- Quadrant spread enforcement: max 1 transition per quadrant, maximizing distance between them.
+- Feature-aware room scoring adds a `nearFeature` field so the LLM can match transitions to nearby points of interest.
+- Door-snapping with a 3m outward offset, exterior doors only.
+- Configurable walkmesh buffer — 2m for transitions vs. the 1m default elsewhere.
+- Fixed L-shaped room internal corridor connectivity.
+- `preferredFeatures` omission now correctly warns about zero features instead of failing silently.
+
+## [1.3.0] — pipeline hardening: loot, buildings, collision, win state
+
+### Building Features
+
+- `groupHasUnsupportedDoors` replaces the previous blanket door rejection — freestanding buildings on uniform floor terrain now pass through.
+- Fixed `adventure_apply_layout` floor terrain resolution (was incorrectly picking wall terrain).
+- Exterior BSP `splitThreshold` raised 10→12 with `marginRange [2,2]` to fit 2×3 features.
+- Obstacle keywords aligned to wall terrain only.
+
+### Loot
+
+- `Dropable=1` now set on creature equipment, creature inventory, and container items.
+- Added an `inventory` param to `create_creature_blueprint` for carried items.
+
+### Other
+
+- `place_creature` now **blocks** on collision instead of warning-only.
+- Win-state handling added as Phase 5b in the `adventure-rewards` skill.
+- POI coverage added as Phase 5b in `adventure-environment` and `adventure-polish`.
+- Z-height sanity-check guidance added to the `adventure-areas` skill.
+
 ## [1.2.0] — 2026-04-03
 
 ### Highlights

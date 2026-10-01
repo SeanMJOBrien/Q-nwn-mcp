@@ -9,6 +9,75 @@ MCP (Model Context Protocol) server for Neverwinter Nights Enhanced Edition modu
 - **MCP server restart required after code changes.** After editing TypeScript source and running `npm run build`, the MCP server must be restarted for new/changed tools to become available. Ask the user to restart before attempting to use newly added tools.
 - **Keep skills in sync with tools.** When adding, renaming, or changing tool parameters/behavior, immediately update the `.claude/skills/` SKILL.md files that reference those tools. The LLM follows skill instructions, not tool schemas — if a skill doesn't mention a parameter, the LLM won't use it.
 
+## Project Health TODOs (survey 2026-10-01)
+
+Ranked by impact, from a structural survey of tests/CI, skills, docs, and git
+history. #8 (typecheck script) is done — `npm run typecheck` / `scripts/verify.sh`.
+The rest are open.
+
+1. **TODO — no CI gate.** `npm test` (vitest, 31 files), `npm run lint`/`check`
+   (biome), and `npm run typecheck` only run when a human remembers to type them
+   or via the local pre-commit hook (`npm run hooks:install`). Note: `scripts/verify.sh`
+   states this is a deliberate choice ("no hosted CI, no network — modules built
+   with this server are one-off and local"), so adding hosted CI (e.g. GitHub
+   Actions) should be a conscious call, not an assumed gap — but even a local-only
+   convention doesn't stop a PR merging without `verify.sh` having been run.
+2. **TODO — rotation/orientation math is the top bug source.** 17 of the last 100
+   commits are fixes to tile rotation, collar orientation, or NPC generation
+   (e.g. "Fix CityGate_2x2 collar: 2 of 4 tiles were 180° off", "Fix
+   invisible-henchman root cause"). Property-based tests on the offset/rotation
+   math would catch this class of bug before it reaches a shipped module.
+3. **TODO — area-building skills are thin vs. adventure skills.** The 12 `area-*`
+   skills average ~115 lines; `adventure-actors`/`adventure-challenges` run
+   900+ lines. An LLM building areas gets far less guidance than one building
+   actors/quests — worth expanding the area skills with the same density of
+   learned rules.
+4. **TODO — most of the raw tool surface has no skill.** Faction, reward, gear,
+   verify-*, bulk-*, undo-* tools (most of the 150+ `mcp__nwn-mcp__*` tools) have
+   no dedicated skill, unlike `module-explorer`. An LLM falls back to scanning all
+   2360+ lines of this file to infer correct tool sequencing.
+5. **TODO — inline-only capability gaps.** e.g. `item-models.ts` ("randomised gear
+   appearance... out of scope for now") and an unresolved creation-order question
+   in `npc-stat-block.ts`. These gaps are discoverable only by reading source —
+   worth surfacing in the relevant skill or tool description so an LLM calling the
+   tool knows the limitation up front.
+6. **TODO — `docs/` has no index.** 13 flat files mixing specs, findings, and
+   survey notes with nothing pointing an LLM at which doc answers which question
+   (unlike the name-addressable `nwscript-docs/`). A short `docs/README.md` table
+   of contents would fix this cheaply.
+7. ~~**IN PROGRESS — integration coverage is thin.**~~ Only 2 integration test
+   files existed (`tools.integration.test.ts`, `npc-tools.integration.test.ts`)
+   against 30+ tool files; dialog, journal, faction, encounter, and blueprint
+   tools — the highest blast-radius mutations — had none. First slice done:
+   `faction-tools.integration.test.ts` pairs `create_faction`/
+   `set_faction_reputation` with `verify_faction`. Dialog, journal, encounter,
+   and blueprint tools still need the same treatment.
+8. ~~**DONE — standalone typecheck script.**~~ `npm run typecheck` (`tsc --noEmit`)
+   added and wired as its own stage in `scripts/verify.sh`, ahead of `build`, so
+   CI (if added per #1) can fail fast on type errors alone.
+9. **TODO — stale parallel branches.** 8+ feature branches on origin
+   (`area-avenue-rotation`, `encounter-difficulty-checker`, `random-caster-abilities`,
+   etc.) with no visible cleanup convention — raises cherry-pick/merge-conflict risk
+   and makes auditing "what's actually in master" harder.
+10. ~~**DONE — `CHANGELOG.md` was stale, not missing.**~~ Correction to the
+    original finding: the file exists (added in the v1.2.0 release commit) but
+    stopped at `[1.2.0]` while `package.json` had moved to `1.3.1`. Backfilled
+    `[1.3.0]` and `[1.3.1]` entries from the release commit bodies
+    (`c834d68`, `f83be47`). Keep extending it on future version bumps.
+11. **TODO (user-raised, 2026-10-01) — skill for doors and area transitions.**
+    Transition triggers are squares drawn on the tileset floor that move a
+    creature to the next area named on the trigger. No skill currently explains
+    this mechanic (door-based vs. trigger-based transitions, how the destination
+    area/waypoint is specified, `create_area_transition`/`link_doors`/
+    `place_trigger` tool sequencing) — worth its own skill, possibly alongside
+    or folded into `nwn-area-builder`.
+12. **TODO (user-raised, 2026-10-01) — examine how tileset rules work for the
+    MCP.** Understand and document `analyze_tileset_rules`/`get_tileset_details`
+    and how tileset edge/corner-matching rules constrain `paint_tiles`/
+    `paint_group`/`adventure_generate_layout` — this underlies the rotation bugs
+    in #2 above and is likely the right place to fix that class of bug at the
+    root rather than patching individual rotation cases.
+
 ## Design Intent
 
 This MCP serves two purposes:
