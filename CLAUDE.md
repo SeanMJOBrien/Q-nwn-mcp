@@ -35,7 +35,13 @@ The rest are open.
 4. **TODO — most of the raw tool surface has no skill.** Faction, reward, gear,
    verify-*, bulk-*, undo-* tools (most of the 150+ `mcp__nwn-mcp__*` tools) have
    no dedicated skill, unlike `module-explorer`. An LLM falls back to scanning all
-   2360+ lines of this file to infer correct tool sequencing.
+   2360+ lines of this file to infer correct tool sequencing. Exact audit: 34/142
+   registered tools have zero skill mentions — database tools (`query_database`
+   et al.), item-property editing, dialog introspection (`get_dialog_tree`,
+   `trace_dialog_path`), and TLK/web-editor/resman utilities. First slice done:
+   `.claude/skills/nwn-item-properties/SKILL.md` (decoded against real items
+   in `/var/www/storage/qlippoth/the-frozen-north`, user-referenced 2026-10-01).
+   Database and dialog-introspection tools still need the same treatment.
 5. **TODO — inline-only capability gaps.** e.g. `item-models.ts` ("randomised gear
    appearance... out of scope for now") and an unresolved creation-order question
    in `npc-stat-block.ts`. These gaps are discoverable only by reading source —
