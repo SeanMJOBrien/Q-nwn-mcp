@@ -1,8 +1,9 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireIndex } from "../module-loader.js";
+import { requireIndex, indexAreaCreatures } from "../module-loader.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
+import type { CreatureRecord } from "../types/module.js";
 
 export function registerEncounterTools(server: McpServer): void {
 
@@ -290,7 +291,16 @@ export function registerEncounterTools(server: McpServer): void {
     { readOnlyHint: true, idempotentHint: true },
     async ({ factionId }) => {
       const index = requireIndex();
-      const matching = index.creatures
+      // Read live from GIT data rather than the index.creatures snapshot — same
+      // staleness bug list_creatures was fixed for (see its comment): that array
+      // is built once at load_module time and never refreshed, so a creature
+      // placed/moved mid-session was invisible here.
+      const creatures: CreatureRecord[] = [];
+      for (const [areaResref] of index.areas) {
+        const gitDoc = index.parsedGff.get(`${areaResref}.git`);
+        if (gitDoc) indexAreaCreatures(areaResref, gitDoc, creatures);
+      }
+      const matching = creatures
         .filter(c => c.faction === factionId)
         .map(c => ({
           tag: c.tag,

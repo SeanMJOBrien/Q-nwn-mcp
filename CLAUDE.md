@@ -34,24 +34,27 @@ The rest are open.
    learned rules.
 4. **TODO — most of the raw tool surface has no skill.** Faction, reward, gear,
    verify-*, bulk-*, undo-* tools (most of the 150+ `mcp__nwn-mcp__*` tools) have
-   no dedicated skill, unlike `module-explorer`. An LLM falls back to scanning all
-   2360+ lines of this file to infer correct tool sequencing. Exact audit started
-   at 34/142 registered tools with zero skill mentions, now **27/142** after two
-   slices: `.claude/skills/nwn-item-properties/SKILL.md` (decoded against real
-   items in `/var/www/storage/qlippoth/the-frozen-north`, user-referenced
-   2026-10-01) and `.claude/skills/nwn-database-tools/SKILL.md` (campaign/PW
-   SQLite state — `query_database`/`read_database_object`/
-   `write_database_object`/`list_databases`). Still uncovered: dialog
-   introspection (`get_dialog_tree`, `trace_dialog_path`), TLK/web-editor/resman
-   utilities (`tlkify_module`, `start_web_editor`/`stop_web_editor`,
-   `search_tlk`/`list_tlk_entries`, `resman_stats`), `analyze_tileset_rules`
-   (see #12), a handful of read-only area/creature getters
-   (`get_area_encounters`/`get_area_items`/`get_area_sounds`/
-   `get_area_waypoints`/`get_creature_details`/`list_creatures`/`list_items`/
-   `list_stores`/`get_faction_creatures`), and a few standalone tools
-   (`delete_area`, `rename_tag`, `export_resource`, `generate_area_map`,
+   no dedicated skill, unlike `module-explorer`. Exact audit started at 34/142
+   registered tools with zero skill mentions, now **14/142** after four slices:
+   `.claude/skills/nwn-item-properties/SKILL.md` (decoded against real items in
+   `/var/www/storage/qlippoth/the-frozen-north`, user-referenced 2026-10-01),
+   `.claude/skills/nwn-database-tools/SKILL.md` (campaign/PW SQLite state),
+   `.claude/skills/nwn-dialog-introspection/SKILL.md` (`get_dialog_tree`/
+   `flatten_dialog`/`trace_dialog_path`/`find_dialog_scripts` — decoded against
+   a real Frozen North quest NPC's conditional `StartingList`, which exposed a
+   real `trace_dialog_path` limitation: it always starts from `StartingList[0]`
+   regardless of that entry's condition), and
+   `.claude/skills/nwn-readonly-getters/SKILL.md` (creature/item/store/area
+   getters + `verify_module_info`). While building the getters skill, found and
+   fixed a live bug: `get_faction_creatures` still read the stale
+   `index.creatures` snapshot — the exact bug `list_creatures` was fixed for —
+   now reads live GIT data the same way.
+   Still uncovered: TLK/web-editor/resman utilities (`tlkify_module`,
+   `start_web_editor`/`stop_web_editor`, `search_tlk`/`list_tlk_entries`,
+   `resman_stats`), `analyze_tileset_rules` (see #12), and a few standalone
+   tools (`rename_tag`, `export_resource`, `generate_area_map`,
    `create_encounter_blueprint`, `place_sound`, `search_by_field`,
-   `verify_faction`, `verify_module_info`).
+   `verify_faction`).
 5. **TODO — inline-only capability gaps.** e.g. `item-models.ts` ("randomised gear
    appearance... out of scope for now") and an unresolved creation-order question
    in `npc-stat-block.ts`. These gaps are discoverable only by reading source —
