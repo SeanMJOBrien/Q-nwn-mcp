@@ -35,13 +35,23 @@ The rest are open.
 4. **TODO — most of the raw tool surface has no skill.** Faction, reward, gear,
    verify-*, bulk-*, undo-* tools (most of the 150+ `mcp__nwn-mcp__*` tools) have
    no dedicated skill, unlike `module-explorer`. An LLM falls back to scanning all
-   2360+ lines of this file to infer correct tool sequencing. Exact audit: 34/142
-   registered tools have zero skill mentions — database tools (`query_database`
-   et al.), item-property editing, dialog introspection (`get_dialog_tree`,
-   `trace_dialog_path`), and TLK/web-editor/resman utilities. First slice done:
-   `.claude/skills/nwn-item-properties/SKILL.md` (decoded against real items
-   in `/var/www/storage/qlippoth/the-frozen-north`, user-referenced 2026-10-01).
-   Database and dialog-introspection tools still need the same treatment.
+   2360+ lines of this file to infer correct tool sequencing. Exact audit started
+   at 34/142 registered tools with zero skill mentions, now **27/142** after two
+   slices: `.claude/skills/nwn-item-properties/SKILL.md` (decoded against real
+   items in `/var/www/storage/qlippoth/the-frozen-north`, user-referenced
+   2026-10-01) and `.claude/skills/nwn-database-tools/SKILL.md` (campaign/PW
+   SQLite state — `query_database`/`read_database_object`/
+   `write_database_object`/`list_databases`). Still uncovered: dialog
+   introspection (`get_dialog_tree`, `trace_dialog_path`), TLK/web-editor/resman
+   utilities (`tlkify_module`, `start_web_editor`/`stop_web_editor`,
+   `search_tlk`/`list_tlk_entries`, `resman_stats`), `analyze_tileset_rules`
+   (see #12), a handful of read-only area/creature getters
+   (`get_area_encounters`/`get_area_items`/`get_area_sounds`/
+   `get_area_waypoints`/`get_creature_details`/`list_creatures`/`list_items`/
+   `list_stores`/`get_faction_creatures`), and a few standalone tools
+   (`delete_area`, `rename_tag`, `export_resource`, `generate_area_map`,
+   `create_encounter_blueprint`, `place_sound`, `search_by_field`,
+   `verify_faction`, `verify_module_info`).
 5. **TODO — inline-only capability gaps.** e.g. `item-models.ts` ("randomised gear
    appearance... out of scope for now") and an unresolved creation-order question
    in `npc-stat-block.ts`. These gaps are discoverable only by reading source —
