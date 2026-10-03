@@ -115,22 +115,25 @@ The rest are open.
     steps, and which tool answers which tileset question (`get_tileset_details`, `analyze_tileset_rules`). The conventions are
     enforced by the live oracle. Still open: extend `paint_tiles`/`paint_group`/the solver beyond flat tiles (height-transition tiles
     — the corner-height agreement rule and `Transition` are known) and fix any remaining rotation cases at the root.
-13. **TODO (2026-10-03) — two local branches hold real, unmerged, unpushed work.**
-    `master` itself is clean and in sync with `origin/master` — this is not an
-    uncommitted-changes problem, it's two feature branches that exist only on this
-    machine with commits nowhere else:
-    - `area-avenue-rotation` (9 commits, no upstream) — rotation support for
-      stamped tile groups (`paint_group`/`apply_layout`), a reserved road/avenue
-      between stamped feature groups, a rotation-handedness fix, and a writeup of
-      the orphaned-tile-from-repeated-repainting pitfall.
-    - `live-verify-automation` (3 commits, no upstream) — automates the live
-      verify-server loop into `run_live_verification`, a `systest-module` skill +
-      `create_systest_instrumentation` for combat/log verification, a "simple NPC"
-      tier, and a signal-gated weather-variance checker.
-    Neither has a remote copy — losing this machine's working copy loses both in
-    full. Distinct from #9 (those branches are already merged into `master`, just
-    not deleted). Decide per branch: merge, push for safekeeping, or confirm
-    abandoned and delete.
+13. ~~**DONE — two local branches held real, unmerged work; resolved 2026-10-03.**~~
+    `live-verify-automation` (3 commits: `run_live_verification`'s fully-automated
+    verify-server loop, the `systest-module` skill + `create_systest_instrumentation`,
+    a "simple NPC" complexity tier, and a signal-gated weather-variance checker) had
+    no remote copy at all and was merged into `master` — see the merge commit for
+    the two conflicts it took (`src/index.ts`, `src/util/git-helpers.ts`, both just
+    "two branches added something in the same spot," kept both sides).
+    `area-avenue-rotation` (9 commits: avenue/rotation support for stamped tile
+    groups, two live bug-report cycles after shipping — see its own commit history
+    for the handedness-bug/revert sequence) was **not** merged — it went through
+    enough live rework after shipping that merging it deserves its own review, not
+    a bundled decision. **Correction to the original finding**: this branch turned
+    out to already have a remote copy (`origin/area-avenue-rotation` matched it
+    exactly) — the earlier "no upstream" read was from the local branch's tracking
+    config, not from whether a same-named remote branch existed; always check
+    `git log <branch>..origin/<branch>` directly, not just `@{upstream}`, before
+    reporting a branch as unpushed. Local tracking has since been set up
+    (`git push -u origin area-avenue-rotation`) so it won't recur. Left as its own
+    pushed branch, explicitly undecided: develop it further or delete it later.
 
 ## Design Intent
 
