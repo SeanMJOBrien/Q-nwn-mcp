@@ -32,6 +32,7 @@ import type { TileRenderData } from "../util/area-data.js";
 import { generateHtmlReportSingleArea, generateHtmlReportAllAreas } from "../util/area-html.js";
 import type { AreaMapData, DoorLink, CreatureInfo } from "../util/area-html.js";
 import { getFieldStr as gffGetStr, getFieldNum as gffGetNum, getFieldLocStr as gffGetLocStr, getFieldList as gffGetList } from "../types/gff.js";
+import { getVarTableString } from "../util/git-helpers.js";
 import type { GffObj } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 
@@ -519,7 +520,9 @@ export function buildAreaTransitions(index: ModuleIndex, areaResref: string, tag
     if (!linkedTo) continue;
     const toArea = tagToArea.get(linkedTo);
     if (!toArea || toArea === areaResref) continue;
-    transitions.push({ x: gffGetNum(plc, "X"), y: gffGetNum(plc, "Y"), targetArea: toArea });
+    const travelTimeRaw = getVarTableString(plc, "MCP_TRAVEL_TIME");
+    const travelTime = travelTimeRaw === "short" || travelTimeRaw === "long" ? travelTimeRaw : undefined;
+    transitions.push({ x: gffGetNum(plc, "X"), y: gffGetNum(plc, "Y"), targetArea: toArea, ...(travelTime ? { travelTime } : {}) });
   }
 
   return transitions;

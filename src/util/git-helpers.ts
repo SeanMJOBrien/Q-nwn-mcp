@@ -431,3 +431,23 @@ export function clearVarTable(obj: GffObj): number {
   table.value = [];
   return count;
 }
+
+/**
+ * Read a string VarTable entry by name (case-insensitive, matching
+ * mergeVarTable's own matching convention). Returns undefined if the object
+ * has no VarTable, the name isn't present, or the entry isn't a string type —
+ * never guesses a value for a caller that should treat "not set" as "unknown."
+ */
+export function getVarTableString(obj: GffObj, name: string): string | undefined {
+  const table = obj.VarTable as { value?: GffObj[] } | undefined;
+  if (!Array.isArray(table?.value)) return undefined;
+
+  const entry = table.value.find((v) => {
+    const nameField = v.Name as { value?: unknown } | undefined;
+    return typeof nameField?.value === "string" && nameField.value.toLowerCase() === name.toLowerCase();
+  });
+  if (!entry) return undefined;
+
+  const valueField = entry.Value as { value?: unknown } | undefined;
+  return typeof valueField?.value === "string" ? valueField.value : undefined;
+}

@@ -249,6 +249,51 @@ describe("buildNpcStatBlock", () => {
     expect(result.feats.some((f) => f.source === "bonus_slot")).toBe(false);
   });
 
+  it("complexity: 'simple' skips class bonus-feat slots entirely, keeping racial/automatic/generic feats", () => {
+    const index = makeIndex();
+    const full = buildNpcStatBlock(index, { race: 6, classId: 4, level: 5, powerLevel: "elite", seed: "fighter_test_seed" });
+    const simple = buildNpcStatBlock(index, {
+      race: 6,
+      classId: 4,
+      level: 5,
+      powerLevel: "elite",
+      seed: "fighter_test_seed",
+      complexity: "simple",
+    });
+
+    // Full has real bonus_slot picks (levels 1,2,4 = 3 slots); simple has none.
+    expect(full.feats.some((f) => f.source === "bonus_slot")).toBe(true);
+    expect(simple.feats.some((f) => f.source === "bonus_slot")).toBe(false);
+
+    // Every non-bonus feat full picked is still present in simple, unchanged.
+    const fullNonBonus = full.feats.filter((f) => f.source !== "bonus_slot").map((f) => f.feat);
+    const simpleFeats = simple.feats.map((f) => f.feat);
+    for (const f of fullNonBonus) expect(simpleFeats).toContain(f);
+    expect(simple.feats.length).toBe(fullNonBonus.length);
+
+    // Everything else (ability scores, HP, skills) is untouched by complexity.
+    expect(simple.abilityScores).toEqual(full.abilityScores);
+    expect(simple.hp).toBe(full.hp);
+    expect(simple.skillRanks).toEqual(full.skillRanks);
+
+    // No spurious "unfilled bonus" warning — the slots were never attempted, not exhausted.
+    expect(simple.warnings.some((w) => w.includes("bonus feat slot"))).toBe(false);
+  });
+
+  it("complexity omitted defaults to 'full' (regression guard — identical to explicit 'full')", () => {
+    const index = makeIndex();
+    const omitted = buildNpcStatBlock(index, { race: 6, classId: 4, level: 5, powerLevel: "elite", seed: "fighter_test_seed" });
+    const explicitFull = buildNpcStatBlock(index, {
+      race: 6,
+      classId: 4,
+      level: 5,
+      powerLevel: "elite",
+      seed: "fighter_test_seed",
+      complexity: "full",
+    });
+    expect(omitted).toEqual(explicitFull);
+  });
+
   it("reports unfilled generic/bonus slots rather than guessing once the candidate queue is empty", () => {
     const index = makeIndex();
     // Monk has no curated weapon preference (queue starts with just the 3 filler feats),

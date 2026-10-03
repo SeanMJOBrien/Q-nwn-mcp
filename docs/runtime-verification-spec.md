@@ -27,7 +27,12 @@ all 7 standard PC races and all 11 base classes.
 and calls `SPEC_VerifyCreature()` from `a_hen_join`.
 
 **§1 is implemented and has run a real end-to-end test successfully.** §4 and §6 remain
-unaddressed; §5's orchestration loop is proven by hand but not yet automated into a tool.
+unaddressed; **§5's orchestration loop is now implemented** as the `run_live_verification`
+MCP tool (2026-09-19, `src/tools/verify-server-tools.ts` — see CLAUDE.md's "Live
+verification automation" entry for the design and four real bugs found building it:
+a `${PWD}` env-var interpolation gap, the log files truncating on every container
+restart rather than appending forever, the MCP SDK's 60s client-side default request
+timeout, and `EXOWARNING` being too broad a default error pattern).
 
 **First real end-to-end run, against the actual module that started this whole effort**
 ("Henchman Gear Showcase" — the "henchmen have bad stats and no appearance" bug report).

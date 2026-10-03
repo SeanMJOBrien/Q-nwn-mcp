@@ -32,6 +32,8 @@ import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
 import { registerNpcTools } from "./tools/npc-tools.js";
 import { registerRandomAbilitiesTools } from "./tools/random-abilities-tools.js";
 import { registerVariableTools } from "./tools/variable-tools.js";
+import { registerVerifyServerTools } from "./tools/verify-server-tools.js";
+import { registerSystestTools } from "./tools/systest-tools.js";
 
 const server = new McpServer({
   name: "nwn-mcp",
@@ -52,6 +54,7 @@ registerResmanTools(server);
 registerTilesetTools(server);
 registerDatabaseTools(server);
 registerVerifyTools(server);
+registerVerifyServerTools(server);
 
 // ── Base tools: module writing, editing, placement ──────────────────────
 registerWriteTools(server);
@@ -71,6 +74,7 @@ registerGearTools(server);
 registerSpecCheckTools(server);
 registerNpcTools(server);
 registerRandomAbilitiesTools(server);
+registerSystestTools(server);
 
 // ── Adventure creator tools ─────────────────────────────────────────────
 registerAdventureTools(server);

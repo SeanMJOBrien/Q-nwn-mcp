@@ -96,6 +96,13 @@ export interface AreaTransitionInfo {
   x: number;
   y: number;
   targetArea: string;  // destination area resref
+  /**
+   * MCP_TRAVEL_TIME VarTable hint set by adventure_create_transition's
+   * optional travelTime param, when present — undefined for a plain door/
+   * trigger or a transition built without it. See
+   * weather_variance_implausible in analysis-tools.ts, the one consumer.
+   */
+  travelTime?: "short" | "long";
 }
 
 // ─── Surface Material Data ──────────────────────────────────────────────────

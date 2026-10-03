@@ -174,6 +174,7 @@ npm run start        # Run compiled output
 | `NWN_FOLDER_DATA` | *(empty)* | NWN game install dir — enables base game 2DA/TLK loading via resman |
 | `NWN_FOLDER_USER` | *(empty)* | NWN user documents dir — enables custom TLK, HAK, override/, development/ loading |
 | `MCP_FOLDER_TEMP` | `%TEMP%/nwn-mcp` | Temp directory for extracted modules |
+| `MCP_FOLDER_VERIFYSERVER` | `~/nwn-mcp-verify-server` | Checkout of the throwaway headless-engine verify server, used by `run_live_verification` |
 
 ## NWScript Function Reference
 
@@ -1264,15 +1265,144 @@ loaded `feat.2da`'s real row set (`index.twodaTables.get("feat").rows.has(...)`,
 membership rather than a computed bounds check, so gaps in the table are
 handled correctly too) — degrades to skip when `feat.2da` isn't loaded
 (no `NWN_FOLDER_DATA`), never guesses. 3 new unit tests.
-**Process note for next time this server is used**: the orchestration is
-still fully manual, per the "what's still missing" note below — copy the
-`.mod` into `server/modules/`, set `NWN_MODULE` in
-`config/nwserver.env`, `docker-compose down && docker-compose up -d` from
-inside the repo (so `${PWD}` resolves), then `grep -iE "invalid feat|error|
-exception" logs/nwengineLog.txt` and `docker logs <container> | grep
-SPEC_`. Tear the container down again after (`docker-compose down`) —
-this server is throwaway and never player-facing, per its own `nwserver.env`
-header comment.
+**Process note (historical — now automated, see below):** the recipe used to
+find this bug was fully manual — copy the `.mod` into `server/modules/`, set
+`NWN_MODULE` in `config/nwserver.env`, `docker-compose down && docker-compose
+up -d` from inside the repo (so `${PWD}` resolves), grep the logs, tear the
+container down again. **This whole loop is now a real MCP tool,
+`run_live_verification`** (2026-09-19, `src/tools/verify-server-tools.ts`) —
+see the "Live verification automation" entry below for the design and two
+real bugs found building it. The manual recipe stays documented here as
+fallback/reference, not as the recommended path anymore.
+
+**Live verification automation — `run_live_verification`
+(2026-09-19, `src/tools/verify-server-tools.ts`).** Automates the manual
+recipe above end-to-end: repacks the currently-loaded module (or an explicit
+`modulePath`), copies it into `MCP_FOLDER_VERIFYSERVER`'s `server/modules/`,
+patches `NWN_MODULE=` in `config/nwserver.env`, `docker-compose down && up
+-d`, polls the logs until either `expectedCheckLines` bracket-tagged lines
+appear or log growth stalls for a few seconds after the module starts
+loading, then **always** tears the container down (`try/finally` — a thrown
+error or timeout never leaves it running). Returns a structured result:
+`loaded`, `timedOut`, `engineErrors` (line + matched pattern),
+`specResults.{ok,fail}` (parsed `[SPEC_OK]`/`[SPEC_FAIL]` lines),
+`otherTaggedLines` (any other `[TAG_*]` line — this is how a future
+instrumentation include's own tags, e.g. a `systest` module's
+`[SYSTEST_DAMAGE]`, surface with zero extra parsing needed), and a bounded
+`rawLogExcerpt`. Log parsing is pure/unit-tested
+(`src/util/verify-server/result.ts`); the Docker orchestration itself is only
+testable live (`src/tools/verify-server-tools.live.test.ts`,
+`describe.skipIf` gated on the verify-server checkout existing).
+
+**Four real, confirmed bugs found getting this working — none visible from
+reading the manual recipe, all found by actually running it live:**
+1. **`${PWD}` in `docker-compose.yml` reads the literal `PWD` environment
+   variable, not `execFile`'s `cwd` option.** Node's `child_process.execFile`
+   changes the child's real working directory without touching the inherited
+   `PWD` env var, so docker-compose resolved `${PWD}` to whatever directory
+   the calling process happened to inherit — sending it looking for
+   `config/nwserver.env` inside the Q-nwn-mcp repo instead of the
+   verify-server checkout. **Fix:** explicitly pass `env: { ...process.env,
+   PWD: cwd }` on every docker-compose invocation.
+2. **The log files truncate on every container restart — they do NOT append
+   forever across runs**, contradicting an earlier exploration's untested
+   assumption (recorded in an earlier draft of this same feature). Confirmed
+   directly: a fresh `docker-compose down && up -d` produces a log containing
+   only that session's lines, nothing from before. An offset recorded before
+   `down`+`up` (to avoid misreading a stale prior run) was therefore *larger*
+   than the new, truncated file, making every "read new bytes since offset"
+   come back empty on every real run — the tool silently reported
+   `loaded: false` despite the module loading correctly. **Fix:** read each
+   log file's full current content on every poll tick instead of diffing
+   against a pre-recorded offset; safe and cheap since these are small,
+   single-session log files and `down` always precedes `up` in this tool's
+   own flow.
+3. **The MCP SDK's client-side default request timeout is 60s**
+   (`DEFAULT_REQUEST_TIMEOUT_MSEC`) — a `timeoutSeconds: 90` budget (the
+   original design) genuinely exceeded it: the server kept running to
+   completion and tore the container down correctly, but the calling client
+   gave up and reported the request as failed, with no way for the caller to
+   know the server-side work actually succeeded. **Fix:** lowered the tool's
+   own default to 45s (real headroom under 60s including down/up overhead),
+   documented in the tool description that raising `timeoutSeconds` past
+   ~50 only helps if the caller has also raised its own client-side request
+   timeout.
+4. **`EXOWARNING` is too broad as a default error-grep pattern** — even a
+   totally minimal, freshly-created module emits one at startup (`"Filename
+   passed contains an undefined alias"`), unrelated to any real defect.
+   Dropped from `DEFAULT_ERROR_PATTERNS` (`invalid feat`/`error`/`exception`
+   remain); still available as an explicit opt-in via the `errorPatterns`
+   param for a caller who wants that strictness.
+
+Also surfaced, not a tool bug but worth recording: `create_module`'s
+generated `_start` stub area (see the "dead `_start` area" pitfall below) has
+**no walkable interior tiles reachable via the standard 1-tile margin at all**
+— `adventure_find_walkable` returns nothing for it, and even its own reported
+`entryPosition` is `Nonwalk`. A live test needing a real placed, spawned
+creature needs a real generated area (`create_area` +
+`adventure_generate_layout` + `adventure_apply_layout`, same recipe
+`comprehensive-module.live.test.ts` already uses), not the `_start` stub.
+
+End-to-end confirmed working against the real bug this whole effort started
+from: a creature built with `feats: [1848]` (the exact historical
+`hos_cbenf` shape), placed and spawned in a real generated area, run through
+`run_live_verification` — `engineErrors` correctly contains the "invalid
+feat" line, `loaded: true`, `timedOut: false`, and the container is
+confirmed torn down afterward (`docker-compose ps -q` returns nothing).
+
+**`systest-module` skill + `create_systest_instrumentation` tool
+(2026-09-19) — a small, disposable module purpose-built to exercise
+nwn-mcp's own systems and prove `run_live_verification` catches real
+problems.** `create_systest_instrumentation` (`src/tools/systest-tools.ts`,
+`src/util/systest-log-script.ts`) generates `inc_systest_log`, the same
+generator/probe-compile shape as `create_spec_verification`/
+`create_random_abilities_system`: `SYSTEST_LogDamage(oCreature)`/
+`SYSTEST_LogDeath(oCreature)`, chained onto `ScriptDamaged`/`ScriptDeath`,
+log `[SYSTEST_DAMAGE] target=<tag> attacker=<tag> amount=<n>`/
+`[SYSTEST_DEATH] tag=<tag> killer=<tag>` via the engine's own OnDamaged/
+OnDeath event context (`GetLastDamager`/`GetTotalDamageDealt`/
+`GetLastHostileActor`) — deliberately taking just `oCreature`, since
+`ExecuteScript()` doesn't forward custom arguments to a chained wrapper.
+Real-compiled and confirmed live (`src/tools/systest-tools.live.test.ts`).
+`run_live_verification`'s `otherTaggedLines` field is what surfaces these
+with zero extra parsing needed — this is the concrete connective tissue
+between the two features.
+
+The `.claude/skills/systest-module/SKILL.md` skill composes existing
+primitive tools (never a new monolithic build-everything tool — matches
+`adventure-actors`' own established pattern of composing primitives rather
+than baking a fixed build into TypeScript) into a 10-NPC roster across two
+minimal `tdm01` areas: one passing regression fixture per bug class fixed
+this session (`weapon_focus_mismatch`, `ranged_feat_no_reload_support`,
+`armor_proficiency_mismatch`, `ammo_stack_size_unreasonable` ×2,
+`invalid_feat_id`, `store_item_miscategorized`), an opposed-faction melee
+pair wired to the new logging instrumentation, and one Tier-1
+(`SetMemorizedSpell`) + one Tier-2 (virtual-ability) caster fixture for
+`create_random_abilities_system`. The caster fixtures need a real
+`LevelUpHenchman()` leveling loop in their own `ScriptSpawn` wrapper before
+calling `RA_OnSpawn` — reusing `SPEC_SelfTestOnSpawn`'s exact,
+BioWare-precedented pattern — since a from-scratch `ClassList` only ever
+yields cantrip-level spell slots until a real leveling call has actually
+run (the documented Tier-1 timing finding under "Random caster abilities"
+below). Never committed to this repo and never sent to the user as a
+deliverable — purely a disposable diagnostic aid, rebuilt fresh by the
+skill whenever needed rather than hand-patched.
+
+NPC-to-NPC dialog (`ActionStartConversation`) is deliberately NOT in this
+roster — flagged as a stretch item pending a first real
+`run_live_verification` pass proving the mechanism actually works (see the
+design discussion this feature's plan recorded: dialogs normally assume a
+PC speaker via `GetPCSpeaker()`, which resolves to `OBJECT_INVALID` with no
+PC involved — untested territory, deliberately not built blind).
+
+**Known gap, honestly recorded rather than glossed over**: the skill has
+been written and its generator tool's probe-compile confirmed live, but the
+skill itself has not yet been run end-to-end to build a real roster and
+run it through `run_live_verification` — that's the natural next real-world
+test of this whole feature, and the strongest form of verification
+available (per this project's own "the only thing that actually caught
+this was a human/engine actually running it" lesson, repeated throughout
+this document). Invoke `/systest-module` to do that.
 
 **A live isolated verification server exists and has run a real end-to-end check
 successfully** (`~/nwn-mcp-verify-server` — a fork of
@@ -1300,12 +1430,15 @@ that needs the same.
   committed that simplification. Worth committing next time this server is used for
   real debugging, so the working, minimal configuration is the actual committed
   state rather than a perpetual uncommitted diff against the original template.
-- **What's still missing is automation**: copying a generated module into the
-  server's `modules/` folder, launching, polling for load completion, grepping,
-  tearing down, and feeding failures back into nwn-mcp's repair tools is all still
-  done by hand — the orchestration loop is designed (`docs/runtime-verification-spec.md`
-  §5) and proven manually (repeatedly, across two separate verification efforts now),
-  but not built into a tool.
+- **BUILT (2026-09-19) — the orchestration loop is now a real tool,
+  `run_live_verification`.** Copying a generated module into the server's
+  `modules/` folder, launching, polling for load completion, grepping, and
+  tearing down is no longer done by hand — see "Live verification automation"
+  below for the full design and the real bugs found getting it working.
+  Feeding failures back into nwn-mcp's repair tools is still a human/LLM step
+  (cross-reference a failing tag via `get_creature_details`/`resolve_blueprint`,
+  fix via the normal typed tools, rerun) — that part was never meant to be
+  automated away, only the mechanical launch/poll/grep/teardown cycle around it.
 - `randspellbooks` (`~/tfndev/src/nss/inc_rand_spell.nss`) also still depends on
   NWNX and a persistent campaign database — out of scope for `inc_spec_check.nss`,
   which deliberately uses zero `NWNX_*` functions. See
@@ -1356,20 +1489,28 @@ session) or simply trusted from a sub-skill's self-report:**
 - **Weather/area-property variance.** "Give each area different weather" is neither
   computed nor diffed — a sub-skill could set every area to the same values and
   nothing would catch it.
-  **TODO (user-raised, 2026-09-09): weather variance is story-dependent, not just a
-  "make adjacent areas differ" rule.** A flat "flag identical weather on adjacent
-  areas" check (see item 4 below) would false-positive on two areas that are
-  genuinely meant to share weather (a short walk between them, same climate) and
-  miss cases where weather *should* differ for reasons a plain adjacency diff can't
-  see. Before building this check for real, the design needs to account for: does
-  the transition between these two areas represent many hours of travel (weather
-  should plausibly have changed) or a near-instant arrival (should usually match)?
-  Does the transition move the party to a meaningfully different location/climate
-  (mountain pass vs. coastal town) that would affect weather regardless of travel
-  time? A real implementation likely needs a per-transition "travel time" and/or
-  "climate change" signal — from `adventure_create_transition`'s own data, or a
-  new field the area-design phase sets — rather than only comparing the two areas'
-  `ChanceRain`/`ChanceSnow`/etc. fields directly.
+  **BUILT (2026-09-19) — resolved exactly along the lines this TODO called for: a
+  real per-transition signal, not a raw adjacency diff.** A flat "flag identical
+  weather on adjacent areas" check (see item 4 below) was rejected here as too
+  naive — it would false-positive on two areas genuinely meant to share weather (a
+  short walk, same climate) and miss cases where weather *should* differ. Fix:
+  `adventure_create_transition` (the one mechanism `/create-adventure` actually
+  uses for inter-area transitions) gained an optional `travelTime?: "short" |
+  "long"` param, stored as an `MCP_TRAVEL_TIME` `VarTable` local on the transition's
+  own light placeable (via `mergeVarTable()`, already used identically by
+  `create_creature_blueprint`'s `varTable` param — no new storage mechanism) —
+  `getVarTableString()` (`src/util/git-helpers.ts`) is the new read-side
+  counterpart. `buildAreaTransitions()` (`src/tools/tileset-tools.ts`) surfaces it
+  on `AreaTransitionInfo.travelTime`. A new `validate_module` check,
+  `weather_variance_implausible` (`src/tools/analysis-tools.ts`, mirroring
+  `cross_area_appearance_mismatch`'s existing cross-area pattern), warns only when
+  a transition is explicitly marked `"short"` AND `ChanceRain`/`ChanceSnow`/
+  `ChanceLightning` differ by more than 30 percentage points between the two
+  areas. `"long"` and — critically — **unset** transitions (every one built before
+  this feature, and the common case) are never flagged: this project's "skip
+  rather than guess" convention, applied directly to close the exact gap this TODO
+  raised, since the check only ever fires where a human explicitly said "this is a
+  quick crossing."
 - **This project's own MCP tool correctness.** The `get_area_creatures`/
   `list_creatures` stale-cache bug (see the pitfall above, found and fixed this same
   session) was caught by manual cross-checking against `get_creature_details`, not
@@ -1469,8 +1610,8 @@ instance (`area`+`tag` passed to `verify_door`), not a standalone blueprint, sin
 with `Plot` unset" as originally scoped — that formulation conflated normal
 door-breakability (true of nearly every door by default) with the actual concern
 (does this obstacle lead anywhere), so the check was redesigned around the latter.
-(4) **NOT BUILT — design open**, see the weather TODO immediately above this list;
-a flat adjacent-area diff was rejected as too naive before writing any code.
+(4) **BUILT (2026-09-19)** — see the weather TODO above: `weather_variance_implausible`,
+gated on an explicit `travelTime` signal rather than a flat adjacent-area diff.
 (5) the big one — generalizing the `SPEC_*` runtime-verification pattern beyond
 companion stats to arbitrary custom quest/encounter scripts, so a bespoke mechanic
 like a scripted web ambush gets an actual headless-server pass/fail instead of
@@ -1909,20 +2050,30 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   "same named NPC renders differently in two areas" bug class. All five checks and the
   slot-write validation have unit/integration test coverage; `npm run verify` passes.
 
-**TODO — not every NPC should get full PC-class bonus-feat progression.** Everything above
+**BUILT (2026-09-19) — a "simple NPC" tier, option (a) below.** Everything above
 (`LevelUpHenchman`, `startingPackage`, `SPEC_VerifyCreature`) assumes an NPC is meant to
 progress exactly like a PC of that class — right for companions, wrong for a background
 NPC the plot describes as a plain "warrior" or "adept" rather than a named Fighter/Cleric
-character. **Confirmed via `nwscript.nss`: NWN ships no separate Warrior/Expert/Adept/
-Aristocrat `CLASS_TYPE_*` the way tabletop D&D 3.5's NPC classes do** — the only true
-non-PC catch-all is `CLASS_TYPE_COMMONER` (20), and that one already grants *no* feats or
-spellbook at all via `LevelUpHenchman` (see the "Commoner chassis" bullet above), which is
-too blunt for an NPC that should still fight competently, just without a PC's full bonus-
-feat chain (Cleave→Great Cleave, Weapon Specialization, metamagic feats, epic feats, ...).
-Needs: a way to mark a creature blueprint as "simple" at creation time, and either (a) a
-curated lighter feat set instead of running it through full `LevelUpHenchman`, or (b) a
-repair tool that strips specific over-advanced bonus feats from a creature that was already
-leveled the normal way. Not designed yet — raised by the user, not yet scoped.
+character. NWN ships no separate Warrior/Expert/Adept/Aristocrat `CLASS_TYPE_*` the way
+tabletop D&D 3.5's NPC classes do, and the only true non-PC catch-all,
+`CLASS_TYPE_COMMONER` (20), already grants *no* feats or spellbook at all via
+`LevelUpHenchman` — too blunt for an NPC that should still fight competently, just without
+a PC's full bonus-feat chain (Cleave→Great Cleave, Weapon Specialization, metamagic feats,
+epic feats, ...). **Fix:** `buildNpcStatBlock()`'s (`src/util/npc-stat-block.ts`) feat
+computation already tagged every pick with a `source` — `"racial"`/`"class_automatic"`/
+`"generic_slot"`/`"bonus_slot"` — and `"bonus_slot"` is exactly the PC-style advancement
+chain (`cls_bfeat_<class>.2da`'s per-level slots) the TODO called out. A new
+`complexity?: "full" | "simple"` param (default `"full"`, identical to prior behavior) on
+both `buildNpcStatBlock()` and the `build_npc_stat_block` tool skips filling bonus-feat
+slots entirely when `"simple"` — racial/automatic-class/generic-slot feats (basic
+proficiencies, the universal "every character gets a feat" slots) are unaffected, so the
+NPC is still mechanically competent, just without the advancement chain. Narrow, low-risk
+change since the source-tagging already existed — no new read logic needed. **Option (b)
+— a repair tool stripping bonus feats from a creature already leveled via a *live*
+`LevelUpHenchman()` call — is deliberately still open**, a different mechanism (runtime
+feat removal vs. build-time generation) with its own design questions; `complexity:
+"simple"` covers the more common case (a background NPC built via `build_npc_stat_block`
+from the start).
 
 ## Gear Appearance
 
