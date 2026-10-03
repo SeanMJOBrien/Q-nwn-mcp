@@ -92,7 +92,6 @@ export function registerWebTools(server: McpServer): void {
       urlPrefix: z.string().optional().describe("Serve under this path prefix (e.g. '/qedit') when behind a reverse proxy"),
       nav: z.array(z.string()).optional().describe("Extra nav-bar links as 'Label=URL' strings"),
     },
-    {},
     async ({ dir, bicDir, host, port, urlPrefix, nav }) => {
       await assertScript(WEB_EDITOR_SCRIPT);
       if (editorProc) {

@@ -1,6 +1,6 @@
 ---
 name: nwn-readonly-getters
-description: Use when listing or inspecting module/area content without editing it — creatures, items, stores, encounters, sounds, waypoints, faction membership, local variables — or when sanity-checking module info (.ifo) itself. Trigger on "list all creatures/items/stores in this area", "what's in this faction", "get details for this creature", "what variables are set on this", "check module info", or requests touching list_creatures/get_creature_details/list_items/list_stores/get_area_encounters/get_area_items/get_area_sounds/get_area_waypoints/get_faction_creatures/get_object_variables/verify_module_info.
+description: Use when listing or inspecting module/area content without editing it — creatures, items, stores, encounters, sounds, waypoints, faction membership, local variables — or when sanity-checking module info (.ifo) or the faction table itself, or searching for a GFF field by name across every resource. Trigger on "list all creatures/items/stores in this area", "what's in this faction", "get details for this creature", "what variables are set on this", "check module info", "check the faction table", "find every field named X", or requests touching list_creatures/get_creature_details/list_items/list_stores/get_area_encounters/get_area_items/get_area_sounds/get_area_waypoints/get_faction_creatures/get_object_variables/search_by_field/verify_module_info/verify_faction.
 ---
 
 # Read-Only Getters
@@ -23,6 +23,7 @@ area's objects of one kind; a few are module-wide.
 | `get_faction_details` | module | — (factions + reputation matrix) |
 | `get_faction_creatures` | module | `factionId` |
 | `get_object_variables` | one placed instance or blueprint | `area`+`tag` **or** `resref`+`blueprintType` |
+| `search_by_field` | module | `fieldName`, optional `value` |
 
 ## `get_object_variables` has a write-tool counterpart, and two target modes
 
@@ -67,6 +68,24 @@ Run it after any edit that touches module-level scripts or the area list
 (e.g. `delete_area`, `create_area`, `set_module_scripts`) — those are the
 edits most likely to leave `.ifo` pointing at something that no longer
 exists, and nothing else in the toolset catches that class of error.
+
+## `verify_faction`
+
+Same category: checks the module's `.fac` — that every reputation entry
+references a real faction and every reputation value is in range. Run it
+after `create_faction`/`set_faction_reputation` (both already call it as
+their own last step, but it's worth re-running after any direct edit to
+the faction table too) and before trusting a faction-driven combat/dialog
+decision in a module you didn't build this session.
+
+## `search_by_field`
+
+Not scoped to one object type — searches every parsed GFF resource in the
+module (blueprints and placed instances alike) for a field name, optionally
+narrowed by value: `search_by_field({ fieldName: "ChallengeRating" })` finds
+every struct carrying that field, module-wide. Reach for it when you need
+"every creature with X field set to Y" and don't already know which area or
+blueprint to look in — `get_area_*`/`list_*` are cheaper once you do.
 
 ## Workflow
 

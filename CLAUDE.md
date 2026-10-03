@@ -38,10 +38,10 @@ The rest are open.
    900+ lines. An LLM building areas gets far less guidance than one building
    actors/quests — worth expanding the area skills with the same density of
    learned rules.
-4. **TODO — most of the raw tool surface has no skill.** Faction, reward, gear,
-   verify-*, bulk-*, undo-* tools (most of the 150+ `mcp__nwn-mcp__*` tools) have
-   no dedicated skill, unlike `module-explorer`. Exact audit started at 34/142
-   registered tools with zero skill mentions, now **14/142** after four slices:
+4. ~~**DONE — most of the raw tool surface had no skill.**~~ Faction, reward,
+   gear, verify-*, bulk-*, undo-* tools (most of the 150+ `mcp__nwn-mcp__*`
+   tools) had no dedicated skill, unlike `module-explorer`. Exact audit started
+   at 34/142 registered tools with zero skill mentions; five slices closed it:
    `.claude/skills/nwn-item-properties/SKILL.md` (decoded against real items in
    `/var/www/storage/qlippoth/the-frozen-north`, user-referenced 2026-10-01),
    `.claude/skills/nwn-database-tools/SKILL.md` (campaign/PW SQLite state),
@@ -49,18 +49,32 @@ The rest are open.
    `flatten_dialog`/`trace_dialog_path`/`find_dialog_scripts` — decoded against
    a real Frozen North quest NPC's conditional `StartingList`, which exposed a
    real `trace_dialog_path` limitation: it always starts from `StartingList[0]`
-   regardless of that entry's condition), and
+   regardless of that entry's condition),
    `.claude/skills/nwn-readonly-getters/SKILL.md` (creature/item/store/area
-   getters + `verify_module_info`). While building the getters skill, found and
-   fixed a live bug: `get_faction_creatures` still read the stale
-   `index.creatures` snapshot — the exact bug `list_creatures` was fixed for —
-   now reads live GIT data the same way.
-   Still uncovered: TLK/web-editor/resman utilities (`tlkify_module`,
-   `start_web_editor`/`stop_web_editor`, `search_tlk`/`list_tlk_entries`,
-   `resman_stats`), and a few standalone
-   tools (`rename_tag`, `export_resource`, `generate_area_map`,
-   `create_encounter_blueprint`, `place_sound`, `search_by_field`,
-   `verify_faction`).
+   getters + `verify_module_info`/`verify_faction`/`search_by_field`; also
+   found and fixed a live bug — `get_faction_creatures` still read the stale
+   `index.creatures` snapshot, the exact bug `list_creatures` was fixed for —
+   now reads live GIT data the same way), and, closing the remaining gap
+   (2026-10-03): a new `.claude/skills/nwn-tlk-resman-tools/SKILL.md`
+   (`tlkify_module`/`search_tlk`/`list_tlk_entries`/`resman_stats`/
+   `resman_search`/`resolve_tlk`), a note added to the (global,
+   `~/.claude/skills/`) `nwn-web-editor` skill pointing at the MCP tool
+   equivalents of its two Python scripts (`generate_area_map`/
+   `start_web_editor`/`stop_web_editor` — confirmed these wrap the exact same
+   scripts that skill already documents invoking by hand, not a separate
+   mechanism), `place_sound` added to `nwn-object-placement` (it's the one
+   `place_*` exempt from walkability/bearing), and `rename_tag`/
+   `export_resource`/`create_encounter_blueprint` added to `module-explorer`.
+   **Found and fixed a real, separate production bug while covering
+   `start_web_editor`**: it was registered with an empty `{}` object as its
+   annotations argument, which the MCP SDK (`@modelcontextprotocol/sdk`
+   ^1.28.0) misinterprets as the 4-arg `(schema, handler)` overload — it
+   silently treats that `{}` as the handler itself, so every real call failed
+   with `typedHandler is not a function`. Confirmed via a minimal repro
+   (any `server.tool(name, desc, schema, {}, handler)` call fails the same
+   way; a non-empty annotations object, or omitting it entirely, both work).
+   Fixed by dropping the stray argument. See the new "Known Pitfalls" entry
+   below — grep the codebase for this pattern before adding another tool.
 5. **TODO — inline-only capability gaps.** e.g. `item-models.ts` ("randomised gear
    appearance... out of scope for now") and an unresolved creation-order question
    in `npc-stat-block.ts`. These gaps are discoverable only by reading source —
@@ -604,6 +618,25 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
 
 ## Known Pitfalls
 
+- **FIXED — `server.tool(name, description, schema, {}, handler)` with an EMPTY
+  annotations object silently breaks the tool: every real call fails with
+  `typedHandler is not a function`.** Found while writing the first integration
+  test ever run against `start_web_editor` (see item #4 of the Project Health
+  TODOs) — it had this exact shape and had apparently never been call-tested
+  for real. Confirmed via a minimal repro against the MCP SDK directly
+  (`@modelcontextprotocol/sdk` ^1.28.0): a *non-empty* annotations object
+  (`{ idempotentHint: true }`, etc.) works fine, and omitting the argument
+  entirely (the 4-arg `(schema, handler)` overload) also works fine — only a
+  literal `{}` in the annotations position breaks it, apparently because the
+  SDK's overload-detection treats an empty object as "this must be the
+  handler," then fails when it isn't callable. **Before adding a new tool
+  registration, never pass `{}` as the annotations argument** — omit it, or
+  give it real hints (`readOnlyHint`/`idempotentHint`/`destructiveHint`).
+  Every other `{}` in this codebase's `server.tool()` calls is the *params*
+  schema (a tool that takes no arguments, e.g. `list_items`), which is a
+  completely different, correct, common pattern — don't conflate the two
+  when auditing for this. Only `start_web_editor` had the broken shape;
+  confirmed by checking every other bare `{}` occurrence's actual position.
 - **FIXED — the equipped-item resref field was read as `EquippedRes` everywhere in
   this codebase; no real equipped item struct carries that field name, so every
   check depending on it was silent dead code.** The real field is `TemplateResRef`

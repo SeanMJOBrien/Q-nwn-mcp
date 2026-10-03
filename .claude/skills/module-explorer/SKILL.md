@@ -64,7 +64,10 @@ Reach for these instead of manually cross-referencing GFF fields:
   Duplicate `Tag` values are a classic silent-bug source (`GetObjectByTag`
   hitting the wrong object) — `visualize_area`'s object list plus
   `search_by_tag` will surface these; treat repeated tags across placed
-  objects as a warning worth flagging even if not asked.
+  objects as a warning worth flagging even if not asked. Found one to fix?
+  `rename_tag(oldTag, newTag, dryRun)` renames it across every GFF resource
+  **and** every NWScript source file in one pass — always `dryRun: true`
+  first and read the affected list before committing to the real rename.
 - `resolve_2da`, `resolve_tlk`, `resolve_blueprint`, `search_2da` — resolve
   what a raw 2DA row index / STRREF / template ResRef actually means before
   reasoning about it as a bare number.
@@ -76,6 +79,17 @@ Reach for these instead of manually cross-referencing GFF fields:
    `set_area_properties`, etc.). Bulk variants (`bulk_move_objects`,
    `bulk_remove_objects`) exist for multi-object operations — prefer them
    over looping single-object calls.
+   - A `create_*_blueprint` family builds new standalone resources rather
+     than editing placed ones — e.g. `create_encounter_blueprint` builds a
+     `.ute` encounter (creature spawn list, difficulty, respawn behavior)
+     ready for `place_encounter`. `sourceResref` clones an existing
+     blueprint as a starting point instead of building from scratch.
+   - `export_resource(resref, type, outputPath)` pulls one resource out of
+     the loaded module to a real file on disk — for handing a single
+     `.uti`/`.dlg`/`.nss`/etc. to the user, or round-tripping it through an
+     external tool. It reads from the in-memory index, not the packed
+     `.mod` directly, so it reflects edits already made this session even
+     before the next `repack_module`.
    - For local variables (VarTable entries) on a creature, placed object, or
      blueprint, use `get_object_variables`/`set_object_variables`/
      `remove_object_variable` instead of `modify_gff_field` — VarTable is a

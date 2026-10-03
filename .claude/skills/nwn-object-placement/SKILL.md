@@ -1,6 +1,6 @@
 ---
 name: nwn-object-placement
-description: Use when placing, moving, orienting or re-heighting objects in an area — props, furniture, camps, creatures, waypoints, doors — or when something is buried, floating, facing the wrong way, or "blocked by walkability/collision". Trigger on "place a table with chairs", "build a camp", "face the NPC toward…", "put this on the table", "the object is underground/floating", "move this group", "fix heights", "where is open ground", or any use of place_creature/place_placeable/place_waypoint/place_door/move_object/bulk_move_objects/fix_object_heights/probe_ground/adventure_find_walkable.
+description: Use when placing, moving, orienting or re-heighting objects in an area — props, furniture, camps, creatures, waypoints, doors, ambient sounds — or when something is buried, floating, facing the wrong way, or "blocked by walkability/collision". Trigger on "place a table with chairs", "build a camp", "face the NPC toward…", "put this on the table", "the object is underground/floating", "move this group", "fix heights", "where is open ground", "place an ambient sound", or any use of place_creature/place_placeable/place_waypoint/place_door/place_sound/move_object/bulk_move_objects/fix_object_heights/probe_ground/adventure_find_walkable.
 ---
 
 # Placing objects correctly
@@ -28,6 +28,9 @@ Tile/orientation/height background is in the `nwn-tileset-conventions` skill.
    chairs at a table, keep the defaults for creatures and anything a player must walk past.
 6. **Height above the ground is `zOffset`.** An item on a table is `zOffset: 0.8` (check `probe_ground` for the floor first);
    a hanging lantern is a larger offset. Without it everything sits on the floor.
+7. **`place_sound` is the one exception to rules 1–4.** Ambient sounds don't block on walkability (audio sources don't need
+   walkable ground) and have no `bearing`/facing — they're omnidirectional. It still takes `x`/`y`/optional fallback `z` like
+   every other `place_*`, just without the walkmesh enforcement or orientation.
 
 ## Recipes
 
@@ -65,6 +68,7 @@ block on walkability — doors sit at tile boundaries.
 | `place_placeable` | `bearing` (raw GFF CCW), `faceTowardX/Y`, `zOffset`, `collisionRadius` (1.0), `walkBuffer` |
 | `place_waypoint` | `bearing` (compass), `faceTowardX/Y`, `walkBuffer` |
 | `place_door` | `bearing` (raw GFF CCW) |
+| `place_sound` | `area`, `blueprint` (UTS resref), `x`, `y`, optional fallback `z` — no `bearing`, no walkability check |
 | `move_object` | `x`, `y`, optional `z`, `followGround` |
 | `bulk_move_objects` | `offsetX/Y/Z`, `followGround` (default true) |
 | `fix_object_heights` | `dryRun`, `tolerance`, `onlyBuried` |
