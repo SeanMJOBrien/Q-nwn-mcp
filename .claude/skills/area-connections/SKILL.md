@@ -88,8 +88,9 @@ surface is usually flat — hides all intra-tile variation and produces a false 
 
 Verification, in increasing order of confidence:
 
-1. `fix_object_heights` — snaps every placed object in an area to the server's walkmesh model.
-   Cheap, run it always.
+1. `fix_object_heights` — snaps every placed object in an area to the server's walkmesh model. Cheap; run it with `dryRun: true`
+   first (it also lowers deliberately raised props — `onlyBuried: true` only raises objects below the ground).
+   `probe_ground(area, x, y)` answers the same question for one spot: walkable?, exact ground Z, and whether it passes the placement check.
 2. `adventure_find_walkable` at the exact transition coordinates. **Note it refuses areas smaller
    than its edge buffer** — a 2×2 area returns "region too small" for every query.
 3. **Ground truth**: parse the tile's `.wok` from the game data and interpolate the walkmesh
@@ -98,7 +99,8 @@ Verification, in increasing order of confidence:
    - map tile ID → model via the tileset's `.set` (`[TILEn] Model=`),
    - extract `<model>.wok` with `nwn_resman_extract`,
    - convert world → tile-local coords, apply the tile's `Tile_Orientation` rotation,
-   - find the covering triangle, interpolate Z, add `Tile_Height × 5.0`,
+   - find the covering triangle, interpolate Z, add the walkmesh node `position` Z offset (57% of walkmeshes have one) and
+     `Tile_Height × Transition` (the tileset's `[GENERAL] Transition=`: 5 for most outdoor sets, **4 for tcn01, 2 for tno01** — not a constant 5),
    - reject any object whose covering face is a non-walkable surface
      (`Undefined`, `Obscuring`, `Nonwalk`, `Transparent`, `Lava`, `BottomlessPit`, `DeepWater`).
 

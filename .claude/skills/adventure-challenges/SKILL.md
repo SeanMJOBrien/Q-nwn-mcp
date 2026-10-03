@@ -385,7 +385,7 @@ Place each creature blueprint directly with `place_creature`. Do NOT use encount
 - **Group creatures together** — patrol members within 2-3 tiles of each other
 - **Guards near doors/objectives** — within 1-2 tiles of what they're guarding
 - **Boss in the climax area** — center or back of the final room, adds flanking
-- **Vary facing** — guards face toward approaches, patrols face their route direction
+- **Vary facing** — guards face toward approaches, patrols face their route direction (`faceTowardX/Y` on `place_creature`; raw `bearing` is compass degrees for creatures)
 
 **Tactical positioning:**
 - Melee fighters in front (closer to doors/entrances)

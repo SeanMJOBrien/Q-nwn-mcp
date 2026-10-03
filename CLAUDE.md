@@ -27,6 +27,10 @@ The rest are open.
    (e.g. "Fix CityGate_2x2 collar: 2 of 4 tiles were 180° off", "Fix
    invisible-henchman root cause"). Property-based tests on the offset/rotation
    math would catch this class of bug before it reaches a shipped module.
+   **Progress (2026-10-02):** the orientation / corner-height / walkmesh-offset / facing maths now has unit tests
+   (`walkmesh.test.ts`, `walkgrid.test.ts`, `facing.test.ts`, `tileset.test.ts`) and a real-data oracle
+   (`src/util/tile-oracle.live.test.ts`: 504 real areas, 274,500 neighbour comparisons, mutation-checked) that pins the
+   counter-clockwise convention. Still open: property-based round-trip tests for `tile-solver`/`zone-solver`/`feature-collars` rotation.
 3. **TODO — area-building skills are thin vs. adventure skills.** The 12 `area-*`
    skills average ~115 lines; `adventure-actors`/`adventure-challenges` run
    900+ lines. An LLM building areas gets far less guidance than one building
@@ -51,7 +55,7 @@ The rest are open.
    now reads live GIT data the same way.
    Still uncovered: TLK/web-editor/resman utilities (`tlkify_module`,
    `start_web_editor`/`stop_web_editor`, `search_tlk`/`list_tlk_entries`,
-   `resman_stats`), `analyze_tileset_rules` (see #12), and a few standalone
+   `resman_stats`), and a few standalone
    tools (`rename_tag`, `export_resource`, `generate_area_map`,
    `create_encounter_blueprint`, `place_sound`, `search_by_field`,
    `verify_faction`).
@@ -60,10 +64,8 @@ The rest are open.
    in `npc-stat-block.ts`. These gaps are discoverable only by reading source —
    worth surfacing in the relevant skill or tool description so an LLM calling the
    tool knows the limitation up front.
-6. **TODO — `docs/` has no index.** 13 flat files mixing specs, findings, and
-   survey notes with nothing pointing an LLM at which doc answers which question
-   (unlike the name-addressable `nwscript-docs/`). A short `docs/README.md` table
-   of contents would fix this cheaply.
+6. ~~**DONE — `docs/` index.**~~ `docs/README.md` is a question → document table of contents for every doc and subfolder
+   (created 2026-10-02). Keep it current when a doc is added.
 7. ~~**IN PROGRESS — integration coverage is thin.**~~ Only 2 integration test
    files existed (`tools.integration.test.ts`, `npc-tools.integration.test.ts`)
    against 30+ tool files; dialog, journal, faction, encounter, and blueprint
@@ -90,12 +92,13 @@ The rest are open.
     area/waypoint is specified, `create_area_transition`/`link_doors`/
     `place_trigger` tool sequencing) — worth its own skill, possibly alongside
     or folded into `nwn-area-builder`.
-12. **TODO (user-raised, 2026-10-01) — examine how tileset rules work for the
-    MCP.** Understand and document `analyze_tileset_rules`/`get_tileset_details`
-    and how tileset edge/corner-matching rules constrain `paint_tiles`/
-    `paint_group`/`adventure_generate_layout` — this underlies the rotation bugs
-    in #2 above and is likely the right place to fix that class of bug at the
-    root rather than patching individual rotation cases.
+12. **PARTLY DONE (user-raised, 2026-10-01) — examine how tileset rules work for the MCP.** Documented 2026-10-02 in
+    `docs/object-placement-and-tilesets.md` and the `nwn-tileset-conventions` skill: what actually constrains tile matching
+    (corner terrains, corner heights, crossers; `[PRIMARY/SECONDARY RULES]` are toolset hints and ignored), the counter-clockwise
+    rotation (the old paragraph claiming `.set` fields are un-rotated by `Orientation` was wrong and is corrected), per-tileset height
+    steps, and which tool answers which tileset question (`get_tileset_details`, `analyze_tileset_rules`). The conventions are
+    enforced by the live oracle. Still open: extend `paint_tiles`/`paint_group`/the solver beyond flat tiles (height-transition tiles
+    — the corner-height agreement rule and `Transition` are known) and fix any remaining rotation cases at the root.
 
 ## Design Intent
 
@@ -235,6 +238,8 @@ Every GFF field is type-wrapped: `{ type: "dword", value: 100 }`. Use helpers fr
 - Creatures/Waypoints/Triggers/Encounters/Sounds/Stores: `XPosition`, `YPosition`, `ZPosition`, `XOrientation`, `YOrientation`
 - Placeables/Doors: `X`, `Y`, `Z`, `Bearing` (radians)
 
+**Facing differs by type** (`util/facing.ts`): creatures/waypoints store a world-axis unit vector and the tools' `bearing` is a **compass** angle (0 = north, 90 = east, clockwise); placeables/doors store `Bearing` as a **counter-clockwise** math angle with the model front facing **south** at 0, and the tools' `bearing` is that raw angle (front compass direction = `180° − bearing`). Prefer `faceTowardX/Y`. **Z always comes from the walkmesh** (the `z` parameter is a fallback) and responses report the placed z.
+
 **Blueprint resolution chain:** module parsedGff cache → module resources on disk → resman (base game/HAKs, 120s timeout). Always deep-cloned before mutation.
 
 ## Walkmesh Caching
@@ -275,11 +280,15 @@ Three mechanisms for moving between areas:
 
 ## Placement Collision Detection
 
-`place_creature` (0.75m radius) and `place_placeable` (1.0m radius) check for nearby objects and **block placement** if another object is within range. The `collisionRadius` parameter on `place_creature` allows callers to override (pass `"0"` to disable).
+`place_creature` (0.75m radius) and `place_placeable` (1.0m radius) check for nearby objects and **block placement** if another object is within range.
+Both take `collisionRadius` to override (`"0"` disables). Real hand-built areas pack props tightly (34 % within 1 m of another prop, 16 % within 0.5 m),
+so furniture groupings should pass `collisionRadius` 0.3-0.5.
 
 ## Walkability Enforcement
 
 All placement and movement tools **block** if the target position is non-walkable or within 1m of a non-walkable surface. Uses `checkPlacementWalkable()` in `walkmesh.ts` which checks the target point plus 4 cardinal probes at a configurable distance (default 1m). `adventure_create_transition` uses a 2m buffer so portals stay clear of walls and cliff edges.
+
+`place_creature`, `place_placeable` and `place_waypoint` take `walkBuffer` to relax the 1 m clearance (0 = only the point itself must be walkable); real props: only 57 % have 1 m of clearance, 74 % have 0.5 m. `probe_ground(area, x, y, buffer)` reports the verdict without placing anything.
 
 **Enforced on:** `place_creature`, `place_placeable`, `place_waypoint`, `place_trigger`, `place_encounter`, `place_store`, `move_object`, `bulk_move_objects`, `create_area_transition`, `adventure_create_transition` (both source and target positions).
 
@@ -291,7 +300,27 @@ The `wok_cache/` directory is lazy-initialized on first use via `ensureWokCacheD
 
 ## Object Height Correction
 
-`fix_object_heights` adjusts Z height of all placed objects in an area (or all areas) to match the walkmesh ground plane. Iterates creatures, placeables, waypoints, triggers, encounters, stores, and sounds. Only adjusts objects where the walkmesh Z differs from the current Z by more than 0.01. The walkmesh check uses the highest walkable face at each position (handles overlapping faces at different heights).
+`fix_object_heights` adjusts Z height of all placed objects in an area (or all areas) to match the walkmesh ground plane. Iterates creatures, placeables, waypoints, triggers, encounters, stores, and sounds. Only adjusts objects where the walkmesh Z differs from the current Z by more than `tolerance` (default 0.01). The walkmesh check uses the highest walkable face at each position (handles overlapping faces at different heights). `dryRun: true` reports up to 40 samples without writing; `onlyBuried: true` only raises objects that are below the ground and never lowers a deliberately raised prop (about 1 % of objects in correct areas). `move_object` / `bulk_move_objects` keep each object's height above the ground when no `z` is given (`followGround`, default true).
+
+## Spatial Conventions (verified against real data, 2026-10-02)
+
+Full write-up with evidence: `docs/object-placement-and-tilesets.md`; skills: `nwn-object-placement`, `nwn-tileset-conventions`. Enforced by the
+env-gated oracle `src/util/tile-oracle.live.test.ts` (base-game tilesets with `NWN_FOLDER_DATA` + `NIM_FOLDER_NWTOOLS`; real areas additionally with
+`TFN_SRC=<nasher src folder>`; `ORACLE_VERBOSE=1` prints the measured numbers). **If a change to rotation/height/offset/facing maths fails the oracle, the change is wrong.**
+
+- World metres: +X east, +Y north, origin south-west, 10 m per tile; `Tile_List` row-major from the south-west (`index = tileY*Width + tileX`).
+- **Tile orientation is counter-clockwise** (corner TR → TL → BL → BR; edge right → top → left → bottom); `.set` fields are orientation-0 terms, never pre-rotated.
+  Neighbour agreement in 504 real areas: corners 99.99 % (clockwise reading: 75 %), crossers 99.99 %, heights 100.00 %.
+- **Ground Z = walkmesh Z (node `position` offset included) + `Tile_Height × Transition`.** `Transition` is the tileset's `[GENERAL] Transition=`:
+  5 for most outdoor sets, **4 for tcn01, 2 for tno01** (a flat 5 m — the old code — fits those 3.5 % / 0 %; `tileHeightStep()`, `get_tileset_details.heightStep`).
+  Flat ground is not always z = 0 (trm02/tno01 +5, ttu01/ttz01 +1). trm02/trs02 ramps span half a level.
+- **Walkmeshes:** `<Model>.wok` (not the `.set`'s `WalkMesh=`), vertices relative to the node `position` (54 % of walkmeshes have a Z offset), tile-local ±5 m;
+  query points are rotated the opposite way (`n=1: (x,y) → (y,−x)`). **`nwn_resman_extract` extracts nothing if any requested file is missing**
+  (tcm02 lacks `tcm02_b92_02.wok`, trs02 lacks `trs02_m00_00.wok`): always extract in batches via `ensureWoksExtracted` / `extractSalvaging` (`util/batch-extract.ts`);
+  missing models are cached so they are not re-requested per object.
+- **Facing** — three encodings (see Object Placement above); doors that belong to a tile: position = tile centre + door `(x,y)` rotated counter-clockwise by `Tile_Orientation`,
+  `Bearing = (doorOrientation + Tile_Orientation×90) % 360` (verified on 3,717 doors, ±180°).
+- **Library:** `util/walkmesh.ts` (pure probing), `util/walkgrid.ts` (1 m raster, `findOpenGround`; `adventure_find_walkable clearRadius`), `util/facing.ts`, `util/batch-extract.ts`.
 
 ## Zone-Based Terrain Solver
 
@@ -466,11 +495,17 @@ The **only** determining factors for tile selection from .set files are:
 
 The `.set` file `[PRIMARY RULES]` and `[SECONDARY RULES]` sections are **NOT functional for tile solving**. They are toolset autotiling rules for terrain propagation when painting in the toolset. They do not restrict which tiles can be placed where. **IGNORE them entirely.**
 
-### Tile Orientation Normalization
+### Tile Orientation (corrected 2026-10-02 — see "Spatial Conventions" above)
 
-The `.set` `Orientation` field specifies the rotation (degrees) at which the tile's corners and crossers are defined in the file. At parse time in `tileset.ts`, corners and crossers are **un-rotated by the `.set` Orientation** to normalize all tiles to GIT orientation 0. This ensures `getRotatedCorners(tile, gitOri)` returns the correct effective corners for any GIT placement orientation.
+`Tile_Orientation` n turns a placed tile **n × 90° counter-clockwise**. The `.set` corner terrains, corner heights and crossers are
+**already in GIT-orientation-0 terms and are used as written — they are NOT un-rotated by the `.set` `Orientation` field** (an older
+version of this paragraph said they were; that transform was removed, see the "orientation un-rotation" pitfall below, and the
+live oracle confirms the raw values: 99.99 % of 274,500 real neighbour-corner comparisons agree). `getRotatedCorners` /
+`getRotatedCrossers` / `getRotatedCornerHeights(tile, gitOri)` apply the counter-clockwise turn for a placed tile.
 
-The solver also **prefers tiles at their natural `.set` Orientation** — the rotation the 3D model was designed for — over rotated alternatives that produce the same corner pattern. This prevents visual artifacts from tiles whose model geometry doesn't align properly when placed at non-native orientations.
+The `.set` `Orientation` field is the angle the tile's 3D **model** was authored at. The solver uses it only as a **preference**: it favours
+tiles at their natural orientation over rotated alternatives that give the same corner pattern, which avoids visual artifacts from models
+placed at non-native orientations.
 
 ### Terrain Adjacency Constraint
 
@@ -822,7 +857,7 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
   until a real `LevelUpHenchman()`/2DA-table population pass is run, which this fix
   didn't touch).
 - **Placeable display name field is `LocName`**, not `LocalizedName`. Setting `LocalizedName` on a placeable has no effect — the toolset and engine read `LocName` (a cexolocstring).
-- **Placement Z height from walkmesh.** All placement tools automatically set the object's Z position from the walkmesh surface height. The walkmesh check returns the highest walkable face Z at the position. Use `fix_object_heights` to retroactively fix objects placed before this feature.
+- **Placement Z height from walkmesh.** All placement tools automatically set the object's Z position from the walkmesh surface height (the `z` parameter is only a fallback). The walkmesh check returns the highest walkable face Z at the position, with the walkmesh node offset and `Tile_Height × Transition` included. Use `fix_object_heights` (`dryRun` first) to retroactively fix objects placed before this feature — heights written before 2026-10-02 ignored the node offset (57 % of walkmeshes) and used a flat 5 m per level.
 - **Zone solver rejects incompatible adjacencies.** `adventure_apply_layout` returns early with zero placements and `INCOMPATIBLE TERRAIN ADJACENCY` errors if the zone layout contains terrain pairs with no transition tiles. Fix the zone layout, don't retry.
 - **`fallbackSubstitute` is constrained.** The zone solver's fallback only tries terrains present in the corner grid (zone-defined + default). It will never inject an alien terrain.
 - **`modify_gff_field` corruption isn't limited to float fields.** Beyond the float-serialization case below, two further confirmed corruptions: (a) attempting to construct new struct-list GFF fields for dialog `ActionParams`/`ConditionParams` corrupted the dialog's in-memory state on the first try; (b) a plain edit to an *existing scalar* field on an area's GIT data corrupted state too, with no struct-list creation involved. Treat `modify_gff_field` as unsafe for this class of edit across the board — prefer a typed tool (`edit_dialog_node`, area/creature/item edit tools, etc.) over a raw GFF field poke wherever one exists.
@@ -2120,6 +2155,10 @@ a service. Do not add a `.github/workflows/` pipeline; the pre-commit hook is th
   pre-commit hook tolerable. Checks needing real game data (tilesets, 2DAs, walkmeshes)
   degrade to "skip", never to "fail".
 - See `docs/TEST_PLAN.md` for the project-wide test plan and test case specification.
+- `src/util/tile-oracle.live.test.ts` is an env-gated **real-data oracle** for the spatial conventions (tile rotation, heights, walkmesh offsets):
+  Part A needs `NWN_FOLDER_DATA` + `NIM_FOLDER_NWTOOLS` (base-game tilesets, ~20 s), Part B additionally `TFN_SRC=<…/the-frozen-north/src>` (any nasher
+  `src` with `are/*.are.json` + `git/*.git.json`). `ORACLE_VERBOSE=1` prints the measured numbers. Skips (never fails) without the environment.
+  Run it after any change to rotation, height, offset or facing maths — see `docs/object-placement-and-tilesets.md` §9.
 
 **BUILT (2026-09-17) — a comprehensive, two-tier "every system" test harness,
 answering "what would it take to create test samples from every nwn-mcp system in

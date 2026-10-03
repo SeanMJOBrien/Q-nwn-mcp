@@ -762,10 +762,12 @@ Place each NPC blueprint in the area specified by the plot.
 - Don't place on top of existing objects (check `objects` array from `visualize_area`)
 - Position at tile center with small offset for natural placement
 
-**Facing:** Orient NPCs toward the player's likely approach:
+**Facing:** Orient NPCs toward the player's likely approach — pass `faceTowardX`/`faceTowardY` to `place_creature` (the point they should look at); a raw `bearing` is a **compass** angle for creatures (0 = north, 90 = east, clockwise):
 - Behind a counter/bar → face the open side
 - In a room → face the door/entrance
 - In an open area → face the nearest path or clearing
+
+Pick the spot with `probe_ground` / `adventure_find_walkable` (Z is set from the walkmesh automatically); creatures keep the default 1 m walkable buffer.
 
 ---
 

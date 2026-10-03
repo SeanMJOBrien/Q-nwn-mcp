@@ -637,7 +637,10 @@ worldX = col*10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[0]
 worldY = row*10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[1]
 bearing = (doorOrientation + tileOrientation*90) % 360
 ```
-`forwardRotate` by orientation 0-3: `(x,y)`, `(-y,x)`, `(-x,-y)`, `(y,-x)`.
+`forwardRotate` by orientation 0-3: `(x,y)`, `(-y,x)`, `(-x,-y)`, `(y,-x)` — a counter-clockwise turn, the same direction
+`Tile_Orientation` rotates the tile. `bearing` is the raw GFF `Bearing` in degrees (counter-clockwise; `place_door` takes it as is).
+Verified on 3,717 real doors: positions match, bearings match exactly or ±180° (a door is symmetric) — see
+[object-placement-and-tilesets.md](object-placement-and-tilesets.md) §5.
 `doorPlacements[].type` (a `doortypes.2da` row) resolves to the exact
 `TemplateResRef` the tile expects — never resolve via `genericdoors.2da`, a separate
 table for hand-placed doors with no tile association (confirmed as a real mistake

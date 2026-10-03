@@ -1,5 +1,55 @@
 # Changelog
 
+## [Unreleased] — 2026-10-02
+
+Spatial conventions (tile rotation, ground heights, walkmesh offsets, facing) re-verified against the 33 base-game tilesets and 504 real
+human-built areas. Full write-up: [docs/object-placement-and-tilesets.md](docs/object-placement-and-tilesets.md).
+This release also adds the local-variable tools (`get_object_variables`, `set_object_variables`, `remove_object_variable`).
+
+### Fixed
+
+- **Ground heights were wrong on most tilesets.** The walkmesh `position` offset of the `.wok` node was ignored (54% of walkmeshes have a Z
+  offset: interiors by −1.5 m, caves by −1.6 … −2.2 m) and `Tile_Height` was assumed to be a flat 5 m per level. A level is the tileset's own
+  `[GENERAL] Transition` — 5 for most outdoor sets but **4 for tcn01 and 2 for tno01** (objects on raised tcn01/tno01 tiles matched 3.5% / 0% before,
+  94% / 93% now). `fix_object_heights` repairs heights written by older versions.
+- **Every `place_*` ignored the Z it reported.** Z is now the walkmesh ground height (the `z` parameter is only a fallback) and responses report the
+  **placed** z instead of echoing the requested one.
+- **Mixed-up facing conventions.** Creatures/waypoints use a compass `bearing` (0 = north, 90 = east, clockwise); placeables/doors use the raw GFF
+  `Bearing` (counter-clockwise, model front faces **south** at 0). The descriptions now say so and the responses report the effective facing.
+- **Missing walkmeshes disabled the whole tileset.** `nwn_resman_extract` extracts nothing when any requested file is missing, and tcm02 / trs02 each
+  lack one `.wok`, so batch extraction silently produced no walkmeshes (every object in such an area probed as non-walkable). Extraction now bisects
+  around missing files (`util/batch-extract.ts`) and remembers models that do not exist instead of re-requesting them for every object.
+- `Tile_Orientation` rotation is documented as counter-clockwise (the code already was); `CLAUDE.md` wrongly claimed `.set` corners are un-rotated by
+  the `.set` `Orientation` field.
+
+### Added
+
+- **`get_object_variables`, `set_object_variables`, `remove_object_variable`**: read, merge (by name, case-insensitive; an existing variable is overwritten
+  in place) and remove local variables (the GFF `VarTable`, which `modify_gff_field` refuses) on a placed instance (`area` + `tag`, or `area` + `listName` +
+  `index`) or on a standalone blueprint (`resref` + `blueprintType`; only blueprints that exist as files in the loaded module). A placed instance's VarTable is
+  a separate copy from its blueprint's, so editing one never changes the other. Instance edits take an undo snapshot. Helpers `getVarTableEntries`,
+  `removeVarTableEntry`, `clearVarTable`; documented in the `module-explorer` and `nwn-readonly-getters` skills.
+- **`probe_ground`** (read-only): walkable?, surface, exact ground Z, the tileset's `heightStep`, the tile, and the placement verdict for a buffer.
+- `faceTowardX` / `faceTowardY` on `place_creature`, `place_placeable`, `place_waypoint` — the server computes the right encoding per object type.
+- `place_placeable`: **`zOffset`** (items on tables), **`collisionRadius`** (default 1.0 m; real areas pack props tighter), `walkBuffer`.
+  `place_creature` and `place_waypoint`: `walkBuffer`.
+- `move_object` / `bulk_move_objects`: **`followGround`** (default true) keeps an object's height above the ground when it moves.
+- `fix_object_heights`: **`dryRun`**, **`tolerance`**, **`onlyBuried`**.
+- `adventure_find_walkable`: **`clearRadius`** finds spots whose whole `(2r+1) × (2r+1)` m footprint is walkable (camps, rings of chairs) with exact Z.
+- `get_tileset_details` reports `heightStep` and `hasHeightTransition`.
+- Library: `util/walkgrid.ts` (1 m raster + open-ground search), `util/facing.ts`, `util/batch-extract.ts`, `tileHeightStep()`, `readAreaTileGrid`, pure
+  `probeTileLocal` / `probeAreaPosition`, `getRotatedCornerHeights`.
+
+### Tests, docs and skills
+
+- New unit tests for the variable helpers (`git-helpers`) and 12 integration tests for the variable tools; new unit tests (`walkmesh`, `walkgrid`, `facing`,
+  `tileset`, `batch-extract`, `walkmesh-extract`) and `tools/placement-conventions.integration.test.ts`
+  (pins the tool behaviour; 18 of its 21 tests fail against the pre-change code, the other 3 pin unchanged behaviour).
+- **`src/util/tile-oracle.live.test.ts`**: env-gated real-data oracle (`NWN_FOLDER_DATA` + `NIM_FOLDER_NWTOOLS`; add `TFN_SRC` for real areas). Mutation-checked:
+  a flipped rotation fails 3 tests, a flat 5 m height step 5, an ignored node offset 4.
+- New skills `nwn-object-placement` and `nwn-tileset-conventions`; `area-connections`, `adventure-areas`, `adventure-environment`, `adventure-actors`,
+  `adventure-challenges` updated; new `docs/README.md` index and `docs/object-placement-and-tilesets.md`.
+
 ## [1.3.1] — 2026-04-04
 
 ### Transition Placement

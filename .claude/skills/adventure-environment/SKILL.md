@@ -91,8 +91,10 @@ Scale linearly for sizes in between. Interiors tend toward the higher end (more 
 
 **Placement rules:**
 
-1. **Position** — tile center = `col * 10 + 5, row * 10 + 5`. Add small random offsets (1-3 meters) for natural variation. Vary bearing for visual interest.
-2. **Avoid** door tiles, transition tiles, tiles with `walkablePercent` < 25%, and positions within 2m of existing objects.
+1. **Position** — tile center = `col * 10 + 5, row * 10 + 5`. Add small random offsets (1-3 meters) for natural variation; confirm doubtful spots with `probe_ground`. Z is set for you from the walkmesh (do not pass one).
+   **Facing** — never reason with raw `bearing` for placeables: it is a raw GFF angle (counter-clockwise, model front faces **south** at 0). Pass `faceTowardX`/`faceTowardY` instead (chairs toward their table, a lectern toward the room's centre, wall furniture toward the room), and vary the *target* for visual interest. See the `nwn-object-placement` skill.
+2. **Avoid** door tiles, transition tiles, tiles with `walkablePercent` < 25%, and positions within 2m of *unrelated* objects. Real hand-built areas pack related props tightly (34% of props sit within 1 m of another): for a table with chairs, items on a shelf, or a campfire ring pass `collisionRadius` 0.3-0.5, and `walkBuffer` 0.5 for furniture against walls (74% of real props have 0.5 m of clearance, only 57% a full 1 m).
+   **Items on furniture** (mugs on a table, books on a shelf): `zOffset` above the ground (about 0.8 for a table top) — without it they sit on the floor.
 3. **Group logically** — place related objects together:
    - Campfire + tent + log in a forest clearing
    - Table + 2-4 chairs + mugs in a tavern
@@ -160,7 +162,7 @@ Place **2-5 waypoints** per area with map notes.
 
 Place a waypoint near each door/transition tile. **Facing must point AWAY from the wall/door, toward the area interior**, so a player arriving through the door looks into the space they're entering.
 
-**Bearing calculation:** determine which edge of the area the door is on, then face inward:
+**Bearing calculation** (compass degrees; or simply pass `faceTowardX/Y` = the area centre): determine which edge of the area the door is on, then face inward:
 - Door on north edge → bearing = 180 (face south, into area)
 - Door on south edge → bearing = 0 (face north, into area)
 - Door on east edge → bearing = 270 (face west, into area)
@@ -354,6 +356,6 @@ When placing placeables, group related objects together (within 2-4m of each oth
 - **Placeables do not block walkmesh.** PWK no-walk zones combine with tile walkmesh at runtime.
 - **Sound radius non-overlap is critical.** Check distances between sound-producing placeables before assigning sounds.
 - **Area-wide sounds go at area center.** Radius = `max(width, height) * 10` to cover the entire area.
-- **Waypoint facing matters.** Entrance waypoints face into the area. Landmark waypoints face toward the landmark from the player's approach.
+- **Waypoint facing matters.** Entrance waypoints face into the area. Landmark waypoints face toward the landmark from the player's approach. Use `faceTowardX/Y` (or a compass `bearing`: 0 = north, 90 = east) — waypoints and creatures use compass degrees, placeables use a different raw angle.
 - **Group name → waypoint label.** Strip dimension suffixes: `"Lodge_2x2"` → `"Lodge"`, `"Temple_3x2"` → `"Temple"`.
 - **Repack after placing.** Call `repack_module` at the end so the user can see changes in the toolset.

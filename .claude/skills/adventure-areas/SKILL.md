@@ -279,9 +279,10 @@ Each door placement in the tileset data has two key fields:
 **Step 1: Compute the world position** for each door placement:
 - World X = `col * 10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[0]`
 - World Y = `row * 10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[1]`
-- Bearing = `(doorOrientation + tileOrientation * 90) % 360`
+- Bearing = `(doorOrientation + tileOrientation * 90) % 360` (raw GFF Bearing, degrees, counter-clockwise; `place_door` takes it as is)
 
-Where `forwardRotate` for orientation 0-3: case 0=(x,y), case 1=(-y,x), case 2=(-x,-y), case 3=(y,-x).
+Where `forwardRotate` for orientation 0-3: case 0=(x,y), case 1=(-y,x), case 2=(-x,-y), case 3=(y,-x) — a counter-clockwise turn, the same direction `Tile_Orientation` rotates the tile.
+Verified on 3,717 real doors: positions match; the bearing matches exactly or ±180° (a door looks the same turned half a turn).
 
 **Step 2: Place and lock based on placement `type`:**
 - **`type: 0` (terrain/feature doors):** Lock via `modify_gff_field` — set `Locked` (byte) to `1`, `Lockable` (byte) to `1`, and `Plot` (byte) to `1`. These are aesthetic and stay locked unless a quest or area transition explicitly unlocks them.
@@ -397,7 +398,7 @@ The solver prioritizes preserving crossers over exact corner matching. At a Pit/
 - **Feature placement:** `paint_group` x,y is the bottom-left corner of the feature group. `adventure_apply_layout` handles this automatically from `suggestedFeatures`.
 - **Zone-based solver:** `adventure_apply_layout` resolves all terrain, crossers, and features atomically.
 - **Manual overrides:** Use `paint_tiles` with exact tileId for tiles the zone solver can't handle.
-- **Z-height sanity check.** After placing objects or transitions, verify the Z coordinate is near 0 (±0.5). Positions with Z far below 0 (e.g., -2.5) are on depressed terrain like tree borders or cliff edges — the object will appear sunken underground. If `adventure_find_walkable` returns a position with Z < -1.0, discard it and try a different region or use explicit tile-center coordinates (col*10+5, row*10+5) on known floor/clearing tiles.
+- **Z-height sanity check.** Z comes from the walkmesh (mesh height + node offset + `Tile_Height × Transition`), so it is exact — and **not necessarily near 0**: raised tiles, and tilesets whose flat ground sits at +1 or +5 (ttu01, ttz01, trm02, tno01), are normal. Do not discard a position because its Z is not ≈ 0. A position is bad only when `probe_ground` says it is non-walkable or too close to a non-walkable surface (tree borders, cliff edges); then pick another spot with `adventure_find_walkable` (or `clearRadius` for a footprint) instead of reasoning from Z.
 - **Do NOT auto-export HTML reports.**
 - **Interior tilesets fill with `wall`, not floor.** On `tic01`, `tde01`, `tdc01` and the
   other interiors, `create_area` fails with *"No suitable default tile found"* for any
@@ -408,9 +409,8 @@ The solver prioritizes preserving crossers over exact corner matching. At a Pit/
 - **Decorated interior terrain is only partly walkable.** `tic01`'s `rich` tiles carry
   furniture, so a tile existing does not mean a creature can stand on it — a throne-room
   centre computed as `col*10+5, row*10+5` came back `Nonwalk (ID 7)`. On any decorated
-  terrain, get positions from `adventure_find_walkable`, never from arithmetic. (This
-  qualifies the tile-centre fallback in the Z-height note above: that fallback is safe on
-  plain floor/clearing tiles only.)
+  terrain, get positions from `adventure_find_walkable`, never from arithmetic. (The tile-centre fallback
+  `col*10+5, row*10+5` is safe on plain floor/clearing tiles only; confirm with `probe_ground`.)
 - **Delete the template's `_start` area** once the real entry area exists and
   `Mod_Entry_Area` points at it. `create_module` always leaves a `tms01` stub behind, and
   it shows up as permanently unreachable in `check_area_connectivity`.
