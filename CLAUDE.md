@@ -115,6 +115,22 @@ The rest are open.
     steps, and which tool answers which tileset question (`get_tileset_details`, `analyze_tileset_rules`). The conventions are
     enforced by the live oracle. Still open: extend `paint_tiles`/`paint_group`/the solver beyond flat tiles (height-transition tiles
     — the corner-height agreement rule and `Transition` are known) and fix any remaining rotation cases at the root.
+13. **TODO (2026-10-03) — two local branches hold real, unmerged, unpushed work.**
+    `master` itself is clean and in sync with `origin/master` — this is not an
+    uncommitted-changes problem, it's two feature branches that exist only on this
+    machine with commits nowhere else:
+    - `area-avenue-rotation` (9 commits, no upstream) — rotation support for
+      stamped tile groups (`paint_group`/`apply_layout`), a reserved road/avenue
+      between stamped feature groups, a rotation-handedness fix, and a writeup of
+      the orphaned-tile-from-repeated-repainting pitfall.
+    - `live-verify-automation` (3 commits, no upstream) — automates the live
+      verify-server loop into `run_live_verification`, a `systest-module` skill +
+      `create_systest_instrumentation` for combat/log verification, a "simple NPC"
+      tier, and a signal-gated weather-variance checker.
+    Neither has a remote copy — losing this machine's working copy loses both in
+    full. Distinct from #9 (those branches are already merged into `master`, just
+    not deleted). Decide per branch: merge, push for safekeeping, or confirm
+    abandoned and delete.
 
 ## Design Intent
 
