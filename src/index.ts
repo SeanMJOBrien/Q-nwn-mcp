@@ -31,6 +31,7 @@ import { registerGearTools } from "./tools/gear-tools.js";
 import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
 import { registerNpcTools } from "./tools/npc-tools.js";
 import { registerRandomAbilitiesTools } from "./tools/random-abilities-tools.js";
+import { registerVariableTools } from "./tools/variable-tools.js";
 
 const server = new McpServer({
   name: "nwn-mcp",
@@ -57,6 +58,7 @@ registerWriteTools(server);
 registerPaintTools(server);
 registerPlacementTools(server);
 registerObjectMgmtTools(server);
+registerVariableTools(server);
 registerBlueprintTools(server);
 registerJournalTools(server);
 registerDialogWriteTools(server);

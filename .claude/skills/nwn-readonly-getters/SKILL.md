@@ -1,6 +1,6 @@
 ---
 name: nwn-readonly-getters
-description: Use when listing or inspecting module/area content without editing it — creatures, items, stores, encounters, sounds, waypoints, faction membership — or when sanity-checking module info (.ifo) itself. Trigger on "list all creatures/items/stores in this area", "what's in this faction", "get details for this creature", "check module info", or requests touching list_creatures/get_creature_details/list_items/list_stores/get_area_encounters/get_area_items/get_area_sounds/get_area_waypoints/get_faction_creatures/verify_module_info.
+description: Use when listing or inspecting module/area content without editing it — creatures, items, stores, encounters, sounds, waypoints, faction membership, local variables — or when sanity-checking module info (.ifo) itself. Trigger on "list all creatures/items/stores in this area", "what's in this faction", "get details for this creature", "what variables are set on this", "check module info", or requests touching list_creatures/get_creature_details/list_items/list_stores/get_area_encounters/get_area_items/get_area_sounds/get_area_waypoints/get_faction_creatures/get_object_variables/verify_module_info.
 ---
 
 # Read-Only Getters
@@ -22,6 +22,17 @@ area's objects of one kind; a few are module-wide.
 | `get_area_waypoints` | one area | `area` |
 | `get_faction_details` | module | — (factions + reputation matrix) |
 | `get_faction_creatures` | module | `factionId` |
+| `get_object_variables` | one placed instance or blueprint | `area`+`tag` **or** `resref`+`blueprintType` |
+
+## `get_object_variables` has a write-tool counterpart, and two target modes
+
+`get_object_variables` is read-only, but `set_object_variables` and
+`remove_object_variable` (module-explorer skill) exist for editing the same
+data — all three share the same targeting params. Pass **either** a placed
+instance (`area` + `tag`, or `area` + `listName` + `index`) **or** a
+standalone blueprint resource (`resref` + `blueprintType`), never both — a
+placed instance's VarTable is a separate copy from its blueprint's, so
+reading/editing one never reflects the other.
 
 ## `get_creature_details`'s two lookup modes
 

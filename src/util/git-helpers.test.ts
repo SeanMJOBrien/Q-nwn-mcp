@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { degToRad, buildMinimalUtc, getGitDoc, updateAreaCounts, mergeVarTable } from "./git-helpers.js";
+import { degToRad, buildMinimalUtc, getGitDoc, updateAreaCounts, mergeVarTable, getVarTableEntries, removeVarTableEntry, clearVarTable } from "./git-helpers.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 
@@ -285,6 +285,66 @@ describe("mergeVarTable", () => {
     expect(() =>
       mergeVarTable(obj, [{ name: "bad", type: "object" as "int", value: 1 }]),
     ).toThrow(/Unknown VarTable type/);
+  });
+});
+
+describe("getVarTableEntries", () => {
+  it("returns an empty array for an object with no VarTable", () => {
+    expect(getVarTableEntries({} as GffObj)).toEqual([]);
+  });
+
+  it("round-trips entries written by mergeVarTable, including type", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [
+      { name: "anInt", type: "int", value: 1 },
+      { name: "aFloat", type: "float", value: 1.5 },
+      { name: "aString", type: "string", value: "hello" },
+    ]);
+
+    expect(getVarTableEntries(obj)).toEqual([
+      { name: "anInt", type: "int", value: 1 },
+      { name: "aFloat", type: "float", value: 1.5 },
+      { name: "aString", type: "string", value: "hello" },
+    ]);
+  });
+});
+
+describe("removeVarTableEntry", () => {
+  it("returns false for an object with no VarTable", () => {
+    expect(removeVarTableEntry({} as GffObj, "ANYTHING")).toBe(false);
+  });
+
+  it("removes a matching entry case-insensitively and returns true", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: 5 }]);
+
+    expect(removeVarTableEntry(obj, "hench_level")).toBe(true);
+    expect(getVarTableEntries(obj)).toEqual([]);
+  });
+
+  it("returns false and leaves other entries untouched when the name isn't found", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: 5 }]);
+
+    expect(removeVarTableEntry(obj, "NOT_PRESENT")).toBe(false);
+    expect(getVarTableEntries(obj)).toHaveLength(1);
+  });
+});
+
+describe("clearVarTable", () => {
+  it("returns 0 for an object with no VarTable", () => {
+    expect(clearVarTable({} as GffObj)).toBe(0);
+  });
+
+  it("removes every entry and returns the count removed", () => {
+    const obj = {} as GffObj;
+    mergeVarTable(obj, [
+      { name: "ONE", type: "int", value: 1 },
+      { name: "TWO", type: "int", value: 2 },
+    ]);
+
+    expect(clearVarTable(obj)).toBe(2);
+    expect(getVarTableEntries(obj)).toEqual([]);
   });
 });
 

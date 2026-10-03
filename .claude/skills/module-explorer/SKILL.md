@@ -76,6 +76,16 @@ Reach for these instead of manually cross-referencing GFF fields:
    `set_area_properties`, etc.). Bulk variants (`bulk_move_objects`,
    `bulk_remove_objects`) exist for multi-object operations — prefer them
    over looping single-object calls.
+   - For local variables (VarTable entries) on a creature, placed object, or
+     blueprint, use `get_object_variables`/`set_object_variables`/
+     `remove_object_variable` instead of `modify_gff_field` — VarTable is a
+     list, which `modify_gff_field` explicitly refuses. Each of these three
+     tools targets **either** a placed instance (`area` + `tag`, or `area` +
+     `listName` + `index`) **or** a standalone blueprint resource (`resref` +
+     `blueprintType`) — never both at once, and a placed instance's VarTable
+     is a separate copy from its blueprint's (see the "separate copy"
+     pitfall in this project's CLAUDE.md), so pick the one that actually
+     matters for the edit at hand.
 2. **Always call `repack_module` after edits so the user can see them in
    the toolset** — edits are held in the in-memory index until repacked.
    Mention that you repacked.

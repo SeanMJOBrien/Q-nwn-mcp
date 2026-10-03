@@ -383,3 +383,51 @@ export function mergeVarTable(obj: GffObj, vars: VarTableEntry[]): void {
     }
   }
 }
+
+/** GFF VarTable type code → VarTableEntry type, the inverse of VAR_TYPE_CODES. */
+const VAR_TYPE_NAMES: Record<number, VarTableEntry["type"]> = { 1: "int", 2: "float", 3: "string" };
+
+/** Read an object's VarTable as a plain array of {name, type, value}, for display or inspection. */
+export function getVarTableEntries(obj: GffObj): VarTableEntry[] {
+  const table = obj.VarTable as { value?: GffObj[] } | undefined;
+  if (!table || !Array.isArray(table.value)) return [];
+
+  return table.value.map(entry => {
+    const nameField = entry.Name as { value?: unknown } | undefined;
+    const typeField = entry.Type as { value?: unknown } | undefined;
+    const valueField = entry.Value as { value?: unknown } | undefined;
+    const typeCode = typeof typeField?.value === "number" ? typeField.value : 1;
+    return {
+      name: typeof nameField?.value === "string" ? nameField.value : "",
+      type: VAR_TYPE_NAMES[typeCode] ?? "int",
+      value: (valueField?.value as number | string | undefined) ?? 0,
+    };
+  });
+}
+
+/**
+ * Remove a single local variable from an object's VarTable by name
+ * (case-insensitive). Returns true if a variable was found and removed.
+ */
+export function removeVarTableEntry(obj: GffObj, name: string): boolean {
+  const table = obj.VarTable as { value?: GffObj[] } | undefined;
+  if (!table || !Array.isArray(table.value)) return false;
+
+  const idx = table.value.findIndex(v => {
+    const nameField = v.Name as { value?: unknown } | undefined;
+    return typeof nameField?.value === "string" && nameField.value.toLowerCase() === name.toLowerCase();
+  });
+  if (idx < 0) return false;
+
+  table.value.splice(idx, 1);
+  return true;
+}
+
+/** Remove every local variable from an object's VarTable. Returns the count removed. */
+export function clearVarTable(obj: GffObj): number {
+  const table = obj.VarTable as { value?: GffObj[] } | undefined;
+  if (!table || !Array.isArray(table.value)) return 0;
+  const count = table.value.length;
+  table.value = [];
+  return count;
+}
