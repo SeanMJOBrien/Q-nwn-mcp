@@ -1,0 +1,33 @@
+name: CI
+
+# Gates the TypeScript server itself (typecheck, lint, test) — the same gate
+# scripts/verify.sh already runs locally and via the pre-commit hook, just
+# enforced even when a contributor skips or bypasses that hook.
+#
+# This does NOT run anything that needs real NWN game data, a nim toolchain,
+# or network access — those stay local/manual per CLAUDE.md's "Testing"
+# section (module generation and testing must never depend on a hosted
+# service). The suite's own live/env-gated tests (comprehensive-module.live,
+# tile-oracle.live) already skip cleanly without NWN_FOLDER_DATA/NWN_FOLDER_USER
+# set, which is exactly the case here.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run verify

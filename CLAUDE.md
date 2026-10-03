@@ -15,13 +15,15 @@ Ranked by impact, from a structural survey of tests/CI, skills, docs, and git
 history. #8 (typecheck script) is done — `npm run typecheck` / `scripts/verify.sh`.
 The rest are open.
 
-1. **TODO — no CI gate.** `npm test` (vitest, 31 files), `npm run lint`/`check`
-   (biome), and `npm run typecheck` only run when a human remembers to type them
-   or via the local pre-commit hook (`npm run hooks:install`). Note: `scripts/verify.sh`
-   states this is a deliberate choice ("no hosted CI, no network — modules built
-   with this server are one-off and local"), so adding hosted CI (e.g. GitHub
-   Actions) should be a conscious call, not an assumed gap — but even a local-only
-   convention doesn't stop a PR merging without `verify.sh` having been run.
+1. ~~**DONE — no CI gate.**~~ `.github/workflows/ci.yml` (2026-10-03) runs
+   `npm ci && npm run verify` (typecheck, build, lint, test) on every push/PR to
+   `master`. This doesn't contradict `scripts/verify.sh`'s "no hosted CI, no
+   network" comment — that line is about not depending on real game data/a nim
+   toolchain for *module building*, not about gating the server's own
+   TypeScript. The suite already runs in ~1s with zero network and degrades to
+   skip without `NWN_FOLDER_DATA`/`NWN_FOLDER_USER` set, which is exactly CI's
+   case, so it was CI-safe as-is — the gap was just that nothing ran it
+   automatically.
 2. **TODO — rotation/orientation math is the top bug source.** 17 of the last 100
    commits are fixes to tile rotation, collar orientation, or NPC generation
    (e.g. "Fix CityGate_2x2 collar: 2 of 4 tiles were 180° off", "Fix
