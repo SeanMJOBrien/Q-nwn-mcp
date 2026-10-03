@@ -22,7 +22,7 @@ import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from
 import type { GffObj } from "../types/gff.js";
 import { snapshotGitForUndo } from "../util/undo.js";
 import { compileScript, jsonToGff } from "../nim-tools.js";
-import { checkPlacementWalkable } from "../util/walkmesh.js";
+import { checkPlacementWalkable, checkPositionWalkable } from "../util/walkmesh.js";
 
 /** List names excluded from walkability validation (doors sit on walls, sounds are ambient) */
 const WALK_CHECK_SKIP_LISTS = new Set(["Door List", "SoundList"]);
@@ -400,7 +400,7 @@ export function registerObjectMgmtTools(server: McpServer): void {
 
   server.tool(
     "move_object",
-    "Move an object to a new position in an area. Finds the object by tag (first match) or list index.",
+    "Move an object to a new position in an area. Finds the object by tag (first match) or list index. When z is omitted the object keeps its height ABOVE THE GROUND (Z changes by the walkmesh ground-height difference between the old and new positions), so moving a prop onto different terrain does not bury or float it; pass followGround=false to leave Z untouched.",
     {
       area: z.string().describe("Area resref"),
       listName: z.string().describe("GIT list name: 'Creature List', 'Placeable List', 'WaypointList', 'Door List', 'TriggerList', 'Encounter List', 'SoundList', 'StoreList'"),
@@ -408,10 +408,11 @@ export function registerObjectMgmtTools(server: McpServer): void {
       index: optNumParam("0-based index in the list"),
       x: numParam("New X position"),
       y: numParam("New Y position"),
-      z: optNumParam("New Z position (keeps current if omitted)"),
+      z: optNumParam("New Z position (if omitted, see followGround)"),
+      followGround: z.boolean().optional().describe("When z is omitted: keep the object's height above the ground by adding the ground-height change between the old and new positions (default true). false = leave Z unchanged."),
     },
     { idempotentHint: true },
-    async ({ area, listName, tag, index: moveIndex, x, y, z: zPos }) => {
+    async ({ area, listName, tag, index: moveIndex, x, y, z: zPos, followGround }) => {
       if (tag === undefined && moveIndex === undefined) {
         return { content: [{ type: "text", text: "Must provide either 'tag' or 'index'" }] };
       }
@@ -475,12 +476,27 @@ export function registerObjectMgmtTools(server: McpServer): void {
         }
       }
 
+      // Keep the object's height above ground when moving it onto different terrain (z not given)
+      let finalZ = zN;
+      let groundShift: number | undefined;
+      if (zN === undefined && followGround !== false) {
+        const resmanForGround = await buildResmanOptions(moduleIndex);
+        const [oldGround, newGround] = await Promise.all([
+          checkPositionWalkable(oldPosition.x, oldPosition.y, area.toLowerCase(), moduleIndex, resmanForGround),
+          checkPositionWalkable(xN, yN, area.toLowerCase(), moduleIndex, resmanForGround),
+        ]);
+        if (oldGround.z !== undefined && newGround.z !== undefined) {
+          groundShift = Math.round((newGround.z - oldGround.z) * 10000) / 10000;
+          finalZ = oldPosition.z + groundShift;
+        }
+      }
+
       snapshotGitForUndo(gitDoc, area, "move_object", `Move ${objTag || `index ${targetIdx}`} in ${listName}`);
 
       obj[xField] = { type: "float", value: xN };
       obj[yField] = { type: "float", value: yN };
-      if (zN !== undefined) {
-        obj[zField] = { type: "float", value: zN };
+      if (finalZ !== undefined) {
+        obj[zField] = { type: "float", value: finalZ };
       }
 
       await writeBackGit(moduleIndex, area, gitDoc);
@@ -494,7 +510,8 @@ export function registerObjectMgmtTools(server: McpServer): void {
             listName,
             object: { tag: objTag, name: objName, index: targetIdx },
             oldPosition,
-            newPosition: { x: xN, y: yN, z: zN ?? oldPosition.z },
+            newPosition: { x: xN, y: yN, z: finalZ ?? oldPosition.z },
+            groundShift: groundShift ?? null,
           }, null, 2),
         }],
       };

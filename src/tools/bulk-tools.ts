@@ -239,10 +239,11 @@ export function registerBulkTools(server: McpServer): void {
       listName: z.string().describe("GIT list name"),
       offsetX: numParam("X offset"),
       offsetY: numParam("Y offset"),
-      offsetZ: optNumParam("Z offset (default 0)"),
+      offsetZ: optNumParam("Z offset (default 0), added on top of the ground-height change when followGround is on"),
+      followGround: z.boolean().optional().describe("Keep each object's height above the ground by adding the walkmesh ground-height change between its old and new position (default true). false = shift Z by offsetZ only."),
     },
     { idempotentHint: true },
-    async ({ area, tag, listName, offsetX, offsetY, offsetZ }) => {
+    async ({ area, tag, listName, offsetX, offsetY, offsetZ, followGround }) => {
       const dx = toF(offsetX), dy = toF(offsetY), dz = toF(offsetZ);
       const index = requireIndex();
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
@@ -287,13 +288,27 @@ export function registerBulkTools(server: McpServer): void {
 
       snapshotGitForUndo(gitDoc, area, "bulk_move_objects", `Move ${matched.length} '${tag}' by (${dx}, ${dy}, ${dz})`);
 
+      const followOn = followGround !== false;
+      const resmanForGround = followOn ? await buildResmanOptions(index) : undefined;
+      let groundAdjusted = 0;
       for (const obj of matched) {
         const curX = getFieldNum(obj, xField);
         const curY = getFieldNum(obj, yField);
         const curZ = getFieldNum(obj, zField);
+        let groundShift = 0;
+        if (followOn && resmanForGround) {
+          const [g0, g1] = await Promise.all([
+            checkPositionWalkable(curX, curY, area.toLowerCase(), index, resmanForGround),
+            checkPositionWalkable(curX + dx, curY + dy, area.toLowerCase(), index, resmanForGround),
+          ]);
+          if (g0.z !== undefined && g1.z !== undefined && Math.abs(g1.z - g0.z) > 1e-6) {
+            groundShift = g1.z - g0.z;
+            groundAdjusted++;
+          }
+        }
         obj[xField] = { type: "float", value: curX + dx };
         obj[yField] = { type: "float", value: curY + dy };
-        obj[zField] = { type: "float", value: curZ + dz };
+        obj[zField] = { type: "float", value: Math.round((curZ + dz + groundShift) * 10000) / 10000 };
       }
 
       await writeBackGit(index, area, gitDoc);
@@ -307,6 +322,8 @@ export function registerBulkTools(server: McpServer): void {
             tag,
             movedCount: matched.length,
             offset: { x: dx, y: dy, z: dz },
+            followGround: followOn,
+            groundAdjusted,
           }, null, 2),
         }],
       };
@@ -317,12 +334,17 @@ export function registerBulkTools(server: McpServer): void {
 
   server.tool(
     "fix_object_heights",
-    "Adjust Z height of all placed objects in an area to match the walkmesh ground plane. Fixes objects that were placed at Z=0 on elevated terrain.",
+    "Adjust Z height of all placed objects in an area to match the walkmesh ground plane (mesh Z + the walkmesh node offset + Tile_Height levels x the tileset's Transition step: 5 m for most outdoor tilesets, 4 for tcn01, 2 for tno01). Fixes objects that were placed at Z=0 on elevated terrain. CAUTION: it also resets props that are deliberately raised (on a table, hanging lanterns) - run with dryRun=true first, and use onlyBuried=true to only RAISE objects that are below the ground. About 1% of objects in real, correct areas differ from the ground height on purpose. Heights written by older versions of this server were wrong on tilesets whose walkmeshes carry a node offset (57% of vanilla walkmeshes, e.g. interiors by -1.5 m); this tool repairs those.",
     {
       area: z.string().optional().describe("Area resref. Omit to fix all areas."),
+      dryRun: z.boolean().optional().describe("Report what would change (up to 40 samples) without modifying anything (default false)."),
+      tolerance: optNumParam("Ignore objects already within this many meters of the ground height (default 0.01)."),
+      onlyBuried: z.boolean().optional().describe("Only raise objects whose Z is below the ground; never lower anything (default false)."),
     },
     { idempotentHint: true },
-    async ({ area }) => {
+    async ({ area, dryRun, tolerance, onlyBuried }) => {
+      const toleranceN = tolerance !== undefined ? toF(tolerance) : 0.01;
+      const samples: Array<{ area: string; list: string; tag: string; oldZ: number; newZ: number }> = [];
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
@@ -358,8 +380,14 @@ export function registerBulkTools(server: McpServer): void {
             const result = await checkPositionWalkable(wx, wy, areaResref, index, resmanOpts);
             if (result.z !== undefined) {
               const oldZ = getFieldNum(obj, zField);
-              if (Math.abs(oldZ - result.z) > 0.01) {
-                (obj as Record<string, unknown>)[zField] = { type: "float", value: result.z };
+              const delta = result.z - oldZ;
+              if (Math.abs(delta) > toleranceN && !(onlyBuried && delta < 0)) {
+                if (samples.length < 40) {
+                  samples.push({ area: areaResref, list: listName, tag: getFieldStr(obj, "Tag"), oldZ, newZ: Math.round(result.z * 10000) / 10000 });
+                }
+                if (!dryRun) {
+                  (obj as Record<string, unknown>)[zField] = { type: "float", value: result.z };
+                }
                 areaFixed++;
               }
             }
@@ -367,8 +395,10 @@ export function registerBulkTools(server: McpServer): void {
         }
 
         if (areaFixed > 0) {
-          snapshotGitForUndo(gitDoc, areaResref, "fix_object_heights", `Fixed ${areaFixed} object heights`);
-          await writeBackGit(index, areaResref, gitDoc);
+          if (!dryRun) {
+            snapshotGitForUndo(gitDoc, areaResref, "fix_object_heights", `Fixed ${areaFixed} object heights`);
+            await writeBackGit(index, areaResref, gitDoc);
+          }
           totalFixed += areaFixed;
           results.push({ area: areaResref, fixed: areaFixed });
         }
@@ -379,8 +409,10 @@ export function registerBulkTools(server: McpServer): void {
           type: "text",
           text: JSON.stringify({
             success: true,
+            dryRun: dryRun === true,
             totalFixed,
             areas: results,
+            samples,
           }, null, 2),
         }],
       };

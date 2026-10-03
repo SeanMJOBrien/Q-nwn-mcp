@@ -24,7 +24,7 @@ import { MCP_FOLDER_USERREPORTS } from "../config.js";
 import { listAllTilesets, getTilesetInfo } from "../util/tileset.js";
 import { analyzeAllGroups, findFlatFillerTiles, checkTilesetIntegrity } from "../util/tileset-rules.js";
 import { computeValidPairs } from "../util/zone-solver.js";
-import { loadAreaWalkmeshData, computeWalkableZones, } from "../util/walkmesh.js";
+import { loadAreaWalkmeshData, computeWalkableZones, tileHeightStep } from "../util/walkmesh.js";
 import type { AreaTransitionInfo } from "../util/walkmesh.js";
 import type { ZoneInfo } from "../util/walkmesh.js";
 import { buildAreaRenderData, extractAreaObjects } from "../util/area-data.js";
@@ -97,7 +97,7 @@ export function registerTilesetTools(server: McpServer): void {
 
   server.tool(
     "get_tileset_details",
-    "Get full details for a tileset: terrain types, crosser types, primary rules, all groups with dimensions and tile IDs, and a summary of the tile catalog organized by terrain patterns. Use detail='summary' (default) for a compact ~2KB overview including valid terrain adjacencies. Use detail='full' for the complete tile catalog (~60-100KB).",
+    "Get full details for a tileset: terrain types, crosser types, primary rules, all groups with dimensions and tile IDs, and a summary of the tile catalog organized by terrain patterns. Includes heightStep, the metres of ground height per ARE Tile_Height level (the tileset's Transition: 5 for most outdoor sets, 4 for tcn01, 2 for tno01). Use detail='summary' (default) for a compact ~2KB overview including valid terrain adjacencies. Use detail='full' for the complete tile catalog (~60-100KB).",
     {
       tileset: z.string().describe("Tileset resref (e.g., 'ttf01' for forest, 'tdc01' for crypt)"),
       detail: z.string().optional().describe("'summary' (default) for compact overview with adjacencies, or 'full' for complete tile catalog"),
@@ -123,6 +123,8 @@ export function registerTilesetTools(server: McpServer): void {
           resref: info.resref,
           displayName: info.displayName,
           interior: info.interior,
+          hasHeightTransition: info.hasHeightTransition,
+          heightStep: tileHeightStep(info),   // metres per ARE Tile_Height level (the .set's Transition)
           defaultTerrain: info.defaultTerrain,
           terrainTypes: info.terrainTypes,
           crosserTypes: info.crosserTypes,
@@ -172,6 +174,7 @@ export function registerTilesetTools(server: McpServer): void {
         displayName: info.displayName,
         interior: info.interior,
         hasHeightTransition: info.hasHeightTransition,
+        heightStep: tileHeightStep(info),   // metres per ARE Tile_Height level (the .set's Transition)
         defaultTerrain: info.defaultTerrain,
         terrainTypes: info.terrainTypes,
         crosserTypes: info.crosserTypes,

@@ -2,6 +2,7 @@
  * Area placement MCP tools.
  *
  * Tools:
+ * - probe_ground: Read-only walkability / surface / exact ground height at a point
  * - place_creature: Place a creature from a blueprint with walkmesh validation
  * - place_placeable: Place a placeable from a blueprint with correct Appearance
  * - place_waypoint: Place a waypoint with optional map note
@@ -23,6 +24,15 @@ import { resolveBlueprint, getGitDoc, writeBackGit, updateAreaCounts, degToRad }
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
 import { snapshotGitForUndo } from "../util/undo.js";
+import {
+  compassToOrientation,
+  orientationToCompass,
+  orientationToward,
+  parseFaceToward,
+  placeableBearingToward,
+  placeableFrontCompass,
+  radToDeg,
+} from "../util/facing.js";
 
 // ─── Collision detection helper ──────────────────────────────────────────────
 
@@ -70,28 +80,98 @@ function checkCollision(git: GffObj, x: number, y: number, radius: number = 0.75
 
 export function registerPlacementTools(server: McpServer): void {
 
+  // ─── probe_ground ──────────────────────────────────────────────────────
+
+  server.tool(
+    "probe_ground",
+    "Read-only: report what is at a world position - whether it is walkable, the surface material, the exact ground height (Z) from the tile walkmesh (mesh height + node offset + Tile_Height levels x the tileset's Transition step, reported as heightStep: 5 m for most outdoor tilesets, 4 for tcn01, 2 for tno01), which tile it is in, and whether it would pass the placement check (the position and four points `buffer` m away all walkable). Use it before placing something or to pick a Z for a prop. Coordinates are meters: +X east, +Y north, origin at the south-west corner, 10 m per tile.",
+    {
+      area: z.string().describe("Area resref"),
+      x: numParam("World X position"),
+      y: numParam("World Y position"),
+      buffer: optNumParam("Clearance in meters for the placement check (default 1.0)"),
+    },
+    { readOnlyHint: true, idempotentHint: true },
+    async ({ area, x, y, buffer }) => {
+      const xN = toF(x), yN = toF(y);
+      const bufferN = buffer !== undefined ? toF(buffer) : undefined;
+      const index = requireIndex();
+      const resmanOpts = await buildResmanOptions(index);
+      const areaKey = area.toLowerCase();
+
+      const ground = await checkPositionWalkable(xN, yN, areaKey, index, resmanOpts);
+
+      let placement: { ok: boolean; reason?: string } | undefined;
+      if (ground.walkable) {
+        const check = await checkPlacementWalkable(xN, yN, areaKey, index, resmanOpts, bufferN);
+        placement = { ok: check.ok, reason: check.reason };
+      }
+
+      // Which tile is this? (row-major from the south-west corner: index = row * Width + col)
+      let tile: Record<string, number> | null = null;
+      const are = index.parsedGff.get(`${areaKey}.are`) as GffObj | undefined;
+      if (are) {
+        const width = getFieldNum(are, "Width");
+        const col = Math.floor(xN / 10), row = Math.floor(yN / 10);
+        const entry = getFieldList(are, "Tile_List")[row * width + col];
+        if (entry && col >= 0 && col < width && row >= 0) {
+          tile = {
+            col,
+            row,
+            tileId: getFieldNum(entry, "Tile_ID"),
+            orientation: getFieldNum(entry, "Tile_Orientation"),
+            heightLevel: getFieldNum(entry, "Tile_Height"),
+          };
+        }
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            area,
+            position: { x: xN, y: yN },
+            walkable: ground.walkable,
+            surface: ground.material ?? null,
+            groundZ: ground.z !== undefined ? Math.round(ground.z * 10000) / 10000 : null,
+            heightStep: ground.heightStep ?? null,
+            tile,
+            placement: placement ? { ...placement, buffer: bufferN ?? 1.0 } : null,
+            error: ground.error ?? null,
+          }, null, 2),
+        }],
+      };
+    },
+  );
+
   // ─── place_creature ────────────────────────────────────────────────────
 
   server.tool(
     "place_creature",
-    "Place a creature in an area from a UTC blueprint (module or base game). Validates position against walkmesh.",
+    "Place a creature in an area from a UTC blueprint (module or base game). Validates position against the walkmesh (the position and four points 1 m away must be walkable; relax with walkBuffer) and sets Z to the exact ground height from the tile walkmesh. Facing: bearing is a COMPASS bearing in degrees (0 = north, 90 = east, clockwise); or pass faceTowardX/faceTowardY to face a world point.",
     {
       area: z.string().describe("Area resref"),
       blueprint: z.string().describe("UTC blueprint resref (module or base game, e.g. 'nw_dog', 'salino')"),
       x: numParam("World X position"),
       y: numParam("World Y position"),
-      z: optNumParam("World Z position (default 0.0)"),
-      bearing: optNumParam("Facing direction in degrees (default 0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
+      bearing: optNumParam("Compass facing in degrees: 0 = north, 90 = east, 180 = south, 270 = west (default 0)"),
       collisionRadius: optNumParam("Collision detection radius in meters (default 0.75). Set to 0 to disable."),
+      faceTowardX: optNumParam("Face the world point (faceTowardX, faceTowardY) instead of using bearing"),
+      faceTowardY: optNumParam("World Y of the point to face (give together with faceTowardX)"),
+      walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 1.0). 0 = only the position itself must be walkable. Real designers' props: only 57% have 1 m of clearance, 74% have 0.5 m."),
     },
     { idempotentHint: true },
-    async ({ area, blueprint, x, y, z: zPos, bearing, collisionRadius }) => {
+    async ({ area, blueprint, x, y, z: zPos, bearing, collisionRadius, faceTowardX, faceTowardY, walkBuffer }) => {
       const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing);
+      const face = parseFaceToward(faceTowardX, faceTowardY);
+      if ("error" in face) return { content: [{ type: "text", text: face.error }] };
+      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : undefined;
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
       // Walkmesh + buffer validation
-      const walkCheck = await checkPlacementWalkable(xN, yN, area.toLowerCase(), index, resmanOpts);
+      const walkCheck = await checkPlacementWalkable(xN, yN, area.toLowerCase(), index, resmanOpts, walkBufferN);
       if (!walkCheck.ok) {
         return {
           content: [{
@@ -123,10 +203,18 @@ export function registerPlacementTools(server: McpServer): void {
       obj.YPosition = { type: "float", value: yN };
       obj.ZPosition = { type: "float", value: placeZ };
 
-      // Set facing
-      const rad = degToRad(bearingN);
-      obj.XOrientation = { type: "float", value: Math.sin(rad) };
-      obj.YOrientation = { type: "float", value: Math.cos(rad) };
+      // Set facing: an orientation VECTOR in world axes (compass bearing b -> (sin b, cos b))
+      let orientation: [number, number];
+      if (face.target) {
+        const toward = orientationToward({ x: xN, y: yN }, face.target);
+        if (!toward) return { content: [{ type: "text", text: "faceToward is the same point as the creature position." }] };
+        orientation = toward;
+      } else {
+        orientation = compassToOrientation(bearingN);
+      }
+      obj.XOrientation = { type: "float", value: orientation[0] };
+      obj.YOrientation = { type: "float", value: orientation[1] };
+      const facingCompass = orientationToCompass(orientation[0], orientation[1]);
 
       // Append to GIT Creature List
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
@@ -162,8 +250,9 @@ export function registerPlacementTools(server: McpServer): void {
             area,
             creature: name,
             blueprint,
-            position: { x: xN, y: yN, z: zN },
-            bearing: bearingN,
+            position: { x: xN, y: yN, z: placeZ },
+            groundZ: walkCheck.z ?? null,
+            bearing: facingCompass,
           }, null, 2),
         }],
       };
@@ -174,24 +263,32 @@ export function registerPlacementTools(server: McpServer): void {
 
   server.tool(
     "place_placeable",
-    "Place a placeable in an area from a UTP blueprint. Appearance field comes from the blueprint (not defaulted to 0). By default strips event scripts and clears Useable/HasInventory — pass stripScripts='false' to keep blueprint defaults. Use add_items_to_container to enable inventory on placed containers. Enforces 1m collision check — placement fails if another object is within 1m.",
+    "Place a placeable in an area from a UTP blueprint. Appearance field comes from the blueprint (not defaulted to 0). By default strips event scripts and clears Useable/HasInventory — pass stripScripts='false' to keep blueprint defaults. Use add_items_to_container to enable inventory on placed containers. Enforces a collision check (default 1 m; collisionRadius to change, 0 disables) and a walkability check (the position and four points walkBuffer m away, default 1 m, must be walkable). Z is the exact ground height from the tile walkmesh plus zOffset (use zOffset to put a prop on a table). Facing: bearing is the RAW GFF Bearing in degrees, counter-clockwise, and the model's FRONT faces SOUTH at 0 (front compass = 180 - bearing), so prefer faceTowardX/faceTowardY, which turns the front toward a world point (chairs toward a table, bedrolls toward a fire).",
     {
       area: z.string().describe("Area resref"),
       blueprint: z.string().describe("UTP blueprint resref (module or base game)"),
       x: numParam("World X position"),
       y: numParam("World Y position"),
-      z: optNumParam("World Z position (default 0.0)"),
-      bearing: optNumParam("Facing direction in degrees (default 0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
+      bearing: optNumParam("Raw GFF Bearing in degrees, counter-clockwise; the model front faces SOUTH at 0, EAST at 90, NORTH at 180 (default 0). Prefer faceTowardX/faceTowardY."),
+      zOffset: optNumParam("Meters above the ground height (default 0). Ground height always comes from the walkmesh; the z parameter is only a fallback when no walkmesh is available."),
+      collisionRadius: optNumParam("Minimum distance to other creatures/placeables/doors in meters (default 1.0). Set to 0 to disable. Real areas: 34% of props sit within 1 m of another prop, 16% within 0.5 m."),
+      faceTowardX: optNumParam("Face the world point (faceTowardX, faceTowardY) instead of using bearing"),
+      faceTowardY: optNumParam("World Y of the point to face (give together with faceTowardX)"),
+      walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 1.0). 0 = only the position itself must be walkable. Real designers' props: only 57% have 1 m of clearance, 74% have 0.5 m."),
       stripScripts: z.string().optional().describe("Strip all event scripts from the blueprint (default 'true'). Set to 'false' to keep blueprint scripts."),
     },
     { idempotentHint: true },
-    async ({ area, blueprint, x, y, z: zPos, bearing, stripScripts }) => {
-      const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing);
+    async ({ area, blueprint, x, y, z: zPos, bearing, zOffset, collisionRadius, faceTowardX, faceTowardY, walkBuffer, stripScripts }) => {
+      const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing), zOffsetN = toF(zOffset);
+      const face = parseFaceToward(faceTowardX, faceTowardY);
+      if ("error" in face) return { content: [{ type: "text", text: face.error }] };
+      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : undefined;
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
       // Walkmesh + buffer validation (blocking)
-      const walkCheck = await checkPlacementWalkable(xN, yN, area.toLowerCase(), index, resmanOpts);
+      const walkCheck = await checkPlacementWalkable(xN, yN, area.toLowerCase(), index, resmanOpts, walkBufferN);
       if (!walkCheck.ok) {
         return {
           content: [{
@@ -241,11 +338,17 @@ export function registerPlacementTools(server: McpServer): void {
       }
 
       // Placeables use different position field names — use walkmesh Z
-      const placeZ = walkCheck.z ?? zN;
+      const placeZ = (walkCheck.z ?? zN) + zOffsetN;
+      let bearingRad = degToRad(bearingN);
+      if (face.target) {
+        const toward = placeableBearingToward({ x: xN, y: yN }, face.target);
+        if (toward === null) return { content: [{ type: "text", text: "faceToward is the same point as the placeable position." }] };
+        bearingRad = toward;
+      }
       obj.X = { type: "float", value: xN };
       obj.Y = { type: "float", value: yN };
       obj.Z = { type: "float", value: placeZ };
-      obj.Bearing = { type: "float", value: degToRad(bearingN) };
+      obj.Bearing = { type: "float", value: bearingRad };
 
       // Verify Appearance is present from blueprint
       const appearance = getFieldNum(obj, "Appearance");
@@ -253,15 +356,18 @@ export function registerPlacementTools(server: McpServer): void {
       // Append to GIT Placeable List
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
 
-      // Collision detection — mandatory 1m radius, blocks placement
-      const collision = checkCollision(git, xN, yN, 1.0);
-      if (collision.collision) {
-        return {
-          content: [{
-            type: "text",
-            text: `Placement blocked: '${collision.nearbyTag}' is ${collision.distance}m away (minimum 1m). Choose a different position.`,
-          }],
-        };
+      // Collision detection — blocks placement (default 1 m; collisionRadius 0 disables)
+      const colRadius = collisionRadius !== undefined ? toF(collisionRadius) : 1.0;
+      if (colRadius > 0) {
+        const collision = checkCollision(git, xN, yN, colRadius);
+        if (collision.collision) {
+          return {
+            content: [{
+              type: "text",
+              text: `Placement blocked: '${collision.nearbyTag}' is ${collision.distance}m away (minimum ${colRadius}m). Choose a different position or lower collisionRadius.`,
+            }],
+          };
+        }
       }
 
       snapshotGitForUndo(gitDoc, area, "place_placeable", `Place placeable ${blueprint}`);
@@ -282,8 +388,10 @@ export function registerPlacementTools(server: McpServer): void {
             placeable: name,
             blueprint,
             appearance,
-            position: { x: xN, y: yN, z: zN },
-            bearing: bearingN,
+            position: { x: xN, y: yN, z: placeZ },
+            groundZ: walkCheck.z ?? null,
+            bearing: radToDeg(bearingRad),
+            frontFacesCompass: placeableFrontCompass(bearingRad),
           }, null, 2),
         }],
       };
@@ -301,19 +409,25 @@ export function registerPlacementTools(server: McpServer): void {
       name: z.string().describe("Waypoint display name"),
       x: numParam("World X position"),
       y: numParam("World Y position"),
-      z: optNumParam("World Z position (default 0.0)"),
-      bearing: optNumParam("Facing direction in degrees (default 0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
+      bearing: optNumParam("Compass facing in degrees: 0 = north, 90 = east, 180 = south, 270 = west (default 0)"),
+      faceTowardX: optNumParam("Face the world point (faceTowardX, faceTowardY) instead of using bearing"),
+      faceTowardY: optNumParam("World Y of the point to face (give together with faceTowardX)"),
+      walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 1.0). 0 = only the position itself must be walkable. Real designers' props: only 57% have 1 m of clearance, 74% have 0.5 m."),
       mapNote: z.string().optional().describe("Map note text (enables map pin if provided)"),
       mapNoteEnabled: z.boolean().optional().describe("Show map note pin (default true if mapNote provided)"),
     },
     { idempotentHint: true },
-    async ({ area, tag, name, x, y, z: zPos, bearing, mapNote, mapNoteEnabled }) => {
+    async ({ area, tag, name, x, y, z: zPos, bearing, faceTowardX, faceTowardY, walkBuffer, mapNote, mapNoteEnabled }) => {
       const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing);
+      const face = parseFaceToward(faceTowardX, faceTowardY);
+      if ("error" in face) return { content: [{ type: "text", text: face.error }] };
+      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : undefined;
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
       // Walkmesh + buffer validation (blocking)
-      const walkCheck = await checkPlacementWalkable(xN, yN, area.toLowerCase(), index, resmanOpts);
+      const walkCheck = await checkPlacementWalkable(xN, yN, area.toLowerCase(), index, resmanOpts, walkBufferN);
       if (!walkCheck.ok) {
         return {
           content: [{
@@ -327,7 +441,15 @@ export function registerPlacementTools(server: McpServer): void {
         };
       }
 
-      const rad = degToRad(bearingN);
+      let orientation: [number, number];
+      if (face.target) {
+        const toward = orientationToward({ x: xN, y: yN }, face.target);
+        if (!toward) return { content: [{ type: "text", text: "faceToward is the same point as the waypoint position." }] };
+        orientation = toward;
+      } else {
+        orientation = compassToOrientation(bearingN);
+      }
+      const placeZ = walkCheck.z ?? zN;
       const hasNote = !!mapNote;
       const noteEnabled = mapNoteEnabled ?? hasNote;
 
@@ -344,9 +466,9 @@ export function registerPlacementTools(server: McpServer): void {
         TemplateResRef: { type: "resref", value: "" },
         XPosition: { type: "float", value: xN },
         YPosition: { type: "float", value: yN },
-        ZPosition: { type: "float", value: walkCheck.z ?? zN },
-        XOrientation: { type: "float", value: Math.sin(rad) },
-        YOrientation: { type: "float", value: Math.cos(rad) },
+        ZPosition: { type: "float", value: placeZ },
+        XOrientation: { type: "float", value: orientation[0] },
+        YOrientation: { type: "float", value: orientation[1] },
       };
 
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
@@ -365,7 +487,8 @@ export function registerPlacementTools(server: McpServer): void {
             area,
             tag,
             name,
-            position: { x: xN, y: yN, z: zN },
+            position: { x: xN, y: yN, z: placeZ },
+            bearing: orientationToCompass(orientation[0], orientation[1]),
             mapNote: mapNote || null,
           }, null, 2),
         }],
@@ -383,8 +506,8 @@ export function registerPlacementTools(server: McpServer): void {
       blueprint: z.string().describe("UTD blueprint resref (module or base game, e.g. 'nw_door_strong')"),
       x: numParam("World X position"),
       y: numParam("World Y position"),
-      z: optNumParam("World Z position (default 0.0)"),
-      bearing: optNumParam("Facing direction in degrees (default 0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
+      bearing: optNumParam("Raw GFF Bearing in degrees, counter-clockwise (default 0). For a door that belongs to a tile (a .set door placement): (doorOrientation + Tile_Orientation x 90) % 360. A door looks the same turned 180 degrees."),
     },
     { idempotentHint: true },
     async ({ area, blueprint, x, y, z: zPos, bearing }) => {
@@ -406,7 +529,8 @@ export function registerPlacementTools(server: McpServer): void {
 
       obj.X = { type: "float", value: xN };
       obj.Y = { type: "float", value: yN };
-      obj.Z = { type: "float", value: walkResult.z ?? zN };
+      const placeZ = walkResult.z ?? zN;
+      obj.Z = { type: "float", value: placeZ };
       obj.Bearing = { type: "float", value: degToRad(bearingN) };
 
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
@@ -427,7 +551,7 @@ export function registerPlacementTools(server: McpServer): void {
             area,
             door: name,
             blueprint,
-            position: { x: xN, y: yN, z: zN },
+            position: { x: xN, y: yN, z: placeZ },
             bearing: bearingN,
             surface: walkResult.material,
             surfaceWalkable: walkResult.walkable,
@@ -447,7 +571,7 @@ export function registerPlacementTools(server: McpServer): void {
       blueprint: z.string().describe("UTT blueprint resref (module or base game)"),
       x: numParam("World X position (trigger center)"),
       y: numParam("World Y position (trigger center)"),
-      z: optNumParam("World Z position (default 0.0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
     },
     { idempotentHint: true },
     async ({ area, blueprint, x, y, z: zPos }) => {
@@ -481,7 +605,8 @@ export function registerPlacementTools(server: McpServer): void {
 
       obj.XPosition = { type: "float", value: xN };
       obj.YPosition = { type: "float", value: yN };
-      obj.ZPosition = { type: "float", value: walkCheck.z ?? zN };
+      const placeZ = walkCheck.z ?? zN;
+      obj.ZPosition = { type: "float", value: placeZ };
 
       // Ensure trigger has geometry — blueprints don't include it, but placed
       // instances require it for the engine to detect entry and the toolset to render.
@@ -516,7 +641,7 @@ export function registerPlacementTools(server: McpServer): void {
             area,
             trigger: name,
             blueprint,
-            position: { x: xN, y: yN, z: zN },
+            position: { x: xN, y: yN, z: placeZ },
           }, null, 2),
         }],
       };
@@ -533,7 +658,7 @@ export function registerPlacementTools(server: McpServer): void {
       blueprint: z.string().describe("UTE blueprint resref (module or base game)"),
       x: numParam("World X position (encounter center)"),
       y: numParam("World Y position (encounter center)"),
-      z: optNumParam("World Z position (default 0.0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
     },
     { idempotentHint: true },
     async ({ area, blueprint, x, y, z: zPos }) => {
@@ -567,7 +692,8 @@ export function registerPlacementTools(server: McpServer): void {
 
       obj.XPosition = { type: "float", value: xN };
       obj.YPosition = { type: "float", value: yN };
-      obj.ZPosition = { type: "float", value: walkCheck.z ?? zN };
+      const placeZ = walkCheck.z ?? zN;
+      obj.ZPosition = { type: "float", value: placeZ };
 
       // Ensure encounter has geometry — blueprints don't include it, but placed
       // instances require it for the engine to define the spawn region.
@@ -602,7 +728,7 @@ export function registerPlacementTools(server: McpServer): void {
             area,
             encounter: name,
             blueprint,
-            position: { x: xN, y: yN, z: zN },
+            position: { x: xN, y: yN, z: placeZ },
           }, null, 2),
         }],
       };
@@ -619,7 +745,7 @@ export function registerPlacementTools(server: McpServer): void {
       blueprint: z.string().describe("UTS blueprint resref (module or base game)"),
       x: numParam("World X position"),
       y: numParam("World Y position"),
-      z: optNumParam("World Z position (default 0.0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
     },
     { idempotentHint: true },
     async ({ area, blueprint, x, y, z: zPos }) => {
@@ -641,7 +767,8 @@ export function registerPlacementTools(server: McpServer): void {
 
       obj.XPosition = { type: "float", value: xN };
       obj.YPosition = { type: "float", value: yN };
-      obj.ZPosition = { type: "float", value: walkResult.z ?? zN };
+      const placeZ = walkResult.z ?? zN;
+      obj.ZPosition = { type: "float", value: placeZ };
 
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
       snapshotGitForUndo(gitDoc, area, "place_sound", `Place sound ${blueprint}`);
@@ -660,7 +787,7 @@ export function registerPlacementTools(server: McpServer): void {
             area,
             sound: name,
             blueprint,
-            position: { x: xN, y: yN, z: zN },
+            position: { x: xN, y: yN, z: placeZ },
             surface: walkResult.material,
             surfaceWalkable: walkResult.walkable,
           }, null, 2),
@@ -679,7 +806,7 @@ export function registerPlacementTools(server: McpServer): void {
       blueprint: z.string().describe("UTM blueprint resref (module or base game)"),
       x: numParam("World X position"),
       y: numParam("World Y position"),
-      z: optNumParam("World Z position (default 0.0)"),
+      z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
     },
     { idempotentHint: true },
     async ({ area, blueprint, x, y, z: zPos }) => {
@@ -724,7 +851,8 @@ export function registerPlacementTools(server: McpServer): void {
 
       obj.XPosition = { type: "float", value: xN };
       obj.YPosition = { type: "float", value: yN };
-      obj.ZPosition = { type: "float", value: walkCheck.z ?? zN };
+      const placeZ = walkCheck.z ?? zN;
+      obj.ZPosition = { type: "float", value: placeZ };
       // Stores also carry XOrientation/YOrientation (confirmed against the
       // same real corpus) — default to facing "north" since this tool has no
       // bearing param.
@@ -748,7 +876,7 @@ export function registerPlacementTools(server: McpServer): void {
             area,
             store: name,
             blueprint,
-            position: { x: xN, y: yN, z: zN },
+            position: { x: xN, y: yN, z: placeZ },
           }, null, 2),
         }],
       };

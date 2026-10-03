@@ -18,6 +18,7 @@ export interface TilesetInfo {
   interior: boolean;
   hasHeightTransition: boolean;
   envMap: string;
+  /** `[GENERAL] Transition=`: metres of ground height per ARE Tile_Height level (see tileHeightStep in walkmesh.ts). */
   transition: number;
   border: string;
   defaultTerrain: string;
@@ -71,6 +72,12 @@ export interface TileDefinition {
   crossers: TileCrossers;
   /** True if all corner heights are 0 (no elevation). Height tiles are excluded from solving. */
   flat: boolean;
+  /**
+   * Per-corner height levels (GIT-orientation-0 terms). Continuity rule verified on every shared edge of 504
+   * real areas (100.00%): for neighbouring tiles A and B, `Tile_Height(A) + rotatedCornerHeight(A, shared corner)`
+   * equals the same sum for B. See getRotatedCornerHeights.
+   */
+  cornerHeights?: TileCornerHeights;
   pathNode: string;
   doors: number;
   doorPlacements: TileDoorPlacement[];
@@ -94,6 +101,14 @@ export interface TileCrossers {
   left: string;
 }
 
+/** Height level (in ARE Tile_Height units, `Transition` metres each) of each tile corner, as written in the .set file. */
+export interface TileCornerHeights {
+  topLeft: number;
+  topRight: number;
+  bottomLeft: number;
+  bottomRight: number;
+}
+
 export interface TileGroup {
   index: number;
   name: string;
@@ -104,6 +119,18 @@ export interface TileGroup {
 }
 
 // ─── Parser ─────────────────────────────────────────────────────────────────
+
+/** A .set corner height; some tilesets leave the value empty, which must read as 0, not NaN. */
+function parseHeight(value: string | undefined): number {
+  const n = parseInt(value ?? "0", 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** `[GENERAL] Transition=` as metres (fractions allowed); 0 when missing or malformed. */
+function parseTransition(value: string | undefined): number {
+  const n = Number.parseFloat(value ?? "0");
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 
 /** Parse a .set file content string into structured TilesetInfo */
 export function parseTilesetFile(content: string, resref: string): TilesetInfo {
@@ -150,10 +177,10 @@ export function parseTilesetFile(content: string, resref: string): TilesetInfo {
   const tiles: TileDefinition[] = [];
   for (let i = 0; i < tileCount; i++) {
     const s = sections.get(`TILE${i}`) ?? {};
-    const tlH = parseInt(s.TopLeftHeight ?? "0", 10);
-    const trH = parseInt(s.TopRightHeight ?? "0", 10);
-    const blH = parseInt(s.BottomLeftHeight ?? "0", 10);
-    const brH = parseInt(s.BottomRightHeight ?? "0", 10);
+    const tlH = parseHeight(s.TopLeftHeight);
+    const trH = parseHeight(s.TopRightHeight);
+    const blH = parseHeight(s.BottomLeftHeight);
+    const brH = parseHeight(s.BottomRightHeight);
 
     // The .set file Orientation field records the rotation the tile's 3D model was
     // originally authored/designed at (used later to prefer natural-orientation
@@ -188,6 +215,7 @@ export function parseTilesetFile(content: string, resref: string): TilesetInfo {
       corners,
       crossers,
       flat: tlH === 0 && trH === 0 && blH === 0 && brH === 0,
+      cornerHeights: { topLeft: tlH, topRight: trH, bottomLeft: blH, bottomRight: brH },
       pathNode: s.PathNode ?? "",
       doors: parseInt(s.Doors ?? "0", 10),
       doorPlacements: [],
@@ -250,7 +278,7 @@ export function parseTilesetFile(content: string, resref: string): TilesetInfo {
     interior,
     hasHeightTransition,
     envMap: general.EnvMap ?? "",
-    transition: parseInt(general.Transition ?? "0", 10),
+    transition: parseTransition(general.Transition),
     border: general.Border ?? "",
     defaultTerrain: (general.Default ?? terrainTypes[0]?.name ?? "").toLowerCase(),
     floor: general.Floor ?? "",
@@ -317,7 +345,14 @@ function parseSections(content: string): Map<string, Record<string, string>> {
 
 // ─── Door Placement Helpers ─────────────────────────────────────────────────
 
-/** Forward-rotate a point by tile orientation (local→world). Same as area-data forwardRotate. */
+/**
+ * Forward-rotate a tile-local point by the tile orientation (local -> world).
+ * Tile_Orientation n turns the tile n x 90 degrees COUNTER-clockwise, so (x, y) -> (-y, x) for n = 1.
+ * Verified: predicted door positions matched 3,717 real door instances. The door bearing
+ * (setOrientation + 90 * tileOrientation) matched exactly for 76% of them and was flipped by a symmetric
+ * 180 degrees (swing side) for the rest - never by 90 degrees (1 of 3,717).
+ * Same as area-data forwardRotate.
+ */
 function forwardRotateDoor(x: number, y: number, orientation: number): [number, number] {
   switch (orientation % 4) {
     case 0: return [x, y];
@@ -427,20 +462,25 @@ export async function listAllTilesets(resmanOpts: ResmanOptions): Promise<string
 }
 
 // ─── Tile Orientation Helpers ───────────────────────────────────────────────
+//
+// CONVENTION (verified on 504 real areas / 137,250 shared tile edges - tile-oracle.live.test.ts):
+//   An ARE `Tile_Orientation` of n turns the tile n x 90 degrees COUNTER-clockwise when seen from above
+//   (+Y north). The .set corner/crosser fields are in orientation-0 terms and must NOT be pre-rotated.
+//   Counter-clockwise means a corner moves  TR -> TL -> BL -> BR -> TR,  an edge moves  right -> top -> left -> bottom.
+//   Under this rule neighbouring tiles agree on their shared corners 99.99% of the time and on their shared
+//   crossers 99.99% of the time; the clockwise reading agrees only 64%. (Earlier comments here said "CW" while
+//   the code was already counter-clockwise: the code is right, the wording was wrong.)
 
 /**
- * Get the effective corners of a tile after applying orientation rotation.
- * When a tile is rotated, its corners rotate with it.
- *
- * The tile's stored corners are normalized to GIT orientation 0 at parse time
- * (un-rotated from the .set Orientation). After rotation by the GIT placement
- * orientation, the result is the corners as rendered by the engine.
+ * Get the effective corners of a tile after applying its placement orientation.
+ * With orientation n the tile is turned n quarter-turns COUNTER-clockwise, so the corner that was at TR
+ * is now at TL (orientation 1), and so on.
  */
 export function getRotatedCorners(tile: TileDefinition, orientation: number): TileCorners {
   const c = tile.corners;
-  switch (orientation % 4) {
+  switch (((orientation % 4) + 4) % 4) {
     case 0: return { ...c };
-    case 1: // 90° CW: TR→TL, BR→TR, BL→BR, TL→BL
+    case 1: // 90° CCW: TR→TL, BR→TR, BL→BR, TL→BL
       return {
         topLeft: c.topRight,
         topRight: c.bottomRight,
@@ -454,7 +494,7 @@ export function getRotatedCorners(tile: TileDefinition, orientation: number): Ti
         bottomRight: c.topLeft,
         bottomLeft: c.topRight,
       };
-    case 3: // 270° CW: BL→TL, TL→TR, TR→BR, BR→BL
+    case 3: // 270° CCW (= 90° CW): BL→TL, TL→TR, TR→BR, BR→BL
       return {
         topLeft: c.bottomLeft,
         topRight: c.topLeft,
@@ -466,16 +506,33 @@ export function getRotatedCorners(tile: TileDefinition, orientation: number): Ti
 }
 
 /**
- * Get the effective crossers of a tile after applying orientation rotation.
+ * Get the effective crossers of a tile after applying orientation rotation (same counter-clockwise rule:
+ * with orientation 1 the crosser that was on the right edge is now on top).
  */
 export function getRotatedCrossers(tile: TileDefinition, orientation: number): TileCrossers {
   const cr = tile.crossers;
-  switch (orientation % 4) {
+  switch (((orientation % 4) + 4) % 4) {
     case 0: return { ...cr };
-    case 1: return { top: cr.right, right: cr.bottom, bottom: cr.left, left: cr.top };       // 90° CW
+    case 1: return { top: cr.right, right: cr.bottom, bottom: cr.left, left: cr.top };       // 90° CCW
     case 2: return { top: cr.bottom, right: cr.left, bottom: cr.top, left: cr.right };      // 180°
-    case 3: return { top: cr.left, right: cr.top, bottom: cr.right, left: cr.bottom };      // 270° CW
+    case 3: return { top: cr.left, right: cr.top, bottom: cr.right, left: cr.bottom };      // 270° CCW
     default: return { ...cr };
+  }
+}
+
+/**
+ * Get the corner height levels of a tile after applying its orientation (same rotation as getRotatedCorners).
+ * Add the area's `Tile_Height` for that tile to get the corner's world height level (`Transition` metres per level,
+ * see tileHeightStep in walkmesh.ts - 5 for most outdoor sets, 4 for tcn01, 2 for tno01).
+ * Returns zeros for tile definitions that predate corner heights.
+ */
+export function getRotatedCornerHeights(tile: TileDefinition, orientation: number): TileCornerHeights {
+  const h = tile.cornerHeights ?? { topLeft: 0, topRight: 0, bottomLeft: 0, bottomRight: 0 };
+  switch (((orientation % 4) + 4) % 4) {
+    case 1: return { topLeft: h.topRight, topRight: h.bottomRight, bottomRight: h.bottomLeft, bottomLeft: h.topLeft };
+    case 2: return { topLeft: h.bottomRight, topRight: h.bottomLeft, bottomRight: h.topLeft, bottomLeft: h.topRight };
+    case 3: return { topLeft: h.bottomLeft, topRight: h.topLeft, bottomRight: h.topRight, bottomLeft: h.bottomRight };
+    default: return { ...h };
   }
 }
 

@@ -29,6 +29,7 @@ import type { GffObj, GffDocument } from "../types/gff.js";
 import { snapshotGitForUndo } from "../util/undo.js";
 import { compileScript, jsonToGff, erfPack } from "../nim-tools.js";
 import { checkPlacementWalkable } from "../util/walkmesh.js";
+import { findOpenGround, loadAreaWalkGrid } from "../util/walkgrid.js";
 import { getTilesetInfo } from "../util/tileset.js";
 import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatchesTerrain, resolveFloorTerrain, MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import type { LayoutStyle, SuggestedFeature } from "../util/layout-generator.js";
@@ -332,15 +333,16 @@ export function registerAdventureTools(server: McpServer): void {
 
   server.tool(
     "adventure_find_walkable",
-    "Find guaranteed walkable coordinates in an area. Returns positions validated against the walkmesh with correct Z height. Use region to constrain the search to a part of the area.",
+    "Find guaranteed walkable coordinates in an area. Returns positions validated against the walkmesh with the exact ground Z. Use region to constrain the search to a part of the area. Without clearRadius it samples tile centres (10 m grid) with a 1-2 m clearance. With clearRadius it searches a 1 m raster of the whole walkmesh for spots where an entire footprint of that radius is walkable (a camp, a ring of chairs, a room-sized prefab), nearest the region centre first, so open ground that is not at a tile centre is found.",
     {
       area: z.string().describe("Area resref"),
       region: z.string().optional().describe("Region to search: 'north', 'south', 'east', 'west', 'center', 'NE', 'NW', 'SE', 'SW', or a bounding box 'x1,y1,x2,y2' in world coordinates. Defaults to 'center'."),
       count: z.string().optional().describe("Number of positions to return (default 1, max 10)"),
-      avoidEdges: z.string().optional().describe("If 'true' (default), uses 2m buffer from non-walkable surfaces instead of 1m"),
+      avoidEdges: z.string().optional().describe("If 'true' (default), uses 2m buffer from non-walkable surfaces instead of 1m (ignored when clearRadius is set)"),
+      clearRadius: z.string().optional().describe("Meters of clear walkable ground required around each position, e.g. '6' for a camp. The (2r+1) x (2r+1) m footprint must be at least 97% walkable; results are at least 2r apart. Enables the raster search described above."),
     },
     { readOnlyHint: true, idempotentHint: true },
-    async ({ area, region, count: countStr, avoidEdges }) => {
+    async ({ area, region, count: countStr, avoidEdges, clearRadius }) => {
       const index = requireIndex();
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
@@ -392,6 +394,53 @@ export function registerAdventureTools(server: McpServer): void {
 
       if (x1 >= x2 || y1 >= y2) {
         return { content: [{ type: "text", text: "Region is too small or outside area bounds after clamping." }] };
+      }
+
+      // Footprint search: whole (2r+1) x (2r+1) m squares must be walkable (1 m raster, not tile centres)
+      const clearR = clearRadius !== undefined ? toF(clearRadius) : 0;
+      if (clearR > 0) {
+        const loaded = await loadAreaWalkGrid(area, index, resmanOpts);
+        if (!loaded) {
+          return { content: [{ type: "text", text: `Walkmesh data unavailable for ${area}; cannot search with clearRadius.` }] };
+        }
+        const spots = findOpenGround(loaded.walk, {
+          radius: clearR,
+          near: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
+          bounds: { x1, y1, x2, y2 },
+          maxResults: maxCount,
+        });
+        if (spots.length === 0) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: `No open ground with ${clearR} m of clearance found in this region`,
+                area,
+                region: reg,
+                clearRadius: clearR,
+                searchBounds: { x1, y1, x2, y2 },
+                hint: "Try a smaller clearRadius or a larger region.",
+              }, null, 2),
+            }],
+          };
+        }
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              area,
+              region: reg,
+              clearRadius: clearR,
+              positions: spots.map((sp) => ({
+                x: sp.x,
+                y: sp.y,
+                z: Math.round((loaded.probe(sp.x, sp.y).z ?? 0) * 10000) / 10000,
+                walkableFraction: sp.walkableFraction,
+              })),
+              searchBounds: { x1, y1, x2, y2 },
+            }, null, 2),
+          }],
+        };
       }
 
       // Scan tile centers in the region, test each for walkability

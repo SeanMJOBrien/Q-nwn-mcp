@@ -2,6 +2,20 @@
  * Walkmesh (.wok) file parser and walkability validation.
  * Parses NWN ASCII walkmesh files to determine which positions are walkable,
  * and performs flood-fill reachability analysis across area tiles.
+ *
+ * Spatial conventions used throughout this file. Every one was verified against real,
+ * human-built areas (see docs/object-placement-and-tilesets.md and the env-gated oracle
+ * in tile-oracle.live.test.ts); do not "fix" them without re-running that oracle:
+ *   - World coordinates are meters: +X east, +Y north, origin at the south-west corner. One tile is 10 m.
+ *   - ARE Tile_List is row-major from the south-west corner: index = tileY * Width + tileX.
+ *   - Tile_Orientation n means the tile is rotated n x 90 degrees COUNTER-clockwise (seen from above).
+ *   - A .wok's vertices are tile-local ([-5, +5], +Y north) and RELATIVE TO THE WALKMESH NODE'S `position`.
+ *     57% of vanilla walkmeshes have a non-zero Z offset (-10.9 m .. +27.1 m); parseWokFile adds it back.
+ *     Ignoring it makes every ground height wrong (tin01/tni01 interiors by -1.5 m, tdc01 caves by -1.6 .. -2.2 m).
+ *   - ARE Tile_Height counts height levels that are added on top of the mesh Z. A level is the tileset's
+ *     `[GENERAL] Transition=` metres (5 for most outdoor sets, 4 for tcn01, 2 for tno01): see tileHeightStep().
+ *     Real objects on raised tcn01/tno01 tiles match to 0.5 m 94% / 93% of the time with that step and 3.5% / 0% with a flat 5.
+ *   - The tileset's `WalkMesh=` field is NOT the .wok name: the walkmesh file is `<Model>.wok`.
  */
 
 import fs from "fs/promises";
@@ -11,13 +25,35 @@ import type { ResmanOptions } from "../nim-tools.js";
 import type { ModuleIndex, TwoDATable } from "../types/module.js";
 import { getFieldList, getFieldNum } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
+import { extractSalvaging } from "./batch-extract.js";
 import { getTilesetInfo, getRotatedCrossers } from "./tileset.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+/** Meters along one tile edge. */
+export const TILE_SIZE = 10;
+
+/** Metres per ARE Tile_Height level when a tileset does not say (BioWare's value for most outdoor tilesets). */
+export const DEFAULT_TILE_HEIGHT_STEP = 5.0;
+
+/**
+ * Metres of ground height per ARE Tile_Height level for a tileset: the `Transition=` value of its .set `[GENERAL]`
+ * section. It is NOT a constant. Base game: 5 for ttr01/tts01/tts02/tti01/ttu01/ttz01/trm02/tms01/tcm02/trs02/tss13,
+ * 4 for tcn01, 3 for the interiors/dungeons (which have no height levels), 2 for tno01, 1 for twc03.
+ * Verified on real, human-placed objects standing on raised tiles: tcn01 93.9% within 0.5 m with the tileset's
+ * step vs 3.5% with 5; tno01 92.6% vs 0.0%. Falls back to 5 when the value is missing or not positive.
+ */
+export function tileHeightStep(tileset: { transition?: number } | null | undefined): number {
+  const step = tileset?.transition;
+  return typeof step === "number" && Number.isFinite(step) && step > 0 ? step : DEFAULT_TILE_HEIGHT_STEP;
+}
+
 export interface WokData {
+  /** Tile-local meters with the walkmesh node's `position` already added (so Z is the true floor height). */
   verts: [number, number, number][];
   faces: WokFace[];
+  /** The node `position` that was added to `verts` (zeros when the file has none). */
+  offset?: [number, number, number];
 }
 
 export interface WokFace {
@@ -34,6 +70,8 @@ export interface WalkabilityResult {
   error?: string;
   /** Z height of the walkmesh surface at the tested position */
   z?: number;
+  /** Metres per Tile_Height level that went into `z` (the tileset's Transition); set by the area-level probes. */
+  heightStep?: number;
 }
 
 export interface TileWalkSummary {
@@ -120,25 +158,44 @@ export function getMaterialName(materialId: number, surfacemat?: TwoDATable): st
 
 // ─── .wok Parser ────────────────────────────────────────────────────────────
 
-/** Parse an ASCII .wok file into vertices and faces */
+/**
+ * Parse an ASCII .wok file into vertices and faces.
+ *
+ * The vertices in the file are relative to the walkmesh node's `position` line
+ * (`node aabb <name>` ... `position x y z`). That offset is added to every vertex so that
+ * `verts` are real tile-local coordinates; without it Z is wrong for most tiles.
+ */
 export function parseWokFile(content: string): WokData {
   const verts: [number, number, number][] = [];
   const faces: WokFace[] = [];
   const lines = content.split("\n");
+  let offset: [number, number, number] = [0, 0, 0];
+  let nodePosition: [number, number, number] = [0, 0, 0];
 
   let i = 0;
   const len = lines.length;
 
-  // Find "verts <count>" line
+  // Find "verts <count>" line, remembering the `position` of the node that contains it
   while (i < len) {
     const line = lines[i].trim();
-    if (line.startsWith("verts ")) {
+    if (/^node\s/i.test(line)) {
+      nodePosition = [0, 0, 0];
+    } else if (/^position\s/i.test(line)) {
+      const p = line.split(/\s+/);
+      const px = parseFloat(p[1]), py = parseFloat(p[2]), pz = parseFloat(p[3]);
+      if ([px, py, pz].every(Number.isFinite)) nodePosition = [px, py, pz];
+    } else if (line.startsWith("verts ")) {
+      offset = nodePosition;
       const vertCount = parseInt(line.split(/\s+/)[1], 10);
       i++;
       for (let v = 0; v < vertCount && i < len; v++, i++) {
         const parts = lines[i].trim().split(/\s+/);
         if (parts.length >= 3) {
-          verts.push([parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2])]);
+          verts.push([
+            parseFloat(parts[0]) + offset[0],
+            parseFloat(parts[1]) + offset[1],
+            parseFloat(parts[2]) + offset[2],
+          ]);
         }
       }
       break;
@@ -169,18 +226,21 @@ export function parseWokFile(content: string): WokData {
     i++;
   }
 
-  return { verts, faces };
+  return { verts, faces, offset };
 }
 
 // ─── WOK Cache ──────────────────────────────────────────────────────────────
 
 const wokCache = new Map<string, WokData>();
+/** Tile models known to have no walkmesh, so they are not re-extracted for every object that stands on them. */
+const missingWoks = new Set<string>();
 let wokCacheDirPath = "";
 let wokCacheDirReady = false;
 
 /** Clear the walkmesh cache (call on load_module) */
 export function clearWokCache(): void {
   wokCache.clear();
+  missingWoks.clear();
   wokCacheDirReady = false;
 }
 
@@ -204,6 +264,34 @@ export function getCachedWok(model: string): WokData | null {
   return wokCache.get(model.toLowerCase()) ?? null;
 }
 
+/**
+ * Extract the walkmeshes of many tile models with as few resman runs as possible.
+ *
+ * `nwn_resman_extract` extracts NOTHING when any one of the requested files does not exist, and some tilesets
+ * (tcm02, trs02, ...) have tiles without a walkmesh. So a failed batch is bisected (see extractSalvaging), and models
+ * that turn out not to exist are remembered so they are never requested again.
+ */
+export async function ensureWoksExtracted(
+  models: Iterable<string>,
+  resmanOpts: ResmanOptions,
+  cacheDir: string,
+): Promise<void> {
+  const wanted: string[] = [];
+  for (const model of new Set([...models].map((m) => m.toLowerCase()))) {
+    if (!model || wokCache.has(model) || missingWoks.has(model)) continue;
+    try {
+      await fs.access(path.join(cacheDir, `${model}.wok`));
+    } catch {
+      wanted.push(model);
+    }
+  }
+  if (wanted.length === 0) return;
+  const result = await extractSalvaging(wanted.map((m) => `${m}.wok`), (batch) =>
+    resmanExtract(cacheDir, { ...resmanOpts, files: batch }),
+  );
+  for (const failed of result.failed) missingWoks.add(failed.replace(/\.wok$/, ""));
+}
+
 /** Get WOK data for a tile model, loading from resman if needed */
 export async function getWokForTile(
   tileModel: string,
@@ -213,6 +301,7 @@ export async function getWokForTile(
   const key = tileModel.toLowerCase();
   const cached = wokCache.get(key);
   if (cached) return cached;
+  if (missingWoks.has(key)) return null;
 
   const wokFile = `${key}.wok`;
   const wokPath = path.join(cacheDir, wokFile);
@@ -225,6 +314,7 @@ export async function getWokForTile(
     try {
       await resmanExtract(cacheDir, { ...resmanOpts, files: [wokFile] });
     } catch {
+      missingWoks.add(key);
       return null;  // WOK not found in resman
     }
   }
@@ -274,24 +364,147 @@ export function interpolateZ(
 }
 
 /**
- * Apply inverse tile orientation rotation to convert world-local coords
+ * Apply the inverse tile orientation rotation to convert world-local coords
  * to the tile's unrotated local space.
  *
- * Tile vertices are in unrotated space [-5, +5].
- * World-local coords are after subtracting tile origin.
- * We need to "un-rotate" the world coords to match the stored vertices.
+ * Tile vertices are in unrotated space [-5, +5]. World-local coords are tile-centred.
+ * Tile_Orientation n rotates the tile n x 90 degrees COUNTER-clockwise in the world, so a world-local
+ * point is mapped back by rotating it n x 90 degrees CLOCKWISE: orientation 1 gives (x, y) -> (y, -x).
+ * (Verified on real areas: 97% of existing creatures/waypoints probe as walkable, 99% have the
+ * stored height reproduced within 0.35 m. The opposite sense scores far worse.)
  */
 export function rotateForOrientation(x: number, y: number, orientation: number): [number, number] {
-  switch (orientation % 4) {
+  switch (((orientation % 4) + 4) % 4) {
     case 0: return [x, y];
-    case 1: return [y, -x];      // inverse of 90° CW
-    case 2: return [-x, -y];     // inverse of 180°
-    case 3: return [-y, x];      // inverse of 270° CW
+    case 1: return [y, -x];      // tile turned 90° CCW  -> point turned 90° CW
+    case 2: return [-x, -y];     // 180°
+    case 3: return [-y, x];      // tile turned 270° CCW -> point turned 270° CW (= 90° CCW)
     default: return [x, y];
   }
 }
 
 // ─── Walkability Check ──────────────────────────────────────────────────────
+
+/** Tile grid of an area, decoupled from GFF so the probing code stays pure and testable. */
+export interface AreaTileGrid {
+  width: number;   // tiles
+  height: number;  // tiles
+  /** Row-major from the south-west corner: index = tileY * width + tileX. */
+  tiles: Array<{ id: number; orientation: number; height: number }>;
+}
+
+/** Read the tile grid (ids, orientations, height levels) out of an ARE document. */
+export function readAreaTileGrid(are: GffObj): AreaTileGrid {
+  return {
+    width: getFieldNum(are, "Width"),
+    height: getFieldNum(are, "Height"),
+    tiles: getFieldList(are, "Tile_List").map((t) => ({
+      id: getFieldNum(t, "Tile_ID"),
+      orientation: getFieldNum(t, "Tile_Orientation"),
+      height: getFieldNum(t, "Tile_Height"),
+    })),
+  };
+}
+
+/** Looks up the parsed walkmesh of a tile model (null/undefined when it is not available). */
+export type WokLookup = (model: string) => WokData | null | undefined;
+
+/**
+ * Probe a point, given in tile-centred local coordinates ([-5, +5] on both axes, +Y north), against one
+ * tile's walkmesh. `orientation` is the ARE Tile_Orientation and `tileHeight` the ARE Tile_Height level.
+ *
+ * Where several faces cover the point the walkable one with the highest Z wins (a bridge over a pit); if
+ * none is walkable the highest blocking face is reported. Z is the true world height: mesh Z (node offset
+ * included) plus tileHeight x heightStep (the tileset's Transition; see tileHeightStep).
+ */
+export function probeTileLocal(
+  wok: WokData,
+  localX: number,
+  localY: number,
+  orientation: number,
+  tileHeight: number,
+  surfacemat?: TwoDATable,
+  heightStep: number = DEFAULT_TILE_HEIGHT_STEP,
+): WalkabilityResult {
+  const [rx, ry] = rotateForOrientation(localX, localY, orientation);
+  const lift = tileHeight * heightStep;
+
+  let bestWalkable: WalkabilityResult | null = null;
+  let bestNonWalkable: WalkabilityResult | null = null;
+
+  for (const face of wok.faces) {
+    const v1 = wok.verts[face.v1];
+    const v2 = wok.verts[face.v2];
+    const v3 = wok.verts[face.v3];
+    if (!v1 || !v2 || !v3) continue;
+
+    if (pointInTriangle2D(rx, ry, v1[0], v1[1], v2[0], v2[1], v3[0], v3[1])) {
+      const walkable = isMaterialWalkable(face.surfaceMaterial, surfacemat);
+      const zHeight = interpolateZ(rx, ry, v1, v2, v3) + lift;
+      const result: WalkabilityResult = {
+        walkable,
+        material: getMaterialName(face.surfaceMaterial, surfacemat),
+        materialId: face.surfaceMaterial,
+        z: zHeight,
+      };
+      if (walkable) {
+        if (!bestWalkable || zHeight > (bestWalkable.z ?? -Infinity)) bestWalkable = result;
+      } else if (!bestNonWalkable || zHeight > (bestNonWalkable.z ?? -Infinity)) {
+        bestNonWalkable = result;
+      }
+    }
+  }
+
+  // Prefer walkable face, fall back to non-walkable
+  if (bestWalkable) return bestWalkable;
+  if (bestNonWalkable) return bestNonWalkable;
+  return { walkable: false, error: "Position is not covered by any walkmesh face" };
+}
+
+/** Which tile a world position falls in, plus that tile's grid entry. */
+export function locateTile(
+  grid: AreaTileGrid,
+  worldX: number,
+  worldY: number,
+): { tileX: number; tileY: number; tile: AreaTileGrid["tiles"][number] } | { error: string } {
+  if (worldX < 0 || worldX >= grid.width * TILE_SIZE || worldY < 0 || worldY >= grid.height * TILE_SIZE) {
+    return {
+      error: `Position (${worldX}, ${worldY}) is outside area bounds (0-${grid.width * TILE_SIZE}, 0-${grid.height * TILE_SIZE})`,
+    };
+  }
+  const tileX = Math.floor(worldX / TILE_SIZE);
+  const tileY = Math.floor(worldY / TILE_SIZE);
+  const tileIndex = tileY * grid.width + tileX;
+  const tile = grid.tiles[tileIndex];
+  if (!tile) return { error: `Tile index ${tileIndex} out of range` };
+  return { tileX, tileY, tile };
+}
+
+/**
+ * Probe a world position against a whole area without any I/O.
+ * Pipeline: world pos -> tile -> tile model (via `tileModels[tileId]`) -> .wok -> triangle test -> material.
+ */
+export function probeAreaPosition(
+  grid: AreaTileGrid,
+  tileModels: readonly string[],
+  getWok: WokLookup,
+  worldX: number,
+  worldY: number,
+  surfacemat?: TwoDATable,
+  heightStep: number = DEFAULT_TILE_HEIGHT_STEP,
+): WalkabilityResult {
+  const loc = locateTile(grid, worldX, worldY);
+  if ("error" in loc) return { walkable: false, error: loc.error };
+
+  const model = tileModels[loc.tile.id];
+  if (!model) return { walkable: false, error: `Tile ID ${loc.tile.id} not found in tileset` };
+  const wok = getWok(model);
+  if (!wok) return { walkable: false, error: `Walkmesh ${model}.wok not found` };
+
+  const localX = worldX - loc.tileX * TILE_SIZE - TILE_SIZE / 2;
+  const localY = worldY - loc.tileY * TILE_SIZE - TILE_SIZE / 2;
+  return { ...probeTileLocal(wok, localX, localY, loc.tile.orientation, loc.tile.height, surfacemat, heightStep), heightStep };
+}
 
 /**
  * Check if a world position is walkable in a given area.
@@ -309,37 +522,19 @@ export async function checkPositionWalkable(
   if (!areDoc) return { walkable: false, error: `Area ${areaResref} not found` };
 
   const are = areDoc as GffObj;
-  const width = getFieldNum(are, "Width");
-  const height = getFieldNum(are, "Height");
+  const grid = readAreaTileGrid(are);
   const tilesetResref = (are.Tileset as { value?: string })?.value ?? "";
 
-  // Check bounds
-  if (worldX < 0 || worldX >= width * 10 || worldY < 0 || worldY >= height * 10) {
-    return { walkable: false, error: `Position (${worldX}, ${worldY}) is outside area bounds (0-${width * 10}, 0-${height * 10})` };
-  }
-
-  // World pos → tile grid
-  const tileX = Math.floor(worldX / 10);
-  const tileY = Math.floor(worldY / 10);
-  const tileIndex = tileY * width + tileX;
-
-  // Get tile data from Tile_List
-  const tileList = getFieldList(are, "Tile_List");
-  if (tileIndex >= tileList.length) {
-    return { walkable: false, error: `Tile index ${tileIndex} out of range` };
-  }
-
-  const tileEntry = tileList[tileIndex];
-  const tileId = getFieldNum(tileEntry, "Tile_ID");
-  const tileOrientation = getFieldNum(tileEntry, "Tile_Orientation");
+  const loc = locateTile(grid, worldX, worldY);
+  if ("error" in loc) return { walkable: false, error: loc.error };
 
   // Get tileset info to look up tile model
   const tileset = await getTilesetInfo(tilesetResref, resmanOpts, index);
-  if (tileId >= tileset.tiles.length) {
-    return { walkable: false, error: `Tile ID ${tileId} not found in tileset ${tilesetResref}` };
+  if (loc.tile.id >= tileset.tiles.length) {
+    return { walkable: false, error: `Tile ID ${loc.tile.id} not found in tileset ${tilesetResref}` };
   }
 
-  const tileModel = tileset.tiles[tileId].model;
+  const tileModel = tileset.tiles[loc.tile.id].model;
 
   // Load .wok
   const cacheDir = await ensureWokCacheDir();
@@ -348,53 +543,14 @@ export async function checkPositionWalkable(
     return { walkable: false, error: `Walkmesh ${tileModel}.wok not found` };
   }
 
-  // Convert world pos to tile-local coords
-  const localX = (worldX - tileX * 10) - 5;
-  const localY = (worldY - tileY * 10) - 5;
-
-  // Apply inverse rotation
-  const [rx, ry] = rotateForOrientation(localX, localY, tileOrientation);
-
-  // Test against all faces — collect ALL hits and prefer the walkable face
-  // with the highest Z (handles overlapping faces at different heights,
-  // e.g., a non-walkable ground plane at Z=0 under a walkable surface at Z=0.5)
-  const surfacemat = index.twodaTables.get("surfacemat");
-
-  let bestWalkable: WalkabilityResult | null = null;
-  let bestNonWalkable: WalkabilityResult | null = null;
-
-  for (const face of wok.faces) {
-    const v1 = wok.verts[face.v1];
-    const v2 = wok.verts[face.v2];
-    const v3 = wok.verts[face.v3];
-    if (!v1 || !v2 || !v3) continue;
-
-    if (pointInTriangle2D(rx, ry, v1[0], v1[1], v2[0], v2[1], v3[0], v3[1])) {
-      const walkable = isMaterialWalkable(face.surfaceMaterial, surfacemat);
-      const zHeight = interpolateZ(rx, ry, v1, v2, v3);
-      const result: WalkabilityResult = {
-        walkable,
-        material: getMaterialName(face.surfaceMaterial, surfacemat),
-        materialId: face.surfaceMaterial,
-        z: zHeight,
-      };
-      if (walkable) {
-        if (!bestWalkable || zHeight > (bestWalkable.z ?? -Infinity)) {
-          bestWalkable = result;
-        }
-      } else {
-        if (!bestNonWalkable || zHeight > (bestNonWalkable.z ?? -Infinity)) {
-          bestNonWalkable = result;
-        }
-      }
-    }
-  }
-
-  // Prefer walkable face, fall back to non-walkable
-  if (bestWalkable) return bestWalkable;
-  if (bestNonWalkable) return bestNonWalkable;
-
-  return { walkable: false, error: "Position is not covered by any walkmesh face" };
+  // Convert world pos to tile-local coords, then probe (rotation, node offset and tile height handled inside)
+  const localX = worldX - loc.tileX * TILE_SIZE - TILE_SIZE / 2;
+  const localY = worldY - loc.tileY * TILE_SIZE - TILE_SIZE / 2;
+  const heightStep = tileHeightStep(tileset);
+  return {
+    ...probeTileLocal(wok, localX, localY, loc.tile.orientation, loc.tile.height, index.twodaTables.get("surfacemat"), heightStep),
+    heightStep,
+  };
 }
 
 // ─── Placement Safety Check ─────────────────────────────────────────────────
@@ -698,15 +854,8 @@ export async function loadAreaWalkmeshData(
     }
   }
 
-  // Extract all unique wok files at once
-  const wokFiles = [...uniqueModels].map(m => `${m}.wok`);
-  if (wokFiles.length > 0) {
-    try {
-      await resmanExtract(cacheDir, { ...resmanOpts, files: wokFiles });
-    } catch {
-      // Some files may not exist — that's OK, we'll handle per-tile
-    }
-  }
+  // Extract all unique wok files at once; models without a walkmesh are skipped (and remembered), not fatal
+  await ensureWoksExtracted(uniqueModels, resmanOpts, cacheDir);
 
   // Compute summaries
   const summaries = new Map<number, TileWalkSummary>();
