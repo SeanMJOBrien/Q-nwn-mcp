@@ -14,6 +14,15 @@
  * Gated by MCP_VERIFY_MODE, the same module-local switch inc_spec_check.nss
  * already uses (module.ifo has no VarTable to bake a static flag into) — a
  * no-op in any module not built for nwn-mcp's own verification.
+ *
+ * Also covers NPC-to-NPC dialog instrumentation (SYSTEST_LogDialogStart) —
+ * CLAUDE.md's "Known Pitfalls" flagged ActionStartConversation between two
+ * NPCs (no PC involved at all) as untested territory with zero prior
+ * precedent in this codebase, deliberately left out of the systest-module
+ * roster pending a first real run. This closes that gap: a dialog node
+ * script fired during an NPC-initiated conversation can call this to log
+ * what GetPCSpeaker()/GetLastSpeaker() actually resolve to with no PC
+ * connected, settling the open question directly instead of guessing.
  */
 
 export interface SystestLogOptions {
@@ -41,6 +50,8 @@ export function generateSystestLogInclude(opts: SystestLogOptions = {}): string 
 // Log protocol (grep the server log for these after a headless run):
 //   [SYSTEST_DAMAGE] target=<tag> attacker=<tag> amount=<n>
 //   [SYSTEST_DEATH] tag=<tag> killer=<tag>
+//   [SYSTEST_DIALOG_START] starter=<tag> target=<tag>
+//   [SYSTEST_DIALOG_NODE] self=<tag> pcspeaker=<tag|NONE> lastspeaker=<tag|NONE>
 //
 // WIRING (chain, never replace — same convention create_random_abilities_system
 // already established): write a small per-role wrapper script that calls
@@ -61,6 +72,16 @@ export function generateSystestLogInclude(opts: SystestLogOptions = {}): string 
 //         ExecuteScript("nw_c2_default6", OBJECT_SELF); // or the creature's own original
 //         SYSTEST_LogDamage(OBJECT_SELF);
 //     }
+//
+// NPC-to-NPC dialog usage: call SYSTEST_LogDialogStart(OBJECT_SELF, oTarget)
+// from the INITIATOR's own wrapper script, right after queuing
+// ActionStartConversation(oTarget, "", FALSE, FALSE) via AssignCommand. Call
+// SYSTEST_LogDialogNode(OBJECT_SELF) from a dialog node's Action script on
+// the TARGET's conversation (added via add_dialog_node/edit_dialog_node) —
+// OBJECT_SELF there is the dialog owner (the target NPC), which is what makes
+// this diagnostic meaningful: it reports what GetPCSpeaker()/GetLastSpeaker()
+// actually resolve to mid-conversation when no PC is involved at all,
+// instead of assuming.
 
 // Chain onto ScriptDamaged (fires from within the creature's own OnDamaged
 // event, so GetLastDamager/GetTotalDamageDealt read the event that's
@@ -90,6 +111,45 @@ void SYSTEST_LogDeath(object oCreature)
     string sKiller = GetIsObjectValid(oKiller) ? GetTag(oKiller) : "unknown";
 
     WriteTimestampedLogEntry("[SYSTEST_DEATH] tag=" + sTag + " killer=" + sKiller);
+}
+
+// Call from the INITIATOR's own wrapper script, right after queuing
+// ActionStartConversation(oTarget, "", FALSE, FALSE) via AssignCommand (the
+// action is queued, not yet executed, at the point this runs — it only
+// confirms the queue attempt, not that the conversation actually opened; see
+// SYSTEST_LogDialogNode for that).
+void SYSTEST_LogDialogStart(object oStarter, object oTarget)
+{
+    if (!GetLocalInt(GetModule(), "MCP_VERIFY_MODE")) return;
+    if (!GetIsObjectValid(oStarter)) return;
+
+    string sStarter = GetTag(oStarter);
+    string sTarget = GetIsObjectValid(oTarget) ? GetTag(oTarget) : "unknown";
+
+    WriteTimestampedLogEntry("[SYSTEST_DIALOG_START] starter=" + sStarter + " target=" + sTarget);
+}
+
+// Call from a dialog node's Action script (added via add_dialog_node/
+// edit_dialog_node) on the TARGET's own conversation file — OBJECT_SELF
+// there is the dialog owner, which is what makes this diagnostic
+// meaningful. Reports what GetPCSpeaker()/GetLastSpeaker() actually resolve
+// to mid-conversation, settling the open question of whether an NPC-to-NPC
+// ActionStartConversation produces a usable speaker/listener pair with no
+// PC connected at all, instead of assuming. "NONE" marks an invalid handle
+// (e.g. GetPCSpeaker() legitimately returns OBJECT_INVALID outside any
+// conversation) rather than a tag that happens to be empty.
+void SYSTEST_LogDialogNode(object oSelf)
+{
+    if (!GetLocalInt(GetModule(), "MCP_VERIFY_MODE")) return;
+
+    object oPCSpeaker = GetPCSpeaker();
+    object oLastSpeaker = GetLastSpeaker();
+    string sPCSpeaker = GetIsObjectValid(oPCSpeaker) ? GetTag(oPCSpeaker) : "NONE";
+    string sLastSpeaker = GetIsObjectValid(oLastSpeaker) ? GetTag(oLastSpeaker) : "NONE";
+    string sSelf = GetIsObjectValid(oSelf) ? GetTag(oSelf) : "NONE";
+
+    WriteTimestampedLogEntry("[SYSTEST_DIALOG_NODE] self=" + sSelf +
+        " pcspeaker=" + sPCSpeaker + " lastspeaker=" + sLastSpeaker);
 }
 `;
 }

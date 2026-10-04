@@ -1391,21 +1391,46 @@ below). Never committed to this repo and never sent to the user as a
 deliverable — purely a disposable diagnostic aid, rebuilt fresh by the
 skill whenever needed rather than hand-patched.
 
-NPC-to-NPC dialog (`ActionStartConversation`) is deliberately NOT in this
-roster — flagged as a stretch item pending a first real
-`run_live_verification` pass proving the mechanism actually works (see the
-design discussion this feature's plan recorded: dialogs normally assume a
-PC speaker via `GetPCSpeaker()`, which resolves to `OBJECT_INVALID` with no
-PC involved — untested territory, deliberately not built blind).
+**NPC-to-NPC dialog (`ActionStartConversation`) is now built into the roster**
+(fixtures #11/#12, branch `systest-live-run-and-generalized-spec`) —
+`SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode` (`src/util/systest-log-script.ts`)
+instrument the initiator's spawn and the target's own dialog node Action
+script. The earlier assumption recorded here ("`GetPCSpeaker()` resolves to
+`OBJECT_INVALID` with no PC involved") turns out to be contradicted by this
+project's own `nwscript-docs/GetPCSpeaker.md`, sourced from nwnlexicon.com:
+"if it is an NPC speaking to another NPC, it will return the NPC who is the
+one who takes the conversation choices (NPC's always take the first one
+after a short delay)" — a real documented remark, not a guess, but still not
+the same as a live-engine confirmation from this project's own module. The
+instrumentation logs both `GetPCSpeaker()` and `GetLastSpeaker()` so the
+first real `run_live_verification` run settles it empirically either way.
+
+**Generalized runtime assertions beyond creature stats are also now built**:
+`create_spec_assertions` (`src/tools/spec-assert-tools.ts`,
+`src/util/spec-assert-script.ts`) generates `inc_spec_assert.nss` —
+`SPEC_AssertInt`/`SPEC_AssertString`/`SPEC_AssertBool`, the same
+`[SPEC_OK]`/`[SPEC_FAIL]` log protocol `SPEC_VerifyCreature()` uses, but for
+any runtime condition, not a fixed creature-stat field set. `run_live_verification`'s
+log parser needed zero changes, since it was written generically from the
+start. The roster's fixture #8 (`a_systest_enc_check.nss`) uses it to assert
+real engine hostility (`GetIsEnemy`) between the Systest Defenders and
+Hostile factions — a genuinely non-creature-stat check. This closes item (5)
+of the Verification Gate's "what should be built" list below.
 
 **Known gap, honestly recorded rather than glossed over**: the skill has
-been written and its generator tool's probe-compile confirmed live, but the
-skill itself has not yet been run end-to-end to build a real roster and
-run it through `run_live_verification` — that's the natural next real-world
-test of this whole feature, and the strongest form of verification
-available (per this project's own "the only thing that actually caught
-this was a human/engine actually running it" lesson, repeated throughout
-this document). Invoke `/systest-module` to do that.
+been written, both new generators' probe-compiles confirmed live, and
+`npm run verify` is green — but the skill itself has not yet been run
+end-to-end to build a real roster and run it through `run_live_verification`.
+That run needs a restarted MCP server connection first (this session's own
+`run_live_verification`/`create_systest_instrumentation`/`create_spec_assertions`
+calls all failed with "No such tool available" against a stale, days-old
+server process that predates them — confirmed by checking `ps` start times
+and testing a known-good tool, `verify_faction`, which responded normally).
+That's the natural next real-world test of this whole feature, and the
+strongest form of verification available (per this project's own "the only
+thing that actually caught this was a human/engine actually running it"
+lesson, repeated throughout this document). Invoke `/systest-module` to do
+that once the MCP connection is restarted.
 
 **A live isolated verification server exists and has run a real end-to-end check
 successfully** (`~/nwn-mcp-verify-server` — a fork of
@@ -1615,11 +1640,21 @@ door-breakability (true of nearly every door by default) with the actual concern
 (does this obstacle lead anywhere), so the check was redesigned around the latter.
 (4) **BUILT (2026-09-19)** — see the weather TODO above: `weather_variance_implausible`,
 gated on an explicit `travelTime` signal rather than a flat adjacent-area diff.
-(5) the big one — generalizing the `SPEC_*` runtime-verification pattern beyond
-companion stats to arbitrary custom quest/encounter scripts, so a bespoke mechanic
-like a scripted web ambush gets an actual headless-server pass/fail instead of
-"it compiled and looks right." (1)-(4) are pure static analysis, buildable without
-the live verify-server; (5) needs it.
+(5) **BUILT (branch `systest-live-run-and-generalized-spec`)** — the `SPEC_*`
+runtime-verification pattern is now generalized beyond companion stats to
+arbitrary custom quest/encounter scripts: `create_spec_assertions` generates
+`inc_spec_assert.nss` (`SPEC_AssertInt`/`SPEC_AssertString`/`SPEC_AssertBool`),
+the same `[SPEC_OK]`/`[SPEC_FAIL]` log protocol, usable from any script —
+not just `SPEC_VerifyCreature()`'s fixed creature-stat field set. A bespoke
+mechanic (a scripted web ambush, a custom encounter spawn script, a quest
+condition script) can now assert its own pass/fail the same way, and
+`run_live_verification` picks it up with zero parser changes. See
+docs/runtime-verification-spec.md §4/§5 and the systest-module skill's
+fixture #8 for a concrete non-creature-stat example (asserting real engine
+faction hostility via `GetIsEnemy`). (1)-(4) are pure static analysis,
+buildable without the live verify-server; (5) needed it and now has it —
+**still pending a real end-to-end live-engine confirmation run** (see the
+"Known gap" paragraph above the systest-module skill description).
 
 ## Co-op / Multiplayer Rules
 

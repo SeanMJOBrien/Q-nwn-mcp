@@ -14,6 +14,8 @@ An [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server for *
 - **Spatial awareness** — JSON payload of tile grids, walkable zones, and placed objects for AI reasoning
 - **Query and update** NWN SQLite campaign databases
 - **HTML area reports** — interactive visual maps of areas for human review
+- **Static verification gate** (`verify_*` family) — structural/semantic checks no compiler catches: dialog field completeness, tile IDs inside tileset bounds, armor/weapon proficiency mismatches, invalid feat IDs, store miscategorization, and more
+- **Live runtime verification** — actually boots the module in a real headless NWN engine (via an isolated, throwaway Docker container) and greps the log for engine errors and custom pass/fail assertions, closing the gap static checks can't: "the blueprint's fields look right" vs. "the engine actually behaved as intended once it ran"
 
 **Bonus:** A fully autonomous one-shot adventure creator. Give it a prompt, sit back, and get a playable module — areas painted, NPCs placed, quests written, loot balanced, all hands-free. Use `/create-adventure` and have fun. (Warning: spoiler-free by design — the DM gets surprised too.)
 
@@ -89,6 +91,7 @@ Add the server to your MCP client config. The config location depends on your cl
 | `NWN_FOLDER_USER` | Yes | | NWN user documents directory (HAKs, overrides, modules) |
 | `MCP_FOLDER_TEMP` | No | `%TEMP%/nwn-mcp` | Temp directory for extracted modules |
 | `MCP_FOLDER_USERREPORTS` | No | | Directory for exported reports |
+| `MCP_FOLDER_VERIFYSERVER` | No | `~/nwn-mcp-verify-server` | Checkout of the throwaway headless-engine verify server, used by `run_live_verification` |
 
 ## Usage
 
@@ -191,6 +194,26 @@ Just describe the kind of adventure you want to play and your party size and lev
 - `check_area_connectivity` — verify all areas are reachable via transitions
 - `get_balance_report` — creature difficulty and item values per area
 - `suggest_encounter` — advisory tool for encounter composition by party level
+
+### Verification — Static and Live
+
+Two layers, because a blueprint having the right *fields* set doesn't prove the engine *behaves* as intended once it actually loads the module:
+
+**Static** — fast, in-process, no engine needed:
+
+- `verify_creature` / `verify_item` / `verify_dialog` / `verify_door` / `verify_store` / `verify_encounter` / `verify_area` / `verify_placeable` / `verify_trigger` / `verify_waypoint` / `verify_sound` / `verify_faction` / `verify_journal` / `verify_module_info` — per-resource structural/semantic checks (dialog field completeness required by the engine, armor/weapon proficiency mismatches, invalid feat IDs, store item miscategorization, ammo stack sizes, door-leads-nowhere, and more), each finding tagged `error` (blocks) or `warning` (advisory) with a stable `code` and a `fix` naming the repair tool
+- `verify_coop_rules` — flags reward/journal/quest-state patterns that silently break in multiplayer (XP/gold given to only one party member, `AddJournalQuestEntry` not fanning out, etc.)
+- `verify_quest_completability` — traces every journal quest from quest-giver dialog through `AddJournalQuestEntry` calls to the end entry, checking area reachability along the way
+- `verify_all` — the shipping gate; `shippable: true` means zero errors module-wide, across both standalone blueprints *and* live-placed GIT instances (which can diverge from their source blueprint)
+
+**Live** — boots a real headless engine, for the class of bug static checks structurally cannot see:
+
+- `run_live_verification` — repacks the module, copies it into an isolated, throwaway Docker container running a real NWN dedicated server, brings it up, polls the server/engine logs until the module finishes loading (or a timeout), tears the container down (always — even on error), and reports engine errors plus any `[SPEC_OK]`/`[SPEC_FAIL]`/`[TAG_*]` bracket-tagged log lines found. Needs `docker-compose` and a configured verify-server checkout (see `MCP_FOLDER_VERIFYSERVER` below) — never touches a real/live/player-facing server.
+- `create_spec_verification` — generates `inc_spec_check.nss`: `SPEC_VerifyCreature(oCreature)` compares a creature's *actual* runtime race/appearance/class/level/package/feats/spells against `SPEC_*` local variables set on its blueprint, logging one `[SPEC_OK]`/`[SPEC_FAIL]` line per creature. This is how a real, confirmed bug class (henchmen with frozen level-1 stats and the wrong body model, despite passing every static check) gets caught automatically instead of by a human tester.
+- `create_spec_assertions` — generates `inc_spec_assert.nss`: the same `[SPEC_OK]`/`[SPEC_FAIL]` log protocol generalized to *any* runtime condition, not just creature stats. `SPEC_AssertInt`/`SPEC_AssertString`/`SPEC_AssertBool` let a custom quest condition/action script, an encounter's spawn script, a trigger, or a dialog node assert things like spawn counts, faction/hostility setup, or quest state — `run_live_verification` picks these up with zero additional parsing, since it was written generically from the start.
+- `create_systest_instrumentation` — generates `inc_systest_log.nss`: chainable logging hooks for things neither of the above can see — real combat outcomes (`SYSTEST_LogDamage`/`SYSTEST_LogDeath`, chained onto `ScriptDamaged`/`ScriptDeath`) and NPC-to-NPC dialog (`SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode`, confirming what `GetPCSpeaker()`/`GetLastSpeaker()` actually resolve to when an NPC starts a conversation with another NPC via `ActionStartConversation` — no PC involved at all).
+
+All four generators are gated by a module-local `MCP_VERIFY_MODE` variable (set `1` during the build→run→check→repair loop, flipped to `0` as the last step before delivery) — a no-op in the module actually handed to the user. See `docs/runtime-verification-spec.md` for the full design, and the `systest-module` skill for a ready-made disposable test rig that exercises all of this end-to-end.
 
 ### Module Management
 

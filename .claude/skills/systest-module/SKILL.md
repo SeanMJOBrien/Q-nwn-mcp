@@ -78,7 +78,14 @@ returned faction ID. `set_faction_reputation(faction1: <that ID>, faction2: "1",
 
 1. `create_random_abilities_system({})` — generates `inc_random_abil` (already
    exists as a project tool; this just writes it into this module).
-2. `create_systest_instrumentation({})` — generates `inc_systest_log`.
+2. `create_systest_instrumentation({})` — generates `inc_systest_log`
+   (`SYSTEST_LogDamage`/`SYSTEST_LogDeath`/`SYSTEST_LogDialogStart`/
+   `SYSTEST_LogDialogNode`).
+2b. `create_spec_assertions({})` — generates `inc_spec_assert`
+   (`SPEC_AssertInt`/`SPEC_AssertString`/`SPEC_AssertBool`), the generic
+   `[SPEC_OK]`/`[SPEC_FAIL]` primitive for checks that aren't about a
+   creature's own stats — used by fixture #8's encounter-design assertion
+   below.
 3. Write two small chained wrapper scripts (default non-henchman scripts are
    `ScriptDamaged=nw_c2_default6`, `ScriptDeath=nw_c2_default7` — confirmed via
    a real `create_creature_blueprint` call's own response):
@@ -102,6 +109,61 @@ returned faction ID. `set_faction_reputation(faction1: <that ID>, faction2: "1",
    }
    ```
    Same `write_script(compile:false)` + `compile_script` two-step as Phase 0.
+
+3b. Encounter-design assertion wrapper for fixture #8 (`systest_defender_paladin`)
+   — demonstrates `inc_spec_assert` checking something that is NOT a creature
+   stat: that the faction setup from Phase 2 actually produced real engine
+   hostility between the two sides, independent of and in addition to
+   `inc_spec_check`'s creature-stat checks.
+
+   `a_systest_enc_check.nss`:
+   ```
+   #include "inc_spec_assert"
+   void main()
+   {
+       ExecuteScript("nw_c2_default9", OBJECT_SELF); // confirm the real default first — see Known Pitfalls
+       object oOrc = GetObjectByTag("systest_hostile_orc");
+       int bHostile = GetIsObjectValid(oOrc) && GetIsEnemy(oOrc, OBJECT_SELF);
+       SPEC_AssertBool("systest_encounter_setup", "defenders_vs_hostile", bHostile);
+   }
+   ```
+   Same `write_script(compile:false)` + `compile_script` two-step.
+
+3c. NPC-to-NPC dialog fixture (#11 below) — settles whether
+   `ActionStartConversation` between two NPCs (no PC at all) actually opens a
+   usable conversation, and what `GetPCSpeaker()`/`GetLastSpeaker()` resolve
+   to inside it. Build the dialog first:
+
+   `create_dialog(resref: "systest_dlg", nodes: [{"speaker":"npc","text":"Status report.","script":"a_systest_dlg_node","children":[{"speaker":"pc","text":"All quiet.","script":"a_systest_dlg_node"}]}])`
+   — a bare two-line exchange, no `GetPCSpeaker()`-dependent condition
+   anywhere, deliberately, since the whole point is observing what that
+   function returns rather than assuming it.
+
+   `a_systest_dlg_node.nss` (the dialog's own Action script on both nodes):
+   ```
+   #include "inc_systest_log"
+   void main()
+   {
+       SYSTEST_LogDialogNode(OBJECT_SELF);
+   }
+   ```
+   `a_systest_dlg_start.nss` (the initiator's `ScriptSpawn`):
+   ```
+   #include "inc_systest_log"
+   void main()
+   {
+       ExecuteScript("nw_c2_default9", OBJECT_SELF);
+       object oTarget = GetObjectByTag("systest_dialog_npc_b");
+       if (GetIsObjectValid(oTarget))
+           AssignCommand(OBJECT_SELF, ActionStartConversation(oTarget, "systest_dlg", FALSE, FALSE));
+       SYSTEST_LogDialogStart(OBJECT_SELF, oTarget);
+   }
+   ```
+   Same `write_script(compile:false)` + `compile_script` two-step for all
+   three. `nw_c2_default9` is this project's own confirmed default
+   `ScriptSpawn` for an ordinary (non-henchman) creature — re-confirm against
+   a real `create_creature_blueprint` response before relying on it, the same
+   discipline already applied to `ScriptDamaged`/`ScriptDeath` above.
 
 4. For the two caster fixtures (Phase 4, items 9-10) only: a leveling+cast
    wrapper is needed, NOT just `RA_OnSpawn` at raw `ScriptSpawn` — a from-scratch
@@ -159,9 +221,11 @@ if it doesn't, the fixture itself has a bug, fix it before moving on.
 | 5 | `systest_valid_feats_rogue` | gallery | Build the blueprint bare (race/appearance/name only), then call `build_npc_stat_block(resref: "systest_valid_feats_rogue", race: <0-6>, classId: "8", level: "5")` to compute a real, 2DA-verified `FeatList`/`SkillList`/ability scores — this is what guarantees no accidental invalid feat ID. Target: `invalid_feat_id` passes (by construction — this is the tool this bug class exists to prevent). |
 | 6 | `systest_shopkeep` | gallery | Commoner (class 20), `sourceResref` a real base-game shopkeeper if convenient. Build a store via `create_store_blueprint(resref: "systest_store", tag: "systest_store", name: "Systest Store", inventory: [...])` with at least one item omitting `category`, spanning all five real `StorePanel` buckets (armor, weapon, potion/scroll, wand, misc — pick real items via `list_blueprints`/`resman_search`, not guesses) so the fixed auto-categorization has real work to do. `place_store` near the shopkeeper. Target: `store_item_miscategorized` passes for every item. |
 | 7 | `systest_hostile_orc` | arena | `faction: "1"` (built-in Hostile). Real melee weapon. `scripts: {"ScriptDamaged":"a_systest_dmg","ScriptDeath":"a_systest_death"}`. Place close to `systest_defender_paladin` (within a few meters) so they engage automatically once both spawn. |
-| 8 | `systest_defender_paladin` | arena | `faction: "<Systest Defenders ID from Phase 2>"`. Real melee weapon + matching proficiency. Same `scripts` override as #7. |
+| 8 | `systest_defender_paladin` | arena | `faction: "<Systest Defenders ID from Phase 2>"`. Real melee weapon + matching proficiency. `scripts: {"ScriptSpawn":"a_systest_enc_check","ScriptDamaged":"a_systest_dmg","ScriptDeath":"a_systest_death"}` — the `ScriptSpawn` override exercises `inc_spec_assert`'s `SPEC_AssertBool` against the faction hostility set up in Phase 2 (a check that is NOT about this creature's own stats, unlike every other fixture in this table). Target: `[SPEC_OK] tag=systest_encounter_setup field=defenders_vs_hostile`. |
 | 9 | `systest_cleric_caster` | arena | Cleric, built at a real target level (e.g. `classes: [{"class":2,"level":6}]`). `scripts: {"ScriptSpawn":"a_systest_caster"}`. No `spells` param — this fixture exists specifically to exercise `create_random_abilities_system`'s Tier-1 real-`SetMemorizedSpell()` path. |
 | 10 | `systest_bard_caster` | arena | Bard, `classes: [{"class":1,"level":6}]`. `scripts: {"ScriptSpawn":"a_systest_bard","ScriptEndRound":"a_systest_bard_er"}`. Exercises the Tier-2 virtual-ability/cast-chance path. |
+| 11 | `systest_dialog_npc_a` | gallery | Any class/role — this fixture is about the dialog mechanism, not stats. `scripts: {"ScriptSpawn":"a_systest_dlg_start"}`. Place a few meters from #12, close enough for `ActionStartConversation` to resolve without the mobile-NPC "run to target" behavior needing much room. The initiator. |
+| 12 | `systest_dialog_npc_b` | gallery | Any class/role. `conversation: "systest_dlg"` (so it has a default conversation to be started with no PC ever connecting). No script override needed — it's the listener; #11 drives the conversation. |
 
 ### Phase 5: Static check, repack, run live
 
@@ -172,14 +236,23 @@ if it doesn't, the fixture itself has a bug, fix it before moving on.
 3. `run_live_verification({ expectedCheckLines: "<N>" })` where `N` is the
    number of grep-able lines you actually expect — at minimum one
    `[SYSTEST_DAMAGE]`/`[SYSTEST_DEATH]` pair from the combat fixtures once they
-   fight (timing isn't fully deterministic — omit `expectedCheckLines` and let
-   the stability-window fallback handle it if unsure).
+   fight, one `[SPEC_OK]`/`[SPEC_FAIL]` from fixture #8's encounter-design
+   assertion, and one `[SYSTEST_DIALOG_START]`/`[SYSTEST_DIALOG_NODE]` pair
+   from fixtures #11/#12 (timing isn't fully deterministic — omit
+   `expectedCheckLines` and let the stability-window fallback handle it if
+   unsure).
 4. Read the result: `engineErrors` should be empty; `otherTaggedLines` should
-   contain real `[SYSTEST_DAMAGE]`/`[SYSTEST_DEATH]` lines from the arena fight.
-   If a `verify_creature` pass in Phase 4 said a fixture was clean but
-   `run_live_verification` still flags it, that's a real static/runtime gap
-   worth a CLAUDE.md note, the same way the `invalid_feat_id` check itself was
-   born from exactly this kind of live-only finding.
+   contain real `[SYSTEST_DAMAGE]`/`[SYSTEST_DEATH]`/`[SYSTEST_DIALOG_START]`/
+   `[SYSTEST_DIALOG_NODE]` lines, and `specResults.ok`/`specResults.fail`
+   should show `systest_encounter_setup`. Read the `[SYSTEST_DIALOG_NODE]`
+   lines specifically for what `pcspeaker`/`lastspeaker` actually resolved to
+   — this is the real, previously-untested finding this fixture exists to
+   produce; report it plainly rather than treating a clean compile as proof
+   the mechanism works. If a `verify_creature` pass in Phase 4 said a fixture
+   was clean but `run_live_verification` still flags it, that's a real
+   static/runtime gap worth a CLAUDE.md note, the same way the
+   `invalid_feat_id` check itself was born from exactly this kind of
+   live-only finding.
 5. Report results plainly — this is a developer-facing diagnostic tool, not a
    spoiler-free player-facing module. Name which fixtures passed/failed and
    quote the relevant log lines.
@@ -189,10 +262,10 @@ if it doesn't, the fixture itself has a bug, fix it before moving on.
 - This module is **never committed** to the Q-nwn-mcp repo and **never sent to
   the user as a deliverable** — it's a disposable diagnostic aid. Don't
   `SendUserFile` it unless explicitly asked.
-- NPC-to-NPC dialog (`ActionStartConversation`) is a deliberate stretch item,
-  not built into this roster — see CLAUDE.md's Feature B design notes for why
-  (zero prior precedent in this codebase, dialogs normally assume a PC
-  speaker). Add it here once a first real run has proven the mechanism, not
-  before.
+- NPC-to-NPC dialog (`ActionStartConversation`, fixtures #11/#12) is now built
+  into this roster via `SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode` — it
+  had zero prior precedent in this codebase before this, so treat its first
+  real `run_live_verification` result as a genuine finding to report, not a
+  foregone conclusion just because it compiled.
 - If `run_live_verification`'s params ever change, update this skill's Phase 5
   to match (per CLAUDE.md's "keep skills in sync with tools" rule).

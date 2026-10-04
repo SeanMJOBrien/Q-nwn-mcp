@@ -26,13 +26,27 @@ all 7 standard PC races and all 11 base classes.
 `adventure-actors/SKILL.md` Phase 3b wires `SPEC_*` vars into every companion blueprint
 and calls `SPEC_VerifyCreature()` from `a_hen_join`.
 
-**§1 is implemented and has run a real end-to-end test successfully.** §4 and §6 remain
+**§1 is implemented and has run a real end-to-end test successfully.** §6 remains
 unaddressed; **§5's orchestration loop is now implemented** as the `run_live_verification`
 MCP tool (2026-09-19, `src/tools/verify-server-tools.ts` — see CLAUDE.md's "Live
 verification automation" entry for the design and four real bugs found building it:
 a `${PWD}` env-var interpolation gap, the log files truncating on every container
 restart rather than appending forever, the MCP SDK's 60s client-side default request
 timeout, and `EXOWARNING` being too broad a default error pattern).
+
+**§4's "generalize beyond creature stats" item is now implemented** — `create_spec_assertions`
+(`src/tools/spec-assert-tools.ts`) generates `inc_spec_assert.nss`
+(`src/util/spec-assert-script.ts`): `SPEC_AssertInt`/`SPEC_AssertString`/`SPEC_AssertBool`
+log the exact same `[SPEC_OK]`/`[SPEC_FAIL]` protocol `SPEC_VerifyCreature()` uses, but for
+*any* runtime condition a custom quest/encounter/trigger/dialog script wants to check — not
+just a fixed creature-stat field set. Each call logs immediately and independently (no
+bundling across calls, unlike `SPEC_VerifyCreature`'s one-line-after-every-field-passes
+behavior) — a caller wanting bundled semantics tracks its own pass flag, same as
+`SPEC_VerifyCreature` does internally. `run_live_verification`'s log parser needed zero
+changes to pick these up, since `parseLiveLogs` was written generically against the tag
+format from the start. The `systest-module` skill's fixture #8 (`a_systest_enc_check.nss`)
+uses this to assert real engine hostility (`GetIsEnemy`) between two factions — a
+genuinely non-creature-stat check, proving the generalization isn't just theoretical.
 
 **First real end-to-end run, against the actual module that started this whole effort**
 ("Henchman Gear Showcase" — the "henchmen have bad stats and no appearance" bug report).
@@ -323,10 +337,17 @@ Beyond race/appearance/class/level/spells:
   below/above the walkmesh — checkable by comparing `GetPosition()`'s Z against a
   `GetGroundHeight()`-equivalent, though this mostly duplicates `fix_object_heights`'
   existing walkmesh-based check and is lower priority.
-- **Dialog actually opens**: harder to check generically — would need a scripted
-  `BeginConversation()` probe, which has side effects (it really starts a conversation)
-  and isn't safe to fire unconditionally on every NPC at module load. Leave this to the
-  existing static `verify_dialog` unless a specific need arises.
+- **Dialog actually opens**: now has a real, deliberate (not unconditional/module-wide)
+  instrumented path — see `SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode` in
+  `src/util/systest-log-script.ts` and the `systest-module` skill's fixtures #11/#12.
+  One NPC's `OnSpawn` queues `ActionStartConversation` at a second NPC and logs the
+  attempt; a dialog node Action script on the target logs what `GetPCSpeaker()`/
+  `GetLastSpeaker()` actually resolve to mid-conversation. This settles — rather than
+  assumes — whether an NPC-to-NPC conversation with no PC connected produces a usable
+  speaker/listener pair, closing a real open question this doc previously left
+  unaddressed. `verify_dialog` remains the static check for dialog file structure; this
+  is the live-engine complement for the specific "does this actually open and run"
+  question that's unsafe to check unconditionally module-wide.
 
 ## 5. Confirming built vs. present — the orchestration loop
 

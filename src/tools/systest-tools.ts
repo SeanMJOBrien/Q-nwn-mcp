@@ -32,6 +32,8 @@ void main()
 {
     SYSTEST_LogDamage(OBJECT_SELF);
     SYSTEST_LogDeath(OBJECT_SELF);
+    SYSTEST_LogDialogStart(OBJECT_SELF, OBJECT_SELF);
+    SYSTEST_LogDialogNode(OBJECT_SELF);
 }
 `;
   const result = await writeAndCompileScript(index, PROBE_RESREF, source, true);
@@ -53,12 +55,17 @@ export function registerSystestTools(server: McpServer): void {
   server.tool(
     "create_systest_instrumentation",
     "Generate the systems-test logging include (inc_systest_log by default), used by the systest-module skill's " +
-      "combat fixtures. SYSTEST_LogDamage(oCreature)/SYSTEST_LogDeath(oCreature), chained onto ScriptDamaged/" +
-      "ScriptDeath, log [SYSTEST_DAMAGE] target=<tag> attacker=<tag> amount=<n> / [SYSTEST_DEATH] tag=<tag> " +
-      "killer=<tag> via the engine's own OnDamaged/OnDeath event context (GetLastDamager/GetTotalDamageDealt/" +
-      "GetLastHostileActor) — ExecuteScript() doesn't forward custom arguments to a chained wrapper, so both " +
-      "functions take just the creature. Only active when the module local MCP_VERIFY_MODE is set (e.g. from " +
-      "a_mod_load) — a no-op in the delivered module, same convention as create_spec_verification. " +
+      "combat and NPC-to-NPC dialog fixtures. SYSTEST_LogDamage(oCreature)/SYSTEST_LogDeath(oCreature), chained onto " +
+      "ScriptDamaged/ScriptDeath, log [SYSTEST_DAMAGE] target=<tag> attacker=<tag> amount=<n> / [SYSTEST_DEATH] " +
+      "tag=<tag> killer=<tag> via the engine's own OnDamaged/OnDeath event context (GetLastDamager/" +
+      "GetTotalDamageDealt/GetLastHostileActor) — ExecuteScript() doesn't forward custom arguments to a chained " +
+      "wrapper, so both functions take just the creature. SYSTEST_LogDialogStart(oStarter, oTarget) (call right " +
+      "after queuing ActionStartConversation) logs [SYSTEST_DIALOG_START] starter=<tag> target=<tag>; " +
+      "SYSTEST_LogDialogNode(oSelf) (call from a dialog node's Action script on the TARGET's conversation) logs " +
+      "[SYSTEST_DIALOG_NODE] self=<tag> pcspeaker=<tag|NONE> lastspeaker=<tag|NONE> — settles what GetPCSpeaker()/ " +
+      "GetLastSpeaker() actually resolve to in an NPC-to-NPC conversation with no PC connected. Only active when " +
+      "the module local MCP_VERIFY_MODE is set (e.g. from a_mod_load) — a no-op in the delivered module, same " +
+      "convention as create_spec_verification. " +
       "WIRING (chain, never replace): write a per-role wrapper that calls ExecuteScript() on the creature's " +
       "original ScriptDamaged/ScriptDeath first, then SYSTEST_LogDamage(OBJECT_SELF)/SYSTEST_LogDeath(OBJECT_SELF), " +
       "and pass it via create_creature_blueprint's scripts param. Run the resulting module through " +
@@ -92,14 +99,26 @@ export function registerSystestTools(server: McpServer): void {
                 sizeBytes: written.sizeBytes,
                 compiles: probe.ok,
                 ...(probe.ok ? {} : { compilerOutput: probe.output }),
-                api: ["void SYSTEST_LogDamage(object oCreature)", "void SYSTEST_LogDeath(object oCreature)"],
+                api: [
+                  "void SYSTEST_LogDamage(object oCreature)",
+                  "void SYSTEST_LogDeath(object oCreature)",
+                  "void SYSTEST_LogDialogStart(object oStarter, object oTarget)",
+                  "void SYSTEST_LogDialogNode(object oSelf)",
+                ],
                 usage: `#include "${includeName}"`,
-                logTags: ["[SYSTEST_DAMAGE] target=<tag> attacker=<tag> amount=<n>", "[SYSTEST_DEATH] tag=<tag> killer=<tag>"],
+                logTags: [
+                  "[SYSTEST_DAMAGE] target=<tag> attacker=<tag> amount=<n>",
+                  "[SYSTEST_DEATH] tag=<tag> killer=<tag>",
+                  "[SYSTEST_DIALOG_START] starter=<tag> target=<tag>",
+                  "[SYSTEST_DIALOG_NODE] self=<tag> pcspeaker=<tag|NONE> lastspeaker=<tag|NONE>",
+                ],
                 gate: 'Only runs when GetLocalInt(GetModule(), "MCP_VERIFY_MODE") is non-zero.',
                 wiring:
                   "Chain, never replace: write a per-role wrapper that calls ExecuteScript() on the creature's " +
                   "original ScriptDamaged/ScriptDeath first, then SYSTEST_LogDamage/SYSTEST_LogDeath, and pass it " +
-                  "via create_creature_blueprint's scripts param.",
+                  "via create_creature_blueprint's scripts param. For dialog: call SYSTEST_LogDialogStart right " +
+                  "after queuing ActionStartConversation on the initiator, and SYSTEST_LogDialogNode from a dialog " +
+                  "node's Action script on the target's conversation.",
               },
               null,
               2,
