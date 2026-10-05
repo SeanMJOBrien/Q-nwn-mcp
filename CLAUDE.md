@@ -1656,6 +1656,25 @@ buildable without the live verify-server; (5) needed it and now has it —
 **still pending a real end-to-end live-engine confirmation run** (see the
 "Known gap" paragraph above the systest-module skill description).
 
+**TODO (user-raised, 2026-10-05) — an "encounter composer": role + target
+difficulty → a built, balanced roster, on both sides of the fight.** The
+user's stated goal: an LLM should be able to say "I need a necromancer for a
+CR 6 battle against the PC(s) and their party" and get back the necromancer
+plus whatever additional NPCs either side actually needs, already built,
+geared, and difficulty-checked — not hand-orchestrate `build_npc_stat_block`
+→ `equip_npc_by_role` → manual `get_balance_report` trial-and-error → repeat.
+Fully planned, nothing implemented, in `docs/encounter-composer-spec.md`:
+an archetype library mapping role names to class/feat/spell/equipment
+recipes (NWN has no literal "Necromancer" class), a reverse-EL solver
+extending `encounter-difficulty.ts`'s existing same-CR combination math to
+solve for "how many support creatures closes this EL gap" instead of only
+auditing a built encounter, a support-roster chooser, an optional ally-side
+reinforcement check, and the `compose_encounter` tool that ties them
+together. Open question flagged in the doc, not yet confirmed with the
+user: whether "CR 6" means the whole fight's Encounter Level against the
+full party (recommended default) or the named boss's own pinned CR with
+escorts added on top regardless of resulting EL.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
