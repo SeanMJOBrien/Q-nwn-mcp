@@ -1,6 +1,6 @@
 # Encounter composer: role + target difficulty → a built, balanced roster
 
-Status: **F2 (reverse EL solver) is built.** F1, F3-F8 remain planning only.
+Status: **F1 and F2 are built.** F3-F8 remain planning only.
 
 ## Why this exists
 
@@ -77,54 +77,54 @@ Each is buildable mostly independently, but F5 is the feature the user
 actually asked for — F1-F4 and F6-F7 are what F5 needs to not be a thin
 wrapper that still leaves the hard parts to the LLM.
 
-### F1. Archetype library — role name → mechanical build recipe
+### F1. Archetype library — role name → mechanical build recipe — **BUILT (one entry)**
 
 **Objective:** let the composer accept a thematic role name instead of
 requiring the caller to already know NWN's class list. "Necromancer" has no
 literal class; it has to resolve to something like *Wizard or Sorcerer,
-necromancy-leaning spell selection, animate-dead-style minion access, light
-or no armor, a bias toward Fighter-type melee escorts to cover its own
-fragility.*
+necromancy-leaning spell selection, animate-dead-style minion access.*
 
-**Design:** a curated table (`src/util/encounter-archetypes.ts`), each entry
-roughly:
+**Built as** a curated table, `ARCHETYPES` in `src/util/encounter-archetypes.ts`
+(`getArchetype(name)` for case-insensitive lookup), with real unit test
+coverage. One entry so far — necromancer — resolved to `CLASS_TYPE_WIZARD`
+(10), `levelForCR` reusing `estimateCRFromLevel`'s already-verified CR ~=
+level correlation directly (a caster's level IS its CR), and
+`naturalSupport: "undead_minion"` for F3 (not yet built) to act on.
+`spellThemeKeywords`/`equipmentThemeKeywords` exist on the type but are
+**not consumed by any tool yet** — `create_random_abilities_system` has no
+school/theme filter and `equip_npc_by_role` has no theme param; these are
+forward-looking fields with a real place to be read from once either tool
+grows that capability, not evidence that filtering already happens.
 
-```
-{
-  name: "necromancer",
-  class: CLASS_TYPE_WIZARD,           // or Sorcerer — see open question below
-  levelFormula: (targetCR) => ...,    // how class level maps to a target CR contribution
-  featBias: [...],                    // feats to prefer when build_npc_stat_block has choice slots
-  spellTheme: "necromancy",           // informs create_random_abilities_system / spell selection once it's role-aware
-  equipmentTheme: "caster_robes",     // informs equip_npc_by_role's search terms
-  naturalSupport: "undead_minion",    // see F3 — what this archetype's "extra NPCs" should be, if any
-}
-```
+**A real caveat is baked into the entry, not left implicit:** this
+project's own prior live-engine investigation (CLAUDE.md, "Random caster
+abilities") already confirmed `create_random_abilities_system`'s Tier 1 path
+is capped at cantrips + 1st-level spells for Wizard *specifically* — three
+separate NWNX investigation attempts failed to find a fix. A necromancer
+built via this archetype inherits that real, confirmed limitation; the
+`caveat` field says so plainly rather than silently shipping a disappointing
+caster. (Sorcerer, this project's other necromancy-plausible option, has
+*no* such limitation — Tier 2 is "confirmed fully working end-to-end... no
+known limitations" — but doesn't get the thematically-correct
+specialist-wizard framing. Left as Wizard for now since the theme match
+matters for a role name specifically chosen to feel like a necromancer;
+revisit if the spell-slot cap turns out to matter more in practice.)
 
-**Open questions needing real 2DA/engine research before implementation —
-do not guess these in:**
+**Still open, deliberately not resolved blind (do not guess these in):**
 - Whether a NWN:EE Wizard's `SpellSchool` GFF field (specialist wizard,
-  trading two opposition schools for a bonus slot in one) is worth setting
-  for a "necromancer" archetype, or whether plain spell-list curation
-  (favoring Animate Dead, necromancy-tagged spells from `spells.2da`) is
-  sufficient and simpler. Not yet confirmed which field this actually is or
-  whether `create_random_abilities_system`'s pool-building logic would need
-  a school filter added to respect it.
-- How "animate dead"-style minion-raising actually works mechanically for an
-  NPC caster at module-build time (a scripted `OnSpawn` that places real
-  skeleton/zombie creatures near the necromancer and sets their faction to
-  match, vs. relying on the spell's own real-time cast effect, which would
-  only produce minions if the necromancer actually casts it in combat and a
-  human plays through that far). The *build-time* approach (F3) sidesteps
-  this entirely by just placing real skeleton/zombie creatures as part of
-  the roster — recommended as the first version, since it's deterministic
-  and doesn't depend on AI actually choosing to cast a specific spell.
-- Initial archetype list should be small and real-need-driven, not an
-  exhaustive catalog guessed up front: necromancer (the stated example),
-  and 2-3 more that `/create-adventure`'s own `adventure-challenges` skill
-  already describes informally (e.g. "tactical roles (melee, caster,
-  healer)" per its own one-line description) — grow the table from actual
-  use, the same way `CLASS_FEATS`/`RACIAL_FEATS` grew from actual verified
+  trading two opposition schools for a bonus slot in one) is worth setting.
+  Not yet confirmed which field this actually is or whether
+  `create_random_abilities_system`'s pool-building logic would need a
+  school filter added to respect it — and moot anyway while Wizard is
+  capped at 1st-level spells (see the caveat above).
+- How "animate dead"-style minion-raising should actually work mechanically
+  — the build-time approach (placing real skeleton/zombie creatures as part
+  of the roster, via F3) remains the recommended design over a scripted
+  real-time spell-cast effect, for the reasons already given below.
+- Growing this table past one entry: 2-3 more real roles that
+  `/create-adventure`'s own `adventure-challenges` skill already describes
+  informally (e.g. "tactical roles (melee, caster, healer)") — grow from
+  actual use, the same way `CLASS_FEATS`/`RACIAL_FEATS` grew from verified
   2DA lookups rather than a speculative full table.
 
 ### F2. Reverse EL solver — target difficulty → required CR total — **BUILT**
@@ -282,7 +282,7 @@ useful standalone before a skill depends on it.
    the same real-data backing `encounter-difficulty.ts` already has, no new
    external dependencies, and independently useful even before F1/F5 exist
    (a human could use it by hand today).
-2. **F1 (archetype library)**, starting with exactly one real entry —
+2. **F1 (archetype library) — DONE**, starting with exactly one real entry —
    necromancer, the stated example — resolved against real 2DA data (not
    guessed), following this project's established "grow the table from
    verified lookups" pattern.
