@@ -157,6 +157,17 @@ describe("create_faction + verify_faction", () => {
         expect.arrayContaining([[2, 0], [0, 2], [2, 1], [1, 2]]),
       );
       expect(repList.every((e) => (e.FactionRep as { value: number }).value === 75)).toBe(true);
+
+      // The actual root cause found live: FactionRep MUST be `dword` to
+      // match every real toolset-authored entry. GFF struct fields are
+      // looked up by (label, type) together — an `int`-typed FactionRep
+      // with the right label was still invisible to a real engine's loader,
+      // silently falling back to a friendly 100 default regardless of the
+      // FactionID values or direction (both already-fixed separately above).
+      expect(repList.every((e) => (e.FactionRep as { type: string }).type === "dword")).toBe(true);
+
+      const factionList = (doc.FactionList as { value: GffObj[] }).value;
+      expect((factionList[2].FactionGlobal as { type: string }).type).toBe("word");
     } finally {
       await cleanup();
     }
@@ -201,6 +212,8 @@ describe("set_faction_reputation + verify_faction", () => {
       ]);
       expect(pairs).toEqual(expect.arrayContaining([[0, 1], [1, 0]]));
       expect(repList.every((e) => (e.FactionRep as { value: number }).value === 10)).toBe(true);
+      // The actual root cause found live — see create_faction's test above.
+      expect(repList.every((e) => (e.FactionRep as { type: string }).type === "dword")).toBe(true);
     } finally {
       await cleanup();
     }
