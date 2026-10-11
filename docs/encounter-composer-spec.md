@@ -1,6 +1,6 @@
 # Encounter composer: role + target difficulty → a built, balanced roster
 
-Status: **F1 and F2 are built.** F3-F8 remain planning only.
+Status: **F1, F2 and F3 are built.** F4-F8 remain planning only.
 
 ## Why this exists
 
@@ -175,21 +175,32 @@ function solveSupportCount(targetEL, bossCR, supportCR, partyLevel, partySize): 
 fight for a 4-person level 6 party" from a manual back-and-forth with
 `get_balance_report` into a single computed answer.
 
-### F3. Support-roster chooser — turning an EL gap into real creatures
+### F3. Support-roster chooser — turning an EL gap into real creatures — **BUILT**
 
 **Objective:** once F2 says "add support creatures totaling EL *y*," decide
 *what* those creatures actually are, using the archetype's declared
 `naturalSupport` (F1) rather than picking arbitrary filler.
 
-**Design:** for `naturalSupport: "undead_minion"`, search base-game +
-module blueprints (`list_blueprints`/`resman_search`, per this project's
-established "search for a real blueprint before building one from scratch"
-gear-sourcing rule) for a real skeleton/zombie blueprint at roughly the
-needed CR; fall back to building one via `build_npc_stat_block` only if no
-real blueprint exists at a usable CR. Same two-tool search discipline this
-project already documents elsewhere (`list_blueprints` alone misses most of
-the base game's terse-resref catalog — try `resman_search` with a short
-prefix guess too).
+**Built as** `pickSupportCandidate(naturalSupport, targetCR)` in
+`src/util/encounter-archetypes.ts`, with a real, verified candidate list
+for `"undead_minion"`: `nw_skeleton` (CR 0.5) and `nw_zombie01` (CR 1), both
+confirmed via `list_blueprints`/`resolve_blueprint` against real game data
+to carry `faction: 1` (Hostile) — the base game's "Summoned" variants
+(`nw_s_skeleton`/`nw_s_zombie`, found in the same search) were deliberately
+excluded, since they default to `faction: 2` (Commoner): they're meant for
+a player's own summon spell, not a hostile encounter's minions. Picks the
+highest-CR real candidate at or below the target CR, falling back to the
+lowest-CR candidate if the target is below every real option — never
+fabricates a blueprint at an exact CR that doesn't exist for real. 9 new
+unit tests (shared with F1's test file).
+
+**Narrower than originally planned, and said so rather than silently
+descoped:** this does NOT yet fall back to `build_npc_stat_block` when no
+real blueprint exists for a `naturalSupport` label — with only one label
+(`undead_minion`) in the table so far, and two confirmed real candidates for
+it, that fallback path has no real case to exercise yet. Add it when a
+second `naturalSupport` label is needed and turns out to have no good real
+blueprint, not speculatively now.
 
 ### F4. Ally-side reinforcement — does the *party* need anything too?
 
@@ -286,7 +297,7 @@ useful standalone before a skill depends on it.
    necromancer, the stated example — resolved against real 2DA data (not
    guessed), following this project's established "grow the table from
    verified lookups" pattern.
-3. **F3 (support-roster chooser)** for that one archetype's `naturalSupport`.
+3. **F3 (support-roster chooser) — DONE** for that one archetype's `naturalSupport`.
 4. **F5 (`compose_encounter`)** wiring F1-F3 together, dry-run mode only
    first (no placement) so the roster-planning logic can be reviewed and
    tested in isolation before it touches a real module.

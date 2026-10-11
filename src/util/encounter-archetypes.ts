@@ -88,3 +88,51 @@ export const ARCHETYPES: Record<string, ArchetypeRecipe> = {
 export function getArchetype(name: string): ArchetypeRecipe | undefined {
   return ARCHETYPES[name.trim().toLowerCase()];
 }
+
+/**
+ * F3 — support-roster chooser. A real, verified base-game blueprint per
+ * `NaturalSupport` label, confirmed via `list_blueprints`/`resolve_blueprint`
+ * against real game data (not guessed): both carry `faction: 1` (Hostile) —
+ * the "Summoned" variants of each (`nw_s_skeleton`/`nw_s_zombie`) were found
+ * in the same search but excluded here, since they default to `faction: 2`
+ * (Commoner) — they're meant for a player's own summon spell, not a hostile
+ * encounter's minions.
+ *
+ * Deliberately a small, real candidate list per label, not a formula —
+ * same discipline as `CLASS_WEAPON_PREFERENCES`. Grow a label's list only
+ * when a real need calls for a wider CR spread.
+ */
+export interface SupportCandidate {
+  resref: string;
+  tag: string;
+  cr: number;
+}
+
+const SUPPORT_CANDIDATES: Partial<Record<Exclude<NaturalSupport, null>, SupportCandidate[]>> = {
+  undead_minion: [
+    { resref: "nw_skeleton", tag: "NW_SKELETON", cr: 0.5 },
+    { resref: "nw_zombie01", tag: "NW_ZOMBIE01", cr: 1 },
+  ],
+};
+
+/**
+ * Pick the best real support-creature blueprint for a `naturalSupport`
+ * label at a given target CR: the highest-CR real candidate that does not
+ * exceed `targetCR`, falling back to the lowest-CR candidate if every real
+ * option would overshoot (a target CR below the cheapest real minion still
+ * gets a real creature back, just one that's relatively tougher than ideal
+ * — never fabricated down to an exact CR that doesn't exist as a real
+ * blueprint). Returns `null` when `naturalSupport` is `null` or has no
+ * candidates yet (an archetype with no natural minion type, or one this
+ * table hasn't grown to cover).
+ */
+export function pickSupportCandidate(naturalSupport: NaturalSupport, targetCR: number): SupportCandidate | null {
+  if (!naturalSupport) return null;
+  const candidates = SUPPORT_CANDIDATES[naturalSupport];
+  if (!candidates || candidates.length === 0) return null;
+
+  const atOrBelowTarget = candidates.filter((c) => c.cr <= targetCR).sort((a, b) => b.cr - a.cr);
+  if (atOrBelowTarget.length > 0) return atOrBelowTarget[0];
+
+  return candidates.reduce((lowest, c) => (c.cr < lowest.cr ? c : lowest));
+}
