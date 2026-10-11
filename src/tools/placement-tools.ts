@@ -24,6 +24,8 @@ import { resolveBlueprint, getGitDoc, writeBackGit, updateAreaCounts, degToRad }
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
 import { snapshotGitForUndo } from "../util/undo.js";
+import { checkCollision } from "../util/collision.js";
+import { placeCreatureCore } from "../util/creature-placer.js";
 import {
   compassToOrientation,
   orientationToCompass,
@@ -34,49 +36,7 @@ import {
   radToDeg,
 } from "../util/facing.js";
 
-// ─── Collision detection helper ──────────────────────────────────────────────
-
-interface CollisionResult {
-  collision: boolean;
-  nearbyTag?: string;
-  distance?: number;
-}
-
-const COLLISION_LISTS = [
-  { name: "Creature List", xField: "XPosition", yField: "YPosition" },
-  { name: "Placeable List", xField: "X", yField: "Y" },
-  { name: "Door List", xField: "X", yField: "Y" },
-] as const;
-
-/**
- * Check for nearby objects within `radius` meters across creature, placeable, and door lists.
- * Returns the closest collision if any.
- */
-function checkCollision(git: GffObj, x: number, y: number, radius: number = 0.75): CollisionResult {
-  let closestDist = Infinity;
-  let closestTag: string | undefined;
-
-  for (const { name, xField, yField } of COLLISION_LISTS) {
-    const list = getFieldList(git, name);
-    for (const obj of list) {
-      const ox = getFieldNum(obj, xField);
-      const oy = getFieldNum(obj, yField);
-      if (ox === undefined || oy === undefined) continue;
-      const dx = ox - x;
-      const dy = oy - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < radius && dist < closestDist) {
-        closestDist = dist;
-        closestTag = getFieldStr(obj, "Tag") || undefined;
-      }
-    }
-  }
-
-  if (closestDist < radius) {
-    return { collision: true, nearbyTag: closestTag, distance: Math.round(closestDist * 100) / 100 };
-  }
-  return { collision: false };
-}
+// Collision detection: src/util/collision.ts (shared with creature-placer.ts)
 
 export function registerPlacementTools(server: McpServer): void {
 
@@ -163,96 +123,45 @@ export function registerPlacementTools(server: McpServer): void {
     },
     { idempotentHint: true },
     async ({ area, blueprint, x, y, z: zPos, bearing, collisionRadius, faceTowardX, faceTowardY, walkBuffer }) => {
-      const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing);
-      const face = parseFaceToward(faceTowardX, faceTowardY);
-      if ("error" in face) return { content: [{ type: "text", text: face.error }] };
-      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : undefined;
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
-      // Walkmesh + buffer validation
-      const walkCheck = await checkPlacementWalkable(xN, yN, area.toLowerCase(), index, resmanOpts, walkBufferN);
-      if (!walkCheck.ok) {
-        return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              error: "Position is not safe for placement",
-              position: { x: xN, y: yN },
-              detail: walkCheck.reason,
-            }, null, 2),
-          }],
-        };
-      }
+      const result = await placeCreatureCore(index, resmanOpts, {
+        area,
+        blueprint,
+        x: toF(x),
+        y: toF(y),
+        z: toF(zPos),
+        bearing: toF(bearing),
+        collisionRadius: collisionRadius !== undefined ? toF(collisionRadius) : undefined,
+        faceTowardX: faceTowardX !== undefined ? toF(faceTowardX) : undefined,
+        faceTowardY: faceTowardY !== undefined ? toF(faceTowardY) : undefined,
+        walkBuffer: walkBuffer !== undefined ? toF(walkBuffer) : undefined,
+      });
 
-      // Resolve blueprint
-      const utc = await resolveBlueprint(index, blueprint, "utc", resmanOpts);
-      if (!utc) {
-        return { content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utc` }] };
-      }
-
-      const obj = utc as GffObj;
-
-      // Strip __data_type, set __struct_id for GIT list entry
-      delete obj.__data_type;
-      obj.__struct_id = GIT_STRUCT_ID.CREATURE;
-
-      // Set position — use walkmesh Z height for accurate ground placement
-      const placeZ = walkCheck.z ?? zN;
-      obj.XPosition = { type: "float", value: xN };
-      obj.YPosition = { type: "float", value: yN };
-      obj.ZPosition = { type: "float", value: placeZ };
-
-      // Set facing: an orientation VECTOR in world axes (compass bearing b -> (sin b, cos b))
-      let orientation: [number, number];
-      if (face.target) {
-        const toward = orientationToward({ x: xN, y: yN }, face.target);
-        if (!toward) return { content: [{ type: "text", text: "faceToward is the same point as the creature position." }] };
-        orientation = toward;
-      } else {
-        orientation = compassToOrientation(bearingN);
-      }
-      obj.XOrientation = { type: "float", value: orientation[0] };
-      obj.YOrientation = { type: "float", value: orientation[1] };
-      const facingCompass = orientationToCompass(orientation[0], orientation[1]);
-
-      // Append to GIT Creature List
-      const { doc: gitDoc, obj: git } = getGitDoc(index, area);
-
-      // Collision detection (blocking — matches placeable behavior)
-      const colRadius = collisionRadius !== undefined ? toF(collisionRadius) : 0.75;
-      if (colRadius > 0) {
-        const collision = checkCollision(git, xN, yN, colRadius);
-        if (collision.collision) {
+      if (!result.success) {
+        if (result.position) {
           return {
             content: [{
               type: "text",
-              text: `Placement blocked: '${collision.nearbyTag}' is ${collision.distance}m away (minimum ${colRadius}m). Choose a different position.`,
+              text: JSON.stringify({ error: result.error, position: result.position, detail: result.detail }, null, 2),
             }],
           };
         }
+        return { content: [{ type: "text", text: result.error ?? "Placement failed." }] };
       }
-
-      snapshotGitForUndo(gitDoc, area, "place_creature", `Place creature ${blueprint}`);
-      const creatureList = getFieldList(git, "Creature List");
-      creatureList.push(obj);
-
-      await writeBackGit(index, area, gitDoc);
-      updateAreaCounts(index, area);
-
-      const name = getFieldLocStr(obj, "FirstName") || getFieldStr(obj, "Tag") || blueprint;
 
       return {
         content: [{
           type: "text",
           text: JSON.stringify({
             success: true,
-            area,
-            creature: name,
-            blueprint,
-            position: { x: xN, y: yN, z: placeZ },
-            groundZ: walkCheck.z ?? null,
-            bearing: facingCompass,
+            area: result.area,
+            creature: result.creature,
+            blueprint: result.blueprint,
+            position: result.placedPosition,
+            groundZ: result.groundZ,
+            bearing: result.bearing,
           }, null, 2),
         }],
       };

@@ -1,32 +1,36 @@
 /**
- * Encounter composer tool — F5 of docs/encounter-composer-spec.md.
+ * Encounter composer tool — F5 (dry-run) and F6 (placement) of
+ * docs/encounter-composer-spec.md.
  *
- * Wires F1 (archetype library), F2 (reverse EL solver) and F3 (support-roster
- * chooser) together into the single call the feature was planned around: an
- * LLM says "I need a necromancer for a CR 6 battle" and gets back a plan,
- * not a sequence of manual build_npc_stat_block/get_balance_report steps.
+ * Wires F1 (archetype library), F2 (reverse EL solver) and F3
+ * (support-roster chooser) together into the single call the feature was
+ * planned around: an LLM says "I need a necromancer for a CR 6 battle" and
+ * gets back a plan — or, with an `area` given, a built and placed roster.
  *
- * Dry-run only, per the spec doc's own build order (step 4: "dry-run mode
- * only first (no placement) so the roster-planning logic can be reviewed and
- * tested in isolation before it touches a real module"). Placement mode
- * (actually calling create_creature_blueprint/place_creature) is a planned
- * follow-up (F6), not built here — this tool never touches a loaded module
- * and needs none loaded, since every input it reads is either a caller
- * param or one of F1-F3's own pure, static tables.
+ * F6 needed a real refactor to become possible at all: create_creature_
+ * blueprint's and place_creature's core logic lived entirely inside their
+ * MCP tool handlers, with no reusable exported function — unlike
+ * write_script's writeAndCompileScript. Extracted into
+ * src/util/creature-builder.ts and src/util/creature-placer.ts
+ * (behavior-preserving — the original MCP tools are now thin wrappers
+ * around the same functions, confirmed by the full existing test suite
+ * passing unchanged).
  *
  * Deliberately narrower than the original design sketch:
- * - `roles: string[]` became a single `role: string` — the math this tool
- *   wires together (planSupportCluster) is built for one named boss; how
- *   multiple named bosses in one fight would combine is the same kind of
- *   unverified mixed-CR question this project already declines to guess at
- *   (see combineSameCREL's own doc comment). Revisit once there's a real
- *   multi-boss need and a real source for that combination rule.
- * - The boss's own CR is a required input (`bossCR`), not derived from
- *   `targetEL`. Nothing in F1-F3 can honestly split "how much of this
- *   fight's difficulty should the boss alone carry vs. its support" — that
- *   split IS the unverified mixed-CR question. The caller decides the
- *   boss's power level; this tool only answers "given that, does support
- *   close the gap to the target, and with what."
+ * - `role` is singular, not `roles: string[]` — see planSupportCluster's
+ *   own scope limit (no verified mixed-boss combination rule).
+ * - `bossCR` is a required caller input, not derived from `targetEL` — see
+ *   the same scope limit; nothing can honestly split a fight's difficulty
+ *   between a boss and its support without a source for that split.
+ * - Placement mode does NOT equip the boss with a specific weapon/armor
+ *   item. `equip_npc_by_role` deliberately never guesses a real item
+ *   resref itself (this project's established discipline) — it only
+ *   validates and reports a budget/recommendation for gear the CALLER has
+ *   already sourced via list_blueprints/resman_search. This tool reports
+ *   the same real budget (gearBudget) and weapon-type recommendation
+ *   (pickWeaponPreference) directly — the same functions equip_npc_by_role
+ *   itself uses — but leaves finding and equipping a real item resref as
+ *   the caller's own next step, named explicitly in the response.
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -37,20 +41,35 @@ import {
 } from "../util/encounter-difficulty.js";
 import { ARCHETYPES, getArchetype, pickSupportCandidate } from "../util/encounter-archetypes.js";
 import { numParam, optNumParam, toF, toI } from "../util/params.js";
+import { requireIndex, buildResmanOptions } from "../module-loader.js";
+import { buildCreatureBlueprint } from "../util/creature-builder.js";
+import { placeCreatureCore, findSimpleWalkableSpots } from "../util/creature-placer.js";
+import { pickWeaponPreference } from "../util/npc-weapon-preferences.js";
+import { gearBudget } from "../util/wealth.js";
+import { Report } from "../util/verify/common.js";
+import { verifyCreature } from "../util/verify/blueprints.js";
+import type { GffObj } from "../types/gff.js";
+
+/** Keep resref within NWN's 16-char limit — see this project's own documented bug class for what happens when a generator doesn't. */
+function shortResref(role: string): string {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `ce_${role.slice(0, 3)}_${suffix}`.slice(0, 16);
+}
 
 export function registerEncounterComposerTools(server: McpServer): void {
   server.tool(
     "compose_encounter",
-    "Dry-run planner: given a thematic role (e.g. 'necromancer') and a target Encounter Level, report whether the " +
-      "boss alone meets it and, if not, a real support-creature cluster that closes the gap. Wires together the " +
-      "archetype library (role name -> class/level), the reverse EL solver (target EL -> required support count), " +
-      "and the support-roster chooser (a real base-game blueprint for the archetype's natural minion type) — see " +
-      "docs/encounter-composer-spec.md. PLANNING ONLY: builds nothing, places nothing, needs no module loaded. " +
-      "Reports the boss's and the support cluster's EL as two separate numbers, never one combined figure — no " +
-      "verified DMG rule exists for combining different-CR groups into a single EL (see get_balance_report's own " +
-      "per-cluster convention). Call list_blueprints/resolve_blueprint yourself to confirm a returned support " +
-      "resref before using it — this tool's own candidate table is curated but not re-validated against the " +
-      "currently-loaded module's resman stack on every call.",
+    "Given a thematic role (e.g. 'necromancer') and a target Encounter Level, report whether the boss alone meets " +
+      "it and, if not, a real support-creature cluster that closes the gap. Wires together the archetype library " +
+      "(role name -> class/level), the reverse EL solver (target EL -> required support count), and the " +
+      "support-roster chooser (a real base-game blueprint for the archetype's natural minion type) — see " +
+      "docs/encounter-composer-spec.md. Without `area`: dry-run, builds and places nothing, needs no module " +
+      "loaded. With `area`: builds the boss blueprint, places it and the support cluster in that area of the " +
+      "currently-loaded module, runs verify_creature on the boss, and reports a real wealth-budget + weapon-type " +
+      "recommendation — but does NOT equip a specific item, since no tool in this project guesses a real item " +
+      "resref; search for one yourself (list_blueprints/resman_search) and finish gearing with " +
+      "equip_npc_by_role. Reports the boss's and the support cluster's EL as two separate numbers, never one " +
+      "combined figure — no verified DMG rule exists for combining different-CR groups into a single EL.",
     {
       role: z.string().describe(
         `Archetype name (case-insensitive). Currently recognized: ${Object.keys(ARCHETYPES).join(", ")}. ` +
@@ -65,9 +84,12 @@ export function registerEncounterComposerTools(server: McpServer): void {
         "Average party level, used only to band the boss's and the support cluster's difficulty " +
           "(trivial/easy/standard/hard/deadly) for human-readable context — not part of the EL math itself.",
       ),
+      area: z.string().optional().describe(
+        "Area resref to build and place into. Omit for a dry-run (plan only, no module needed). When given, needs " +
+          "a module already loaded (load_module) and that area to exist in it.",
+      ),
     },
-    { readOnlyHint: true, idempotentHint: true },
-    async ({ role, bossCR, targetEL, partyLevel }) => {
+    async ({ role, bossCR, targetEL, partyLevel, area }) => {
       const archetype = getArchetype(role);
       if (!archetype) {
         return {
@@ -91,7 +113,6 @@ export function registerEncounterComposerTools(server: McpServer): void {
       const bossCRNum = toF(bossCR);
       const targetELNum = toF(targetEL);
       const partyLevelNum = partyLevel !== undefined ? toI(partyLevel) : undefined;
-
       const bossLevel = archetype.levelForCR(bossCRNum);
 
       const supportCandidate = pickSupportCandidate(archetype.naturalSupport, bossCRNum);
@@ -99,7 +120,7 @@ export function registerEncounterComposerTools(server: McpServer): void {
         ? planSupportCluster(bossCRNum, targetELNum, supportCandidate.cr)
         : planSupportCluster(bossCRNum, targetELNum, bossCRNum);
 
-      const result = {
+      const result: Record<string, unknown> = {
         success: true,
         role: archetype.name,
         boss: {
@@ -126,12 +147,102 @@ export function registerEncounterComposerTools(server: McpServer): void {
           "boss.el and support.el are reported separately, never combined into one figure — see this tool's own " +
           "description for why. support is null when the boss alone already meets targetEL, or when this " +
           "archetype has no naturalSupport candidate yet.",
-        nextSteps:
-          "Dry-run only. To actually build this: create_creature_blueprint for the boss (class=boss.classId, " +
-          "level=boss.level), then place_creature it; for the support cluster, place_creature support.count " +
-          "copies of support.resref (a real base-game blueprint — verify with get_item_details/resolve_blueprint " +
-          "first if targeting a different module's resman stack).",
       };
+
+      if (!area) {
+        result.nextSteps =
+          "Dry-run only (no area given). To build this: create_creature_blueprint for the boss (class=boss.classId, " +
+          "level=boss.level), then place_creature it; for the support cluster, place_creature support.count " +
+          "copies of support.resref. Or call compose_encounter again with an area to do this automatically.";
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      // ─── Placement mode ─────────────────────────────────────────────────
+
+      const index = requireIndex();
+      const resmanOpts = await buildResmanOptions(index);
+
+      const spotsNeeded = 1 + (plan.support?.count ?? 0);
+      const spots = await findSimpleWalkableSpots(index, resmanOpts, area, spotsNeeded);
+      if (spots.length < spotsNeeded) {
+        result.success = false;
+        result.error = `Only found ${spots.length} walkable spot(s) in ${area}, needed ${spotsNeeded}. Try a larger or less crowded area.`;
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      const bossResref = shortResref(archetype.name);
+      const bossTag = `compose_${archetype.name}_boss`;
+      const bossName = archetype.name.charAt(0).toUpperCase() + archetype.name.slice(1);
+
+      const buildResult = await buildCreatureBlueprint(index, {
+        resref: bossResref,
+        tag: bossTag,
+        name: bossName,
+        classes: [{ class: archetype.classId, level: bossLevel }],
+        race: 6, // Human — a neutral default; caller can rebuild with a different race/appearance if the archetype calls for one.
+        appearance: 6,
+        gender: 0,
+      });
+      if (!buildResult.success) {
+        result.success = false;
+        result.error = `Failed to build boss blueprint: ${buildResult.error}`;
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      const bossSpot = spots[0];
+      const placeResult = await placeCreatureCore(index, resmanOpts, {
+        area,
+        blueprint: bossResref,
+        x: bossSpot.x,
+        y: bossSpot.y,
+        collisionRadius: 0,
+      });
+      if (!placeResult.success) {
+        result.success = false;
+        result.error = `Built the boss blueprint but failed to place it: ${placeResult.error}`;
+        return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      // verify_creature on the just-built boss blueprint (not yet gear-checked, since no item was equipped).
+      const bossDoc = index.parsedGff.get(`${bossResref}.utc`) as GffObj;
+      const report = new Report(bossResref, "utc");
+      await verifyCreature(report, index, bossDoc);
+      const verifyResult = report.result();
+
+      const placedSupport: Array<{ resref: string; position: { x: number; y: number; z: number } }> = [];
+      if (plan.support && supportCandidate) {
+        for (let i = 0; i < plan.support.count; i++) {
+          const spot = spots[1 + i];
+          const supportPlace = await placeCreatureCore(index, resmanOpts, {
+            area,
+            blueprint: supportCandidate.resref,
+            x: spot.x,
+            y: spot.y,
+            collisionRadius: 0,
+          });
+          if (supportPlace.success && supportPlace.placedPosition) {
+            placedSupport.push({ resref: supportCandidate.resref, position: supportPlace.placedPosition });
+          }
+        }
+      }
+
+      const weaponPref = pickWeaponPreference(archetype.classId, bossResref);
+      const budget = gearBudget(bossLevel, "elite");
+
+      result.placed = {
+        area,
+        boss: { resref: bossResref, tag: bossTag, position: placeResult.placedPosition, verify: verifyResult },
+        support: placedSupport,
+      };
+      result.gearing = {
+        wealthBudgetGp: budget,
+        recommendedWeapon: weaponPref ? { baseItem: weaponPref.baseItem, label: weaponPref.label } : null,
+      };
+      result.nextSteps =
+        "Boss and support are placed. Gearing is NOT done — search for a real weapon item " +
+        (weaponPref ? `(recommended type: ${weaponPref.label})` : "") +
+        ` via list_blueprints/resman_search, then call equip_npc_by_role(resref: "${bossResref}", equipment: ` +
+        '{"righthand": "<real resref>"}) to finish gearing and re-verify. Never fabricate a resref yourself.';
 
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     },

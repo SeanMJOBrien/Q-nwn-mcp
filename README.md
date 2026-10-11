@@ -194,7 +194,7 @@ Just describe the kind of adventure you want to play and your party size and lev
 - `check_area_connectivity` — verify all areas are reachable via transitions
 - `get_balance_report` — creature difficulty and item values per area
 - `suggest_encounter` — advisory tool for encounter composition by party level
-- `compose_encounter` — dry-run planner: a thematic role (e.g. "necromancer") + target Encounter Level → the boss's class/level and (if needed) a real support-creature cluster that closes the gap. See `docs/encounter-composer-spec.md`.
+- `compose_encounter` — a thematic role (e.g. "necromancer") + target Encounter Level → the boss's class/level and (if needed) a real support-creature cluster that closes the gap, plus a real wealth budget and weapon-type recommendation. Dry-run without `area`; with `area`, actually builds and places the roster and runs `verify_creature` on the boss. See `docs/encounter-composer-spec.md`.
 
 ### Verification — Static and Live
 

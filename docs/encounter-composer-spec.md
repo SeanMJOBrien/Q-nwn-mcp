@@ -1,8 +1,8 @@
 # Encounter composer: role + target difficulty → a built, balanced roster
 
-Status: **F1, F2, F3 and F5 (dry-run mode) are built.** F4, F6-F8 remain
-planning only — see F5's own entry below for what "dry-run mode" means and
-doesn't yet cover.
+Status: **F1, F2, F3, F5 and F6 are built** — `compose_encounter` now
+builds and places a real roster, not just a plan. F4, F7 (v2), F8 remain
+planning only.
 
 ## Why this exists
 
@@ -288,13 +288,66 @@ including the user's own stated example (`role: necromancer, bossCR: 6,
 targetEL: 6` -> boss alone sufficient, no support) and a case where the
 boss falls short and a real `nw_zombie01` cluster is computed.
 
-### F6. Equipment and wealth integration (no new mechanism — just correct wiring)
+### F6. Placement mode + wealth integration — **BUILT**
 
-**Objective:** make sure every creature F5 builds is actually geared, not
-just statted. No new tool — `equip_npc_by_role` already exists and already
-does exactly this (proficiency-checked gear against `get_wealth_budget`,
-ending in its own `verify_creature` pass). F5 just has to call it for every
-roster member instead of leaving that step to the caller.
+**Objective:** make `compose_encounter` actually build and place the roster
+it plans, not just describe it — and make sure the boss is reported against
+a real wealth budget, not just statted.
+
+**A real architectural fork turned up building this, not assumed:**
+`create_creature_blueprint` and `place_creature` had no reusable exported
+function to call — their entire logic lived inside their MCP tool handlers
+(unlike `write_script`, which already had `writeAndCompileScript` for
+exactly this purpose). The original plan ("no new mechanism — just correct
+wiring, call `equip_npc_by_role` for every roster member") assumed F5 could
+just invoke other tools from inside its own handler, which isn't how this
+codebase's tools are composed anywhere else — composition happens at the
+orchestrator/LLM level (see `/create-adventure`'s own pipeline), not by one
+MCP tool calling another's handler directly.
+
+**Resolved by a real, behavior-preserving refactor**, confirmed safe by the
+full pre-existing test suite passing unchanged:
+- `create_creature_blueprint`'s ~275-line handler body moved into
+  `buildCreatureBlueprint()` in `src/util/creature-builder.ts` (native
+  params, not JSON strings); the MCP tool is now a thin shim that parses
+  its string params and calls it.
+- `place_creature`'s handler moved into `placeCreatureCore()` in
+  `src/util/creature-placer.ts`, same pattern. `checkCollision` (previously
+  a private helper in `placement-tools.ts`) moved to `src/util/collision.ts`
+  so both the tool and the new core function can use it without a
+  tools-importing-from-tools layering violation.
+- A new `findSimpleWalkableSpots()` (also in `creature-placer.ts`) finds
+  placement spots — deliberately simpler than `adventure_find_walkable`
+  (center-outward ring search, no region/clearRadius support), since
+  placement mode only needs "several walkable spots, spread apart," not
+  that tool's full targeting.
+
+**What placement mode actually does**, given an `area`: builds the boss
+blueprint (`buildCreatureBlueprint`), places it and the support cluster
+(`placeCreatureCore`, reusing the exact same validated blueprints F3
+already chose), runs `verifyCreature` on the boss directly (the same
+function `verify_creature` the MCP tool uses), and reports a real
+`gearBudget()` figure and a real `pickWeaponPreference()` recommendation —
+**the same functions `equip_npc_by_role` itself calls internally.**
+
+**What it deliberately does NOT do: equip a specific weapon or armor
+item.** `equip_npc_by_role` never guesses a real item resref itself — this
+project's established discipline, confirmed in its own description
+("never guesses a real item resref itself — source items with
+list_blueprints/resman_search first"). `compose_encounter` holds to the
+same rule: it reports the budget and the recommended weapon *type*, and
+names `equip_npc_by_role` as the caller's explicit next step once a real
+resref has been found. Fabricating one here would be the exact mistake
+this project's own CLAUDE.md documents repeatedly getting caught and fixed
+for.
+
+5 new integration tests
+(`src/tools/encounter-composer-placement.integration.test.ts`) against a
+synthetic module index — real GIT mutations, real `verifyCreature`
+execution, not mocked. Not yet confirmed against a real live-loaded module
+(the mocked tests prove correctness in isolation; a real end-to-end
+`run_live_verification`-style pass through an actual module is still
+open).
 
 ### F7. Verification hook
 
@@ -339,8 +392,10 @@ useful standalone before a skill depends on it.
 3. **F3 (support-roster chooser) — DONE** for that one archetype's `naturalSupport`.
 4. **F5 (`compose_encounter`), dry-run mode — DONE.** Wires F1-F3 together;
    placement mode (actually building and placing the plan) is step 5 below.
-5. **F6** (equip integration) and **placement mode** for F5 together, since
-   placement needs gear to already be decided.
+5. **F6 — DONE.** Placement mode for F5, plus a real wealth-budget/weapon
+   recommendation (not full auto-gearing — see F6's own entry for why).
+   Needed an unplanned refactor (create_creature_blueprint/place_creature
+   had no reusable exported function) before it was possible at all.
 6. **F4 (ally-side reinforcement)** — report-only first (just surface the
    band), auto-generation deferred.
 7. **F7 v2** and **F8** once the rest is proven and the live-verification
