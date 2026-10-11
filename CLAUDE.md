@@ -1391,46 +1391,102 @@ below). Never committed to this repo and never sent to the user as a
 deliverable — purely a disposable diagnostic aid, rebuilt fresh by the
 skill whenever needed rather than hand-patched.
 
-**NPC-to-NPC dialog (`ActionStartConversation`) is now built into the roster**
-(fixtures #11/#12, branch `systest-live-run-and-generalized-spec`) —
-`SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode` (`src/util/systest-log-script.ts`)
-instrument the initiator's spawn and the target's own dialog node Action
-script. The earlier assumption recorded here ("`GetPCSpeaker()` resolves to
-`OBJECT_INVALID` with no PC involved") turns out to be contradicted by this
-project's own `nwscript-docs/GetPCSpeaker.md`, sourced from nwnlexicon.com:
-"if it is an NPC speaking to another NPC, it will return the NPC who is the
-one who takes the conversation choices (NPC's always take the first one
-after a short delay)" — a real documented remark, not a guess, but still not
-the same as a live-engine confirmation from this project's own module. The
-instrumentation logs both `GetPCSpeaker()` and `GetLastSpeaker()` so the
-first real `run_live_verification` run settles it empirically either way.
+**NPC-to-NPC dialog (`ActionStartConversation`) is built and has now
+actually been run live** (fixtures #11/#12). Real result, settling the
+previously-open question: `[SYSTEST_DIALOG_NODE] self=systest_dialog_npc_a
+pcspeaker=NONE lastspeaker=NONE`, both occurrences. Two real findings, not
+one:
+- **`GetPCSpeaker()`/`GetLastSpeaker()` both return invalid in a genuine
+  PC-less NPC-to-NPC conversation.** This project's own
+  `nwscript-docs/GetPCSpeaker.md` (sourced from nwnlexicon.com) claims an
+  NPC-to-NPC conversation makes `GetPCSpeaker()` "return the NPC who is the
+  one who takes the conversation choices" — that did NOT happen here. Either
+  that remark describes a different scenario (e.g. a PC present elsewhere in
+  the module, or a different conversation mode), or it's simply wrong for
+  this engine build. Trust the live result, not the inherited doc, for this
+  specific case.
+- **The dialog's own Action script runs with `OBJECT_SELF` = the
+  *initiator* (`systest_dialog_npc_a`), not the conversation *owner*
+  (`systest_dialog_npc_b`, the one with `conversation: "systest_dlg"` set).**
+  This directly contradicts the design assumption written into this skill
+  ("OBJECT_SELF there is the dialog owner"). Any future dialog-action-script
+  design for an NPC-initiated conversation needs to account for this —
+  `OBJECT_SELF` tracks whoever called `ActionStartConversation`, not whoever
+  the `.dlg` file is attached to.
 
-**Generalized runtime assertions beyond creature stats are also now built**:
-`create_spec_assertions` (`src/tools/spec-assert-tools.ts`,
-`src/util/spec-assert-script.ts`) generates `inc_spec_assert.nss` —
-`SPEC_AssertInt`/`SPEC_AssertString`/`SPEC_AssertBool`, the same
-`[SPEC_OK]`/`[SPEC_FAIL]` log protocol `SPEC_VerifyCreature()` uses, but for
-any runtime condition, not a fixed creature-stat field set. `run_live_verification`'s
-log parser needed zero changes, since it was written generically from the
-start. The roster's fixture #8 (`a_systest_enc_check.nss`) uses it to assert
-real engine hostility (`GetIsEnemy`) between the Systest Defenders and
-Hostile factions — a genuinely non-creature-stat check. This closes item (5)
-of the Verification Gate's "what should be built" list below.
+**Generalized runtime assertions beyond creature stats are also now built
+and run live**: `create_spec_assertions` works exactly as designed —
+confirmed by a real `[SPEC_OK]`/`[SPEC_FAIL]` round trip in this exact run
+(see the faction finding below, which `SPEC_AssertBool`/`SPEC_AssertInt`
+diagnosed cleanly). This closes item (5) of the Verification Gate's "what
+should be built" list below.
 
-**Known gap, honestly recorded rather than glossed over**: the skill has
-been written, both new generators' probe-compiles confirmed live, and
-`npm run verify` is green — but the skill itself has not yet been run
-end-to-end to build a real roster and run it through `run_live_verification`.
-That run needs a restarted MCP server connection first (this session's own
-`run_live_verification`/`create_systest_instrumentation`/`create_spec_assertions`
-calls all failed with "No such tool available" against a stale, days-old
-server process that predates them — confirmed by checking `ps` start times
-and testing a known-good tool, `verify_faction`, which responded normally).
-That's the natural next real-world test of this whole feature, and the
-strongest form of verification available (per this project's own "the only
-thing that actually caught this was a human/engine actually running it"
-lesson, repeated throughout this document). Invoke `/systest-module` to do
-that once the MCP connection is restarted.
+**Major finding, NOT a bug in this project's code — a real NWN engine
+limitation with `create_faction`:** fixture #8's encounter-design assertion
+(`defenders_vs_hostile`) failed live, and chasing it down fully isolated a
+genuine engine-level gap. In order:
+1. `GetReputation(OBJECT_SELF, oOrc)` read back 100 (friendly) instead of the
+   0 (hostile) written via `set_faction_reputation`. First hypothesis: the
+   old `create_faction`/`set_faction_reputation` wrote reputation in only
+   one direction despite claiming "bilateral" — confirmed and **fixed**
+   (both now write/update both `(f1,f2)` and `(f2,f1)`).
+2. Re-tested live: **still** read 100. Second hypothesis, found by diffing a
+   freshly-written RepList entry against a real toolset-authored one: every
+   pre-existing entry's `FactionRep` is GFF type `dword`; this project wrote
+   `int`. Same mismatch found for `FactionGlobal` (`word` vs. the written
+   `byte`). GFF struct fields are looked up by (label, type) together, so a
+   same-label wrong-type field is invisible to the engine's loader — **fixed**
+   both types.
+3. Re-tested live with a *brand-new* faction (so the type fix applies to a
+   genuinely fresh write, not an update — `modify_gff_field`/`setField` both
+   confirmed to preserve a field's *existing* type even when told to set a
+   different one, so already-written bad entries can't be patched in place):
+   **still** read 100. Also tried `FactionGlobal` 0 and 1 explicitly: no
+   change either way.
+4. **Decisive control test**: paired the same Hostile-faction creature
+   against a *different* creature on a pre-existing standard faction
+   (Commoner, ID 2 — reassigned via `modify_gff_field` on the placed
+   instance) instead of the dynamically-created one. `GetReputation`
+   correctly read 0, confirmed by a real `[SPEC_OK]`. **This isolates the
+   problem precisely**: `GetReputation()`/`GetIsEnemy()` work correctly for
+   the five standard factions (PC=0, Hostile=1, Commoner=2, Merchant=3,
+   Defender=4) that ship in every module by default. A **dynamically-added
+   faction (ID 5+, via `create_faction`) never participates in live
+   reputation lookups, no matter how correct its `.fac` data is** — not a
+   direction bug, not a type bug, not the Global flag. Root cause not found
+   (would need engine source or further NWNX-level investigation, not
+   attempted this session) — recorded here as a confirmed, reproducible
+   constraint, not a guess.
+5. **Practical consequence for this project and `/create-adventure`:** don't
+   create a new faction via `create_faction` when the goal is simple
+   mutual-hostility/friendliness dynamics — **reuse one of the four
+   pre-existing standard factions instead** (Hostile=1 already ships
+   mutually hostile toward Commoner/Merchant/Defender; Defender=4 is already
+   mutually hostile toward Hostile out of the box, confirmed in the real
+   `.fac` data — a ready-made "good guys vs. Hostile" pair with zero setup
+   needed). `create_faction` still has its place for a genuinely new faction
+   *identity* a module needs to display/reference, but its live reputation
+   behavior cannot currently be trusted — update `adventure-challenges`/
+   `adventure-actors` guidance if either skill calls `create_faction`
+   expecting the new faction to actually participate in combat AI hostility
+   decisions.
+
+Both real code bugs found along the way (bilateral direction, GFF field
+type) are fixed and committed regardless of the deeper engine limitation —
+they're objectively correct fixes (matching the toolset's own authored
+convention) and `create_faction`/`set_faction_reputation` behave correctly
+now for the one case that matters least to this finding: a human reading the
+`.fac` file, or a tool like `verify_faction` checking it statically.
+
+**Status: this is now a closed investigation, not an open gap.** The skill
+has been run end-to-end for the first time, building a real roster and
+running it through `run_live_verification` against a real headless engine.
+Three real bugs were found and fixed (`compile_script` resource
+registration, the log parser's timestamp-anchor, faction bilateral+type);
+one genuine engine limitation was found, fully isolated via a clean control
+test, and documented with its practical workaround; and the NPC-to-NPC
+dialog question was settled with a real (if unexpected) answer. Re-run
+`/systest-module` after any future change to these systems to re-confirm.
 
 **A live isolated verification server exists and has run a real end-to-end check
 successfully** (`~/nwn-mcp-verify-server` — a fork of

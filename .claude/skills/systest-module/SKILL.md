@@ -70,9 +70,24 @@ arithmetically.
 
 ### Phase 2: Factions
 
-`create_faction(name: "Systest Defenders", defaultReputation: "50")` — note the
-returned faction ID. `set_faction_reputation(faction1: <that ID>, faction2: "1", reputation: "0")`
-(faction 1 = the built-in Hostile faction) so the two sides are mutually hostile.
+**No `create_faction` call needed.** Every module ships 5 built-in standard
+factions — PC=0, Hostile=1, Commoner=2, Merchant=3, Defender=4 — and
+Defender is *already* mutually hostile toward Hostile out of the box
+(confirmed in a real module's own `.fac` data). Use faction `"4"` directly
+for fixture #8 (`systest_defender_paladin`) against fixture #7's faction
+`"1"` orc.
+
+**Do not call `create_faction` for this roster.** Confirmed live
+(`run_live_verification`, branch `systest-live-run-and-generalized-spec`): a
+dynamically-created faction's reputation entries never register with the
+live engine's `GetReputation()`/`GetIsEnemy()` — always reads back the
+friendly default (100) — regardless of writing both directions, the correct
+GFF field type, or the Global flag. Isolated via a clean control test
+pairing a standard-faction creature against another standard-faction
+creature, which read back correctly. This is a real NWN engine limitation
+(root cause not found), not a bug in this skill's build sequence — see
+CLAUDE.md's systest-module section for the full investigation. Reusing a
+standard faction sidesteps it entirely.
 
 ### Phase 3: Instrumentation
 
@@ -116,7 +131,7 @@ returned faction ID. `set_faction_reputation(faction1: <that ID>, faction2: "1",
    hostility between the two sides, independent of and in addition to
    `inc_spec_check`'s creature-stat checks.
 
-   `a_systest_enc_check.nss`:
+   `a_syst_enc_chk.nss`:
    ```
    #include "inc_spec_assert"
    void main()
@@ -134,12 +149,12 @@ returned faction ID. `set_faction_reputation(faction1: <that ID>, faction2: "1",
    usable conversation, and what `GetPCSpeaker()`/`GetLastSpeaker()` resolve
    to inside it. Build the dialog first:
 
-   `create_dialog(resref: "systest_dlg", nodes: [{"speaker":"npc","text":"Status report.","script":"a_systest_dlg_node","children":[{"speaker":"pc","text":"All quiet.","script":"a_systest_dlg_node"}]}])`
+   `create_dialog(resref: "systest_dlg", nodes: [{"speaker":"npc","text":"Status report.","script":"a_syst_dlg_node","children":[{"speaker":"pc","text":"All quiet.","script":"a_syst_dlg_node"}]}])`
    — a bare two-line exchange, no `GetPCSpeaker()`-dependent condition
    anywhere, deliberately, since the whole point is observing what that
    function returns rather than assuming it.
 
-   `a_systest_dlg_node.nss` (the dialog's own Action script on both nodes):
+   `a_syst_dlg_node.nss` (the dialog's own Action script on both nodes):
    ```
    #include "inc_systest_log"
    void main()
@@ -147,7 +162,7 @@ returned faction ID. `set_faction_reputation(faction1: <that ID>, faction2: "1",
        SYSTEST_LogDialogNode(OBJECT_SELF);
    }
    ```
-   `a_systest_dlg_start.nss` (the initiator's `ScriptSpawn`):
+   `a_syst_dlg_strt.nss` (the initiator's `ScriptSpawn`):
    ```
    #include "inc_systest_log"
    void main()
@@ -192,7 +207,7 @@ returned faction ID. `set_faction_reputation(faction1: <that ID>, faction2: "1",
    ```
    `a_systest_bard.nss` (Tier 2 — Bard, same leveling loop but
    `CLASS_TYPE_BARD`) — `ScriptSpawn` only.
-   `a_systest_bard_er.nss` (`ScriptEndRound`):
+   `a_syst_bard_er.nss` (`ScriptEndRound`):
    ```
    #include "inc_random_abil"
    void main()
@@ -221,10 +236,10 @@ if it doesn't, the fixture itself has a bug, fix it before moving on.
 | 5 | `systest_valid_feats_rogue` | gallery | Build the blueprint bare (race/appearance/name only), then call `build_npc_stat_block(resref: "systest_valid_feats_rogue", race: <0-6>, classId: "8", level: "5")` to compute a real, 2DA-verified `FeatList`/`SkillList`/ability scores — this is what guarantees no accidental invalid feat ID. Target: `invalid_feat_id` passes (by construction — this is the tool this bug class exists to prevent). |
 | 6 | `systest_shopkeep` | gallery | Commoner (class 20), `sourceResref` a real base-game shopkeeper if convenient. Build a store via `create_store_blueprint(resref: "systest_store", tag: "systest_store", name: "Systest Store", inventory: [...])` with at least one item omitting `category`, spanning all five real `StorePanel` buckets (armor, weapon, potion/scroll, wand, misc — pick real items via `list_blueprints`/`resman_search`, not guesses) so the fixed auto-categorization has real work to do. `place_store` near the shopkeeper. Target: `store_item_miscategorized` passes for every item. |
 | 7 | `systest_hostile_orc` | arena | `faction: "1"` (built-in Hostile). Real melee weapon. `scripts: {"ScriptDamaged":"a_systest_dmg","ScriptDeath":"a_systest_death"}`. Place close to `systest_defender_paladin` (within a few meters) so they engage automatically once both spawn. |
-| 8 | `systest_defender_paladin` | arena | `faction: "<Systest Defenders ID from Phase 2>"`. Real melee weapon + matching proficiency. `scripts: {"ScriptSpawn":"a_systest_enc_check","ScriptDamaged":"a_systest_dmg","ScriptDeath":"a_systest_death"}` — the `ScriptSpawn` override exercises `inc_spec_assert`'s `SPEC_AssertBool` against the faction hostility set up in Phase 2 (a check that is NOT about this creature's own stats, unlike every other fixture in this table). Target: `[SPEC_OK] tag=systest_encounter_setup field=defenders_vs_hostile`. |
+| 8 | `systest_defender_paladin` | arena | `faction: "4"` (built-in Defender — **do NOT use the Phase 2 dynamically-created faction here**; see the real live finding below the table). Real melee weapon + matching proficiency. `scripts: {"ScriptSpawn":"a_syst_enc_chk","ScriptDamaged":"a_systest_dmg","ScriptDeath":"a_systest_death"}` — the `ScriptSpawn` override exercises `inc_spec_assert`'s `SPEC_AssertBool` against real engine hostility (a check that is NOT about this creature's own stats, unlike every other fixture in this table). Target: `[SPEC_OK] tag=systest_encounter_setup field=defenders_vs_hostile`. |
 | 9 | `systest_cleric_caster` | arena | Cleric, built at a real target level (e.g. `classes: [{"class":2,"level":6}]`). `scripts: {"ScriptSpawn":"a_systest_caster"}`. No `spells` param — this fixture exists specifically to exercise `create_random_abilities_system`'s Tier-1 real-`SetMemorizedSpell()` path. |
-| 10 | `systest_bard_caster` | arena | Bard, `classes: [{"class":1,"level":6}]`. `scripts: {"ScriptSpawn":"a_systest_bard","ScriptEndRound":"a_systest_bard_er"}`. Exercises the Tier-2 virtual-ability/cast-chance path. |
-| 11 | `systest_dialog_npc_a` | gallery | Any class/role — this fixture is about the dialog mechanism, not stats. `scripts: {"ScriptSpawn":"a_systest_dlg_start"}`. Place a few meters from #12, close enough for `ActionStartConversation` to resolve without the mobile-NPC "run to target" behavior needing much room. The initiator. |
+| 10 | `systest_bard_caster` | arena | Bard, `classes: [{"class":1,"level":6}]`. `scripts: {"ScriptSpawn":"a_systest_bard","ScriptEndRound":"a_syst_bard_er"}`. Exercises the Tier-2 virtual-ability/cast-chance path. |
+| 11 | `systest_dialog_npc_a` | gallery | Any class/role — this fixture is about the dialog mechanism, not stats. `scripts: {"ScriptSpawn":"a_syst_dlg_strt"}`. Place a few meters from #12, close enough for `ActionStartConversation` to resolve without the mobile-NPC "run to target" behavior needing much room. The initiator. |
 | 12 | `systest_dialog_npc_b` | gallery | Any class/role. `conversation: "systest_dlg"` (so it has a default conversation to be started with no PC ever connecting). No script override needed — it's the listener; #11 drives the conversation. |
 
 ### Phase 5: Static check, repack, run live
@@ -263,9 +278,22 @@ if it doesn't, the fixture itself has a bug, fix it before moving on.
   the user as a deliverable** — it's a disposable diagnostic aid. Don't
   `SendUserFile` it unless explicitly asked.
 - NPC-to-NPC dialog (`ActionStartConversation`, fixtures #11/#12) is now built
-  into this roster via `SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode` — it
-  had zero prior precedent in this codebase before this, so treat its first
-  real `run_live_verification` result as a genuine finding to report, not a
-  foregone conclusion just because it compiled.
+  into this roster via `SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode`, and
+  has now actually been run live. Real, settled result:
+  `pcspeaker=NONE lastspeaker=NONE` — both return invalid, contradicting this
+  project's inherited `nwscript-docs/GetPCSpeaker.md` claim about NPC-to-NPC
+  conversations. Also found: the dialog's Action script runs with
+  `OBJECT_SELF` = the *initiator* (`systest_dialog_npc_a`), not the
+  conversation *owner* (`systest_dialog_npc_b`) — see CLAUDE.md's
+  systest-module section for the full writeup.
+- **Script resref length — a real bug this skill's own first live run found
+  in itself.** Four of this skill's original script resrefs exceeded NWN's
+  16-character limit (`a_systest_enc_check`, `a_systest_dlg_node`,
+  `a_systest_dlg_start`, `a_systest_bard_er` — 17-19 chars) and silently
+  failed to compile (`nwn_erf`/`nwn_script_comp`: "is not a valid resref" /
+  "not a resolvable resref" at repack time). Already fixed in this document
+  (shortened to `a_syst_enc_chk`/`a_syst_dlg_node`/`a_syst_dlg_strt`/
+  `a_syst_bard_er`) — if adding a new wrapper script to this roster, count
+  the characters first.
 - If `run_live_verification`'s params ever change, update this skill's Phase 5
   to match (per CLAUDE.md's "keep skills in sync with tools" rule).

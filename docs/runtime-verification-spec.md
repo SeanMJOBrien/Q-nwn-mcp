@@ -42,11 +42,76 @@ log the exact same `[SPEC_OK]`/`[SPEC_FAIL]` protocol `SPEC_VerifyCreature()` us
 just a fixed creature-stat field set. Each call logs immediately and independently (no
 bundling across calls, unlike `SPEC_VerifyCreature`'s one-line-after-every-field-passes
 behavior) — a caller wanting bundled semantics tracks its own pass flag, same as
-`SPEC_VerifyCreature` does internally. `run_live_verification`'s log parser needed zero
-changes to pick these up, since `parseLiveLogs` was written generically against the tag
-format from the start. The `systest-module` skill's fixture #8 (`a_systest_enc_check.nss`)
-uses this to assert real engine hostility (`GetIsEnemy`) between two factions — a
-genuinely non-creature-stat check, proving the generalization isn't just theoretical.
+`SPEC_VerifyCreature` does internally. `parseLiveLogs`'s own matching logic needed zero
+changes — it was written generically against the tag format from the start — **but a
+real, separate bug in the same file did need fixing before any of this could actually be
+observed live: see "Real end-to-end run of the systest-module skill" below.** The
+`systest-module` skill's fixture #8 (`a_syst_enc_chk.nss`) uses this to assert real engine
+hostility (`GetIsEnemy`) between two factions — a genuinely non-creature-stat check,
+confirmed live, not just theoretical (see below for what that run actually found).
+
+## 3b. Real end-to-end run of the systest-module skill (first ever) and what it found
+
+The `systest-module` skill was written, and both `create_spec_assertions` and the
+NPC-to-NPC dialog instrumentation were probe-compiled, well before either was ever
+actually run against a live engine. This session ran it for real for the first time.
+Three real code bugs were found and fixed; one genuine NWN engine limitation was found,
+isolated, and documented (not fixed — it isn't this project's bug to fix); the
+NPC-to-NPC dialog open question was settled with a real, if unexpected, answer.
+
+**Bugs found and fixed:**
+1. `compile_script` (the standalone MCP tool, as opposed to `writeAndCompileScript`
+   used by `write_script`/the generator tools) never registered the compiled `.ncs`
+   in `index.resources`. Every `verify_*` check kept reporting "uncompiled_script" for
+   scripts that had, in fact, compiled successfully moments earlier in the same
+   session — silently breaking this project's own documented two-step
+   `write_script(compile:false)` + `compile_script()` pattern (recommended
+   specifically to dodge `write_script`'s own `compile:true` race). Fixed in
+   `src/tools/script-tools.ts`.
+2. **The actual bug behind "zero changes needed" above being wrong**: `parseLiveLogs`'s
+   `BRACKET_TAG_RE`/`SPEC_OK_RE`/`SPEC_FAIL_RE` (`src/util/verify-server/result.ts`)
+   anchored to line-start (`^`). The real engine's `WriteTimestampedLogEntry()` —
+   which every tag-logging call in this project goes through — always prepends its
+   own `[Day Mon DD HH:MM:SS Year]` bracket first, e.g. the real captured line was
+   `[Sun Oct 11 01:49:40] [SPEC_FAIL] tag=... field=... expected=... actual=...`.
+   Every existing unit test fixture put the tag literally first on the line, so this
+   had never actually been exercised against a real engine log before — `specResults`/
+   `otherTaggedLines` came back empty on every real run in this project's history
+   despite the raw log genuinely containing these lines. Fixed by dropping the anchor
+   (the `[A-Z_0-9]+` character class already excludes the timestamp bracket's content).
+3. `create_faction`'s own comment claimed "bilateral reputation entries" but only ever
+   wrote one direction; `set_faction_reputation` inherited the same false assumption.
+   Fixed both to write/update both `(f1,f2)` and `(f2,f1)`. This fix alone did **not**
+   resolve the live symptom — see the engine limitation below.
+
+**Engine limitation found and isolated (not a bug in this project — documented, not
+fixed):** even after fixing bug 3 above, `GetReputation()`/`GetIsEnemy()` still read a
+friendly default (100) for a dynamically-created faction, in both directions. Further
+diffing found a second real mismatch — every toolset-authored `RepList` entry's
+`FactionRep` is GFF type `dword`; this project wrote `int` (same pattern for
+`FactionGlobal`: `word` vs. the written `byte`). GFF struct fields are looked up by
+(label, type) together, so a same-label wrong-type field is invisible to the engine's
+loader. **Fixed both types** — and the live symptom **still did not resolve**, even
+against a brand-new faction with correct bilateral, correctly-typed data, with
+`FactionGlobal` tried as both 0 and 1. A decisive control test (pairing the same
+Hostile-faction creature against a creature on a pre-existing standard faction instead)
+read back correctly. **Conclusion, confirmed not guessed: `GetReputation()`/
+`GetIsEnemy()` work correctly for the five standard factions every module ships with
+(PC=0, Hostile=1, Commoner=2, Merchant=3, Defender=4) — a faction created at build time
+via `create_faction` never participates in live reputation lookups, regardless of
+direction, type, or the Global flag.** Root cause not found (would need engine source
+or NWNX-level investigation, not attempted this session). Practical workaround, now
+reflected in the `systest-module` skill: reuse a standard faction for
+hostility/friendliness dynamics instead of creating a new one — Defender (4) already
+ships mutually hostile toward Hostile (1).
+
+**NPC-to-NPC dialog, settled for real:** `[SYSTEST_DIALOG_NODE] self=systest_dialog_npc_a
+pcspeaker=NONE lastspeaker=NONE`, both firings. `GetPCSpeaker()`/`GetLastSpeaker()` both
+return invalid in a genuine PC-less NPC-to-NPC conversation — this project's own
+`nwscript-docs/GetPCSpeaker.md` claim about NPC-to-NPC conversations did not hold here.
+Also found: the dialog's Action script runs with `OBJECT_SELF` = the *initiating*
+creature, not the conversation *owner* — the opposite of this doc's original
+assumption (§4 above has been corrected accordingly).
 
 **First real end-to-end run, against the actual module that started this whole effort**
 ("Henchman Gear Showcase" — the "henchmen have bad stats and no appearance" bug report).
@@ -338,16 +403,24 @@ Beyond race/appearance/class/level/spells:
   `GetGroundHeight()`-equivalent, though this mostly duplicates `fix_object_heights`'
   existing walkmesh-based check and is lower priority.
 - **Dialog actually opens**: now has a real, deliberate (not unconditional/module-wide)
-  instrumented path — see `SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode` in
-  `src/util/systest-log-script.ts` and the `systest-module` skill's fixtures #11/#12.
-  One NPC's `OnSpawn` queues `ActionStartConversation` at a second NPC and logs the
-  attempt; a dialog node Action script on the target logs what `GetPCSpeaker()`/
-  `GetLastSpeaker()` actually resolve to mid-conversation. This settles — rather than
-  assumes — whether an NPC-to-NPC conversation with no PC connected produces a usable
-  speaker/listener pair, closing a real open question this doc previously left
-  unaddressed. `verify_dialog` remains the static check for dialog file structure; this
-  is the live-engine complement for the specific "does this actually open and run"
-  question that's unsafe to check unconditionally module-wide.
+  instrumented path — `SYSTEST_LogDialogStart`/`SYSTEST_LogDialogNode` in
+  `src/util/systest-log-script.ts`, exercised by the `systest-module` skill's
+  fixtures #11/#12 — **and it has now actually been run live**, settling the
+  question for real rather than leaving it instrumented-but-untested. Real
+  captured result: `[SYSTEST_DIALOG_NODE] self=systest_dialog_npc_a
+  pcspeaker=NONE lastspeaker=NONE` (both node firings). Two concrete findings:
+  (1) `GetPCSpeaker()`/`GetLastSpeaker()` both return invalid in a genuine
+  PC-less NPC-to-NPC conversation — contradicts this project's inherited
+  `nwscript-docs/GetPCSpeaker.md` claim that an NPC-to-NPC conversation makes
+  `GetPCSpeaker()` return "the NPC who takes the conversation choices"; trust
+  the live result over the inherited doc for this case. (2) The dialog's own
+  Action script runs with `OBJECT_SELF` = the *initiating* creature
+  (`ActionStartConversation`'s caller), not the conversation *owner* (the one
+  whose `conversation` field names the `.dlg`) — the opposite of what this
+  doc and the skill originally assumed. `verify_dialog` remains the static
+  check for dialog file structure; this was the live-engine complement for
+  the specific "does this actually open and run, and with what object
+  identity" question that's unsafe to check unconditionally module-wide.
 
 ## 5. Confirming built vs. present — the orchestration loop
 
