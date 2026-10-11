@@ -1,6 +1,8 @@
 # Encounter composer: role + target difficulty → a built, balanced roster
 
-Status: **F1, F2 and F3 are built.** F4-F8 remain planning only.
+Status: **F1, F2, F3 and F5 (dry-run mode) are built.** F4, F6-F8 remain
+planning only — see F5's own entry below for what "dry-run mode" means and
+doesn't yet cover.
 
 ## Why this exists
 
@@ -221,33 +223,70 @@ reusing the existing henchman/companion pipeline (`create_creature_blueprint
 henchman:true`, `build_npc_stat_block`, `create_spec_verification`) rather
 than inventing a second NPC-construction path.
 
-### F5. `compose_encounter` — the actual entry point tool
+### F5. `compose_encounter` — the actual entry point tool — **BUILT (dry-run only)**
 
-**Objective:** the single call the user's stated goal describes. Ties F1-F4
-together into one MCP tool call instead of requiring the LLM to orchestrate
-five separate tools correctly, in the right order, every time.
+**Objective:** the single call the user's stated goal describes. Ties
+F1-F3 together into one MCP tool call instead of requiring the LLM to
+orchestrate several separate tools correctly, in the right order, every
+time.
 
-**Proposed shape:**
+**Built as** the `compose_encounter` MCP tool
+(`src/tools/encounter-composer-tools.ts`), needing no module loaded at all —
+it's pure planning over F1-F3's own static tables plus caller input. Real
+shape, narrower than the sketch below in two deliberate ways (both
+documented in the tool's own file header, not silently dropped):
 
 ```
 compose_encounter({
-  roles: ["necromancer"],        // one or more archetype names (F1)
-  targetDifficulty: "CR 6" | { el: 6 } | { label: "hard" },  // see the CR-vs-EL open question above
-  partyLevel: 6,
-  partySize: 4,
-  area: "crypt_01",               // optional — if given, builds AND places; if omitted, dry-run (returns the roster plan only)
-  pinBossCR: false,                // optional override, see open question above
+  role: "necromancer",   // ONE archetype name, not an array — see why below
+  bossCR: "6",            // the boss's OWN target CR — a required input, not derived from targetEL
+  targetEL: "6",
+  partyLevel: "6",        // optional — only for banding the two EL figures, not part of the math
 })
 ```
 
-**Output:** the full roster — each creature's role, resref/tag, build
-rationale (why this CR, why this count), the achieved combined EL and its
-difficulty band, and (if an `area` was given) confirmation of placement plus
-a `verify_creature`/`verify_all` pass. A dry-run response is the same shape
-minus placement confirmation, so an LLM can review the plan before
-committing to it — consistent with how `adventure_generate_layout` /
-`adventure_apply_layout` are already split into "propose" and "commit"
-steps elsewhere in this codebase.
+returning (abbreviated):
+
+```json
+{
+  "role": "necromancer",
+  "boss": { "classId": 10, "level": 6, "cr": 6, "el": 6, "band": "standard" },
+  "bossAloneSufficient": true,
+  "support": null,
+  "caveat": "Wizard (this archetype's class) is capped at cantrips + 1st-level spells by ...",
+  "nextSteps": "Dry-run only. To actually build this: create_creature_blueprint for the boss ..."
+}
+```
+
+or, when the boss alone falls short of the target EL, `support` becomes
+`{ resref, tag, cr, count, el }` — a real base-game blueprint and a count,
+never a fabricated combined EL (see `boss.el`/`support.el` staying separate
+— enforced by a dedicated test asserting no `totalEL`/`combinedEL` field
+ever appears).
+
+**Two deliberate narrowings from the original sketch, not oversights:**
+- **`role` is singular, not `roles: string[]`.** `planSupportCluster` (F2)
+  is built for one named boss; how multiple named bosses in the same fight
+  would combine is the same kind of unverified mixed-CR question this
+  project already declines to guess at. Revisit with a real multi-boss need
+  and a real source for that combination rule — not before.
+- **`bossCR` is a required caller input, not derived from `targetEL`.**
+  Nothing in F1-F3 can honestly answer "how much of this fight's difficulty
+  should the boss alone carry vs. its support" — that split IS the
+  unverified mixed-CR question from the point above. This tool answers
+  "given a boss at this CR, does support close the gap to this target, and
+  with what" — the caller decides the boss's own power level. This also
+  means the original open question ("does CR 6 mean the whole fight's EL or
+  the boss's own pinned CR") is moot for this tool's actual shape: there is
+  no implicit default to pick, since the boss's CR is never implicit.
+- **No `area`/placement mode yet, and no `pinBossCR` override** — both
+  planned for F6 below, not built here. This tool only plans; it builds and
+  places nothing.
+
+6 new integration tests (`encounter-composer-tools.integration.test.ts`),
+including the user's own stated example (`role: necromancer, bossCR: 6,
+targetEL: 6` -> boss alone sufficient, no support) and a case where the
+boss falls short and a real `nw_zombie01` cluster is computed.
 
 ### F6. Equipment and wealth integration (no new mechanism — just correct wiring)
 
@@ -298,9 +337,8 @@ useful standalone before a skill depends on it.
    guessed), following this project's established "grow the table from
    verified lookups" pattern.
 3. **F3 (support-roster chooser) — DONE** for that one archetype's `naturalSupport`.
-4. **F5 (`compose_encounter`)** wiring F1-F3 together, dry-run mode only
-   first (no placement) so the roster-planning logic can be reviewed and
-   tested in isolation before it touches a real module.
+4. **F5 (`compose_encounter`), dry-run mode — DONE.** Wires F1-F3 together;
+   placement mode (actually building and placing the plan) is step 5 below.
 5. **F6** (equip integration) and **placement mode** for F5 together, since
    placement needs gear to already be decided.
 6. **F4 (ally-side reinforcement)** — report-only first (just surface the
