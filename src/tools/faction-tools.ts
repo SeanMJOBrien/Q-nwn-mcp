@@ -34,7 +34,8 @@ export function registerFactionTools(server: McpServer): void {
 
   server.tool(
     "create_faction",
-    "Add a new faction to the module's .fac file with reputation entries for all existing factions.",
+    "Add a new faction to the module's .fac file with bilateral reputation entries (both directions) for all " +
+      "existing factions.",
     {
       name: z.string().describe("Faction display name"),
       parentId: optNumParam("Parent faction ID (default 4294967295 = no parent)"),
@@ -63,12 +64,27 @@ export function registerFactionTools(server: McpServer): void {
         FactionGlobal: { type: "byte", value: globalN },
       });
 
-      // Add bilateral reputation entries for all existing factions
+      // Add bilateral reputation entries for all existing factions — BOTH
+      // directions. Confirmed live (branch systest-live-run-and-generalized-spec)
+      // that writing only the new->existing direction leaves the reverse
+      // (existing->new) entry completely absent from the .fac, and a real
+      // headless engine's GetReputation()/GetIsEnemy() then reads back a
+      // friendly default (100) for that missing direction regardless of what
+      // the present direction says — despite this function's own comment
+      // always having claimed "bilateral." NWN's reputation table is
+      // genuinely directional per (FactionID1, FactionID2) pair; nothing
+      // makes the engine mirror one direction onto the other automatically.
       for (let i = 0; i < newFactionId; i++) {
         repList.push({
           __struct_id: repList.length,
           FactionID1: { type: "dword", value: newFactionId },
           FactionID2: { type: "dword", value: i },
+          FactionRep: { type: "int", value: defaultRepN },
+        });
+        repList.push({
+          __struct_id: repList.length,
+          FactionID1: { type: "dword", value: i },
+          FactionID2: { type: "dword", value: newFactionId },
           FactionRep: { type: "int", value: defaultRepN },
         });
       }
@@ -84,7 +100,7 @@ export function registerFactionTools(server: McpServer): void {
             name,
             parentId: parentIdN,
             global: globalN,
-            reputationEntriesAdded: newFactionId,
+            reputationEntriesAdded: newFactionId * 2,
             defaultReputation: defaultRepN,
           }, null, 2),
         }],
@@ -96,7 +112,9 @@ export function registerFactionTools(server: McpServer): void {
 
   server.tool(
     "set_faction_reputation",
-    "Modify reputation between two factions. Creates a new entry if none exists.",
+    "Modify reputation between two factions, in BOTH directions (NWN's reputation table is directional per " +
+      "(FactionID1, FactionID2) pair — setting only one direction leaves the engine reading a friendly 100 default " +
+      "for the other, confirmed live). Creates either entry if it doesn't already exist.",
     {
       faction1: numParam("First faction ID"),
       faction2: numParam("Second faction ID"),
@@ -121,27 +139,34 @@ export function registerFactionTools(server: McpServer): void {
         return { content: [{ type: "text", text: `Invalid faction2 ID: ${f2}. Valid range: 0-${factionList.length - 1}` }] };
       }
 
-      // Find existing entry (either direction)
-      let found = false;
-      for (const entry of repList) {
-        const id1 = getFieldNum(entry, "FactionID1");
-        const id2 = getFieldNum(entry, "FactionID2");
-        if ((id1 === f1 && id2 === f2) || (id1 === f2 && id2 === f1)) {
-          setField(entry, "FactionRep", "int", rep);
-          found = true;
-          break;
+      // NWN's reputation table is directional per (FactionID1, FactionID2)
+      // pair — confirmed live (branch systest-live-run-and-generalized-spec)
+      // that setting only one direction leaves the reverse direction's entry
+      // completely absent, and a real headless engine's GetReputation()/
+      // GetIsEnemy() then reads back a friendly default (100) for the
+      // missing direction regardless of what the present direction says.
+      // Set (and create if absent) BOTH (f1,f2) and (f2,f1) to the same
+      // value, exactly like create_faction now does — a caller asking to
+      // "set reputation between two factions" means the relationship, not
+      // one arbitrary direction of it.
+      const upsertRep = (id1: number, id2: number): "updated" | "created" => {
+        for (const entry of repList) {
+          if (getFieldNum(entry, "FactionID1") === id1 && getFieldNum(entry, "FactionID2") === id2) {
+            setField(entry, "FactionRep", "int", rep);
+            return "updated";
+          }
         }
-      }
-
-      // Create new entry if not found
-      if (!found) {
         repList.push({
           __struct_id: repList.length,
-          FactionID1: { type: "dword", value: f1 },
-          FactionID2: { type: "dword", value: f2 },
+          FactionID1: { type: "dword", value: id1 },
+          FactionID2: { type: "dword", value: id2 },
           FactionRep: { type: "int", value: rep },
         });
-      }
+        return "created";
+      };
+
+      const forwardAction = upsertRep(f1, f2);
+      const reverseAction = f2 !== f1 ? upsertRep(f2, f1) : forwardAction;
 
       await jsonToGff(fac.doc, fac.filePath);
 
@@ -156,7 +181,7 @@ export function registerFactionTools(server: McpServer): void {
             faction1: { id: f1, name: f1Name },
             faction2: { id: f2, name: f2Name },
             reputation: rep,
-            action: found ? "updated" : "created",
+            action: { forward: forwardAction, reverse: reverseAction },
           }, null, 2),
         }],
       };

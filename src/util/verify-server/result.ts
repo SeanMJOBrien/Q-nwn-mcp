@@ -44,11 +44,29 @@ export interface ParsedLiveLogs {
  */
 export const DEFAULT_ERROR_PATTERNS = ["invalid feat", "error", "exception"];
 
-const BRACKET_TAG_RE = /^\[[A-Z_0-9]+\]/;
-const SPEC_OK_RE = /^\[SPEC_OK\]\s+tag=(\S+)/;
-const SPEC_FAIL_RE = /^\[SPEC_FAIL\]\s+tag=(\S+)\s+field=(\S+)\s+expected=(\S+)\s+actual=(\S+)/;
+/**
+ * Deliberately NOT anchored to line start (`^`). Confirmed live (branch
+ * systest-live-run-and-generalized-spec) that the real engine's
+ * WriteTimestampedLogEntry() — the function every tag-logging line in this
+ * project goes through (inc_spec_check/inc_spec_assert/inc_systest_log) —
+ * ALWAYS prepends its own `[Day Mon DD HH:MM:SS Year]` timestamp bracket
+ * before the string passed to it, e.g. the real captured line was
+ * `[Sun Oct 11 01:49:40] [SPEC_FAIL] tag=... field=... expected=... actual=...`.
+ * An earlier, line-start-anchored version of this regex had never actually
+ * been run against a real engine log (every existing unit test fixture put
+ * the tag literally first on the line) — against this project's real output
+ * it silently matched nothing, so specResults/otherTaggedLines came back
+ * empty on every real run despite the raw log genuinely containing these
+ * lines. The `[A-Z_0-9]+` character class already excludes the timestamp
+ * bracket's content (mixed case, spaces, colons), so dropping the anchor is
+ * safe — nothing else in a real server/engine log coincidentally looks like
+ * an all-caps/underscore/digit bracket tag.
+ */
+const BRACKET_TAG_RE = /\[[A-Z_0-9]+\]/;
+const SPEC_OK_RE = /\[SPEC_OK\]\s+tag=(\S+)/;
+const SPEC_FAIL_RE = /\[SPEC_FAIL\]\s+tag=(\S+)\s+field=(\S+)\s+expected=(\S+)\s+actual=(\S+)/;
 
-/** Count of lines starting with a `[SOME_TAG]`-shaped prefix, across all instrumentation. */
+/** Count of lines containing a `[SOME_TAG]`-shaped bracket, across all instrumentation. */
 export function bracketTagCount(text: string): number {
   return (text.match(new RegExp(BRACKET_TAG_RE.source, "gm")) ?? []).length;
 }

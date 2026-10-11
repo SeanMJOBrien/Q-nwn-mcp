@@ -123,7 +123,11 @@ describe("create_faction + verify_faction", () => {
       const created = parseResult(createResult) as { success: boolean; factionId: number; reputationEntriesAdded: number };
       expect(created.success).toBe(true);
       expect(created.factionId).toBe(2);
-      expect(created.reputationEntriesAdded).toBe(2);
+      // 2 existing factions x 2 directions each — see the real bug this
+      // fixed (branch systest-live-run-and-generalized-spec): the old code
+      // wrote only the new->existing direction, leaving the engine reading
+      // a friendly 100 default for the unset reverse direction live.
+      expect(created.reputationEntriesAdded).toBe(4);
 
       const verifyResult = await client.callTool({ name: "verify_faction", arguments: {} });
       const verified = parseResult(verifyResult) as { status: string; errors: unknown[] };
@@ -133,10 +137,34 @@ describe("create_faction + verify_faction", () => {
       await cleanup();
     }
   });
+
+  it("writes reputation entries in both directions for every existing faction", async () => {
+    const key = seedFacResource(mockIndex);
+
+    const { registerFactionTools } = await import("./faction-tools.js");
+    const { client, cleanup } = await createTestClient([registerFactionTools]);
+    try {
+      await client.callTool({ name: "create_faction", arguments: { name: "Merchants", defaultReputation: "75" } });
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const repList = (doc.RepList as { value: GffObj[] }).value;
+      const pairs = repList.map((e) => [
+        (e.FactionID1 as { value: number }).value,
+        (e.FactionID2 as { value: number }).value,
+      ]);
+      // New faction (2) <-> each existing faction (0, 1), both directions.
+      expect(pairs).toEqual(
+        expect.arrayContaining([[2, 0], [0, 2], [2, 1], [1, 2]]),
+      );
+      expect(repList.every((e) => (e.FactionRep as { value: number }).value === 75)).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
 });
 
 describe("set_faction_reputation + verify_faction", () => {
-  it("updates an existing entry and leaves the faction table valid", async () => {
+  it("creates entries in both directions and leaves the faction table valid", async () => {
     const key = seedFacResource(mockIndex);
 
     const { registerFactionTools } = await import("./faction-tools.js");
@@ -147,14 +175,49 @@ describe("set_faction_reputation + verify_faction", () => {
         name: "set_faction_reputation",
         arguments: { faction1: "0", faction2: "1", reputation: "10" },
       });
-      const set = parseResult(setResult) as { success: boolean; reputation: number; action: string };
+      const set = parseResult(setResult) as {
+        success: boolean;
+        reputation: number;
+        action: { forward: string; reverse: string };
+      };
       expect(set.success).toBe(true);
       expect(set.reputation).toBe(10);
-      expect(set.action).toBe("created");
+      // Real bug fixed (branch systest-live-run-and-generalized-spec): the
+      // old code wrote only one direction and reported a flat "created"
+      // string — a real headless engine then read a friendly 100 default
+      // for the unset reverse direction regardless of what was set here.
+      expect(set.action).toEqual({ forward: "created", reverse: "created" });
 
       const verifyResult = await client.callTool({ name: "verify_faction", arguments: {} });
       const verified = parseResult(verifyResult) as { status: string; errors: unknown[] };
       expect(verified.status).toBe("pass");
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const repList = (doc.RepList as { value: GffObj[] }).value;
+      expect(repList).toHaveLength(2);
+      const pairs = repList.map((e) => [
+        (e.FactionID1 as { value: number }).value,
+        (e.FactionID2 as { value: number }).value,
+      ]);
+      expect(pairs).toEqual(expect.arrayContaining([[0, 1], [1, 0]]));
+      expect(repList.every((e) => (e.FactionRep as { value: number }).value === 10)).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("writes only one entry when faction1 equals faction2 (reputation toward itself)", async () => {
+    const key = seedFacResource(mockIndex);
+
+    const { registerFactionTools } = await import("./faction-tools.js");
+    const { client, cleanup } = await createTestClient([registerFactionTools]);
+    try {
+      const setResult = await client.callTool({
+        name: "set_faction_reputation",
+        arguments: { faction1: "0", faction2: "0", reputation: "100" },
+      });
+      const set = parseResult(setResult) as { action: { forward: string; reverse: string } };
+      expect(set.action).toEqual({ forward: "created", reverse: "created" });
 
       const doc = mockIndex.parsedGff.get(key) as GffObj;
       const repList = (doc.RepList as { value: GffObj[] }).value;

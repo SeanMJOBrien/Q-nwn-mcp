@@ -375,9 +375,12 @@ describe("faction tools", () => {
       expect(factionList).toHaveLength(4);
       expect((factionList[3].FactionName as { value: string }).value).toBe("Thieves Guild");
 
-      // Should have added 3 rep entries (one for each existing faction)
+      // Should have added 6 rep entries: one for each existing faction, in
+      // BOTH directions (see faction-tools.ts's real bug fix, branch
+      // systest-live-run-and-generalized-spec — a real engine read a
+      // friendly 100 default for a missing reverse-direction entry).
       const repList = (fac.RepList as { value: GffObj[] }).value;
-      expect(repList.length).toBe(5); // 2 original + 3 new
+      expect(repList.length).toBe(8); // 2 original + 6 new (3 existing x 2 directions)
     } finally {
       await cleanup();
     }
@@ -399,12 +402,22 @@ describe("faction tools", () => {
 
       const parsed = parseResult(result) as Record<string, unknown>;
       expect(parsed.success).toBe(true);
-      expect((parsed as { action: string }).action).toBe("updated");
+      // (0,1) already existed (seeded at rep 0) and is updated; the reverse
+      // (1,0) didn't exist yet and is created — both now set to the same
+      // value, per the bilateral-reputation fix (see faction-tools.ts).
+      expect((parsed as { action: { forward: string; reverse: string } }).action).toEqual({
+        forward: "updated",
+        reverse: "created",
+      });
 
-      // Verify the rep value changed
+      // Verify the rep value changed in both directions
       const fac = facDoc as GffObj;
       const repList = (fac.RepList as { value: GffObj[] }).value;
       expect((repList[0].FactionRep as { value: number }).value).toBe(50);
+      const reverseEntry = repList.find(
+        (e) => (e.FactionID1 as { value: number }).value === 1 && (e.FactionID2 as { value: number }).value === 0,
+      );
+      expect((reverseEntry?.FactionRep as { value: number }).value).toBe(50);
     } finally {
       await cleanup();
     }

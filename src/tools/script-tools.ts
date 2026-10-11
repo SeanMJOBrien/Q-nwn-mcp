@@ -66,6 +66,16 @@ export function registerScriptTools(server: McpServer): void {
         resman,
       });
 
+      if (result.success) {
+        const ncsStat = await fsPromises.stat(ncsPath);
+        index.resources.set(`${resref.toLowerCase()}.ncs`, {
+          resref: resref.toLowerCase(),
+          extension: "ncs",
+          filePath: ncsPath,
+          sizeBytes: ncsStat.size,
+        });
+      }
+
       return {
         content: [{
           type: "text",

@@ -11,8 +11,19 @@ describe("bracketTagCount", () => {
     expect(bracketTagCount("Loading Module: foo\nServer shutting down")).toBe(0);
   });
 
-  it("does not count a tag that isn't at line start", () => {
-    expect(bracketTagCount("some prefix [SPEC_OK] tag=a")).toBe(0);
+  it("counts a tag preceded by a WriteTimestampedLogEntry timestamp bracket — the real engine's actual format", () => {
+    // Regression guard for a real bug found live (branch
+    // systest-live-run-and-generalized-spec): WriteTimestampedLogEntry()
+    // always prepends its own timestamp bracket, so a line-start-anchored
+    // regex (what this test used to assert, expecting 0) silently matched
+    // nothing on every real engine run. This is the exact captured shape.
+    expect(bracketTagCount("[Sun Oct 11 01:49:40] [SPEC_OK] tag=a")).toBe(1);
+  });
+
+  it("does not miscount the timestamp bracket itself as a tag", () => {
+    // The timestamp bracket's content (mixed case, spaces, colons) must
+    // never match the [A-Z_0-9]+ tag character class on its own.
+    expect(bracketTagCount("[Sun Oct 11 01:49:40] Loading Module: foo")).toBe(0);
   });
 });
 
@@ -80,6 +91,27 @@ describe("parseLiveLogs", () => {
     expect(result.otherTaggedLines).toEqual([]);
     expect(result.specResults.ok).toEqual([]);
     expect(result.engineErrors).toEqual([]);
+  });
+
+  it("parses real WriteTimestampedLogEntry-prefixed lines captured live from the real engine", () => {
+    // Exact raw lines captured from a real headless run (branch
+    // systest-live-run-and-generalized-spec, nwn_mcp_systest module,
+    // 2026-10-11) — the regression test for the timestamp-prefix bug found
+    // by that run. Before the fix, all three of these came back empty.
+    const serverTail = [
+      "[Sun Oct 11 01:49:40] Loading Module: nwn_mcp_systest",
+      "[Sun Oct 11 01:49:40] [SPEC_FAIL] tag=systest_encounter_setup field=defenders_vs_hostile expected=TRUE actual=FALSE",
+      "[Sun Oct 11 01:49:40] [SYSTEST_DIALOG_START] starter=systest_dialog_npc_a target=systest_dialog_npc_b",
+      "[Sun Oct 11 01:49:42] [SYSTEST_DIALOG_NODE] self=systest_dialog_npc_a pcspeaker=NONE lastspeaker=NONE",
+    ].join("\n");
+    const result = parseLiveLogs(serverTail, "");
+    expect(result.specResults.fail).toEqual([
+      { tag: "systest_encounter_setup", field: "defenders_vs_hostile", expected: "TRUE", actual: "FALSE" },
+    ]);
+    expect(result.otherTaggedLines).toEqual([
+      "[Sun Oct 11 01:49:40] [SYSTEST_DIALOG_START] starter=systest_dialog_npc_a target=systest_dialog_npc_b",
+      "[Sun Oct 11 01:49:42] [SYSTEST_DIALOG_NODE] self=systest_dialog_npc_a pcspeaker=NONE lastspeaker=NONE",
+    ]);
   });
 
   it("handles a combined realistic tail with both OK and FAIL lines plus an engine error", () => {
