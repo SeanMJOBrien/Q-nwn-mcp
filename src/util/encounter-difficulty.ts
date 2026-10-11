@@ -29,6 +29,18 @@
  *  - bandDifficulty: the EL/APL bands already documented in
  *    adventure-challenges/SKILL.md ("EL=APL is a standard encounter",
  *    "EL=APL+4 risks a character death; reserve for the boss").
+ *
+ *  - solveSameCRCount / planSupportCluster: the reverse direction — given a
+ *    target EL, how many creatures does it take, instead of auditing a
+ *    roster that already exists. See docs/encounter-composer-spec.md (F2)
+ *    for the feature this was planned under. Deliberately does NOT attempt
+ *    a mixed-CR "boss + weaker support = one combined EL" formula — the
+ *    real DMG rule for that was never found through any accessible source
+ *    (see combineSameCREL's own note above), so planSupportCluster reports
+ *    the boss's own EL and a same-CR support cluster's own EL as two
+ *    separate numbers, exactly mirroring clusterHostiles's existing
+ *    per-cluster (not per-fight) convention — never a fabricated combined
+ *    figure.
  */
 
 /**
@@ -43,6 +55,70 @@ export function combineSameCREL(cr: number, count: number): number {
 /** CR ≈ total character level — see the module doc comment for the real-data backing. */
 export function estimateCRFromLevel(totalLevel: number): number {
   return totalLevel;
+}
+
+/**
+ * The exact inverse of combineSameCREL: the minimum count of same-CR
+ * creatures whose combined EL reaches or exceeds `targetEL`. Since
+ * combineSameCREL is non-decreasing in count, this is a direct forward scan
+ * (count = 1, 2, 3, ...), not a search — there's no case where a larger
+ * count produces a lower EL. `count` is always >= 1 (you can't have zero
+ * creatures and still call it a support cluster); if `cr` alone already
+ * meets or exceeds `targetEL`, this correctly returns `{ count: 1,
+ * achievedEL: cr }` — the caller decides whether a single creature was
+ * even necessary by comparing `cr` to `targetEL` directly.
+ *
+ * Bounded at 256 creatures as a sanity guard — the EL-vs-count curve grows
+ * logarithmically (each doubling adds exactly +2 EL, confirmed above), so a
+ * realistic EL gap (even the full deadly-encounter range this project
+ * bands, APL+4) never approaches this; hitting the bound means `targetEL`
+ * or `cr` is a degenerate input, not a real encounter design.
+ */
+export function solveSameCRCount(cr: number, targetEL: number): { count: number; achievedEL: number } {
+  let count = 1;
+  let achievedEL = combineSameCREL(cr, count);
+  while (achievedEL < targetEL && count < 256) {
+    count++;
+    achievedEL = combineSameCREL(cr, count);
+  }
+  return { count, achievedEL };
+}
+
+export interface SupportClusterPlan {
+  /** Whether the boss's own CR already meets or exceeds targetEL on its own. */
+  bossAloneSufficient: boolean;
+  /** The boss's own EL contribution (always just its CR — a single creature). */
+  bossEL: number;
+  /**
+   * The support cluster's own count/EL — present only when a cluster was
+   * actually asked for (supportCR given) and the boss alone wasn't already
+   * sufficient. Its EL is reported standalone, NOT combined with bossEL —
+   * see the module doc comment's scope limit.
+   */
+  support: { cr: number; count: number; achievedEL: number } | null;
+}
+
+/**
+ * Plan a support cluster for a named "boss" creature against a target EL.
+ * Deliberately returns the boss's and the support cluster's EL as two
+ * separate figures rather than one fabricated combined number — see the
+ * module doc comment. When the boss alone already meets or exceeds
+ * `targetEL`, `support` is `null` — this function's only job is answering
+ * "is support needed, and if so how much"; a caller that wants a thematic
+ * escort anyway even when none is strictly required (F3's job, not this
+ * one) can ignore `bossAloneSufficient` and ask for one directly.
+ */
+export function planSupportCluster(bossCR: number, targetEL: number, supportCR: number): SupportClusterPlan {
+  const bossAloneSufficient = bossCR >= targetEL;
+  if (bossAloneSufficient) {
+    return { bossAloneSufficient, bossEL: bossCR, support: null };
+  }
+  const { count, achievedEL } = solveSameCRCount(supportCR, targetEL);
+  return {
+    bossAloneSufficient,
+    bossEL: bossCR,
+    support: { cr: supportCR, count, achievedEL },
+  };
 }
 
 export type DifficultyLabel = "trivial" | "easy" | "standard" | "hard" | "deadly";

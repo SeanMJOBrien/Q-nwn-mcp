@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { bandDifficulty, clusterHostiles, combineSameCREL, estimateCRFromLevel } from "./encounter-difficulty.js";
+import {
+  bandDifficulty,
+  clusterHostiles,
+  combineSameCREL,
+  estimateCRFromLevel,
+  planSupportCluster,
+  solveSameCRCount,
+} from "./encounter-difficulty.js";
 
 describe("combineSameCREL", () => {
   it("a single creature's EL is its own CR", () => {
@@ -30,6 +37,67 @@ describe("combineSameCREL", () => {
         expect(combineSameCREL(cr, n * 2) - combineSameCREL(cr, n)).toBe(2);
       }
     }
+  });
+});
+
+describe("solveSameCRCount", () => {
+  it("returns count 1 when the CR alone already meets the target", () => {
+    expect(solveSameCRCount(8, 6)).toEqual({ count: 1, achievedEL: 8 });
+    expect(solveSameCRCount(5, 5)).toEqual({ count: 1, achievedEL: 5 });
+  });
+
+  it("is the exact inverse of combineSameCREL for every cross-validated CR-5 data point", () => {
+    // Reuses the same cross-validated table combineSameCREL's own test
+    // does — the minimal count that first reaches each EL must round-trip.
+    expect(solveSameCRCount(5, 7)).toEqual({ count: 2, achievedEL: 7 });
+    expect(solveSameCRCount(5, 8)).toEqual({ count: 3, achievedEL: 8 });
+    expect(solveSameCRCount(5, 9)).toEqual({ count: 4, achievedEL: 9 });
+    expect(solveSameCRCount(5, 10)).toEqual({ count: 5, achievedEL: 10 });
+  });
+
+  it("never returns a count whose EL is below the target (monotonic forward scan)", () => {
+    for (const cr of [1, 3, 8, 15]) {
+      for (const targetEL of [cr, cr + 1, cr + 3, cr + 5]) {
+        const { count, achievedEL } = solveSameCRCount(cr, targetEL);
+        expect(achievedEL).toBeGreaterThanOrEqual(targetEL);
+        expect(count).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
+
+  it("the previous count's EL is always strictly below target (minimality — no overshoot)", () => {
+    const { count } = solveSameCRCount(3, 6);
+    if (count > 1) {
+      expect(combineSameCREL(3, count - 1)).toBeLessThan(6);
+    }
+  });
+});
+
+describe("planSupportCluster", () => {
+  it("reports the boss alone as sufficient and omits a support cluster entirely", () => {
+    const plan = planSupportCluster(8, 6, 3);
+    expect(plan.bossAloneSufficient).toBe(true);
+    expect(plan.bossEL).toBe(8);
+    expect(plan.support).toBeNull();
+  });
+
+  it("computes a same-CR support cluster when the boss alone falls short, reporting its EL separately", () => {
+    // Boss CR 3 vs target EL 6: boss alone is insufficient (3 < 6).
+    // combineSameCREL(3, 3) = 3 + round(2*log2(3)) = 3 + 3 = 6, so 3 CR-3
+    // support creatures is the minimal cluster reaching EL 6.
+    const plan = planSupportCluster(3, 6, 3);
+    expect(plan.bossAloneSufficient).toBe(false);
+    expect(plan.bossEL).toBe(3);
+    expect(plan.support).toEqual({ cr: 3, count: 3, achievedEL: 6 });
+  });
+
+  it("never fabricates one combined boss+support EL number — bossEL and support.achievedEL stay separate", () => {
+    const plan = planSupportCluster(5, 9, 2);
+    expect(plan).toHaveProperty("bossEL");
+    expect(plan.support).toHaveProperty("achievedEL");
+    // There is deliberately no "totalEL" or "combinedEL" field anywhere.
+    expect(plan).not.toHaveProperty("totalEL");
+    expect(plan).not.toHaveProperty("combinedEL");
   });
 });
 

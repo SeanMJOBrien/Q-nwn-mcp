@@ -1,6 +1,6 @@
 # Encounter composer: role + target difficulty → a built, balanced roster
 
-Status: **planning only — nothing in this document is implemented yet.**
+Status: **F2 (reverse EL solver) is built.** F1, F3-F8 remain planning only.
 
 ## Why this exists
 
@@ -127,16 +127,33 @@ do not guess these in:**
   use, the same way `CLASS_FEATS`/`RACIAL_FEATS` grew from actual verified
   2DA lookups rather than a speculative full table.
 
-### F2. Reverse EL solver — target difficulty → required CR total
+### F2. Reverse EL solver — target difficulty → required CR total — **BUILT**
 
 **Objective:** automate the arithmetic a human currently does by trial and
-error against `get_balance_report`: given a target EL (or difficulty label
-like "hard") and the party's level/size, and given the boss's own CR, compute
-how much *additional* same-or-mixed CR needs adding (or, if the boss alone
-already exceeds the target, that no support is needed at all).
+error against `get_balance_report`: given a target EL and the boss's own CR,
+compute how many same-CR support creatures close the gap (or that no support
+is needed at all, if the boss alone already meets the target).
 
-**Design:** extend `src/util/encounter-difficulty.ts` with the mechanical
-inverse of `combineSameCREL`:
+**Built as** `solveSameCRCount(cr, targetEL)` and `planSupportCluster(bossCR,
+targetEL, supportCR)` in `src/util/encounter-difficulty.ts`, with full unit
+test coverage in `encounter-difficulty.test.ts` (19 tests). Matches the
+design below exactly, including the scope limit: `planSupportCluster` never
+fabricates one combined boss+support EL number — it reports `bossEL` and
+`support.achievedEL` as two separate figures, mirroring `clusterHostiles`'s
+existing per-cluster (not per-fight) convention. When the boss alone already
+meets `targetEL`, `support` is `null` rather than computing a 1-creature
+cluster nobody asked for — deciding whether to add a *thematic* escort
+anyway (not needed for difficulty) is F3's job, not this pure-math utility's.
+
+Dropped from the original sketch below: `partyLevel`/`partySize` params and a
+returned `label`. Neither `combineSameCREL` nor its inverse involve party
+stats at all — EL is a property of the hostile side alone; banding against a
+party (`bandDifficulty(el, partyLevel)`) already exists as its own composable
+function, so callers band `bossEL`/`support.achievedEL` separately rather
+than this function doing it inline.
+
+<details>
+<summary>Original design sketch (superseded by the actual signatures above)</summary>
 
 ```
 // Given target EL and a fixed boss CR, solve for how many creatures of a
@@ -151,6 +168,8 @@ inverse of `combineSameCREL`:
 // formula here that the rest of the codebase deliberately avoids elsewhere.
 function solveSupportCount(targetEL, bossCR, supportCR, partyLevel, partySize): { count, achievedEL, label }
 ```
+
+</details>
 
 **Objective, restated simply:** turn "is 1 necromancer + N skeletons a CR 6
 fight for a 4-person level 6 party" from a manual back-and-forth with
@@ -259,7 +278,7 @@ useful standalone before a skill depends on it.
 
 ## Suggested build order
 
-1. **F2 (reverse EL solver)** first — pure math, fully unit-testable against
+1. **F2 (reverse EL solver) — DONE.** Pure math, fully unit-tested against
    the same real-data backing `encounter-difficulty.ts` already has, no new
    external dependencies, and independently useful even before F1/F5 exist
    (a human could use it by hand today).
