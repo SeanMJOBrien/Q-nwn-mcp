@@ -71,3 +71,9 @@ export const SCRIPT_FIELDS = new Set([
   "Mod_OnUnAqreItem", "Mod_OnUsrDefined",
   "Script", "Active", "EndConverAbort", "EndConversation",
 ]);
+
+/** Moonglow Toolset's `mg` command-line binary (for moonglow_run_plugin). Defaults to `mg` on PATH. */
+export const MOONGLOW_BIN = process.env.MOONGLOW_BIN || "mg";
+
+/** Folder of Moonglow plugins (each a folder with plugin.cfg); moonglow_list_plugins looks here by default. */
+export const MOONGLOW_PLUGINS = process.env.MOONGLOW_PLUGINS || "";

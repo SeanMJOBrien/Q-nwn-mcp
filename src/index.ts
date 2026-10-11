@@ -36,6 +36,7 @@ import { registerTilesetTools } from "./tools/tileset-tools.js";
 import { registerUndoTools } from "./tools/undo-tools.js";
 import { registerVariableTools } from "./tools/variable-tools.js";
 import { registerVerifyServerTools } from "./tools/verify-server-tools.js";
+import { registerMoonglowTools } from "./tools/moonglow-tools.js";
 import { registerVerifyTools } from "./tools/verify-tools.js";
 import { registerWebTools } from "./tools/web-tools.js";
 import { registerWriteTools } from "./tools/write-tools.js";
@@ -85,6 +86,7 @@ registerPackageTools(server);
 registerRandomAbilitiesTools(server);
 registerSpecAbilityTools(server);
 registerSystestTools(server);
+registerMoonglowTools(server);
 
 // ── Adventure creator tools ─────────────────────────────────────────────
 registerAdventureTools(server);
