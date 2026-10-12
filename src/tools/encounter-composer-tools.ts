@@ -1,6 +1,6 @@
 /**
- * Encounter composer tool — F5 (dry-run) and F6 (placement) of
- * docs/encounter-composer-spec.md.
+ * Encounter composer tool — F5 (dry-run), F6 (placement) and F4 (ally-side
+ * reinforcement, report-only) of docs/encounter-composer-spec.md.
  *
  * Wires F1 (archetype library), F2 (reverse EL solver) and F3
  * (support-roster chooser) together into the single call the feature was
@@ -31,24 +31,35 @@
  *   (pickWeaponPreference) directly — the same functions equip_npc_by_role
  *   itself uses — but leaves finding and equipping a real item resref as
  *   the caller's own next step, named explicitly in the response.
+ * - F4 is report-only, per the spec's own "deliberately conservative for a
+ *   first version" design: when partyLevel is given and the worse of the
+ *   boss's/support's band is "hard" or "deadly", `allyRecommendation`
+ *   surfaces that fact and names the existing companion pipeline
+ *   (create_creature_blueprint henchman:true + build_npc_stat_block) as the
+ *   way to add a reinforcing ally — it never builds one itself. `partySize`
+ *   is accepted purely as a caveat label, never folded into the EL/band math
+ *   — see encounter-difficulty.ts's bandDifficulty doc comment for why no
+ *   party-size adjustment formula is applied.
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { buildResmanOptions, requireIndex } from "../module-loader.js";
+import type { GffObj } from "../types/gff.js";
+import { buildCreatureBlueprint } from "../util/creature-builder.js";
+import { findSimpleWalkableSpots, placeCreatureCore } from "../util/creature-placer.js";
+import { ARCHETYPES, getArchetype, pickSupportCandidate } from "../util/encounter-archetypes.js";
 import {
   bandDifficulty,
+  type DifficultyLabel,
+  difficultyRank,
   planSupportCluster,
 } from "../util/encounter-difficulty.js";
-import { ARCHETYPES, getArchetype, pickSupportCandidate } from "../util/encounter-archetypes.js";
-import { numParam, optNumParam, toF, toI } from "../util/params.js";
-import { requireIndex, buildResmanOptions } from "../module-loader.js";
-import { buildCreatureBlueprint } from "../util/creature-builder.js";
-import { placeCreatureCore, findSimpleWalkableSpots } from "../util/creature-placer.js";
 import { pickWeaponPreference } from "../util/npc-weapon-preferences.js";
-import { gearBudget } from "../util/wealth.js";
-import { Report } from "../util/verify/common.js";
+import { numParam, optNumParam, toF, toI } from "../util/params.js";
 import { verifyCreature } from "../util/verify/blueprints.js";
-import type { GffObj } from "../types/gff.js";
+import { Report } from "../util/verify/common.js";
+import { gearBudget } from "../util/wealth.js";
 
 /** Keep resref within NWN's 16-char limit — see this project's own documented bug class for what happens when a generator doesn't. */
 function shortResref(role: string): string {
@@ -69,12 +80,16 @@ export function registerEncounterComposerTools(server: McpServer): void {
       "recommendation — but does NOT equip a specific item, since no tool in this project guesses a real item " +
       "resref; search for one yourself (list_blueprints/resman_search) and finish gearing with " +
       "equip_npc_by_role. Reports the boss's and the support cluster's EL as two separate numbers, never one " +
-      "combined figure — no verified DMG rule exists for combining different-CR groups into a single EL.",
+      "combined figure — no verified DMG rule exists for combining different-CR groups into a single EL. When " +
+      "partyLevel is given and the fight bands 'hard'/'deadly', also returns allyRecommendation flagging that and " +
+      "naming the existing companion pipeline as the way to add a reinforcing ally — never builds one itself.",
     {
-      role: z.string().describe(
-        `Archetype name (case-insensitive). Currently recognized: ${Object.keys(ARCHETYPES).join(", ")}. ` +
-          "An unrecognized role returns an error naming the recognized list — never a guessed mapping.",
-      ),
+      role: z
+        .string()
+        .describe(
+          `Archetype name (case-insensitive). Currently recognized: ${Object.keys(ARCHETYPES).join(", ")}. ` +
+            "An unrecognized role returns an error naming the recognized list — never a guessed mapping.",
+        ),
       bossCR: numParam(
         "The boss's own target CR (and, via the archetype's levelForCR, its class level). This tool does not " +
           "derive the boss's power level from targetEL — see this file's own header comment for why.",
@@ -84,12 +99,20 @@ export function registerEncounterComposerTools(server: McpServer): void {
         "Average party level, used only to band the boss's and the support cluster's difficulty " +
           "(trivial/easy/standard/hard/deadly) for human-readable context — not part of the EL math itself.",
       ),
-      area: z.string().optional().describe(
-        "Area resref to build and place into. Omit for a dry-run (plan only, no module needed). When given, needs " +
-          "a module already loaded (load_module) and that area to exist in it.",
+      partySize: optNumParam(
+        "Number of PCs facing this fight. Purely a caveat label on allyRecommendation (e.g. 'smaller than the " +
+          "DMG's assumed 4-character party') — never folded into the band/EL math, since no DMG-sourced formula " +
+          "for the exact size adjustment could be verified (see encounter-difficulty.ts).",
       ),
+      area: z
+        .string()
+        .optional()
+        .describe(
+          "Area resref to build and place into. Omit for a dry-run (plan only, no module needed). When given, needs " +
+            "a module already loaded (load_module) and that area to exist in it.",
+        ),
     },
-    async ({ role, bossCR, targetEL, partyLevel, area }) => {
+    async ({ role, bossCR, targetEL, partyLevel, partySize, area }) => {
       const archetype = getArchetype(role);
       if (!archetype) {
         return {
@@ -113,12 +136,20 @@ export function registerEncounterComposerTools(server: McpServer): void {
       const bossCRNum = toF(bossCR);
       const targetELNum = toF(targetEL);
       const partyLevelNum = partyLevel !== undefined ? toI(partyLevel) : undefined;
+      const partySizeNum = partySize !== undefined ? toI(partySize) : undefined;
       const bossLevel = archetype.levelForCR(bossCRNum);
 
       const supportCandidate = pickSupportCandidate(archetype.naturalSupport, bossCRNum);
       const plan = supportCandidate
         ? planSupportCluster(bossCRNum, targetELNum, supportCandidate.cr)
         : planSupportCluster(bossCRNum, targetELNum, bossCRNum);
+
+      const bossBand: DifficultyLabel | undefined =
+        partyLevelNum !== undefined ? bandDifficulty(plan.bossEL, partyLevelNum) : undefined;
+      const supportBand: DifficultyLabel | undefined =
+        partyLevelNum !== undefined && plan.support
+          ? bandDifficulty(plan.support.achievedEL, partyLevelNum)
+          : undefined;
 
       const result: Record<string, unknown> = {
         success: true,
@@ -128,7 +159,7 @@ export function registerEncounterComposerTools(server: McpServer): void {
           level: bossLevel,
           cr: bossCRNum,
           el: plan.bossEL,
-          band: partyLevelNum !== undefined ? bandDifficulty(plan.bossEL, partyLevelNum) : undefined,
+          band: bossBand,
         },
         bossAloneSufficient: plan.bossAloneSufficient,
         support:
@@ -139,7 +170,7 @@ export function registerEncounterComposerTools(server: McpServer): void {
                 cr: plan.support.cr,
                 count: plan.support.count,
                 el: plan.support.achievedEL,
-                band: partyLevelNum !== undefined ? bandDifficulty(plan.support.achievedEL, partyLevelNum) : undefined,
+                band: supportBand,
               }
             : null,
         caveat: archetype.caveat,
@@ -148,6 +179,37 @@ export function registerEncounterComposerTools(server: McpServer): void {
           "description for why. support is null when the boss alone already meets targetEL, or when this " +
           "archetype has no naturalSupport candidate yet.",
       };
+
+      // ─── F4: ally-side reinforcement — report-only ─────────────────────
+      // Only meaningful when partyLevel was given (band needs it). Flags,
+      // never auto-builds — see this file's own header comment for why.
+      if (partyLevelNum !== undefined) {
+        const worstBand =
+          supportBand && difficultyRank(supportBand) > difficultyRank(bossBand as DifficultyLabel)
+            ? supportBand
+            : (bossBand as DifficultyLabel);
+        const recommended = difficultyRank(worstBand) >= difficultyRank("hard");
+        result.allyRecommendation = {
+          recommended,
+          band: worstBand,
+          reason: recommended
+            ? `This encounter bands as "${worstBand}" for a party at level ${partyLevelNum} — consider a ` +
+              "reinforcing ally if the party shouldn't face that alone."
+            : `This encounter bands as "${worstBand}" for a party at level ${partyLevelNum} — no ally flagged.`,
+          partySizeCaveat:
+            partySizeNum !== undefined && partySizeNum < 4
+              ? `partySize ${partySizeNum} is smaller than the DMG's assumed 4-character party — the true ` +
+                "difficulty is plausibly higher than the band above, but no verified formula exists for exactly " +
+                "how much (see encounter-difficulty.ts's bandDifficulty doc comment), so this is a caveat, not an " +
+                "adjustment."
+              : undefined,
+          howToAddAlly: recommended
+            ? "This tool does not auto-build an ally. Use the existing companion pipeline: " +
+              "create_creature_blueprint (henchman: true) + build_npc_stat_block for the stat block, then place " +
+              "and recruit as normal."
+            : undefined,
+        };
+      }
 
       if (!area) {
         result.nextSteps =

@@ -5,10 +5,10 @@
  * round-trip against the real registered tool, no mocking required at all.
  */
 
-import { describe, expect, it } from "vitest";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { describe, expect, it } from "vitest";
 import { registerEncounterComposerTools } from "./encounter-composer-tools.js";
 
 async function createTestClient(): Promise<{ client: Client; cleanup: () => Promise<void> }> {
@@ -18,7 +18,13 @@ async function createTestClient(): Promise<{ client: Client; cleanup: () => Prom
   await server.connect(serverTransport);
   const client = new Client({ name: "test-client", version: "1.0.0" });
   await client.connect(clientTransport);
-  return { client, cleanup: async () => { await client.close(); await server.close(); } };
+  return {
+    client,
+    cleanup: async () => {
+      await client.close();
+      await server.close();
+    },
+  };
 }
 
 function json(result: { content: Array<{ type: string; text?: string }> }): Record<string, unknown> {
@@ -116,6 +122,71 @@ describe("compose_encounter", () => {
       });
       const parsed = json(result) as { caveat?: string };
       expect(parsed.caveat).toContain("cantrips");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("flags allyRecommendation when the fight bands hard/deadly for the stated party level", async () => {
+    const { client, cleanup } = await createTestClient();
+    try {
+      // Boss CR 6 at partyLevel 2 -> diff 4 -> "deadly" per bandDifficulty.
+      const result = await client.callTool({
+        name: "compose_encounter",
+        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", partyLevel: "2" },
+      });
+      const parsed = json(result) as {
+        allyRecommendation: { recommended: boolean; band: string; howToAddAlly?: string };
+      };
+      expect(parsed.allyRecommendation.recommended).toBe(true);
+      expect(parsed.allyRecommendation.band).toBe("deadly");
+      expect(parsed.allyRecommendation.howToAddAlly).toContain("henchman");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not recommend an ally for a standard-banded fight", async () => {
+    const { client, cleanup } = await createTestClient();
+    try {
+      const result = await client.callTool({
+        name: "compose_encounter",
+        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", partyLevel: "6" },
+      });
+      const parsed = json(result) as { allyRecommendation: { recommended: boolean; band: string } };
+      expect(parsed.allyRecommendation.recommended).toBe(false);
+      expect(parsed.allyRecommendation.band).toBe("standard");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("adds a partySizeCaveat only when partySize is below 4, never adjusting the band itself", async () => {
+    const { client, cleanup } = await createTestClient();
+    try {
+      const result = await client.callTool({
+        name: "compose_encounter",
+        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", partyLevel: "2", partySize: "1" },
+      });
+      const parsed = json(result) as {
+        allyRecommendation: { band: string; partySizeCaveat?: string };
+      };
+      expect(parsed.allyRecommendation.band).toBe("deadly"); // unchanged by partySize
+      expect(parsed.allyRecommendation.partySizeCaveat).toContain("4-character party");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("omits allyRecommendation entirely when partyLevel is not given", async () => {
+    const { client, cleanup } = await createTestClient();
+    try {
+      const result = await client.callTool({
+        name: "compose_encounter",
+        arguments: { role: "necromancer", bossCR: "6", targetEL: "6" },
+      });
+      const parsed = json(result);
+      expect(parsed).not.toHaveProperty("allyRecommendation");
     } finally {
       await cleanup();
     }

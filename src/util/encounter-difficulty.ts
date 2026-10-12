@@ -129,6 +129,18 @@ export type DifficultyLabel = "trivial" | "easy" | "standard" | "hard" | "deadly
  * EL=APL -> "standard", EL=APL+4 -> "deadly, reserve for the boss". The
  * intermediate "easy"/"hard" bands are a straightforward symmetric fill
  * between those two anchors, not independently sourced.
+ *
+ * Deliberately takes no party-SIZE argument, only level. The DMG's EL/CR
+ * system is calibrated to a 4-character party, and a smaller/larger party
+ * should in principle shift the effective difficulty — but a real research
+ * pass for docs/encounter-composer-spec.md's F4 turned up three mutually
+ * contradictory secondary-source claims for the exact adjustment (a flat
+ * +-1 EL per character above/below 4; a non-linear -2/-1/0/+1/+2 table for
+ * 1/2/3/5/6 PCs; and a separate claim that only 5-6 PCs is +1 and 7-9 is
+ * +2), with no DMG page number any source could actually quote. Per this
+ * project's "never guess" convention, no formula is applied — F4
+ * (compose_encounter's allyRecommendation) surfaces partySize only as a
+ * plain, undemonstrated-magnitude caveat, never folds it into the band.
  */
 export function bandDifficulty(el: number, partyLevel: number): DifficultyLabel {
   const diff = el - partyLevel;
@@ -137,6 +149,11 @@ export function bandDifficulty(el: number, partyLevel: number): DifficultyLabel 
   if (diff <= 1) return "standard";
   if (diff <= 3) return "hard";
   return "deadly";
+}
+
+/** Severity order for DifficultyLabel, for picking the worse of two bands (e.g. boss vs. support cluster). */
+export function difficultyRank(label: DifficultyLabel): number {
+  return { trivial: 0, easy: 1, standard: 2, hard: 3, deadly: 4 }[label];
 }
 
 export interface HostileCluster {

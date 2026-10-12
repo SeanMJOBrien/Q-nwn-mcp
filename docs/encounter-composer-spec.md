@@ -1,8 +1,8 @@
 # Encounter composer: role + target difficulty → a built, balanced roster
 
-Status: **F1, F2, F3, F5 and F6 are built** — `compose_encounter` now
-builds and places a real roster, not just a plan. F4, F7 (v2), F8 remain
-planning only.
+Status: **F1, F2, F3, F4, F5 and F6 are built** — `compose_encounter` now
+builds and places a real roster, reports when the fight is too hard for the
+stated party, and names the fix. F7 (v2) and F8 remain planning only.
 
 ## Why this exists
 
@@ -204,7 +204,7 @@ it, that fallback path has no real case to exercise yet. Add it when a
 second `naturalSupport` label is needed and turns out to have no good real
 blueprint, not speculatively now.
 
-### F4. Ally-side reinforcement — does the *party* need anything too?
+### F4. Ally-side reinforcement — does the *party* need anything too? — **BUILT (report-only)**
 
 **Objective:** closes "any additional NPCs needed for each side," not just
 the hostile side. If the target difficulty would otherwise be unfairly hard
@@ -214,14 +214,37 @@ to say so and optionally generate a reinforcing ally (a companion-style NPC
 who joins for this fight) rather than silently handing back an unfair
 encounter.
 
-**Design, deliberately conservative for a first version:** report the
-banded difficulty (`bandDifficulty` already does this) and let the *caller*
-(the LLM, or a human DM) decide whether to accept a "hard"/"deadly" rating
-or ask for an ally — don't auto-inject a reinforcement without being asked.
-Auto-generating one is a reasonable later extension once F1-F3 are proven,
-reusing the existing henchman/companion pipeline (`create_creature_blueprint
-henchman:true`, `build_npc_stat_block`, `create_spec_verification`) rather
-than inventing a second NPC-construction path.
+**Built exactly to the "deliberately conservative" design below — report,
+never auto-build.** `compose_encounter`'s `allyRecommendation` (present
+whenever `partyLevel` is given) reports the worse of the boss's/support
+cluster's band (reusing `bandDifficulty`, via a new `difficultyRank` helper
+in `encounter-difficulty.ts`), flags `recommended: true` when that band is
+"hard" or "deadly", and — only then — names the fix: the existing
+henchman/companion pipeline (`create_creature_blueprint henchman:true` +
+`build_npc_stat_block`), never built automatically.
+
+**`partySize` is accepted but deliberately NOT folded into the band math.**
+A real research pass (same discipline as `combineSameCREL`'s DMG-quote
+cross-check) tried to source the DMG's actual party-size-adjustment rule and
+found three mutually contradictory secondary-source claims — a flat ±1 EL
+per character above/below 4; a non-linear −2/−1/0/+1/+2 table for 1/2/3/5/6
+PCs; and a separate claim that only 5-6 PCs is +1 and 7-9 is +2 — with no
+source able to quote an actual DMG page number. Per this project's "never
+guess" convention (the same reason `planSupportCluster` won't fabricate a
+combined boss+support EL), no formula is applied. `partySize` below 4 only
+adds a plain `partySizeCaveat` string noting the true difficulty is
+*plausibly* higher than shown, with no claimed magnitude — see
+`encounter-difficulty.ts`'s `bandDifficulty` doc comment for the full
+citation trail.
+
+Original design, preserved for context: report the banded difficulty
+(`bandDifficulty` already does this) and let the *caller* (the LLM, or a
+human DM) decide whether to accept a "hard"/"deadly" rating or ask for an
+ally — don't auto-inject a reinforcement without being asked.
+Auto-generating one is still a reasonable later extension once this
+report-only version has seen real use, reusing the existing
+henchman/companion pipeline rather than inventing a second NPC-construction
+path.
 
 ### F5. `compose_encounter` — the actual entry point tool — **BUILT (dry-run only)**
 
@@ -396,8 +419,9 @@ useful standalone before a skill depends on it.
    recommendation (not full auto-gearing — see F6's own entry for why).
    Needed an unplanned refactor (create_creature_blueprint/place_creature
    had no reusable exported function) before it was possible at all.
-6. **F4 (ally-side reinforcement)** — report-only first (just surface the
-   band), auto-generation deferred.
+6. **F4 (ally-side reinforcement) — DONE, report-only.** `allyRecommendation`
+   surfaces the band + a plain, unverified-magnitude `partySize` caveat;
+   auto-generation still deferred.
 7. **F7 v2** and **F8** once the rest is proven and the live-verification
    branch has landed.
 
