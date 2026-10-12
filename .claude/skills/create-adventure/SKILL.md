@@ -100,6 +100,57 @@ When splitting a phase into per-area calls, pass the sub-skill SKILL.md each tim
 - Include progress fraction when splitting (e.g., "2 of 3")
 - Use atmospheric language, not technical language
 
+## Efficiency: Avoiding Rate Limits Mid-Build
+
+A full run through this pipeline is 15-25+ Agent dispatches, each burning
+150k-370k tokens — confirmed from real usage stats across a full 6-area build
+("The Hollow Communion," 2026-10-11). The dominant cost in every dispatch is
+NOT the actual work; it's a fresh agent cold-reading its sub-skill's SKILL.md
+(300-1000+ lines) and the shared `adventure.md` (which only grows — 900+
+lines by the later phases) from scratch, every single time. That session hit
+its account-level rate limit mid-build from exactly this pattern, and one
+dispatch failed outright (`HTTP 429`) and had to be retried after confirming
+it had made zero actual changes.
+
+**Rules, in priority order:**
+
+1. **Combine calls wherever the content split is natural.** Don't default to
+   strictly one-agent-call-per-area. Two small or closely-related areas (the
+   two tiny boss rooms in the Hollow Communion build, both 6x4 single-room
+   interiors) dress/build cleanly in one call with scoped instructions for
+   both — half the cold-read overhead for the same output. Reserve one call
+   per area for areas that are actually large/independent enough to need
+   their own focused context window.
+2. **Prefer `fork` over a fresh `general-purpose` agent once the orchestrator
+   has already read the relevant sub-skill's SKILL.md into its own context.**
+   A fork inherits the orchestrator's conversation and shares its prompt
+   cache — it skips the cold SKILL.md + `adventure.md` re-read a fresh agent
+   always pays. This is a better fit in the middle/back half of a build, once
+   the orchestrator has already accumulated real context from reading
+   several skills and reviewing several phase reports — not at the very
+   start, before that context exists to inherit.
+3. **Do small, one-off bespoke work directly as the orchestrator, not via a
+   dispatched agent.** Custom NWScript for a plot-specific mechanic, a
+   handful of dialogue nodes, a few `modify_gff_field` calls to wire a script
+   onto an already-placed creature — a dedicated agent for this re-derives
+   all the surrounding context from zero for a task that's cheaper to just
+   do. The orchestrator is already in the right context to do it in a
+   fraction of the tokens.
+4. **Dispatch sequentially, never in parallel, for anything that writes
+   `adventure.md` or mutates module state.** This is already required for
+   correctness — concurrent agents doing a read-modify-write on the same
+   shared file race and silently drop each other's writes — and it has the
+   side benefit of naturally pacing request volume instead of bursting,
+   which is exactly what trips a rate limit fastest.
+5. **If a dispatch fails with a rate-limit error mid-build, verify state
+   before retrying.** Don't assume "it did nothing" or "it half-finished" —
+   check the actual module state (`get_journal`, `list_resources`,
+   `flatten_dialog`, grep `adventure.md` for the section it was supposed to
+   write) before re-dispatching. A clean failure before any real tool calls
+   needs a plain retry; a failure mid-way through needs the retry prompt to
+   say exactly what already exists so the agent doesn't duplicate or corrupt
+   it.
+
 ## Purpose
 
 The LLM does not try to do everything in one pass. Instead it decomposes the goal into phases and hands each phase to a focused sub-skill. Each sub-skill has bounded context, clear inputs, and clear outputs. The master directive sequences them, passes context forward, and makes creative judgment calls so the user never has to.
