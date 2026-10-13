@@ -306,6 +306,23 @@ against real blueprint costs from `resolve_blueprint`. A level-3 `standard` guar
 — chainmail (150) + longsword (15) + large shield (50) leaves plenty, so the roll can afford a
 better armour grade rather than a magic weapon. Reserve enchantments for `elite`.
 
+**Purchase order and armor selection — buy the weapon first, then spend what's left on the
+best-affordable armor the creature is actually proficient with.**
+1. **Weapon (and shield, if the role calls for one) first.** Spend the weapon's share of the
+   budget (`get_wealth_budget`'s per-slot split is a reference starting point, not a hard
+   wall — a cheap mundane weapon is fine; a magic one for an `elite`/boss eats more of it).
+2. **Armor tier comes from the creature's baked Armor Proficiency feat, never from taste.**
+   Read the creature's `FeatList`: Light (feat 3) → AC Bonus 1-3 armor only, Medium (feat 4) →
+   up to AC Bonus 5, Heavy (feat 2) → up to AC Bonus 8 — the exact mapping `adventure-actors`'
+   Equipment section and `verify_creature`'s `armor_proficiency_mismatch` check both use.
+   Never pick an item whose AC Bonus exceeds what the baked feat allows, even if gold remains.
+3. **Within that proficiency tier, spend what's left on the highest-AC (and therefore usually
+   highest-price) option that fits — not the cheapest "good enough" one.** A Heavy-proficient
+   boss with 400gp left over after its weapon should walk away in full plate (AC Bonus 8) over
+   a cheaper banded mail (AC Bonus 6) if the remaining budget covers it; a Light-proficient
+   rogue with proficiency capping it at AC Bonus 3 should still get the best AC-Bonus-3 item
+   available, not a cheaper AC-Bonus-1 one, once the weapon is paid for.
+
 Apply the same rules to **henchmen and companions** — a recruitable NPC that joins the party is
 geared by its own class and level exactly as a hostile is, and its gear is visible to the player
 for the whole adventure, so it is the worst place to leave a default loadout.

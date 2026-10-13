@@ -470,7 +470,11 @@ literal Corin Vale bug (a Rogue in Medium armor with only Light Armor Proficienc
 When picking armor for a class, prefer what its automatic-class-feat proficiency
 actually covers (Rogue/Bard/Sorcerer/Wizard → light only; most others per their
 `cls_feat_<class>.2da` bake) rather than relying on the check to catch a mismatch after
-the fact.
+the fact. **Buy the weapon first, armor second, with whatever budget remains** — then,
+within the proficiency-determined tier, pick the highest AC Bonus (and correspondingly
+highest-price) item the remaining gold affords, not just the cheapest one that clears
+the proficiency bar. See `adventure-challenges/SKILL.md`'s "Purchase order and armor
+selection" for the full rule and a worked example — it applies here identically.
 
 **Give every ranged-weapon creature a melee weapon too.** NWN's base combat AI
 auto-switches a ranged attacker to melee when it runs out of ammo
