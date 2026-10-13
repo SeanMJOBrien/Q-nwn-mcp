@@ -619,28 +619,38 @@ Templates below already build Fighters and Rangers.
 |------|-----|------|-------------|-----------------|------------|
 | Minion | 0.5-1 | 6-12 | 12-13 | 10-11 | 0-1 |
 | Standard | 1-2 | 12-20 | 13-14 | 10-12 | 1-2 |
-| Elite | 2-3 | 20-30 | 14-16 | 11-13 | 2-3 |
+| Elite | 2-3 | 20-30 | 14-15 | 11-13 | 2-3 |
 | Boss | 3-4 | 30-45 | 16-18 | 12-14 | 3-5 |
 
 **Target level 4-6:**
 
 | Tier | CR | HP | Primary Stat | Secondary Stats | Natural AC |
 |------|-----|------|-------------|-----------------|------------|
-| Minion | 2-3 | 15-25 | 14-15 | 10-12 | 1-2 |
-| Standard | 3-5 | 25-40 | 15-16 | 11-13 | 2-3 |
-| Elite | 5-6 | 40-55 | 16-18 | 12-14 | 3-4 |
+| Minion | 2-3 | 15-25 | 13-14 | 10-12 | 1-2 |
+| Standard | 3-5 | 25-40 | 14-15 | 11-13 | 2-3 |
+| Elite | 5-6 | 40-55 | 15 | 12-14 | 3-4 |
 | Boss | 6-8 | 55-75 | 18-20 | 14-16 | 4-6 |
 
 **Target level 7-10:**
 
 | Tier | CR | HP | Primary Stat | Secondary Stats | Natural AC |
 |------|-----|------|-------------|-----------------|------------|
-| Minion | 4-6 | 25-40 | 15-16 | 11-13 | 2-3 |
-| Standard | 6-8 | 40-55 | 16-18 | 12-14 | 3-4 |
-| Elite | 8-10 | 55-75 | 18-20 | 14-16 | 4-6 |
+| Minion | 4-6 | 25-40 | 14-15 | 11-13 | 2-3 |
+| Standard | 6-8 | 40-55 | 15 | 12-14 | 3-4 |
+| Elite | 8-10 | 55-75 | 15 | 14-16 | 4-6 |
 | Boss | 10-12 | 75-100 | 20-22 | 16-18 | 6-8 |
 
 **Primary stat** = the stat most relevant to the role (STR for melee, DEX for ranged, INT for wizard, WIS for cleric, CHA for sorcerer). **Secondary stats** = everything else.
+
+**Rule: no non-Boss tier's Primary Stat exceeds 15 — the Elite Array's own ceiling
+(`build_npc_stat_block`'s default `powerLevel: "elite"`, 15/14/13/12/10/8) — at any
+target level.** Confirmed real, reported bug this closes: a plain "Standard"-tier Thug
+(Fighter, not a boss) built with 18 Strength, from an earlier version of this table that
+let Minion/Standard/Elite climb past 15 as target level increased. Difficulty still
+escalates with level through CR/HP/secondary stats/Natural AC — Primary Stat alone just
+stops climbing once it hits the Elite Array's ceiling, which is why "Elite" tier settles
+at a flat 15 instead of continuing to rise. **Only Boss may exceed 15**, and already did
+at every bracket above — that part of the table was correct as originally written.
 
 ### By Combat Role
 

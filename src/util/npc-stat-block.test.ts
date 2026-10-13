@@ -221,6 +221,21 @@ describe("buildNpcStatBlock", () => {
     expect(result.startingPackage).toBe(4);
   });
 
+  it("never grants Weapon Focus/Specialization/Improved Critical to a non-Fighter class (regression: a Cleric's generic feat slot pulling from the Fighter-only weapon-investment queue)", () => {
+    const index = makeIndex();
+    const result = buildNpcStatBlock(index, { race: 6, classId: 2, level: 1, powerLevel: "elite", seed: "cleric_test_seed" });
+    const featIds = result.feats.map((f) => f.feat);
+
+    const weaponPref = pickWeaponPreference(2, "cleric_test_seed")!;
+    for (const f of [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]) {
+      expect(featIds).not.toContain(f);
+    }
+    // The 2 generic slots (1 baseline + Human's ExtraFeatsAtFirstLevel) fall through to
+    // the universal filler instead — confirms the slots were filled, not just skipped.
+    expect(featIds).toContain(40); // Toughness
+    expect(featIds).toContain(6); // Cleave
+  });
+
   it("point-buy power levels never exceed their budget and stay within score bounds", () => {
     const index = makeIndex();
     for (const powerLevel of ["low", "standard", "tougher", "epic"] as const) {
@@ -230,6 +245,29 @@ describe("buildNpcStatBlock", () => {
         expect(score).toBeLessThanOrEqual(18);
       }
     }
+  });
+
+  it("'standard' reproduces the Elite Array exactly — its real D&D 3.5 point-buy cost is 25", () => {
+    const index = makeIndex();
+    const result = buildNpcStatBlock(index, { race: 6, classId: 4, level: 1, powerLevel: "standard" });
+    expect(result.abilityScores).toEqual({ str: 15, con: 14, dex: 13, wis: 12, int: 10, cha: 8 });
+  });
+
+  it("'low' stays below the Elite Array's ceiling on every stat — regression: a background Thug with 18 Strength", () => {
+    const index = makeIndex();
+    const result = buildNpcStatBlock(index, { race: 6, classId: 4, level: 1, powerLevel: "low" });
+    expect(result.abilityScores).toEqual({ str: 13, con: 12, dex: 11, wis: 10, int: 9, cha: 8 });
+    for (const score of Object.values(result.abilityScores)) expect(score).toBeLessThan(15);
+  });
+
+  it("'tougher'/'epic' scale above the Elite Array in the SAME descending shape, never one stat at 18 with the rest at the floor", () => {
+    const index = makeIndex();
+    const tougher = buildNpcStatBlock(index, { race: 6, classId: 4, level: 1, powerLevel: "tougher" }).abilityScores;
+    expect(tougher).toEqual({ str: 17, con: 14, dex: 14, wis: 13, int: 10, cha: 8 });
+    // The old greedy allocator produced exactly this spike shape for "standard" (and
+    // would for "tougher"/"epic" too) — assert the fix never reproduces it.
+    expect(Object.values(tougher).filter((s) => s === 18)).toHaveLength(0);
+    expect(Object.values(tougher).filter((s) => s === 8)).toHaveLength(1); // only the lowest-priority stat sits at the floor
   });
 
   it("applies the racial floor (Cha>=6, Int>=8) for a race with a matching penalty", () => {

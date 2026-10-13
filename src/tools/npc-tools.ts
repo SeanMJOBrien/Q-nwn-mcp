@@ -116,7 +116,12 @@ export function registerNpcTools(server: McpServer): void {
         .enum(["elite", "low", "standard", "tougher", "epic"])
         .optional()
         .describe(
-          "Ability-score generation band (default elite = literal Elite Array 15/14/13/12/10/8). Others are D&D 3.5 point-buy budgets: low=15, standard=25, tougher=32, epic=36.",
+          "Ability-score generation band (default elite = literal Elite Array 15/14/13/12/10/8, 25-point-buy " +
+            "equivalent). Others are D&D 3.5 point-buy budgets, scaled to keep the same descending shape as the " +
+            "Elite Array rather than spiking one stat: low=15 (below Elite's ceiling), standard=25 (reproduces " +
+            "Elite Array exactly), tougher=32/epic=36 (above it). Use 'tougher'/'epic' only for a genuine boss-tier " +
+            "creature — an ordinary NPC, including a flavorfully-named mook ('Thug', 'Bandit'), should stay at the " +
+            "default 'elite' so no ability score exceeds the Elite Array's own ceiling.",
         ),
       complexity: z
         .enum(["full", "simple"])

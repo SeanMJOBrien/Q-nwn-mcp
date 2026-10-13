@@ -26,6 +26,20 @@ export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
 export type PowerLevel = "elite" | "low" | "standard" | "tougher" | "epic";
 
+/**
+ * Only Fighter gets a per-weapon investment tier (Weapon Focus/Specialization/
+ * Improved Critical) filled into its generic/bonus feat slots — confirmed
+ * real, reported bug: a non-Fighter NPC's universal level-1 generic feat slot
+ * (every character gets one, any class/race) could pull Weapon Focus or
+ * Improved Critical off the candidate queue just like a Fighter would,
+ * producing a non-melee or non-Fighter creature with a per-weapon
+ * specialization that makes no sense for it. Basic weapon proficiency
+ * (Simple/Martial/Exotic, via the automatic class-feat table — "class
+ * automatic" source, untouched by this restriction) is unaffected and still
+ * correct for every class.
+ */
+const WEAPON_INVESTMENT_CLASS_IDS = new Set([4]); // Fighter
+
 /** D&D 3.5 point-buy budgets, per CLAUDE.md's documented bands. "elite" isn't a budget — see ELITE_ARRAY. */
 const POINT_BUY_BUDGET: Record<Exclude<PowerLevel, "elite">, number> = {
   low: 15,
@@ -172,11 +186,37 @@ function computeAbilityScores(
       base[key] = ELITE_ARRAY[i];
     });
   } else {
-    let budget = POINT_BUY_BUDGET[powerLevel];
-    for (const key of priorityOrder) {
-      while (base[key] < 18 && POINT_BUY_COST[base[key] + 1] - POINT_BUY_COST[base[key]] <= budget) {
-        budget -= POINT_BUY_COST[base[key] + 1] - POINT_BUY_COST[base[key]];
-        base[key] += 1;
+    // Scale Elite Array's own shape by the budget ratio, rather than greedily maxing one
+    // stat to 18 before spending anything on the rest. Elite Array's real point-buy cost
+    // is exactly 25 (8+6+5+4+2+0), so "standard" (budget 25) reproduces it exactly;
+    // "low" (15) scales it down and "tougher"/"epic" (32/36) scale it up — but every band
+    // keeps the same descending curve shape Elite Array has, never one stat at 18 with
+    // the rest at 8. Confirmed real, reported bug the old greedy version produced: a
+    // plain "standard"-power Thug with 18 Strength and every other stat at the floor.
+    const budget = POINT_BUY_BUDGET[powerLevel];
+    const scale = budget / 25;
+    let spent = 0;
+    priorityOrder.forEach((key, i) => {
+      const targetCost = POINT_BUY_COST[ELITE_ARRAY[i]] * scale;
+      let score = 8;
+      while (score < 18 && POINT_BUY_COST[score + 1] <= targetCost) score += 1;
+      base[key] = score;
+      spent += POINT_BUY_COST[score];
+    });
+    // Spend any leftover from independent per-stat rounding one point at a time, in
+    // priority order — too little ever remains to produce a spike.
+    let remaining = budget - spent;
+    let progressed = true;
+    while (remaining > 0 && progressed) {
+      progressed = false;
+      for (const key of priorityOrder) {
+        if (base[key] >= 18) continue;
+        const stepCost = POINT_BUY_COST[base[key] + 1] - POINT_BUY_COST[base[key]];
+        if (stepCost <= remaining) {
+          remaining -= stepCost;
+          base[key] += 1;
+          progressed = true;
+        }
       }
     }
   }
@@ -258,8 +298,9 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
   // warning rather than guessing — this project's "encode unverified data as
   // a skip, never a guess" convention.
   const weaponPref = pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed");
+  const grantWeaponInvestment = WEAPON_INVESTMENT_CLASS_IDS.has(params.classId);
   const candidateQueue: number[] = [
-    ...(weaponPref
+    ...(weaponPref && grantWeaponInvestment
       ? [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]
       : []),
     TOUGHNESS_FEAT,

@@ -304,8 +304,13 @@ hardcoded) and applies the same rules — the manual recipe below is still the r
 for *why* each field ends up the way it does, and is what to fall back on for anything
 the tool doesn't cover (HP is also set by the tool; spells are not — see "Casters with
 no recruit event" below). `powerLevel` defaults to `elite` (the Elite Array `15/14/13/
-12/10/8`, ~25-point-buy equivalent) — pass `low`/`standard`/`tougher`/`epic` for a
-deliberately weaker or stronger named NPC.
+12/10/8`, ~25-point-buy equivalent) and is the right choice for essentially every NPC,
+including a flavorfully-named mook ("Thug," "Bandit") — `elite` already reads as a
+competent, above-average individual. **`tougher`/`epic` are reserved for a genuine
+boss-tier creature** — they're built to deliberately exceed the Elite Array's ceiling,
+and using one for an ordinary NPC produces an implausibly strong character for no
+narrative reason (a confirmed real bug: a background Thug built this way with 18
+Strength). `low` is the one band safe to use for a deliberately weaker NPC at any tier.
 
 **Ability scores.** Apply real racial adjustments (Dwarf +2Con/-2Cha, Elf +2Dex/-2Con,
 Gnome +2Con/-2Str, Halfling +2Dex/-2Str, Half-Orc +2Str/-2Int/-2Cha, Half-Elf/Human none),

@@ -1810,6 +1810,56 @@ only area-sizing preference).**
   castle's halls/jails/baileys legitimately exceed any size cap this skill
   states.
 
+**Two more user-corrections-turned-into-rules from the same session (2026-10-13),
+both root-caused to real generation logic rather than one-off mistakes.**
+
+- **"Thug fighters have 18 strength. Elite stat array should be the highest
+  stats unless the creature is a boss."** Two independent, real mechanisms
+  could both produce this, so both are fixed:
+  1. `build_npc_stat_block`'s point-buy allocator (`npc-stat-block.ts`) was
+     greedy — for any band above `"elite"`, it maxed the primary ability all
+     the way to 18 before spending anything on the rest, instead of
+     producing a curve shaped like the Elite Array. **Fix:** the allocator
+     now scales the Elite Array's own real point-buy cost (exactly 25 —
+     8+6+5+4+2+0) by the requested budget's ratio, preserving its
+     descending shape instead of spiking one stat: `"standard"` (budget 25)
+     now reproduces the Elite Array exactly; `"low"` (15) scales below it;
+     `"tougher"`/`"epic"` (32/36) scale above it without ever leaving every
+     other stat at the floor. 4 new tests in `npc-stat-block.test.ts` pin
+     the exact resulting arrays per band. `build_npc_stat_block`'s own
+     `powerLevel` param description and `adventure-actors/SKILL.md` now
+     also say plainly that `tougher`/`epic` are for a genuine boss, not an
+     ordinarily-named mook.
+  2. **Separately, independent of that tool entirely**: `adventure-
+     challenges/SKILL.md`'s own hand-authored Minion/Standard/Elite/Boss
+     Primary Stat ranges let a non-Boss tier's Primary Stat climb past 15
+     as target level increased (e.g. "Elite" tier reached 16-20 depending
+     on bracket) — a "Thug" tiered Standard or Elite (not Boss) under this
+     table could land on 16-18 directly, with no code involved at all.
+     **Fix:** every Minion/Standard/Elite row across all three level
+     brackets is now capped at Primary Stat 15 (Elite Array's own
+     ceiling) — Elite tier settles at a flat 15 instead of continuing to
+     climb with level; difficulty still escalates via CR/HP/secondary
+     stats/Natural AC. Boss rows are unchanged — they already correctly
+     exceeded 15 at every bracket.
+- **"Expanded Weapon feats are not something a non-fighter should be given.
+  Giving the 'Martial Weapon' feat is acceptable, but not 'Weapon Focus' or
+  'Improved Critical' feats for non-melee creatures."** `build_npc_stat_block`'s
+  shared generic/bonus-feat-slot candidate queue included the class's
+  preferred weapon's Focus/Specialization/Improved Critical tier for
+  *every* class — including the universal "every character gets one generic
+  feat at level 1" slot every race/class has, so a Wizard or Cleric could
+  pick up a per-weapon investment feat that makes no sense for it. Basic
+  proficiency (Martial/Simple/Exotic Weapon Proficiency, from the automatic
+  class-feat table — a different, unaffected code path) was never the
+  problem, matching the user's own distinction. **Fix:** the Focus/
+  Specialization/Improved-Critical trio is now only added to the candidate
+  queue for Fighter (`WEAPON_INVESTMENT_CLASS_IDS`, currently `{4}`) — every
+  other class's generic/bonus slots fall through to the universal filler
+  (Toughness/Cleave/Dodge) instead. New regression test in
+  `npc-stat-block.test.ts` confirms a Cleric never receives these three
+  feats and that its slots are filled by the fallback set instead.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
