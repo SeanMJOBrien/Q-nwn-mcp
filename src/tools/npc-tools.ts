@@ -37,9 +37,12 @@ import { buildNpcStatBlock, type PowerLevel } from "../util/npc-stat-block.js";
 import { pickWeaponPreference } from "../util/npc-weapon-preferences.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
 import { snapshotGitForUndo } from "../util/undo.js";
-import { armorTierFeat, REQ_FEAT_COLUMNS, verifyCreature } from "../util/verify/blueprints.js";
+import { checkEquipProficiency, verifyCreature } from "../util/verify/blueprints.js";
 import { hasCell, listOf, Report, twoDARow } from "../util/verify/common.js";
 import { budgetBreakdown, type GearRole } from "../util/wealth.js";
+
+/** classes.2da rows that cast spells at all (MemorizesSpells=1 or a spontaneous caster) — see random-abilities-script.ts's own header for the same 7-class split. */
+const CASTER_CLASS_IDS = new Set([1, 2, 3, 6, 7, 9, 10]); // Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Wizard
 
 // ─── Shared target resolution (blueprint OR placed instance) ──────────────
 
@@ -161,14 +164,22 @@ export function registerNpcTools(server: McpServer): void {
       setField(obj, "Wis", "byte", result.abilityScores.wis);
       setField(obj, "Cha", "byte", result.abilityScores.cha);
 
-      // Classes
+      // Classes — merge onto any existing ClassList entry for the same class rather than
+      // replacing it outright. A blueprint can already carry static spells baked directly
+      // into ClassList[n].MemorizedList0-9 (the documented GFF struct format — see
+      // CLAUDE.md's "Static spell-baking IS possible" section); blindly overwriting the
+      // whole list here would silently wipe them, a real, confirmed-possible contributor
+      // to a caster shipping with no spells memorized.
+      const existingClasses = getFieldList(obj, "ClassList");
       obj.ClassList = {
         type: "list",
-        value: result.classes.map((c) => ({
-          __struct_id: 2,
-          Class: { type: "int", value: c.class },
-          ClassLevel: { type: "short", value: c.level },
-        })),
+        value: result.classes.map((c) => {
+          const existing = existingClasses.find((e) => getFieldNum(e, "Class") === c.class);
+          const entry: GffObj = existing ? { ...existing } : { __struct_id: 2 };
+          entry.Class = { type: "int", value: c.class };
+          entry.ClassLevel = { type: "short", value: c.level };
+          return entry;
+        }),
       };
 
       // Feats
@@ -196,6 +207,30 @@ export function registerNpcTools(server: McpServer): void {
       // StartingPackage — packages.2da row = class ID convention, verified elsewhere in this project.
       setField(obj, "StartingPackage", "byte", result.startingPackage);
 
+      // Spellcasting-class-with-no-spells check. build_npc_stat_block deliberately doesn't
+      // compute spells — see this project's own documented gap ("a non-companion Key NPC
+      // never gets a live LevelUpHenchman() call... needs its spells param populated at
+      // build time"). Confirmed real, shipped instance of exactly this: a Key NPC built
+      // this way with no spells ever added. Non-mutating reads only (listOf, never
+      // getFieldList) — this is a read-only check, not a write.
+      const casterClasses = result.classes.filter((c) => CASTER_CLASS_IDS.has(c.class));
+      const hasAnySpells =
+        listOf(obj, "SpecAbilityList").length > 0 ||
+        getFieldList(obj, "ClassList").some((cls) =>
+          Array.from({ length: 10 }, (_, lvl) => listOf(cls, `MemorizedList${lvl}`).length > 0).some(Boolean),
+        );
+      const casterWarning =
+        casterClasses.length > 0 && !hasAnySpells
+          ? [
+              `classId ${casterClasses.map((c) => c.class).join(", ")} is a spellcasting class, but this ` +
+                "blueprint has no spells anywhere (no SpecAbilityList, no ClassList MemorizedList entries) — " +
+                "build_npc_stat_block does not compute them. Populate create_creature_blueprint's `spells` param " +
+                "for a fixed loadout, or wire create_random_abilities_system (chained onto ScriptSpawn) for a " +
+                "random one, before this NPC is used in play. A non-companion caster never gets a live " +
+                "LevelUpHenchman() call to grant spells any other way.",
+            ]
+          : [];
+
       const filePath = path.join(index.tempDir, key);
       await jsonToGff(doc, filePath);
       const stat = await fs.stat(filePath);
@@ -219,7 +254,7 @@ export function registerNpcTools(server: McpServer): void {
                 hp: result.hp,
                 startingPackage: result.startingPackage,
                 complexity: (complexity as "full" | "simple" | undefined) ?? "full",
-                warnings: [...raceWarning, ...result.warnings],
+                warnings: [...raceWarning, ...result.warnings, ...casterWarning],
               },
               null,
               2,
@@ -334,22 +369,8 @@ export function registerNpcTools(server: McpServer): void {
         }
 
         // Proficiency check — weapons/shields via ReqFeat0-4, Chest armor via its AC Bonus tier.
-        let profReason: string | undefined;
-        if ((slotId === EQUIP_SLOT_MAP.righthand || slotId === EQUIP_SLOT_MAP.lefthand) && baseRow) {
-          const reqFeats = REQ_FEAT_COLUMNS.map((col) => baseRow[col])
-            .filter((v) => v !== undefined && v !== "" && v !== "****")
-            .map(Number);
-          if (reqFeats.length > 0 && !reqFeats.some((f) => featIds.has(f))) {
-            profReason = `not proficient — needs one of feat.2da rows ${reqFeats.join(", ")}`;
-          }
-        } else if (slotId === EQUIP_SLOT_MAP.chest) {
-          const acBonusProp = listOf(itemObj, "PropertiesList").find((p) => getFieldNum(p, "PropertyName") === 1);
-          const acBonus = acBonusProp ? getFieldNum(acBonusProp, "CostValue") : 0;
-          const requiredFeat = armorTierFeat(acBonus);
-          if (requiredFeat !== undefined && !featIds.has(requiredFeat)) {
-            profReason = `not proficient with this armor's weight tier — needs feat.2da row ${requiredFeat}`;
-          }
-        }
+        // Shared with set_creature_equipment so there's one place this logic can get wrong.
+        const profReason = checkEquipProficiency(slotId, itemObj, baseRow, featIds);
         if (profReason && !force) {
           skipped.push({ slot: slotName, resref: itemResref, reason: profReason });
           continue;

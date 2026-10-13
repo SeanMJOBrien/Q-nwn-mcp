@@ -367,10 +367,45 @@ for.
 5 new integration tests
 (`src/tools/encounter-composer-placement.integration.test.ts`) against a
 synthetic module index — real GIT mutations, real `verifyCreature`
-execution, not mocked. Not yet confirmed against a real live-loaded module
-(the mocked tests prove correctness in isolation; a real end-to-end
-`run_live_verification`-style pass through an actual module is still
-open).
+execution, not mocked.
+
+**Confirmed against a real built/played module, and two real gaps found and
+fixed (2026-10-13, user report: "the Thug caster had no clothes" / "had no
+spells").** The original F6 build above only covered race/classes —
+`buildCreatureBlueprint` was called with no `feats`, no `equipment`, and no
+`spells`, so any boss composed this way shipped with an empty `FeatList`
+(no proficiencies at all) and nothing equipped. Fixed:
+- The boss now gets a real stat block from `buildNpcStatBlock` (ability
+  scores, `FeatList`, HP, `StartingPackage` — the same function
+  `build_npc_stat_block` wraps) before `buildCreatureBlueprint` runs, and is
+  equipped with baseline clothing (`nw_cloth001`, AC bonus 0 — needs no
+  proficiency, always safe) so it is never bare. Same rule
+  `adventure-actors/SKILL.md` already states for companions
+  ("give every companion clothing, even with no mechanical property"),
+  generalized to this pipeline.
+- When the archetype's class is one `create_random_abilities_system`
+  supports (Tier 1: Cleric/Druid/Paladin/Ranger/Wizard; Tier 2: Bard/
+  Sorcerer — necromancer's Wizard is Tier 1), placement mode now ensures
+  the include exists (`ensureRandomAbilitiesInclude`, exported from
+  `random-abilities-tools.ts` for this reuse) and writes+compiles a small
+  wrapper chaining the boss's original `ScriptSpawn` (and, for Tier 2,
+  `ScriptEndRound`) into `RA_OnSpawn`/`RA_OnEndRound`, reported as
+  `placed.boss.spellsWired`.
+- **Honestly caveated, not overclaimed**: this boss's `ClassList` is set
+  directly, never through a live `LevelUpHenchman()` call (there is no
+  recruit event for a hostile boss) — per this project's own confirmed
+  finding (CLAUDE.md, "Random caster abilities" → "Tier 1 real-runtime
+  findings" item 2), `SetMemorizedSpell()` only populates cantrip
+  (level 0) slots on a never-leveled creature. `spellWiringWarnings` says
+  this plainly rather than claiming a full spellbook. Still closes "zero
+  spells" → "at least cantrips," which is the bug that actually shipped.
+
+See `src/tools/creature-tools.ts`'s `checkEquipProficiency`-sharing fix and
+`src/tools/npc-tools.ts`'s caster-no-spells warning for the two sibling
+fixes this same report surfaced in `set_creature_equipment` and
+`build_npc_stat_block` — not specific to the composer, but found alongside
+it. A real end-to-end `run_live_verification`-style pass through an actual
+module is still open.
 
 ### F7. Verification hook
 

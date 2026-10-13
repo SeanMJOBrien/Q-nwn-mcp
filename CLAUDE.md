@@ -1731,6 +1731,85 @@ user: whether "CR 6" means the whole fight's Encounter Level against the
 full party (recommended default) or the named boss's own pinned CR with
 escorts added on top regardless of resulting EL.
 
+**User-corrections-turned-into-rules (2026-10-13, three real bugs reported
+from an actual build — the Rogue/armor and spell-related two closed with
+real script-enforced checks per this project's own established "corrections
+become rules validated by script" discipline, the third a documentation-
+only area-sizing preference).**
+
+- **A Rogue was equipped with armor above AC bonus 3 (only Light Armor
+  Proficiency, feat 3, from its automatic class feats) via
+  `set_creature_equipment`, with zero warning.** `verify_creature`'s
+  `armor_proficiency_mismatch` check already existed and already catches
+  this — the real gap was upstream, at the WRITE path. `equip_npc_by_role`
+  already checked proficiency before equipping (weapon ReqFeat0-4, armor
+  tier via `armorTierFeat`); the lower-level `set_creature_equipment` —
+  called directly by plenty of skills, not just through
+  `equip_npc_by_role` — never did, checking only the `EquipableSlots`
+  bitmask. **Fix:** extracted the shared check into
+  `checkEquipProficiency()` (`src/util/verify/blueprints.ts`, the same file
+  `armorTierFeat`/`REQ_FEAT_COLUMNS` already lived in) and wired it into
+  both tools, so there is exactly one place this logic can get wrong.
+  `set_creature_equipment` gained the same `force:true` override
+  `equip_npc_by_role` already had (default: skip the mismatched item,
+  report why, in `failed`). New regression test in
+  `new-features.integration.test.ts` reproduces the exact Rogue/AC-bonus-4
+  shape.
+- **A boss composed via `compose_encounter` (F6) had no clothes and no
+  spells.** Root cause: F6's original implementation called
+  `buildCreatureBlueprint` with only `classes`/`race`/`appearance`/`gender`
+  — no `feats`, no `equipment`, no `spells`. Every composed boss shipped
+  with an empty `FeatList` (no proficiencies, no racial/class feats at all)
+  and nothing equipped. **Fix**, in `encounter-composer-tools.ts`: the boss
+  now gets a real stat block from `buildNpcStatBlock` (ability scores,
+  `FeatList`, HP, `StartingPackage`) before the blueprint is built, is
+  equipped with baseline clothing (`nw_cloth001`, AC bonus 0, needs no
+  proficiency — the same "give every companion clothing, even with no
+  mechanical property" rule `adventure-actors/SKILL.md` already states for
+  companions, generalized here), and — for an archetype whose class
+  `create_random_abilities_system` supports — gets a spawn-script wrapper
+  chaining `RA_OnSpawn` (and, for Tier 2 classes, an end-round wrapper for
+  `RA_OnEndRound`) automatically, reported as `placed.boss.spellsWired`.
+  **Honestly caveated, not overclaimed**: this boss's `ClassList` is set
+  directly rather than through a live `LevelUpHenchman()` call (there's no
+  recruit event for a hostile boss), so per this project's own confirmed
+  finding ("Random caster abilities" → "Tier 1 real-runtime findings" item
+  2 above) `SetMemorizedSpell()` only ever populates cantrip-level slots on
+  a never-leveled creature — `spellWiringWarnings` says this plainly. Still
+  closes "zero spells" → "at least cantrips," the bug that actually shipped.
+  New regression test in `encounter-composer-placement.integration.test.ts`.
+- **Separately, while fixing the above: `build_npc_stat_block` could ship a
+  spellcasting-class NPC with no spells anywhere and never say so, and its
+  `ClassList` write was a blind overwrite that would have silently dropped
+  any spells already baked onto an existing entry's `MemorizedList0-9`
+  fields** (the documented static-spell-baking GFF format) **had one been
+  present before the call.** The second half was never observed to
+  actually happen, but is a real, confirmed-possible mechanism — this tool
+  runs on an *existing* blueprint per its own docs, and nothing stopped a
+  caller from baking spells first and running this second. **Fix:** the
+  `ClassList` write now merges onto any existing entry for the same class
+  (preserving every field but `Class`/`ClassLevel`) instead of replacing
+  the list outright, and the tool now returns a `warnings` entry naming the
+  exact fix (`spells` param, or `create_random_abilities_system`) whenever
+  its target class is one of the 7 real caster classes and the blueprint
+  ends up with no spells anywhere (`SpecAbilityList` empty and no
+  `MemorizedList*` entries) after the call. Two new tests in
+  `npc-tools.integration.test.ts` cover the warning and the merge-preserves-
+  spells case — this is the most likely real cause of a separately-reported
+  "Venn had no spells memorized" bug, a non-companion Key NPC built this
+  way.
+- **Home interiors were being built at tavern/shop scale (the general
+  `tin01`/`tni01` p90 ≈ 60 tiles) instead of a tighter, deliberately
+  lived-in scale.** Not a code bug — a missing distinction in
+  `area-city-interior/SKILL.md` between a personal residence and a public
+  interior (inn/tavern/shop), which the corpus data never separated out.
+  **Rule added:** a home interior (Living room/Kitchen/`Home*` dwelling) is
+  capped at 3×4 tiles (12 tiles) per floor; multi-room houses stack floors
+  via `StairsUp`/`StairsDown` rather than growing one oversized footprint.
+  **Castle interiors (`tic01`, `area-castle`) are explicitly exempt** — a
+  castle's halls/jails/baileys legitimately exceed any size cap this skill
+  states.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs

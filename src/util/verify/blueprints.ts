@@ -140,6 +140,47 @@ export function armorTierFeat(acBonus: number): number | undefined {
 export const REQ_FEAT_COLUMNS = ["ReqFeat0", "ReqFeat1", "ReqFeat2", "ReqFeat3", "ReqFeat4"];
 
 /**
+ * The single proficiency check for an item about to be equipped into `slotId` —
+ * shared by every equip path (equip_npc_by_role, set_creature_equipment, and
+ * verify_creature's own post-hoc check above) so there is exactly one place
+ * that can get this wrong. Returns undefined when the creature is proficient
+ * (or the item needs no proficiency at all); otherwise a human-readable reason
+ * naming the feat.2da row(s) that would satisfy it. Only checks RightHand/
+ * LeftHand (via ReqFeat0-4) and Chest (via its AC Bonus weight tier) — every
+ * other slot needs no proficiency feat in this ruleset.
+ *
+ * Confirmed real, shipped bug this closes: a Rogue (Light Armor Proficiency
+ * only, from its automatic class feats) equipped with armor above AC bonus 3
+ * via set_creature_equipment — that tool only checked the EquipableSlots
+ * bitmask, never proficiency, so the mismatch shipped undetected until a human
+ * played the module. equip_npc_by_role already had this check; it simply
+ * wasn't shared with the lower-level tool a skill might call directly.
+ */
+export function checkEquipProficiency(
+  slotId: number,
+  itemObj: GffObj,
+  baseRow: Record<string, string> | undefined,
+  featIds: Set<number>,
+): string | undefined {
+  if ((slotId === EQUIP_SLOT_MAP.righthand || slotId === EQUIP_SLOT_MAP.lefthand) && baseRow) {
+    const reqFeats = REQ_FEAT_COLUMNS.map((col) => baseRow[col])
+      .filter((v) => v !== undefined && v !== "" && v !== "****")
+      .map(Number);
+    if (reqFeats.length > 0 && !reqFeats.some((f) => featIds.has(f))) {
+      return `not proficient — needs one of feat.2da rows ${reqFeats.join(", ")}`;
+    }
+  } else if (slotId === EQUIP_SLOT_MAP.chest) {
+    const acBonusProp = listOf(itemObj, "PropertiesList").find((p) => getFieldNum(p, "PropertyName") === 1);
+    const acBonus = acBonusProp ? getFieldNum(acBonusProp, "CostValue") : 0;
+    const requiredFeat = armorTierFeat(acBonus);
+    if (requiredFeat !== undefined && !featIds.has(requiredFeat)) {
+      return `not proficient with this armor's weight tier — needs feat.2da row ${requiredFeat}`;
+    }
+  }
+  return undefined;
+}
+
+/**
  * baseitems.2da columns naming the feat granted at each weapon-specific
  * investment tier (Focus, Specialization, Improved Critical, and their Epic
  * equivalents) — the same column set respec_weapon_feats reverse-scans to

@@ -8,6 +8,7 @@ import type { CreatureRecord } from "../types/module.js";
 import { EQUIP_SLOT_MAP, EQUIP_SLOT_NAMES } from "../util/equip-slots.js";
 import { snapshotGitForUndo } from "../util/undo.js";
 import { twoDARow, hasCell } from "../util/verify/common.js";
+import { checkEquipProficiency } from "../util/verify/blueprints.js";
 
 export function registerCreatureTools(server: McpServer): void {
 
@@ -178,15 +179,22 @@ export function registerCreatureTools(server: McpServer): void {
 
   server.tool(
     "set_creature_equipment",
-    "Set equipment on a placed creature in an area. Merges with existing equipment by default; use replace=true to clear first.",
+    "Set equipment on a placed creature in an area. Merges with existing equipment by default; use replace=true to clear first. " +
+      "Checks proficiency the same way equip_npc_by_role does — a RightHand/LeftHand item the creature's FeatList has no " +
+      "baseitems.2da ReqFeat for, or Chest armor above the creature's Armor Proficiency tier (e.g. a Rogue in anything above " +
+      "AC bonus 3), is skipped by default rather than silently equipped at a real mechanical penalty. Pass force:true to " +
+      "equip it anyway. Prefer equip_npc_by_role when you also want a wealth-budget check and a weapon recommendation.",
     {
       area: z.string().describe("Area resref"),
       tag: z.string().describe("Creature tag"),
       equipment: z.string().describe("JSON object: {\"righthand\": \"nw_wswls001\", \"chest\": \"nw_cloth001\"}"),
       replace: z.boolean().optional().default(false).describe("Replace all equipment (true) or merge (false, default)"),
+      force: z.boolean().optional().describe(
+        "Equip an item even if the creature lacks the proficiency feat for it (default false — such items are skipped, listed in `failed`)",
+      ),
     },
     { idempotentHint: true },
-    async ({ area, tag, equipment: equipJson, replace }) => {
+    async ({ area, tag, equipment: equipJson, replace, force }) => {
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
@@ -218,7 +226,8 @@ export function registerCreatureTools(server: McpServer): void {
         equipList = (creature.Equip_ItemList as { value: GffObj[] }).value;
       }
 
-      const added: Array<{ slot: string; resref: string }> = [];
+      const featIds = new Set(getFieldList(creature, "FeatList").map((f) => getFieldNum(f, "Feat")));
+      const added: Array<{ slot: string; resref: string; warning?: string }> = [];
       const failed: string[] = [];
 
       for (const [slotName, itemResref] of Object.entries(equipMap)) {
@@ -258,6 +267,14 @@ export function registerCreatureTools(server: McpServer): void {
           }
         }
 
+        // Proficiency check — shared with equip_npc_by_role (see checkEquipProficiency's own
+        // comment for the real Rogue-in-heavy-armor bug this closes).
+        const profReason = checkEquipProficiency(slotId, itemObj, baseRow, featIds);
+        if (profReason && !force) {
+          failed.push(`${itemResref} in slot "${slotName}": ${profReason}`);
+          continue;
+        }
+
         delete itemObj.__data_type;
         itemObj.__struct_id = slotId;
         setField(itemObj, "Dropable", "byte", 1);
@@ -269,7 +286,7 @@ export function registerCreatureTools(server: McpServer): void {
         }
 
         equipList.push(itemObj);
-        added.push({ slot: slotName, resref: itemResref });
+        added.push({ slot: slotName, resref: itemResref, ...(profReason ? { warning: profReason } : {}) });
       }
 
       await writeBackGit(index, area, gitDoc);

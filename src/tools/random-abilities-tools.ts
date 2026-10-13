@@ -51,6 +51,27 @@ void main()
   return { ok, output };
 }
 
+/**
+ * Idempotently ensure the random-abilities include exists and compiles in
+ * the loaded module, writing it with default options if it doesn't yet.
+ * Shared by the `create_random_abilities_system` tool below and by
+ * `compose_encounter` (encounter-composer-tools.ts), which needs the same
+ * include present before it can wire a Tier 1/Tier 2 caster boss onto it —
+ * see this file's own header for what the include does.
+ */
+export async function ensureRandomAbilitiesInclude(
+  index: ModuleIndex,
+  includeName = "inc_random_abil",
+): Promise<{ includeName: string; created: boolean }> {
+  if (index.resources.has(`${includeName}.nss`)) {
+    return { includeName, created: false };
+  }
+  const source = generateRandomAbilitiesInclude({ includeName, castChancePercent: 35 });
+  await writeAndCompileScript(index, includeName, source, false);
+  await compileProbe(index, includeName);
+  return { includeName, created: true };
+}
+
 export function registerRandomAbilitiesTools(server: McpServer): void {
   server.tool(
     "create_random_abilities_system",

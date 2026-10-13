@@ -728,6 +728,60 @@ describe("creature equipment tools", () => {
     }
   });
 
+  it("set_creature_equipment rejects armor above the creature's Armor Proficiency tier (regression: a Rogue equipped above AC bonus 3)", async () => {
+    const { registerCreatureTools } = await import("./creature-tools.js");
+    const { client, cleanup } = await createTestClient(registerCreatureTools);
+
+    const gitDoc = makeGitDoc();
+    const git = gitDoc as GffObj;
+    (git["Creature List"] as { value: GffObj[] }).value.push({
+      __struct_id: 4,
+      Tag: { type: "cexostring", value: "rogue1" },
+      FirstName: { type: "cexolocstring", value: { "0": "Rogue" } },
+      Equip_ItemList: { type: "list", value: [] },
+      // Light Armor Proficiency only (feat 3) — a Rogue's real automatic class feat.
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 3 } }] },
+      XPosition: { type: "float", value: 5 },
+      YPosition: { type: "float", value: 5 },
+      ZPosition: { type: "float", value: 0 },
+    });
+
+    mockIndex.parsedGff.set("testarea.git", gitDoc);
+    mockIndex.resources.set("testarea.git", { resref: "testarea", extension: "git", filePath: path.join(tempDir, "testarea.git"), sizeBytes: 100 });
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "Test", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    // Medium armor: AC Bonus property (PropertyName 1) with CostValue 4 -> armorTierFeat(4) = 4 (ArmProfMed).
+    const chainmailDoc = makeItemDoc("medium_armor", "MEDIUM_ARMOR");
+    (chainmailDoc.PropertiesList as { value: GffObj[] }).value.push({
+      __struct_id: 0,
+      PropertyName: { type: "word", value: 1 },
+      CostValue: { type: "word", value: 4 },
+    });
+    mockIndex.parsedGff.set("medium_armor.uti", chainmailDoc);
+
+    try {
+      const rejected = await client.callTool({
+        name: "set_creature_equipment",
+        arguments: { area: "testarea", tag: "rogue1", equipment: '{"chest": "medium_armor"}' },
+      });
+      const rejectedParsed = parseResult(rejected) as Record<string, unknown>;
+      expect(rejectedParsed.success).toBe(true);
+      expect((rejectedParsed.failed as string[])[0]).toMatch(/not proficient with this armor's weight tier/);
+      expect(rejectedParsed.totalEquipped).toBe(0);
+
+      // force:true equips it anyway, with a warning attached.
+      const forced = await client.callTool({
+        name: "set_creature_equipment",
+        arguments: { area: "testarea", tag: "rogue1", equipment: '{"chest": "medium_armor"}', force: true },
+      });
+      const forcedParsed = parseResult(forced) as Record<string, unknown>;
+      expect(forcedParsed.totalEquipped).toBe(1);
+      expect((forcedParsed.added as Array<{ warning?: string }>)[0].warning).toMatch(/not proficient/);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("clear_creature_equipment clears all equipment", async () => {
     const { registerCreatureTools } = await import("./creature-tools.js");
     const { client, cleanup } = await createTestClient(registerCreatureTools);

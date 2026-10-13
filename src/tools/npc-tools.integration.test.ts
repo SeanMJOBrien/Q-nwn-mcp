@@ -64,6 +64,29 @@ function createMockIndex(overrides?: Partial<ModuleIndex>): ModuleIndex {
   };
 }
 
+/** Wizard (class 10) table, real-data-shaped — same column set as the Fighter table below. */
+function loadWizardClassTable(index: ModuleIndex): void {
+  index.twodaTables.set(
+    "classes",
+    twoDA(
+      ["HitDie", "FeatsTable", "BonusFeatsTable", "SkillsTable", "SkillPointBase", "PrimaryAbil", "SpellCaster"],
+      [[10, { HitDie: "4", FeatsTable: "CLS_FEAT_WIZ", BonusFeatsTable: "CLS_BFEAT_WIZ", SkillsTable: "CLS_SKILL_WIZ", SkillPointBase: "2", PrimaryAbil: "INT", SpellCaster: "1" }]],
+    ),
+  );
+  index.twodaTables.set(
+    "cls_feat_wiz",
+    twoDA(["FeatLabel", "FeatIndex", "List", "GrantedOnLevel"], [[0, { FeatLabel: "WeapProfWizard", FeatIndex: "51", List: "3", GrantedOnLevel: "1" }]]),
+  );
+  index.twodaTables.set(
+    "cls_bfeat_wiz",
+    twoDA(["Bonus"], Array.from({ length: 10 }, (_, i) => [i, { Bonus: "0" }] as [number, Record<string, string>])),
+  );
+  index.twodaTables.set(
+    "cls_skill_wiz",
+    twoDA(["SkillLabel", "SkillIndex", "ClassSkill"], [[0, { SkillLabel: "Spellcraft", SkillIndex: "8", ClassSkill: "1" }]]),
+  );
+}
+
 /** Fighter (class 4) + Human (race 6) class/race tables, real-data-shaped. */
 function loadClassRaceTables(index: ModuleIndex): void {
   index.twodaTables.set(
@@ -206,6 +229,79 @@ describe("build_npc_stat_block", () => {
       expect(parsed.complexity).toBe("simple");
       expect(parsed.feats.some((f) => f.source === "bonus_slot")).toBe(false);
       expect(parsed.feats.length).toBeGreaterThan(0); // racial/automatic/generic feats still present
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("warns when a spellcasting class ends up with no spells anywhere (regression: 'Venn had no spells memorized')", async () => {
+    loadClassRaceTables(mockIndex);
+    loadWizardClassTable(mockIndex); // overwrites "classes" with just the Wizard row — fine, this test only needs class 10
+    const key = "venn.utc";
+    mockIndex.parsedGff.set(key, makeBlueprintUtc({ Tag: { type: "cexostring", value: "venn" } }) as unknown as GffDocument);
+    mockIndex.resources.set(key, { resref: "venn", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_stat_block",
+        arguments: { resref: "venn", race: "6", classId: "10", level: "5", powerLevel: "elite" },
+      });
+      const parsed = parseResult(result) as { success: boolean; warnings: string[] };
+      expect(parsed.success).toBe(true);
+      expect(parsed.warnings.some((w) => w.includes("spellcasting class"))).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not warn, and preserves existing MemorizedList spells, when the blueprint already has them baked onto ClassList", async () => {
+    loadClassRaceTables(mockIndex);
+    loadWizardClassTable(mockIndex);
+    const key = "prebaked.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "prebaked" },
+        ClassList: {
+          type: "list",
+          value: [
+            {
+              __struct_id: 2,
+              Class: { type: "int", value: 10 },
+              ClassLevel: { type: "short", value: 1 },
+              MemorizedList0: {
+                type: "list",
+                value: [{ __struct_id: 0, Spell: { type: "word", value: 5 }, SpellFlags: { type: "byte", value: 1 } }],
+              },
+            },
+          ],
+        },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "prebaked", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_stat_block",
+        arguments: { resref: "prebaked", race: "6", classId: "10", level: "5", powerLevel: "elite" },
+      });
+      const parsed = parseResult(result) as { success: boolean; warnings: string[] };
+      expect(parsed.success).toBe(true);
+      expect(parsed.warnings.some((w) => w.includes("spellcasting class"))).toBe(false);
+
+      // The merge must not have dropped the pre-existing spell.
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const classList = (doc.ClassList as { value: GffObj[] }).value;
+      expect(classList).toHaveLength(1);
+      expect((classList[0].Class as { value: number }).value).toBe(10);
+      expect((classList[0].ClassLevel as { value: number }).value).toBe(5); // updated to the new target level
+      const memorized = (classList[0].MemorizedList0 as { value: GffObj[] }).value;
+      expect(memorized).toHaveLength(1);
+      expect((memorized[0].Spell as { value: number }).value).toBe(5);
     } finally {
       await cleanup();
     }

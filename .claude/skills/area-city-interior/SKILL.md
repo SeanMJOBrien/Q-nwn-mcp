@@ -71,6 +71,15 @@ model from `DoorKitchen01`; mismatching them is the interior equivalent of a tex
 `HomeLower*`/`HomeUpper*` 2×2 groups are complete dwellings — the fastest way to build a house is
 one `HomeLower01_2x2` plus stairs to a `HomeUpper01_2x2`, rather than assembling rooms by hand.
 
+**Rule: a home interior (a personal residence — a Living room/Kitchen/`Home*` dwelling, not an
+Inn/tavern or Shop) is capped at 3×4 tiles (12 tiles).** This is tighter than the general p90=60
+guidance above, deliberately — a house's room scale reads as intentionally tight and lived-in, not
+merely small. `create_area(width: "3", height: "4", tileset: "tin01")` or `"4"/"3"` is the right
+call for a single-room home; a house with more than one functional room (kitchen + living room,
+a second floor) stays within the cap per floor, using `StairsUp`/`StairsDown` to a second 3×4 area
+rather than one oversized footprint. **Castle interiors (`tic01`, see `area-castle`) are exempt —
+a castle's halls, jails, and baileys legitimately exceed this.**
+
 ## Building a tavern (the common case)
 
 1. `create_area(width: "4", height: "3", tileset: "tin01")` — 12 tiles is generous for a tavern.
@@ -88,7 +97,9 @@ one `HomeLower01_2x2` plus stairs to a `HomeUpper01_2x2`, rather than assembling
 
 ## Pitfalls
 
-- **Don't build big.** p90 is 60 tiles. If you are past 8×8 for an inn, split it.
+- **Don't build big.** p90 is 60 tiles. If you are past 8×8 for an inn, split it. **A home interior
+  specifically is capped at 3×4 (12 tiles) — never size a house like a tavern.** Castle interiors
+  are the one exception to any size cap here.
 - **Don't set `DayNightCycle` or a `SkyBox`** on an interior — set `IsNight` instead, so the
   lighting is stable.
 - **Don't raise tiles.** 0% elevation adoption across the corpus.

@@ -38,6 +38,17 @@ vi.mock("../nim-tools.js", () => ({
   resmanExtract: vi.fn(async () => {}),
   resmanExtractToJson: vi.fn(async () => ({})),
   readTextFile: vi.fn(async () => ""),
+  // compose_encounter wires a Tier 1/2 caster's random-abilities spawn script, which
+  // goes through writeAndCompileScript -> compileScript (real nim toolchain in prod).
+  // Mocked the same way jsonToGff is above: write a stub file so the real function's
+  // subsequent fs.stat(outPath) succeeds, and report success.
+  compileScript: vi.fn(async (_nssPath: string, outPath?: string) => {
+    if (outPath) {
+      await fs.mkdir(path.dirname(outPath), { recursive: true });
+      await fs.writeFile(outPath, "compiled");
+    }
+    return { success: true, output: "" };
+  }),
 }));
 
 let mockIndex: ModuleIndex;
@@ -118,6 +129,20 @@ function addSupportBlueprint(resref: string): void {
   const p = path.join(tempDir, `${resref}.utc`);
   mockIndex.resources.set(`${resref}.utc`, { resref, extension: "utc", filePath: p, sizeBytes: 100 });
   mockIndex.parsedGff.set(`${resref}.utc`, doc as unknown as GffDocument);
+}
+
+/** Simulate a real base-game item blueprint already resolvable from the module (sidesteps real resman). */
+function addItemBlueprint(resref: string): void {
+  const doc = {
+    __data_type: "UTI ",
+    Tag: { type: "cexostring", value: resref.toUpperCase() },
+    TemplateResRef: { type: "resref", value: resref },
+    BaseItem: { type: "int", value: 16 }, // Armor base item row — matches nw_cloth001's real class
+    LocalizedName: { type: "cexolocstring", value: { "0": "Clothing" } },
+  };
+  const p = path.join(tempDir, `${resref}.uti`);
+  mockIndex.resources.set(`${resref}.uti`, { resref, extension: "uti", filePath: p, sizeBytes: 100 });
+  mockIndex.parsedGff.set(`${resref}.uti`, doc as unknown as GffDocument);
 }
 
 async function createTestClient(): Promise<{ client: Client; cleanup: () => Promise<void> }> {
@@ -240,6 +265,37 @@ describe("compose_encounter — placement mode", () => {
       const parsed = json(result) as { placed?: { boss: { verify: { status: string; target: string } } } };
       expect(parsed.placed?.boss.verify).toBeDefined();
       expect(["pass", "warn", "fail"]).toContain(parsed.placed?.boss.verify.status);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("gives the boss a real stat block, baseline clothing, and wires the random-abilities spawn script (regression: 'Thug caster had no clothes/spells')", async () => {
+    await setupArea();
+    addItemBlueprint("nw_cloth001");
+    const { client, cleanup } = await createTestClient();
+    try {
+      const result = await client.callTool({
+        name: "compose_encounter",
+        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea" },
+      });
+      const parsed = json(result) as {
+        placed?: { boss: { resref: string; spellsWired: boolean; spellWiringWarnings?: string[] } };
+      };
+      expect(parsed.placed?.boss.spellsWired).toBe(true);
+      expect(parsed.placed?.boss.spellWiringWarnings?.join(" ")).toContain("LevelUpHenchman");
+
+      const bossDoc = mockIndex.parsedGff.get(`${parsed.placed!.boss.resref}.utc`) as GffObj;
+      const feats = (bossDoc.FeatList as { value: GffObj[] } | undefined)?.value ?? [];
+      expect(feats.length).toBeGreaterThan(0);
+
+      const equip = (bossDoc.Equip_ItemList as { value: GffObj[] } | undefined)?.value ?? [];
+      const chest = equip.find((e) => e.__struct_id === 2); // EQUIP_SLOT_MAP.chest
+      expect((chest?.TemplateResRef as { value: string } | undefined)?.value).toBe("nw_cloth001");
+
+      // The spawn wrapper script exists and includes the random-abilities system.
+      expect(mockIndex.resources.has("inc_random_abil.nss")).toBe(true);
+      expect([...mockIndex.resources.keys()].some((k) => k.startsWith("ce_nec_spn"))).toBe(true);
     } finally {
       await cleanup();
     }

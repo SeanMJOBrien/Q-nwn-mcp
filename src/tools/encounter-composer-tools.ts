@@ -45,9 +45,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
+import { ensureRandomAbilitiesInclude } from "./random-abilities-tools.js";
 import type { GffObj } from "../types/gff.js";
 import { buildCreatureBlueprint } from "../util/creature-builder.js";
 import { findSimpleWalkableSpots, placeCreatureCore } from "../util/creature-placer.js";
+import { buildNpcStatBlock } from "../util/npc-stat-block.js";
+import { writeAndCompileScript } from "../util/script-writer.js";
 import { ARCHETYPES, getArchetype, pickSupportCandidate } from "../util/encounter-archetypes.js";
 import {
   bandDifficulty,
@@ -67,6 +70,17 @@ function shortResref(role: string): string {
   return `ce_${role.slice(0, 3)}_${suffix}`.slice(0, 16);
 }
 
+/**
+ * classIds create_random_abilities_system supports — real memorized
+ * spellbook via SetMemorizedSpell (Tier 1) vs. a virtual-ability list cast
+ * via ActionCastSpellAtObject's bCheat param (Tier 2), per the tiers
+ * documented in random-abilities-script.ts's own header (classes.2da's
+ * MemorizesSpells column). Duplicated as a plain set here rather than
+ * importing that module's internals, since this file only needs membership.
+ */
+const TIER1_CASTER_CLASSES = new Set([2, 3, 6, 7, 10]); // Cleric, Druid, Paladin, Ranger, Wizard
+const TIER2_CASTER_CLASSES = new Set([1, 9]); // Bard, Sorcerer
+
 export function registerEncounterComposerTools(server: McpServer): void {
   server.tool(
     "compose_encounter",
@@ -75,12 +89,15 @@ export function registerEncounterComposerTools(server: McpServer): void {
       "(role name -> class/level), the reverse EL solver (target EL -> required support count), and the " +
       "support-roster chooser (a real base-game blueprint for the archetype's natural minion type) — see " +
       "docs/encounter-composer-spec.md. Without `area`: dry-run, builds and places nothing, needs no module " +
-      "loaded. With `area`: builds the boss blueprint, places it and the support cluster in that area of the " +
-      "currently-loaded module, runs verify_creature on the boss, and reports a real wealth-budget + weapon-type " +
-      "recommendation — but does NOT equip a specific item, since no tool in this project guesses a real item " +
-      "resref; search for one yourself (list_blueprints/resman_search) and finish gearing with " +
-      "equip_npc_by_role. Reports the boss's and the support cluster's EL as two separate numbers, never one " +
-      "combined figure — no verified DMG rule exists for combining different-CR groups into a single EL. When " +
+      "loaded. With `area`: builds a real stat block for the boss (ability scores, FeatList, HP — via " +
+      "buildNpcStatBlock), equips baseline clothing so it's never bare, wires the random-abilities caster system " +
+      "onto its spawn script when its class supports one (reported as placed.boss.spellsWired), places it and " +
+      "the support cluster, runs verify_creature on the boss, and reports a real wealth-budget + weapon-type " +
+      "recommendation — but does NOT equip a specific weapon/armor item beyond that baseline, since no tool in " +
+      "this project guesses a real item resref; search for one yourself (list_blueprints/resman_search) and " +
+      "finish gearing with equip_npc_by_role. Reports the boss's and the support cluster's EL as two separate " +
+      "numbers, never one combined figure — no verified DMG rule exists for combining different-CR groups into " +
+      "a single EL. When " +
       "partyLevel is given and the fight bands 'hard'/'deadly', also returns allyRecommendation flagging that and " +
       "naming the existing companion pipeline as the way to add a reinforcing ally — never builds one itself.",
     {
@@ -235,15 +252,94 @@ export function registerEncounterComposerTools(server: McpServer): void {
       const bossResref = shortResref(archetype.name);
       const bossTag = `compose_${archetype.name}_boss`;
       const bossName = archetype.name.charAt(0).toUpperCase() + archetype.name.slice(1);
+      const BOSS_RACE = 6; // Human — a neutral default; caller can rebuild with a different race/appearance if the archetype calls for one.
+
+      // Real stat block (ability scores, FeatList, HP, StartingPackage) —
+      // without this the boss ships with an empty FeatList (no proficiencies,
+      // no automatic class/racial feats) and no equipped clothing, a
+      // confirmed real bug ("Thug caster had no clothes") from this tool
+      // shipping a blueprint with nothing but class/race/appearance set.
+      const statBlock = buildNpcStatBlock(index, {
+        race: BOSS_RACE,
+        classId: archetype.classId,
+        level: bossLevel,
+        powerLevel: "elite",
+        seed: bossResref,
+      });
+
+      // Spellcasting classes get zero spells from buildNpcStatBlock (it
+      // deliberately doesn't compute MemorizedList) and zero from
+      // buildCreatureBlueprint (no `spells` param passed here) — another
+      // confirmed real bug ("Thug caster had no spells"). Wire the runtime
+      // random-abilities system when the archetype's class actually supports
+      // it, per each archetype's own documented tier (see the caveat field).
+      let bossScripts: Record<string, string> | undefined;
+      const spellWiringWarnings: string[] = [];
+      if (TIER1_CASTER_CLASSES.has(archetype.classId) || TIER2_CASTER_CLASSES.has(archetype.classId)) {
+        const include = await ensureRandomAbilitiesInclude(index);
+        const isTier2 = TIER2_CASTER_CLASSES.has(archetype.classId);
+        const spawnWrapper = `ce_${archetype.name.slice(0, 3)}_spn`.slice(0, 16);
+        const spawnSource =
+          `#include "${include.includeName}"\n\n` +
+          `void main()\n{\n    ExecuteScript("nw_c2_default9", OBJECT_SELF);\n` +
+          `    DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF));\n}\n`;
+        const spawnWritten = await writeAndCompileScript(index, spawnWrapper, spawnSource, true);
+        if (spawnWritten.compiled) {
+          bossScripts = { ScriptSpawn: spawnWrapper };
+          // Confirmed real engine limitation (CLAUDE.md, "Random caster abilities" ->
+          // "Tier 1 real-runtime findings" item 2): a creature whose ClassList was set
+          // directly (as this boss's was, via buildCreatureBlueprint) rather than via a
+          // live LevelUpHenchman() call only ever gets cantrip (level 0) slots from
+          // SetMemorizedSpell() — there is no recruit-style event for a hostile boss to
+          // level through. This still closes "no spells at all," not "full spellbook."
+          spellWiringWarnings.push(
+            "RA_OnSpawn is wired, but this boss's class levels were set directly (never " +
+              "run through a live LevelUpHenchman() pass) — per this project's own confirmed " +
+              "findings, that caps it to cantrip-level (level 0) spells at spawn, not the " +
+              "full spellbook a leveled companion would get.",
+          );
+        } else {
+          spellWiringWarnings.push(`Random-abilities spawn wrapper failed to compile: ${spawnWritten.compilerOutput}`);
+        }
+
+        if (isTier2 && bossScripts) {
+          const endRoundWrapper = `ce_${archetype.name.slice(0, 3)}_end`.slice(0, 16);
+          const endRoundSource =
+            `#include "${include.includeName}"\n\n` +
+            `void main()\n{\n    ExecuteScript("nw_c2_default3", OBJECT_SELF);\n` +
+            `    RA_OnEndRound(OBJECT_SELF);\n}\n`;
+          const endRoundWritten = await writeAndCompileScript(index, endRoundWrapper, endRoundSource, true);
+          if (endRoundWritten.compiled) {
+            bossScripts.ScriptEndRound = endRoundWrapper;
+          } else {
+            spellWiringWarnings.push(`Random-abilities end-round wrapper failed to compile: ${endRoundWritten.compilerOutput}`);
+          }
+        }
+      }
 
       const buildResult = await buildCreatureBlueprint(index, {
         resref: bossResref,
         tag: bossTag,
         name: bossName,
         classes: [{ class: archetype.classId, level: bossLevel }],
-        race: 6, // Human — a neutral default; caller can rebuild with a different race/appearance if the archetype calls for one.
-        appearance: 6,
+        race: BOSS_RACE,
+        appearance: BOSS_RACE,
         gender: 0,
+        str: statBlock.abilityScores.str,
+        dex: statBlock.abilityScores.dex,
+        con: statBlock.abilityScores.con,
+        int: statBlock.abilityScores.int,
+        wis: statBlock.abilityScores.wis,
+        cha: statBlock.abilityScores.cha,
+        feats: statBlock.feats.map((f) => f.feat),
+        hp: statBlock.hp,
+        startingPackage: statBlock.startingPackage,
+        // Baseline clothing so the boss is never bare — the same rule
+        // adventure-actors already applies to every companion, generalized
+        // here. AC bonus 0, so it needs no proficiency feat and is always
+        // safe to equip regardless of class.
+        equipment: { chest: "nw_cloth001" },
+        ...(bossScripts ? { scripts: bossScripts } : {}),
       });
       if (!buildResult.success) {
         result.success = false;
@@ -265,7 +361,8 @@ export function registerEncounterComposerTools(server: McpServer): void {
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
       }
 
-      // verify_creature on the just-built boss blueprint (not yet gear-checked, since no item was equipped).
+      // verify_creature on the just-built boss blueprint — has baseline clothing and a real
+      // FeatList/stat block now, but no weapon yet (see result.gearing/nextSteps below).
       const bossDoc = index.parsedGff.get(`${bossResref}.utc`) as GffObj;
       const report = new Report(bossResref, "utc");
       await verifyCreature(report, index, bossDoc);
@@ -293,7 +390,14 @@ export function registerEncounterComposerTools(server: McpServer): void {
 
       result.placed = {
         area,
-        boss: { resref: bossResref, tag: bossTag, position: placeResult.placedPosition, verify: verifyResult },
+        boss: {
+          resref: bossResref,
+          tag: bossTag,
+          position: placeResult.placedPosition,
+          verify: verifyResult,
+          spellsWired: bossScripts !== undefined,
+          ...(spellWiringWarnings.length > 0 ? { spellWiringWarnings } : {}),
+        },
         support: placedSupport,
       };
       result.gearing = {
