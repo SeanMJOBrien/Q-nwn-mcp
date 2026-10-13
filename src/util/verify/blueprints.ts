@@ -5,6 +5,7 @@
  */
 
 import { EQUIP_SLOT_MAP } from "../equip-slots.js";
+import { tableFromConstantColumn } from "../npc-stat-block.js";
 import { WEAPON_INVESTMENT_CLASS_IDS } from "../npc-weapon-preferences.js";
 import type { ResmanOptions } from "../../nim-tools.js";
 import type { GffObj } from "../../types/gff.js";
@@ -291,37 +292,142 @@ export async function verifyCreature(
   }
 
   // User-specified rule: a stat may exceed 15 (the Elite Array's own ceiling) only
-  // via racial adjustment or the real level-based ability increase (+1 to the
-  // primary ability every 4 levels, applied by build_npc_stat_block) — never from
-  // picking a higher point-buy band directly. Reconstructed by backing both of
-  // those out of the actual stat; only checkable for a single-class creature (this
-  // project's generation side only ever resolves one class's PrimaryAbil for this
-  // purpose) — skipped rather than guessed for multiclass.
-  if (classList.length === 1) {
-    const primaryAbil = twoDARow(index, "classes", classIds[0])?.PrimaryAbil?.toLowerCase();
+  // via racial adjustment or the real level-based ability increase — never from
+  // picking a higher point-buy band directly. The increase count is always based on
+  // TOTAL character level across every class combined, at 4th/8th/12th/16th/20th
+  // (user-confirmed) — the same for a single-class or multiclass creature, so this
+  // check no longer needs to skip multiclass. What's genuinely ambiguous for
+  // multiclass is WHICH ability a real player would have put each increase into
+  // (not tracked anywhere, and this project's own generator only ever builds
+  // single-class creatures) — handled by checking every distinct class's
+  // PrimaryAbil as its own candidate, each independently given the full benefit of
+  // every increase. A candidate still over 15 after that generous an assumption is
+  // a real violation no matter which ability actually received the increases.
+  {
     const abilityField: Record<string, string> = { str: "Str", dex: "Dex", con: "Con", int: "Int", wis: "Wis", cha: "Cha" };
     const abilityRaceCol: Record<string, string> = {
       str: "StrAdjust", dex: "DexAdjust", con: "ConAdjust", int: "IntAdjust", wis: "WisAdjust", cha: "ChaAdjust",
     };
-    if (primaryAbil && abilityField[primaryAbil]) {
+    const levelIncrease = Math.floor(totalLevel / 4);
+    const raceRow = twoDARow(index, "racialtypes", race);
+    const candidates = new Set(
+      classIds
+        .map((id) => twoDARow(index, "classes", id)?.PrimaryAbil?.toLowerCase())
+        .filter((a): a is string => !!a && !!abilityField[a]),
+    );
+    for (const primaryAbil of candidates) {
       const actual = getFieldNum(obj, abilityField[primaryAbil]);
-      const raceRow = twoDARow(index, "racialtypes", race);
       const racialAdj =
         raceRow && hasCell(raceRow, abilityRaceCol[primaryAbil]) ? Number(raceRow[abilityRaceCol[primaryAbil]]) : 0;
-      const levelIncrease = Math.floor(totalLevel / 4);
       const base = actual - racialAdj - levelIncrease;
       if (base > 15) {
         report.warn(
           "ability_score_base_exceeds_elite",
-          `Primary ability (${primaryAbil.toUpperCase()}) is ${actual} — after backing out the racial adjustment ` +
-            `(${racialAdj >= 0 ? "+" : ""}${racialAdj}) and the real level-based increase (+${levelIncrease} from ` +
-            `${totalLevel} level(s)), the remaining base is ${base}, above the Elite Array's own ceiling of 15. A ` +
-            "stat should only exceed 15 via racial adjustment or leveling, never a higher point-buy band directly.",
+          `${primaryAbil.toUpperCase()} (a class's PrimaryAbil) is ${actual} — after backing out the racial ` +
+            `adjustment (${racialAdj >= 0 ? "+" : ""}${racialAdj}) and the maximum possible level-based increase ` +
+            `(+${levelIncrease}, from ${totalLevel} total level(s) across every class), the remaining base is ` +
+            `${base}, above the Elite Array's own ceiling of 15 even giving every increase to this stat. A stat ` +
+            "should only exceed 15 via racial adjustment or leveling, never a higher point-buy band directly.",
           abilityField[primaryAbil],
           "rebuild with build_npc_stat_block at powerLevel 'elite' (or lower) and let leveling/racial adjustment " +
             "account for anything above 15",
         );
       }
+    }
+  }
+
+  // HP vs. the real formula — max HitDie at level 1, average-rounded-up
+  // ((HitDie/2)+1, floored to a minimum of 1 after Con penalty) per level after,
+  // same computation build_npc_stat_block itself uses. Single-class only: a
+  // multiclass creature's real HP depends on which class each individual level
+  // was taken in (the first level taken is the one that gets max HitDie, not
+  // necessarily ClassList[0]), which isn't reconstructable from the final
+  // ClassList alone — skipped rather than guessed, same caution as the ability-
+  // score check above before its multiclass fix.
+  if (classList.length === 1 && totalLevel >= 1) {
+    const classRow = twoDARow(index, "classes", classIds[0]);
+    const hitDie = classRow && hasCell(classRow, "HitDie") ? Number(classRow.HitDie) : undefined;
+    if (hitDie !== undefined && Number.isFinite(hitDie)) {
+      const conMod = Math.floor((getFieldNum(obj, "Con") - 10) / 2);
+      const avgPerLevel = Math.floor(hitDie / 2) + 1;
+      let expectedHp = hitDie + conMod;
+      for (let lvl = 2; lvl <= totalLevel; lvl++) expectedHp += Math.max(1, avgPerLevel + conMod);
+      expectedHp = Math.max(totalLevel, expectedHp);
+      const actualHp = getFieldNum(obj, "MaxHitPoints");
+      if (actualHp !== expectedHp) {
+        report.warn(
+          "hp_formula_mismatch",
+          `MaxHitPoints is ${actualHp}, but the formula for a level-${totalLevel} HitDie-${hitDie} creature with ` +
+            `Con ${getFieldNum(obj, "Con")} gives ${expectedHp} — likely a stale value left over from a level or ` +
+            "ability-score change made after HP was last computed",
+          "MaxHitPoints",
+          "rebuild with build_npc_stat_block, which recomputes HP from the current level/Con together",
+        );
+      }
+    }
+  }
+
+  // Skill points vs. the real formula — (SkillPointBase + Int mod + racial
+  // ExtraSkillPointsPerLevel) per level, x FirstLevelSkillPointsMultiplier
+  // (default 4) at level 1 only, capped per-skill at level+3 and only spendable
+  // on real ClassSkill=1 rows — same computation build_npc_stat_block itself
+  // uses. Single-class only, same multiclass caution as HP above (each class's
+  // own SkillPointBase/SkillsTable differ, and which levels were taken in which
+  // class isn't reconstructable from the final ClassList).
+  if (classList.length === 1 && totalLevel >= 1) {
+    const classRow = twoDARow(index, "classes", classIds[0]);
+    const raceRow = twoDARow(index, "racialtypes", race);
+    if (classRow) {
+      const skillPointBase = hasCell(classRow, "SkillPointBase") ? Number(classRow.SkillPointBase) : 0;
+      const intMod = Math.floor((getFieldNum(obj, "Int") - 10) / 2);
+      const extraSkillPerLevel = raceRow && hasCell(raceRow, "ExtraSkillPointsPerLevel") ? Number(raceRow.ExtraSkillPointsPerLevel) : 0;
+      const perLevel = Math.max(1, skillPointBase + intMod + extraSkillPerLevel);
+      const firstLevelMultiplier = raceRow && hasCell(raceRow, "FirstLevelSkillPointsMultiplier") ? Number(raceRow.FirstLevelSkillPointsMultiplier) : 4;
+      const totalSkillPoints = perLevel * firstLevelMultiplier + perLevel * (totalLevel - 1);
+
+      const skillTable = tableFromConstantColumn(index, classRow, "SkillsTable");
+      let classSkillCount = 0;
+      for (const row of skillTable?.rows.values() ?? []) {
+        if (row.ClassSkill === "1") classSkillCount++;
+      }
+      if (classSkillCount > 0) {
+        // The generator's round-robin spend always ends at exactly this total: every
+        // skill gets incremented each pass until either the budget or every skill's
+        // own level+3 cap is hit — equivalent in total to this closed form.
+        const cap = totalLevel + 3;
+        const expectedSpent = Math.min(totalSkillPoints, classSkillCount * cap);
+        const actualSpent = listOf(obj, "SkillList").reduce((sum, s) => sum + getFieldNum(s, "Rank"), 0);
+        if (actualSpent !== expectedSpent) {
+          report.warn(
+            "skill_points_formula_mismatch",
+            `SkillList has ${actualSpent} total ranks spent, but the formula for a level-${totalLevel} class ` +
+              `(SkillPointBase ${skillPointBase}, Int mod ${intMod}) gives ${expectedSpent} — likely a stale ` +
+              "SkillList left over from a level or ability-score change made after skills were last computed",
+            "SkillList",
+            "rebuild with build_npc_stat_block, which recomputes and respends skill points from the current level/Int together",
+          );
+        }
+      }
+    }
+  }
+
+  // StartingPackage vs. the packages.2da row-equals-classId convention this
+  // project documents and relies on everywhere else (LevelUpHenchman() reads it
+  // for feat/skill/spell picks) — generalizes henchman_no_package (below, in the
+  // henchman-only block) beyond its narrower "stuck at 0" case and beyond
+  // henchmen specifically, since the convention is universal, not companion-only.
+  // Single-class only — the convention itself has no defined multiclass answer.
+  if (classList.length === 1) {
+    const startingPackage = getFieldNum(obj, "StartingPackage");
+    if (startingPackage !== classIds[0]) {
+      report.warn(
+        "starting_package_mismatch",
+        `StartingPackage is ${startingPackage}, but this creature's class is ${classIds[0]} — packages.2da row ` +
+          "should equal class ID for each base class's iconic package, or LevelUpHenchman()/the toolset's own " +
+          "level-up logic will make picks for the wrong class",
+        "StartingPackage",
+        `create_creature_blueprint or build_npc_stat_block with startingPackage:${classIds[0]}`,
+      );
     }
   }
 

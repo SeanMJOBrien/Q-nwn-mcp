@@ -475,8 +475,8 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).toContain("weapon_feat_non_melee_class");
   });
 
-  it("does not flag a weapon-investment feat on Fighter/Barbarian/Ranger", async () => {
-    for (const classId of [4, 0, 7]) {
+  it("does not flag a weapon-investment feat on Fighter/Barbarian/Paladin/Ranger", async () => {
+    for (const classId of [4, 0, 6, 7]) {
       const obj = makeCreature("nw_c2_default", {
         ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: classId }, ClassLevel: { type: "short", value: 5 } }] },
         FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] },
@@ -527,7 +527,10 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).not.toContain("ability_score_base_exceeds_elite");
   });
 
-  it("skips the ability-base check for a multiclass creature rather than guessing", async () => {
+  // User-confirmed: the level-based increase count is always TOTAL character level
+  // across every class combined (4th/8th/12th/16th/20th), the same for multiclass as
+  // single-class — this check no longer skips multiclass.
+  it("flags a multiclass creature whose shared primary ability (STR for both classes) still exceeds 15 even given every possible increase", async () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 6 },
       Str: { type: "byte", value: 20 },
@@ -547,7 +550,117 @@ describe("verifyCreature", () => {
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
-    expect(report.warnings.map((w) => w.code)).not.toContain("ability_score_base_exceeds_elite");
+    // Total level 5 -> levelIncrease = floor(5/4) = 1. base = 20 - 0 - 1 = 19 > 15.
+    expect(report.warnings.map((w) => w.code)).toContain("ability_score_base_exceeds_elite");
+  });
+
+  it("checks each distinct class's PrimaryAbil independently for a multiclass creature with two different primary stats", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Str: { type: "byte", value: 17 }, // Fighter side: base 17 - 0 racial - 2 level = 15, fine
+      Int: { type: "byte", value: 19 }, // Wizard side: base 19 - 0 racial - 2 level = 17, over 15
+      ClassList: {
+        type: "list",
+        value: [
+          { __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }, // Fighter
+          { __struct_id: 2, Class: { type: "int", value: 10 }, ClassLevel: { type: "short", value: 3 } }, // Wizard
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["classes", twoDA(["PrimaryAbil"], [[4, { PrimaryAbil: "STR" }], [10, { PrimaryAbil: "INT" }]])],
+        ["racialtypes", twoDA(["StrAdjust", "IntAdjust"], [[6, { StrAdjust: "0", IntAdjust: "0" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    // Total level 8 -> levelIncrease = floor(8/4) = 2, shared by both candidates.
+    const codes = report.warnings.map((w) => w.code);
+    expect(codes).toContain("ability_score_base_exceeds_elite"); // fires for INT
+    expect(report.warnings.filter((w) => w.code === "ability_score_base_exceeds_elite")).toHaveLength(1); // not for STR
+  });
+
+  // HP, skill points, and StartingPackage vs. the same formulas build_npc_stat_block
+  // itself uses — a stale value left over from a level/stat change, surfaced the same
+  // way the ability-score check above catches a stale/mis-generated stat.
+  it("flags MaxHitPoints that doesn't match the HitDie/Con formula for its level", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Con: { type: "byte", value: 14 }, // +2 mod
+      MaxHitPoints: { type: "short", value: 999 }, // wildly wrong for level 3, d10, +2 Con
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }] },
+    });
+    const index = makeIndex({ twodaTables: new Map([["classes", twoDA(["HitDie"], [[4, { HitDie: "10" }]])]]) });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("hp_formula_mismatch");
+  });
+
+  it("does not flag MaxHitPoints matching the formula (level 3, d10, +2 Con: 10+2 + 2*(6+2))", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Con: { type: "byte", value: 14 },
+      MaxHitPoints: { type: "short", value: 10 + 2 + 2 * (6 + 2) },
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }] },
+    });
+    const index = makeIndex({ twodaTables: new Map([["classes", twoDA(["HitDie"], [[4, { HitDie: "10" }]])]]) });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("hp_formula_mismatch");
+  });
+
+  it("flags a SkillList total that doesn't match the SkillPointBase/Int-mod formula", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Int: { type: "byte", value: 10 }, // mod 0
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
+      SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 0 } }] }, // 0 spent
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["classes", twoDA(["SkillPointBase", "SkillsTable"], [[4, { SkillPointBase: "2", SkillsTable: "CLS_SKILL_FIGHT" }]])],
+        ["cls_skill_fight", twoDA(["SkillIndex", "ClassSkill"], [[0, { SkillIndex: "1", ClassSkill: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    // Expected: perLevel=max(1,2+0+0)=2, x4 at level 1 = 8, capped at 1 skill x (1+3)=4 -> expectedSpent=4. Actual 0.
+    expect(report.warnings.map((w) => w.code)).toContain("skill_points_formula_mismatch");
+  });
+
+  it("does not flag a SkillList total matching the formula", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Int: { type: "byte", value: 10 },
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
+      SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 4 } }] }, // hits the level+3=4 cap
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["classes", twoDA(["SkillPointBase", "SkillsTable"], [[4, { SkillPointBase: "2", SkillsTable: "CLS_SKILL_FIGHT" }]])],
+        ["cls_skill_fight", twoDA(["SkillIndex", "ClassSkill"], [[0, { SkillIndex: "1", ClassSkill: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("skill_points_formula_mismatch");
+  });
+
+  it("flags StartingPackage that doesn't match the packages.2da row-equals-classId convention", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      StartingPackage: { type: "byte", value: 0 },
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }] },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).toContain("starting_package_mismatch");
+  });
+
+  it("does not flag StartingPackage matching its class", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      StartingPackage: { type: "byte", value: 4 },
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }] },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("starting_package_mismatch");
   });
 
   // Real, shipped bug: a Salt Gate Crossbowman had Point Blank Shot + Rapid

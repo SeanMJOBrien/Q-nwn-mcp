@@ -153,8 +153,12 @@ function resolvePrimaryAbility(classRow: Record<string, string> | undefined): Ab
   return raw && (ABILITY_KEYS as string[]).includes(raw) ? (raw as AbilityKey) : "str";
 }
 
-/** Look up a 2DA table named by a "constant-style" column value (e.g. "CLS_FEAT_FIGHT" -> the cls_feat_fight table). */
-function tableFromConstantColumn(index: ModuleIndex, row: Record<string, string> | undefined, column: string) {
+/**
+ * Look up a 2DA table named by a "constant-style" column value (e.g. "CLS_FEAT_FIGHT"
+ * -> the cls_feat_fight table). Exported for verify/blueprints.ts's skill-points
+ * formula check, which needs the exact same SkillsTable resolution this file uses.
+ */
+export function tableFromConstantColumn(index: ModuleIndex, row: Record<string, string> | undefined, column: string) {
   const value = row?.[column];
   if (!value || value === "****") return undefined;
   return index.twodaTables.get(value.toLowerCase());

@@ -65,8 +65,7 @@ function makeIndex(): ModuleIndex {
           },
         ],
         [
-          6, // Paladin — melee in this ruleset, but NOT in WEAPON_INVESTMENT_CLASS_IDS
-             // per the user's own list (Fighter/Barbarian/Ranger only) — deliberate.
+          6, // Paladin — in WEAPON_INVESTMENT_CLASS_IDS (user-specified melee set)
           {
             HitDie: "10",
             FeatsTable: "****",
@@ -273,23 +272,16 @@ describe("buildNpcStatBlock", () => {
     expect(featIds).toContain(6); // Cleave
   });
 
-  it("grants Weapon Focus/Specialization/Improved Critical to Barbarian and Ranger too (user-specified melee set), but not to Paladin (deliberately excluded)", () => {
+  it("grants Weapon Focus/Specialization/Improved Critical to Barbarian, Paladin, and Ranger too (user-specified melee set)", () => {
     const index = makeIndex();
 
-    for (const classId of [0, 7]) {
+    for (const classId of [0, 6, 7]) {
       // Level 5, not 1: enough generic+bonus slots open to reach all three weapon-tier
       // feats in the candidate queue, not just the first one.
       const result = buildNpcStatBlock(index, { race: 6, classId, level: 5, powerLevel: "elite", seed: `melee_${classId}` });
       const featIds = result.feats.map((f) => f.feat);
       const weaponPref = pickWeaponPreference(classId, `melee_${classId}`)!;
       expect(featIds).toContain(weaponPref.weaponFocusFeat);
-    }
-
-    const paladin = buildNpcStatBlock(index, { race: 6, classId: 6, level: 5, powerLevel: "elite", seed: "paladin_test" });
-    const paladinFeatIds = paladin.feats.map((f) => f.feat);
-    const paladinWeaponPref = pickWeaponPreference(6, "paladin_test")!;
-    for (const f of [paladinWeaponPref.weaponFocusFeat, paladinWeaponPref.weaponSpecializationFeat, paladinWeaponPref.weaponImprovedCriticalFeat]) {
-      expect(paladinFeatIds).not.toContain(f);
     }
   });
 

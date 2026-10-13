@@ -145,15 +145,12 @@ export const DODGE_FEAT = 10;
  * time (`verify/blueprints.ts`'s `weapon_feat_non_melee_class` check), so
  * both sides of this rule read the same set instead of drifting apart.
  *
- * User-specified: Fighter (4), Barbarian (0), Ranger (7) — explicitly named
- * base classes, not a guess. **Paladin (6) is deliberately NOT included**
- * despite being a strong melee class in this ruleset — the user's own list
- * named Fighter/Barbarian/Ranger specifically and did not name Paladin, so
- * it stays out until that's confirmed rather than assumed. "Prestige melee
- * classes" (Weapon Master, Champion of Torm, Divine Champion, etc.) are a
- * real, documented gap, not silently covered here — their classes.2da row
- * IDs vary by HAK/installation and haven't been verified against a live
- * table, so nothing is guessed in. Add a prestige class's real row id here
- * once confirmed, following this same pattern.
+ * User-specified: Fighter (4), Barbarian (0), Ranger (7), Paladin (6) —
+ * explicitly named base classes, not a guess. "Prestige melee classes"
+ * (Weapon Master, Champion of Torm, Divine Champion, etc.) are a real,
+ * documented gap, not silently covered here — their classes.2da row IDs
+ * vary by HAK/installation and haven't been verified against a live table,
+ * so nothing is guessed in. Add a prestige class's real row id here once
+ * confirmed, following this same pattern.
  */
-export const WEAPON_INVESTMENT_CLASS_IDS = new Set([0, 4, 7]); // Barbarian, Fighter, Ranger
+export const WEAPON_INVESTMENT_CLASS_IDS = new Set([0, 4, 6, 7]); // Barbarian, Fighter, Paladin, Ranger

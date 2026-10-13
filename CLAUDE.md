@@ -1913,42 +1913,46 @@ scripts to verify these rules after the creature is generated").**
   session didn't add (see "what else can we verify" below for why this one is
   harder than the other two).
 
-**What else is worth a `verify_creature`/`verify_*` check — surveyed while adding the
-two above, not yet built, roughly in order of how cleanly checkable each one is from
-GFF data alone:**
-- **Skill point total vs. the formula.** `(SkillPointBase + Int mod + racial bonus)
-  × 4` at level 1, `×1` after, spread only across real `ClassSkill=1` rows, capped at
-  `level + 3` per skill — fully reconstructable and comparable against the actual
-  `SkillList`/ability scores/class, the same way the new ability-score check works.
-  Would catch a hand-edited or stale `SkillList` left over from a level change.
-- **HP vs. the formula.** `HitDie` max at level 1 + Con mod, then average-rounded-up
-  per level after — same reconstruction technique, same confidence level as the
-  ability-score check above.
-- **`StartingPackage` vs. the `packages.2da` row-equals-classId convention** this
-  project already documents and relies on (`henchman_no_package` partially covers
-  this already — worth confirming it checks the *value*, not just presence).
-- **Multiclass PrimaryAbil/leveling reconstruction** — the ability-score check above
-  explicitly skips multiclass "rather than guessing." A real fix needs a verified
-  rule for how 3.5e handles ability increases across multiple classes (probably:
-  the increase can go to any class's relevant stat, a player choice this project's
-  generator doesn't model at all yet) before this gap can close honestly.
-- **The "simple NPC / required feats only" rule above** — not cleanly checkable from
-  GFF data alone, because nothing on a placed creature currently distinguishes "built
-  as a deliberate minion/commoner" from "a low-level creature that happens to have
-  few feats for other legitimate reasons" (low level, no automatic class feats this
-  level, etc.). Closing this would need a new convention — e.g. a `VarTable` flag
-  analogous to `LOOT_INTENTIONAL` (already used to silence the lootable/droppable
-  override checker for a creature deliberately built without loot) — marking
-  "built at complexity: simple" at generation time, so a check could later confirm
-  no generic/bonus-slot-shaped feat snuck in some other way. Not built here because
-  inventing that convention is a real design decision, not a quick addition.
-- **Armor purchase order/tier** (the "buy weapon first, then highest-AC proficient
-  armor" rule, two entries above) — partially checkable already via
-  `armor_proficiency_mismatch` (tier correctness), but nothing checks that a
-  *cheaper, lower-AC* item was chosen within an affordable, proficient tier when a
-  pricier one was available — that needs the actual wealth budget and real
-  blueprint costs at verify time, not just the equipped item's own properties, so
-  it's a bigger lift than the others on this list.
+**Follow-up (2026-10-13), three more user corrections, all closed:**
+
+- **Paladin (6) added to `WEAPON_INVESTMENT_CLASS_IDS`.** Now `{0, 4, 6, 7}`
+  (Barbarian, Fighter, Paladin, Ranger) in `npc-weapon-preferences.ts`, shared by
+  generation and `weapon_feat_non_melee_class` alike. "Prestige melee classes" are
+  still a documented, un-guessed gap (their row IDs vary by HAK).
+- **Multiclass ability-score reconstruction, resolved rather than skipped.**
+  User-confirmed: the level-based ability increase count is always based on TOTAL
+  character level across every class combined, at 4th/8th/12th/16th/20th — the same
+  rule for multiclass as single-class. `ability_score_base_exceeds_elite` no longer
+  skips multiclass: it checks every distinct class's `PrimaryAbil` as its own
+  candidate, each independently given the full benefit of every level-based
+  increase (the genuinely unresolvable part — which ability a real player would
+  have put each increase into — isn't tracked anywhere, so this is the most
+  generous assumption rather than a guess; a candidate still over 15 even with every
+  increase credited to it is a real violation no matter which ability actually got
+  them). Two new tests cover a shared-primary-ability multiclass creature and a
+  two-different-primaries one (each checked independently).
+- **"Add the verifications that make sense."** Built three of the five surveyed
+  candidates from the previous entry, all single-class-only (multiclass HP/skill
+  points depend on which class each individual level was taken in, not
+  reconstructable from the final `ClassList` — skipped rather than guessed, unlike
+  the ability-score case above which had a real resolving rule):
+  - **`hp_formula_mismatch`** — `HitDie` max at level 1 + Con mod, then
+    average-rounded-up per level after, same formula `build_npc_stat_block` itself
+    uses, compared against the actual `MaxHitPoints`.
+  - **`skill_points_formula_mismatch`** — `(SkillPointBase + Int mod + racial
+    ExtraSkillPointsPerLevel)` per level (×`FirstLevelSkillPointsMultiplier` at
+    level 1), capped at `classSkillCount × (level + 3)` the same way the
+    generator's own round-robin spend caps out, compared against `SkillList`'s
+    actual total ranks.
+  - **`starting_package_mismatch`** — generalizes `henchman_no_package` (which only
+    ever caught the narrow "stuck at 0" case, and only for henchmen) to the full
+    `packages.2da` row-equals-classId convention, for any single-class creature.
+  All three reuse `tableFromConstantColumn` (newly exported from `npc-stat-block.ts`
+  rather than duplicated) and are tested with both a flagged and a clean case.
+  **Deliberately not built**: the "simple NPC" tagging-convention gap and the armor
+  purchase-order economics check — both still need a real design decision (a new
+  `VarTable` convention; real wealth-budget math at verify time) rather than being a
+  quick, mechanically-checkable addition like the three above.
 
 ## Co-op / Multiplayer Rules
 
