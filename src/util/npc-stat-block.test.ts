@@ -40,6 +40,43 @@ function makeIndex(): ModuleIndex {
             SpellCaster: "1",
           },
         ],
+        [
+          0, // Barbarian — melee, in WEAPON_INVESTMENT_CLASS_IDS
+          {
+            HitDie: "12",
+            FeatsTable: "****",
+            BonusFeatsTable: "****",
+            SkillsTable: "****",
+            SkillPointBase: "4",
+            PrimaryAbil: "STR",
+            SpellCaster: "0",
+          },
+        ],
+        [
+          7, // Ranger — melee, in WEAPON_INVESTMENT_CLASS_IDS
+          {
+            HitDie: "8",
+            FeatsTable: "****",
+            BonusFeatsTable: "****",
+            SkillsTable: "****",
+            SkillPointBase: "4",
+            PrimaryAbil: "DEX",
+            SpellCaster: "0",
+          },
+        ],
+        [
+          6, // Paladin — melee in this ruleset, but NOT in WEAPON_INVESTMENT_CLASS_IDS
+             // per the user's own list (Fighter/Barbarian/Ranger only) — deliberate.
+          {
+            HitDie: "10",
+            FeatsTable: "****",
+            BonusFeatsTable: "****",
+            SkillsTable: "****",
+            SkillPointBase: "2",
+            PrimaryAbil: "STR",
+            SpellCaster: "0",
+          },
+        ],
       ],
     ),
   );
@@ -236,6 +273,26 @@ describe("buildNpcStatBlock", () => {
     expect(featIds).toContain(6); // Cleave
   });
 
+  it("grants Weapon Focus/Specialization/Improved Critical to Barbarian and Ranger too (user-specified melee set), but not to Paladin (deliberately excluded)", () => {
+    const index = makeIndex();
+
+    for (const classId of [0, 7]) {
+      // Level 5, not 1: enough generic+bonus slots open to reach all three weapon-tier
+      // feats in the candidate queue, not just the first one.
+      const result = buildNpcStatBlock(index, { race: 6, classId, level: 5, powerLevel: "elite", seed: `melee_${classId}` });
+      const featIds = result.feats.map((f) => f.feat);
+      const weaponPref = pickWeaponPreference(classId, `melee_${classId}`)!;
+      expect(featIds).toContain(weaponPref.weaponFocusFeat);
+    }
+
+    const paladin = buildNpcStatBlock(index, { race: 6, classId: 6, level: 5, powerLevel: "elite", seed: "paladin_test" });
+    const paladinFeatIds = paladin.feats.map((f) => f.feat);
+    const paladinWeaponPref = pickWeaponPreference(6, "paladin_test")!;
+    for (const f of [paladinWeaponPref.weaponFocusFeat, paladinWeaponPref.weaponSpecializationFeat, paladinWeaponPref.weaponImprovedCriticalFeat]) {
+      expect(paladinFeatIds).not.toContain(f);
+    }
+  });
+
   it("point-buy power levels never exceed their budget and stay within score bounds", () => {
     const index = makeIndex();
     for (const powerLevel of ["low", "standard", "tougher", "epic"] as const) {
@@ -260,14 +317,27 @@ describe("buildNpcStatBlock", () => {
     for (const score of Object.values(result.abilityScores)) expect(score).toBeLessThan(15);
   });
 
-  it("'tougher'/'epic' scale above the Elite Array in the SAME descending shape, never one stat at 18 with the rest at the floor", () => {
+  it("'tougher'/'epic' scale secondary stats above the Elite Array, but clamp the primary at 15 — only leveling/racial may push it higher", () => {
     const index = makeIndex();
     const tougher = buildNpcStatBlock(index, { race: 6, classId: 4, level: 1, powerLevel: "tougher" }).abilityScores;
-    expect(tougher).toEqual({ str: 17, con: 14, dex: 14, wis: 13, int: 10, cha: 8 });
-    // The old greedy allocator produced exactly this spike shape for "standard" (and
-    // would for "tougher"/"epic" too) — assert the fix never reproduces it.
+    // Secondary stats DO scale above Elite Array's own values (con/dex here are 14,
+    // above Elite's 13 for that rank) — only the primary (str) is clamped to 15.
+    expect(tougher).toEqual({ str: 15, con: 14, dex: 14, wis: 13, int: 10, cha: 8 });
+    // The old greedy allocator produced an 18/8/8/8/8/8 spike shape for "standard" (and
+    // would for "tougher"/"epic" too) — assert the fix never reproduces it, and that the
+    // primary never exceeds 15 from the point-buy band alone (user-specified rule).
     expect(Object.values(tougher).filter((s) => s === 18)).toHaveLength(0);
+    expect(tougher.str).toBeLessThanOrEqual(15);
     expect(Object.values(tougher).filter((s) => s === 8)).toHaveLength(1); // only the lowest-priority stat sits at the floor
+  });
+
+  it("level-based ability increases are the only sanctioned way to push the primary stat above 15 (user-specified rule)", () => {
+    const index = makeIndex();
+    // A level-9 Fighter (2 increases: levels 4,8) at "tougher" power: base clamped to
+    // 15, then +2 from leveling -> 17. Exceeding 15 here comes entirely from leveling,
+    // never from the point-buy band itself.
+    const result = buildNpcStatBlock(index, { race: 6, classId: 4, level: 9, powerLevel: "tougher" });
+    expect(result.abilityScores.str).toBe(17);
   });
 
   it("applies the racial floor (Cha>=6, Int>=8) for a race with a matching penalty", () => {
@@ -287,7 +357,7 @@ describe("buildNpcStatBlock", () => {
     expect(result.feats.some((f) => f.source === "bonus_slot")).toBe(false);
   });
 
-  it("complexity: 'simple' skips class bonus-feat slots entirely, keeping racial/automatic/generic feats", () => {
+  it("complexity: 'simple' constrains feats to required (racial + automatic class) only — no generic or bonus filler (user-specified rule: low-level/minion/commoner NPCs get only required feats)", () => {
     const index = makeIndex();
     const full = buildNpcStatBlock(index, { race: 6, classId: 4, level: 5, powerLevel: "elite", seed: "fighter_test_seed" });
     const simple = buildNpcStatBlock(index, {
@@ -299,15 +369,17 @@ describe("buildNpcStatBlock", () => {
       complexity: "simple",
     });
 
-    // Full has real bonus_slot picks (levels 1,2,4 = 3 slots); simple has none.
+    // Full has real bonus_slot AND generic_slot picks; simple has neither.
     expect(full.feats.some((f) => f.source === "bonus_slot")).toBe(true);
+    expect(full.feats.some((f) => f.source === "generic_slot")).toBe(true);
     expect(simple.feats.some((f) => f.source === "bonus_slot")).toBe(false);
+    expect(simple.feats.some((f) => f.source === "generic_slot")).toBe(false);
 
-    // Every non-bonus feat full picked is still present in simple, unchanged.
-    const fullNonBonus = full.feats.filter((f) => f.source !== "bonus_slot").map((f) => f.feat);
+    // Every required (racial/automatic) feat full picked is still present in simple, unchanged.
+    const fullRequired = full.feats.filter((f) => f.source === "racial" || f.source === "class_automatic").map((f) => f.feat);
     const simpleFeats = simple.feats.map((f) => f.feat);
-    for (const f of fullNonBonus) expect(simpleFeats).toContain(f);
-    expect(simple.feats.length).toBe(fullNonBonus.length);
+    for (const f of fullRequired) expect(simpleFeats).toContain(f);
+    expect(simple.feats.length).toBe(fullRequired.length);
 
     // Everything else (ability scores, HP, skills) is untouched by complexity.
     expect(simple.abilityScores).toEqual(full.abilityScores);

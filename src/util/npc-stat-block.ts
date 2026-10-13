@@ -19,26 +19,23 @@
  */
 
 import type { ModuleIndex } from "../types/module.js";
-import { CLEAVE_FEAT, DODGE_FEAT, pickWeaponPreference, TOUGHNESS_FEAT } from "./npc-weapon-preferences.js";
+import {
+  CLEAVE_FEAT,
+  DODGE_FEAT,
+  pickWeaponPreference,
+  TOUGHNESS_FEAT,
+  WEAPON_INVESTMENT_CLASS_IDS,
+} from "./npc-weapon-preferences.js";
 import { twoDARow } from "./verify/common.js";
 
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
 export type PowerLevel = "elite" | "low" | "standard" | "tougher" | "epic";
 
-/**
- * Only Fighter gets a per-weapon investment tier (Weapon Focus/Specialization/
- * Improved Critical) filled into its generic/bonus feat slots — confirmed
- * real, reported bug: a non-Fighter NPC's universal level-1 generic feat slot
- * (every character gets one, any class/race) could pull Weapon Focus or
- * Improved Critical off the candidate queue just like a Fighter would,
- * producing a non-melee or non-Fighter creature with a per-weapon
- * specialization that makes no sense for it. Basic weapon proficiency
- * (Simple/Martial/Exotic, via the automatic class-feat table — "class
- * automatic" source, untouched by this restriction) is unaffected and still
- * correct for every class.
- */
-const WEAPON_INVESTMENT_CLASS_IDS = new Set([4]); // Fighter
+// WEAPON_INVESTMENT_CLASS_IDS (imported above) gates which classes get a per-weapon
+// investment tier (Weapon Focus/Specialization/Improved Critical) in the generic/bonus
+// feat-slot filler below — see its own doc comment in npc-weapon-preferences.ts for the
+// full rationale (shared with verify/blueprints.ts's weapon_feat_non_melee_class check).
 
 /** D&D 3.5 point-buy budgets, per CLAUDE.md's documented bands. "elite" isn't a budget — see ELITE_ARRAY. */
 const POINT_BUY_BUDGET: Record<Exclude<PowerLevel, "elite">, number> = {
@@ -100,17 +97,21 @@ export interface StatBlockParams {
    */
   seed?: string;
   /**
-   * "full" (default) computes every feat category, including PC-style class
-   * bonus-feat slots (cls_bfeat_<class>.2da — Weapon Specialization,
-   * Cleave->Great Cleave, metamagic, epic feats). "simple" skips that
-   * category entirely — for a background NPC the plot just calls a plain
-   * "warrior"/"adept" rather than a named PC-progression character: still
-   * competent (racial feats, automatic class feats, and the universal
-   * generic feat slots are unaffected), just without a PC's full advancement
-   * chain. NWN has no tabletop-style Warrior/Expert NPC class to fall back
-   * on, and CLASS_TYPE_COMMONER grants no feats/spellbook at all — too blunt
-   * for something that should still fight. See CLAUDE.md's "simple NPC
-   * tier" entry.
+   * "full" (default) computes every feat category: racial, automatic class
+   * feats, the universal generic feat slot(s) (1st level + race table), and
+   * PC-style class bonus-feat slots (cls_bfeat_<class>.2da — Weapon
+   * Specialization, Cleave->Great Cleave, metamagic, epic feats). "simple"
+   * constrains feats to what's actually REQUIRED — racial + automatic class
+   * feats only, skipping BOTH the generic and bonus slot filler entirely —
+   * for a low-level NPC, a minion, a commoner, or a background NPC the plot
+   * just calls a plain "warrior"/"adept" rather than a named PC-progression
+   * character. The generic/bonus slots are this project's curated stand-in
+   * for a tabletop player's free feat choice; an NPC with no PC-style
+   * progression doesn't need that choice made for it. NWN has no
+   * tabletop-style Warrior/Expert NPC class to fall back on, and
+   * CLASS_TYPE_COMMONER grants no feats/spellbook at all — too blunt for
+   * something that should still fight with its real proficiencies. See
+   * CLAUDE.md's "simple NPC tier" entry.
    */
   complexity?: "full" | "simple";
 }
@@ -219,6 +220,16 @@ function computeAbilityScores(
         }
       }
     }
+
+    // User-specified rule: a stat may end up above 15 (the Elite Array's own ceiling),
+    // but only via racial adjustment or the real level-based ability increase below —
+    // never directly from a higher point-buy band. "tougher"/"epic" exist to fund a
+    // broader, stronger ARRAY (more budget spent on secondary stats), not to push any
+    // one stat past 15 on its own. Clamp every point-buy-derived base back to 15 here,
+    // before racial adjustments or level increases are applied.
+    for (const key of priorityOrder) {
+      if (base[key] > 15) base[key] = 15;
+    }
   }
 
   // Racial adjustments, read live — not hardcoded.
@@ -320,24 +331,35 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
   // ExtraFeatsAtFirstLevel (Human=1, verified; every other standard race is
   // unset), plus NumberNormalFeatsEveryNthLevel feats at each multiple of
   // NormalFeatEveryNthLevel up to `level` — both columns read live.
-  let genericSlots = level >= 1 ? 1 : 0;
-  const extraAtFirst = numCell(raceRow, "ExtraFeatsAtFirstLevel", 0);
-  genericSlots += extraAtFirst;
-  const nth = numCell(raceRow, "NormalFeatEveryNthLevel", 0);
-  const perNth = numCell(raceRow, "NumberNormalFeatsEveryNthLevel", 0);
-  genericSlots += multiplesUpTo(nth, level).length * perNth;
+  //
+  // Skipped entirely for complexity: "simple", same as the bonus slots below —
+  // user-specified rule: a low-level/minion/commoner-tier NPC's feats should
+  // be constrained to what's actually REQUIRED (racial + automatic class
+  // feats), not filled out with this project's curated stand-in for a
+  // tabletop player's free choice. The real D&D rule ("every character gets a
+  // feat at 1st level") describes a player's choice to make, not a feat this
+  // kind of NPC is missing without one.
+  const complexity = params.complexity ?? "full";
+  if (complexity === "full") {
+    let genericSlots = level >= 1 ? 1 : 0;
+    const extraAtFirst = numCell(raceRow, "ExtraFeatsAtFirstLevel", 0);
+    genericSlots += extraAtFirst;
+    const nth = numCell(raceRow, "NormalFeatEveryNthLevel", 0);
+    const perNth = numCell(raceRow, "NumberNormalFeatsEveryNthLevel", 0);
+    genericSlots += multiplesUpTo(nth, level).length * perNth;
 
-  let unfilledGeneric = 0;
-  for (let i = 0; i < genericSlots; i++) {
-    const c = nextCandidate();
-    if (c === undefined) {
-      unfilledGeneric++;
-    } else {
-      addFeat(c, "generic_slot");
+    let unfilledGeneric = 0;
+    for (let i = 0; i < genericSlots; i++) {
+      const c = nextCandidate();
+      if (c === undefined) {
+        unfilledGeneric++;
+      } else {
+        addFeat(c, "generic_slot");
+      }
     }
-  }
-  if (unfilledGeneric > 0) {
-    warnings.push(`${unfilledGeneric} generic feat slot(s) left unfilled — no more curated candidates, pick manually`);
+    if (unfilledGeneric > 0) {
+      warnings.push(`${unfilledGeneric} generic feat slot(s) left unfilled — no more curated candidates, pick manually`);
+    }
   }
 
   // 4. Class-specific bonus feat slots — cls_bfeat_<class>.2da's single
@@ -345,7 +367,6 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
   // Skipped entirely for complexity: "simple" — this is exactly the PC-style
   // advancement chain a background NPC doesn't need (see StatBlockParams'
   // complexity doc comment).
-  const complexity = params.complexity ?? "full";
   if (complexity === "full") {
     const bonusFeatTable = tableFromConstantColumn(index, classRow, "BonusFeatsTable");
     let bonusSlots = 0;

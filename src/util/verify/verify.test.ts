@@ -459,6 +459,97 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).not.toContain("weapon_focus_mismatch");
   });
 
+  // User-specified rule: Weapon Focus/Specialization/Improved Critical only fit a
+  // melee-investment class (Fighter/Barbarian/Ranger) — flagged regardless of what's
+  // equipped, since the problem is the feat existing on a non-melee class at all.
+  it("flags a weapon-investment feat on a non-melee class (Cleric)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 2 }, ClassLevel: { type: "short", value: 5 } }] },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] }, // WeapFocWHam
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["baseitems", twoDA(["WeaponFocusFeat"], [[5, { WeaponFocusFeat: "115" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("weapon_feat_non_melee_class");
+  });
+
+  it("does not flag a weapon-investment feat on Fighter/Barbarian/Ranger", async () => {
+    for (const classId of [4, 0, 7]) {
+      const obj = makeCreature("nw_c2_default", {
+        ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: classId }, ClassLevel: { type: "short", value: 5 } }] },
+        FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] },
+      });
+      const index = makeIndex({
+        twodaTables: new Map([["baseitems", twoDA(["WeaponFocusFeat"], [[5, { WeaponFocusFeat: "115" }]])]]),
+      });
+      const report = new Report("t", "utc");
+      await verifyCreature(report, index, obj);
+      expect(report.warnings.map((w) => w.code)).not.toContain("weapon_feat_non_melee_class");
+    }
+  });
+
+  // User-specified rule: a stat may exceed 15 (Elite Array's own ceiling) only via
+  // racial adjustment or a real level-based ability increase, never a higher
+  // point-buy band directly.
+  it("flags a primary ability whose base (after backing out racial/leveling) exceeds 15", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Str: { type: "byte", value: 17 }, // level 3, no increases yet (needs level 4+); no racial adj -> base 17
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["classes", twoDA(["PrimaryAbil"], [[4, { PrimaryAbil: "STR" }]])],
+        ["racialtypes", twoDA(["StrAdjust"], [[6, { StrAdjust: "0" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("ability_score_base_exceeds_elite");
+  });
+
+  it("does not flag a primary ability above 15 once leveling/racial adjustment fully accounts for it", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Str: { type: "byte", value: 17 }, // level 9: +2 from leveling (levels 4,8) on a base-15 primary -> 17
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 9 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["classes", twoDA(["PrimaryAbil"], [[4, { PrimaryAbil: "STR" }]])],
+        ["racialtypes", twoDA(["StrAdjust"], [[6, { StrAdjust: "0" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ability_score_base_exceeds_elite");
+  });
+
+  it("skips the ability-base check for a multiclass creature rather than guessing", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Str: { type: "byte", value: 20 },
+      ClassList: {
+        type: "list",
+        value: [
+          { __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } },
+          { __struct_id: 2, Class: { type: "int", value: 0 }, ClassLevel: { type: "short", value: 2 } },
+        ],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["classes", twoDA(["PrimaryAbil"], [[4, { PrimaryAbil: "STR" }], [0, { PrimaryAbil: "STR" }]])],
+        ["racialtypes", twoDA(["StrAdjust"], [[6, { StrAdjust: "0" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ability_score_base_exceeds_elite");
+  });
+
   // Real, shipped bug: a Salt Gate Crossbowman had Point Blank Shot + Rapid
   // Shot (the generic ranged-combat feat pair) and a crossbow, with no Rapid
   // Reload — a crossbow needs a full round to reload without it, so Rapid

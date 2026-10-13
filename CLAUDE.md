@@ -1860,6 +1860,96 @@ both root-caused to real generation logic rather than one-off mistakes.**
   `npc-stat-block.test.ts` confirms a Cleric never receives these three
   feats and that its slots are filled by the fallback set instead.
 
+**Three further user-specified generation rules (2026-10-13), each paired with a
+`verify_creature` check so a violation is caught after the fact too, not just
+prevented at generation time — per the user's own explicit request ("there should be
+scripts to verify these rules after the creature is generated").**
+
+- **"Creatures can have their most important stats be above 15, but must be achieved
+  through stat increases from leveling up from a base stat of 15."** The point-buy
+  curve-shape fix two entries above still let `tougher`/`epic` push the PRIMARY
+  stat's base directly past 15 (17 in the worked example) — exactly what this rule
+  forbids. **Fix:** every point-buy-derived stat (`npc-stat-block.ts`) is now clamped
+  to 15 before racial adjustment or the existing level-based increase (+1 to the
+  primary ability every 4 levels) is applied — those two remain the only sanctioned
+  ways to exceed 15. Secondary stats still scale with the band (e.g. `tougher`'s
+  secondary stats reach 14, above Elite Array's own 13 for that rank) — the clamp is
+  specific to the primary ability, matching "most important stat" in the user's own
+  wording. **New verify check: `ability_score_base_exceeds_elite`** — reconstructs
+  the pre-racial, pre-leveling base (actual stat minus racial adjustment minus
+  `floor(totalLevel / 4)`) for a single-class creature and warns if it's still above
+  15, naming `build_npc_stat_block` at `powerLevel: "elite"` as the fix. Skipped
+  (never guessed) for multiclass, where this project's generation side doesn't
+  resolve a single PrimaryAbil anyway.
+- **"NPC Feats should concentrate on feats for their class, not weapons if not a
+  melee class like fighter, barbarian, Ranger, or prestige melee classes."** Widens
+  the Fighter-only restriction above to the user's actual named set.
+  `WEAPON_INVESTMENT_CLASS_IDS` moved to `npc-weapon-preferences.ts` (shared by both
+  the generator and the new verify check below, so they can't drift apart) and
+  expanded to `{0, 4, 7}` (Barbarian, Fighter, Ranger). **Paladin (6) is deliberately
+  NOT included** — a strong melee class in this ruleset, but not one the user's own
+  list named, so it stays out until that's confirmed rather than assumed. "Prestige
+  melee classes" are a documented gap, not guessed in — their classes.2da row IDs
+  vary by HAK/installation. **New verify check: `weapon_feat_non_melee_class`** —
+  the same baseitems.2da reverse-scan `weapon_focus_mismatch` already uses, but
+  triggered by class membership instead of equipped-weapon mismatch: any Weapon
+  Focus/Specialization/Improved Critical on a class outside that set is flagged
+  regardless of what's equipped, since the problem is the feat's existence on a
+  non-melee build, not which weapon it points at.
+- **"Feats granted should be constrained to required feats for low level NPCs, or
+  NPCs that shouldn't have class levels, like Warriors or low level minions or
+  commoners."** The existing `complexity: "simple"` tier (see the "simple NPC tier"
+  entry elsewhere in this doc) only ever skipped the PC-style bonus-feat-slot
+  advancement chain — it still filled the universal generic feat slot(s) with the
+  same curated filler (Toughness/Cleave/Dodge, or a weapon-investment tier) a full
+  PC-progression character gets. That filler exists as this project's stand-in for a
+  tabletop player's free feat choice — exactly the thing a minion/commoner/low-level
+  background NPC has no business making. **Fix:** `complexity: "simple"` now skips
+  BOTH the generic and bonus feat-slot filler, leaving only racial + automatic class
+  feats (the mechanically required set) — updated doc comments on the `complexity`
+  param reflect this. No new verify check: an NPC correctly built this way is
+  structurally identical to a legitimately low-feat creature, so there's nothing
+  distinguishable to check for after the fact without a new tagging convention this
+  session didn't add (see "what else can we verify" below for why this one is
+  harder than the other two).
+
+**What else is worth a `verify_creature`/`verify_*` check — surveyed while adding the
+two above, not yet built, roughly in order of how cleanly checkable each one is from
+GFF data alone:**
+- **Skill point total vs. the formula.** `(SkillPointBase + Int mod + racial bonus)
+  × 4` at level 1, `×1` after, spread only across real `ClassSkill=1` rows, capped at
+  `level + 3` per skill — fully reconstructable and comparable against the actual
+  `SkillList`/ability scores/class, the same way the new ability-score check works.
+  Would catch a hand-edited or stale `SkillList` left over from a level change.
+- **HP vs. the formula.** `HitDie` max at level 1 + Con mod, then average-rounded-up
+  per level after — same reconstruction technique, same confidence level as the
+  ability-score check above.
+- **`StartingPackage` vs. the `packages.2da` row-equals-classId convention** this
+  project already documents and relies on (`henchman_no_package` partially covers
+  this already — worth confirming it checks the *value*, not just presence).
+- **Multiclass PrimaryAbil/leveling reconstruction** — the ability-score check above
+  explicitly skips multiclass "rather than guessing." A real fix needs a verified
+  rule for how 3.5e handles ability increases across multiple classes (probably:
+  the increase can go to any class's relevant stat, a player choice this project's
+  generator doesn't model at all yet) before this gap can close honestly.
+- **The "simple NPC / required feats only" rule above** — not cleanly checkable from
+  GFF data alone, because nothing on a placed creature currently distinguishes "built
+  as a deliberate minion/commoner" from "a low-level creature that happens to have
+  few feats for other legitimate reasons" (low level, no automatic class feats this
+  level, etc.). Closing this would need a new convention — e.g. a `VarTable` flag
+  analogous to `LOOT_INTENTIONAL` (already used to silence the lootable/droppable
+  override checker for a creature deliberately built without loot) — marking
+  "built at complexity: simple" at generation time, so a check could later confirm
+  no generic/bonus-slot-shaped feat snuck in some other way. Not built here because
+  inventing that convention is a real design decision, not a quick addition.
+- **Armor purchase order/tier** (the "buy weapon first, then highest-AC proficient
+  armor" rule, two entries above) — partially checkable already via
+  `armor_proficiency_mismatch` (tier correctness), but nothing checks that a
+  *cheaper, lower-AC* item was chosen within an affordable, proficient tier when a
+  pricier one was available — that needs the actual wealth budget and real
+  blueprint costs at verify time, not just the equipped item's own properties, so
+  it's a bigger lift than the others on this list.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs

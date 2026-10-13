@@ -5,6 +5,7 @@
  */
 
 import { EQUIP_SLOT_MAP } from "../equip-slots.js";
+import { WEAPON_INVESTMENT_CLASS_IDS } from "../npc-weapon-preferences.js";
 import type { ResmanOptions } from "../../nim-tools.js";
 import type { GffObj } from "../../types/gff.js";
 import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
@@ -266,9 +267,11 @@ export async function verifyCreature(
   }
   let totalLevel = 0;
   let hasUncastCaster = false;
+  const classIds: number[] = [];
   for (const [i, cls] of classList.entries()) {
     const classId = getFieldNum(cls, "Class");
     const classLevel = getFieldNum(cls, "ClassLevel");
+    classIds.push(classId);
     checkTwoDARef(report, index, "classes", classId, `ClassList.${i}.Class`);
     if (classLevel < 1) {
       report.warn("zero_class_level", `ClassList.${i} has level 0`, `ClassList.${i}.ClassLevel`);
@@ -284,6 +287,41 @@ export async function verifyCreature(
     if (classRow?.SpellCaster === "1") {
       const minCastingLevel = hasCell(classRow, "MinCastingLevel") ? Number(classRow.MinCastingLevel) : 1;
       if (classLevel >= minCastingLevel) hasUncastCaster = true;
+    }
+  }
+
+  // User-specified rule: a stat may exceed 15 (the Elite Array's own ceiling) only
+  // via racial adjustment or the real level-based ability increase (+1 to the
+  // primary ability every 4 levels, applied by build_npc_stat_block) — never from
+  // picking a higher point-buy band directly. Reconstructed by backing both of
+  // those out of the actual stat; only checkable for a single-class creature (this
+  // project's generation side only ever resolves one class's PrimaryAbil for this
+  // purpose) — skipped rather than guessed for multiclass.
+  if (classList.length === 1) {
+    const primaryAbil = twoDARow(index, "classes", classIds[0])?.PrimaryAbil?.toLowerCase();
+    const abilityField: Record<string, string> = { str: "Str", dex: "Dex", con: "Con", int: "Int", wis: "Wis", cha: "Cha" };
+    const abilityRaceCol: Record<string, string> = {
+      str: "StrAdjust", dex: "DexAdjust", con: "ConAdjust", int: "IntAdjust", wis: "WisAdjust", cha: "ChaAdjust",
+    };
+    if (primaryAbil && abilityField[primaryAbil]) {
+      const actual = getFieldNum(obj, abilityField[primaryAbil]);
+      const raceRow = twoDARow(index, "racialtypes", race);
+      const racialAdj =
+        raceRow && hasCell(raceRow, abilityRaceCol[primaryAbil]) ? Number(raceRow[abilityRaceCol[primaryAbil]]) : 0;
+      const levelIncrease = Math.floor(totalLevel / 4);
+      const base = actual - racialAdj - levelIncrease;
+      if (base > 15) {
+        report.warn(
+          "ability_score_base_exceeds_elite",
+          `Primary ability (${primaryAbil.toUpperCase()}) is ${actual} — after backing out the racial adjustment ` +
+            `(${racialAdj >= 0 ? "+" : ""}${racialAdj}) and the real level-based increase (+${levelIncrease} from ` +
+            `${totalLevel} level(s)), the remaining base is ${base}, above the Elite Array's own ceiling of 15. A ` +
+            "stat should only exceed 15 via racial adjustment or leveling, never a higher point-buy band directly.",
+          abilityField[primaryAbil],
+          "rebuild with build_npc_stat_block at powerLevel 'elite' (or lower) and let leveling/racial adjustment " +
+            "account for anything above 15",
+        );
+      }
     }
   }
 
@@ -545,6 +583,39 @@ export async function verifyCreature(
               "), or respec_weapon_feats onto the equipped weapon instead",
           );
         }
+      }
+    }
+  }
+
+  // User-specified rule: a per-weapon investment feat (Weapon Focus/Specialization/
+  // Improved Critical) only fits a melee-focused class — WEAPON_INVESTMENT_CLASS_IDS
+  // (Fighter/Barbarian/Ranger; see its own doc comment in npc-weapon-preferences.ts
+  // for why Paladin and prestige classes aren't in that set yet). Flagged regardless
+  // of what's equipped — the problem is the feat existing on this class at all, not a
+  // mismatch with the current weapon (that's weapon_focus_mismatch's job, above).
+  if (!classIds.some((id) => WEAPON_INVESTMENT_CLASS_IDS.has(id))) {
+    const baseitemRows = index.twodaTables.get("baseitems")?.rows;
+    if (baseitemRows) {
+      const found = new Map<number, string[]>();
+      for (const [row, data] of baseitemRows) {
+        for (const column of WEAPON_FOCUS_TIER_COLUMNS) {
+          const featVal = data[column];
+          if (!featVal || featVal === "****") continue;
+          if (featIds.has(Number(featVal))) {
+            if (!found.has(row)) found.set(row, []);
+            found.get(row)!.push(column);
+          }
+        }
+      }
+      for (const [row, tiers] of found) {
+        report.warn(
+          "weapon_feat_non_melee_class",
+          `FeatList has ${tiers.join("/")} for baseitems.2da row ${row}, but this creature's class(es) ` +
+            `(${classIds.join(", ")}) aren't a melee-investment class (Fighter/Barbarian/Ranger) — a per-weapon ` +
+            "feat like this doesn't fit a non-melee build",
+          "FeatList",
+          "remove the feat — basic weapon proficiency is unaffected and still correct for this class",
+        );
       }
     }
   }
