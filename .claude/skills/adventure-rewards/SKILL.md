@@ -1,12 +1,12 @@
 ---
 name: adventure-rewards
-description: Sub-skill of /create-adventure. Reads all sections from adventure.md and assigns quest XP rewards, places end-of-adventure and mid-adventure reward items. Fully autonomous, no user interaction.
+description: Sub-skill of /create-adventure. Reads all sections from adventure.md and assigns quest XP rewards, places end-of-adventure and mid-adventure reward items, sets the module's player-facing description, and writes a spoilers-included DM guide for running the module at a tabletop. Fully autonomous, no user interaction.
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
 # Rewards
 
-Sub-skill of `/create-adventure`. Reads all sections of `adventure.md`, then assigns quest XP rewards and places notable reward items throughout the adventure. Monster XP is automatic from kills — this skill handles **quest-completion XP** and **placed loot rewards** (magic items, unique treasure). Downstream: this is the final content skill before the adventure is complete.
+Sub-skill of `/create-adventure`. Reads all sections of `adventure.md`, then assigns quest XP rewards and places notable reward items throughout the adventure. Monster XP is automatic from kills — this skill handles **quest-completion XP** and **placed loot rewards** (magic items, unique treasure). It also sets the module's real, player-facing `Mod_Description` and writes a full-spoiler `dm-guide.md` for anyone who wants to run the finished module as a tabletop session. This is the final content skill before the adventure is complete.
 
 ## Prerequisites
 
@@ -468,7 +468,150 @@ Append a `## Rewards` section to `adventure.md`:
 - **Reward items:** [count] items placed by /adventure-rewards
 - **Store:** [count] items available for purchase
 - **Total notable items:** [N]
+
+### Delivery
+
+- **Module description set:** [the exact text passed to set_module_description]
+- **DM guide written:** `dm-guide.md` in the MCP temp directory
 ```
+
+---
+
+### Phase 7b: Set Module Description
+
+Call `set_module_description` so a player sees real, useful information in the NWN
+toolset/vault before ever loading the module — right now `Mod_Description` is always
+blank. Build the text from data already in `adventure.md`:
+
+```
+set_module_description(
+  description: "[Tone] adventure for [Party Size] character(s) at level [Target Level].
+    [Difficulty] difficulty. Includes [N] recruitable companion(s). Estimated playtime:
+    [Estimated Duration]. [One short, evocative, non-spoiler hook line.]"
+)
+```
+
+**Pull the mechanical facts straight from `## Module` and `## Actors`:**
+- **Target Level**, **Party Size**, **Difficulty**, **Estimated Duration**, **Tone** — all from `## Module`.
+- **Henchman/companion count** — count the NPCs in `## Actors` flagged as recruitable companions (built with `henchman: true`). Report the real number, including zero ("No recruitable companions").
+
+**The one-line hook must be evocative, not informative.** It exists to set a mood, the
+same way a real module's back-cover blurb does — not to tell the player what happens.
+Draw it from the plot's premise/setting at the vaguest level that's still atmospheric
+("Something stirs on the old forest road" is fine; "A lich has taken the mayor's
+daughter" is not).
+
+**Never include, even vaguely:**
+- The villain's identity or true nature
+- Quest objectives, puzzle solutions, or branching outcomes
+- Named NPCs' real roles (a "friendly merchant" who is secretly the villain stays
+  described as neither)
+- Any twist, reveal, or the ending
+
+This is the same spoiler-free discipline the whole `/create-adventure` pipeline already
+follows for the user-facing progress messages — the description is the module's own
+"back of the box," read before anyone presses play.
+
+Record the exact text written in the `## Rewards` section's `### Delivery` subsection
+(Phase 7, template below).
+
+---
+
+### Phase 7c: Write the DM Guide
+
+Generate a companion document for a human who wants to **run this module as a
+tabletop session** — a real spoilers-included reference a DM reads before and during
+play, distinct from `adventure.md` (which is an internal build log, not meant to be
+read for enjoyment or run from). Write it to `dm-guide.md` in the same MCP temp
+directory as `adventure.md` (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp`) — a
+sidecar file, never packed into the `.mod`.
+
+**This step has full spoiler access and should use it.** Everything below is written
+assuming the reader is the DM, not a player — unlike every other phase's user-facing
+output, there is no spoiler-free constraint here.
+
+**Source material:** all of `adventure.md`'s sections, plus live tool calls where the
+document is too terse to run a table from directly — `get_balance_report(partyLevel:
+"<target level>")` per area for a real difficulty read, `get_creature_details` for any
+boss or named NPC's actual stats, `flatten_dialog` for the real shape of branching
+conversations, and `get_area_details`/`visualize_area` for anything spatial a DM would
+need to describe out loud.
+
+**Structure** (write this exact section order to `dm-guide.md`):
+
+```markdown
+# DM Guide: [Adventure Title]
+
+**Spoilers throughout. This document is for the DM only.**
+
+## At a Glance
+
+- **Target level:** [N] · **Party size:** [N] · **Difficulty:** [Normal/Hard]
+- **Estimated playtime:** [duration]
+- **Companions available:** [N] — [names, one line each]
+- **Win condition:** [the actual mechanical win condition, stated plainly]
+- **One-paragraph synopsis:** [the real plot, twist included — this is the summary
+  a DM skims five minutes before the session]
+
+## Cast of Characters
+
+For each named NPC from `## Actors`, `## Quests`, and `## Challenges`:
+- **[Name]** — [role: quest-giver / villain / companion / merchant / etc.], found in
+  [area]. **True motivation:** [what they actually want, including any hidden agenda].
+  **Voice/personality:** [a sentence a DM could use to roleplay them at the table].
+  [If they have a secret] **Secret:** [what it is and when it's meant to surface].
+
+## Area-by-Area Walkthrough
+
+One subsection per area, in the order a party is expected to reach them:
+
+### [Area Name] (`area_resref`)
+
+- **Read-aloud description:** [1-3 sentences a DM could read or paraphrase on arrival —
+  derive from the area's actual Description/atmosphere fields, not invented fresh]
+- **What's here:** [NPCs present, notable placeables, loot, traps — the practical
+  contents a DM needs to track]
+- **Encounters:** [hostile creatures, their real stat-block essentials (race/class/
+  level/CR from get_creature_details), suggested tactics, and the difficulty band from
+  get_balance_report]
+- **Skill checks / puzzles:** [any DC-gated interaction and the real DC, translated
+  from the module's mechanics into tabletop terms — e.g. "Search DC 18 to find the
+  hidden lever" rather than a script name]
+- **Exits:** [where each transition leads]
+
+## Quest Walkthrough
+
+For each quest in `## Quests`:
+- **[Quest Name]** (primary/side) — **trigger:** [how it's offered]. **Objective:**
+  [the real objective]. **Path to completion:** [the intended route, and any branches
+  or alternate solutions the dialog tree actually supports — check with
+  `flatten_dialog`, don't assume only the "obvious" path exists]. **Completion:**
+  [what happens, and the reward].
+
+## The Climax
+
+[A dedicated section spelling out the final encounter/confrontation/reveal in full —
+what the DM needs to know to run it well: the boss's real tactics, any twist that
+lands here, and what victory/failure actually looks like mechanically and narratively.]
+
+## Running This at a Table
+
+A short, practical section translating the module's NWN-specific mechanics into
+ordinary tabletop terms a DM can use without the game running: how to adjudicate the
+skill checks and DCs listed above using standard D&D 3.5 rules, how to run the
+listed encounters as normal combat (the creatures' CRs and the balance-report
+difficulty bands above are the same D&D 3.5 figures a DM already uses), and a note on
+pacing (where the natural session breaks fall, if the estimated playtime suggests
+more than one sitting).
+```
+
+**Keep it readable, not exhaustive.** This is prose a person reads start to finish
+before a session, not a raw data dump — summarize `get_creature_details`/
+`flatten_dialog` output into the one or two sentences a DM actually needs, rather than
+pasting tool output verbatim.
+
+Record in `adventure.md`'s `## Rewards` → `### Delivery` subsection that `dm-guide.md`
+was written, and its path.
 
 ---
 
@@ -500,4 +643,6 @@ Call `repack_module()` to save all changes.
 - **Append to existing container ItemLists.** If `/adventure-affordances` already placed items in a container, read the existing items first and append — don't overwrite with a new list.
 - **XP should feel generous but not excessive.** The player should gain meaningful progress (60-80% to next level) but not level up twice from a single one-shot adventure.
 - **Reward power curve:** Boss reward > mid-adventure reward > creature drops > store items. This creates a clear progression of loot quality.
+- **Module description is mandatory (Phase 7b).** Every delivered module gets a real `Mod_Description` — target level, party size, henchmen count, estimated playtime, and at most one vague atmospheric hook. Never a plot spoiler.
+- **DM guide is mandatory (Phase 7c).** Every delivered module gets a `dm-guide.md` sidecar — full spoilers, written for a human running the module at a tabletop. Unlike every other deliverable in this pipeline, this one is spoilers-on by design.
 - **Repack after all changes.** Call `repack_module` at the end so the user can see changes in the toolset.

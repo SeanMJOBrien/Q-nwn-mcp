@@ -713,6 +713,13 @@ describe("comprehensive module — every mockable nwn-mcp system, one shared mod
     const modScripts = await call("set_module_scripts", { Mod_OnHeartbeat: "a_mod_hb" });
     expect(modScripts.success).toBe(true);
     expect(((mockIndex.parsedGff.get("module.ifo") as GffObj).Mod_OnHeartbeat as { value: string }).value).toBe("a_mod_hb");
+
+    const modDescription = await call("set_module_description", {
+      description: "A dark-fantasy adventure for 1 character at level 3-5. Includes 1 recruitable companion.",
+    });
+    expect(modDescription.success).toBe(true);
+    const descField = (mockIndex.parsedGff.get("module.ifo") as GffObj).Mod_Description as { value: Record<string, string> };
+    expect(descField.value["0"]).toBe("A dark-fantasy adventure for 1 character at level 3-5. Includes 1 recruitable companion.");
   });
 
   it("analysis: validate_module, get_balance_report, find_orphans, check_area_connectivity, get_dependency_graph, get_module_summary", async () => {

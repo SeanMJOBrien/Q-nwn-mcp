@@ -4,7 +4,7 @@ import type { ModuleIndex, TwoDATable } from "../../types/module.js";
 import { verifyCreature, verifyDoor, verifyItem, verifyPlaceable, verifyStore, verifyTrigger } from "./blueprints.js";
 import { isBaseGameResource, isBaseGameScript, Report } from "./common.js";
 import { verifyDialog } from "./dialog.js";
-import { verifyJournal } from "./journal.js";
+import { verifyJournal, verifyModuleInfo } from "./journal.js";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -1213,5 +1213,29 @@ describe("verifyJournal", () => {
     const report = new Report("t", "jrl");
     await verifyJournal(report, makeIndex(), questDoc([{ id: 1, end: true }]));
     expect(report.errors.map((e) => e.code)).toContain("quest_never_awarded");
+  });
+});
+
+describe("verifyModuleInfo", () => {
+  const ifoDoc = (description?: string) =>
+    ({
+      Mod_Entry_Area: { type: "resref", value: "" },
+      ...(description !== undefined
+        ? { Mod_Description: { type: "cexolocstring", value: { "0": description } } }
+        : {}),
+    }) as unknown as GffObj;
+
+  it("warns when Mod_Description is empty (never set, or set with empty/whitespace text)", () => {
+    for (const doc of [ifoDoc(), ifoDoc(""), ifoDoc("   ")]) {
+      const report = new Report("module", "ifo");
+      verifyModuleInfo(report, makeIndex(), doc);
+      expect(report.warnings.map((w) => w.code)).toContain("module_description_empty");
+    }
+  });
+
+  it("does not warn once a real description is set", () => {
+    const report = new Report("module", "ifo");
+    verifyModuleInfo(report, makeIndex(), ifoDoc("A dark-fantasy adventure for 1 character at level 3-5."));
+    expect(report.warnings.map((w) => w.code)).not.toContain("module_description_empty");
   });
 });

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, indexAreaCreatures } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
-import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from "../types/gff.js";
+import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField, setFieldLocStr } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
 import type { CreatureRecord } from "../types/module.js";
 
@@ -311,6 +311,59 @@ export function registerAreaTools(server: McpServer): void {
 
       if (changes.length === 0) {
         return { content: [{ type: "text", text: "No scripts provided." }] };
+      }
+
+      await jsonToGff(ifoDoc, ifoEntry.filePath);
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({ success: true, changes }, null, 2),
+        }],
+      };
+    },
+  );
+
+  // ─── set_module_description ────────────────────────────────────────────
+
+  server.tool(
+    "set_module_description",
+    "Set the module's Name and/or Description (Mod_Name / Mod_Description on module.ifo) — what a player sees in the " +
+      "NWN toolset/vault before loading the module, not anything read by the engine at runtime. `description` should " +
+      "be player-facing practical info (target level, recommended party size, how many henchmen/companions are " +
+      "available, difficulty, estimated playtime) plus at most a one-line evocative, non-spoiler premise — never a " +
+      "plot summary, the villain's identity, a twist, a puzzle solution, or any named quest-giver's actual role. " +
+      "Pass an empty string to clear a field.",
+    {
+      description: z.string().optional().describe(
+        "Player-facing module description. E.g. 'A dark-fantasy adventure for 1 character at level 3-5. Includes " +
+          "2 recruitable companions. Estimated playtime: 2-3 hours. Something stirs on the old forest road.'",
+      ),
+      name: z.string().optional().describe("Module display name (Mod_Name). Usually set once at create_module time; optional here."),
+    },
+    { idempotentHint: true },
+    async ({ description, name }) => {
+      const index = requireIndex();
+      const ifoDoc = index.parsedGff.get("module.ifo");
+      if (!ifoDoc) return { content: [{ type: "text", text: "Module IFO not found" }] };
+
+      const ifoEntry = index.resources.get("module.ifo");
+      if (!ifoEntry) return { content: [{ type: "text", text: "Module IFO resource not found" }] };
+
+      const ifo = ifoDoc as GffObj;
+      const changes: string[] = [];
+
+      if (description !== undefined) {
+        setFieldLocStr(ifo, "Mod_Description", description);
+        changes.push(`Mod_Description = "${description}"`);
+      }
+      if (name !== undefined) {
+        setFieldLocStr(ifo, "Mod_Name", name);
+        changes.push(`Mod_Name = "${name}"`);
+      }
+
+      if (changes.length === 0) {
+        return { content: [{ type: "text", text: "No fields provided. Pass description and/or name." }] };
       }
 
       await jsonToGff(ifoDoc, ifoEntry.filePath);

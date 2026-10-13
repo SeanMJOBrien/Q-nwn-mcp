@@ -172,6 +172,17 @@ export function verifyModuleInfo(report: Report, index: ModuleIndex, doc: GffObj
     }
   }
 
+  // ─── Player-facing description ──────────────────────────────────────────
+  if (!getFieldLocStr(doc, "Mod_Description").trim()) {
+    report.warn(
+      "module_description_empty",
+      "Mod_Description is empty — a player sees nothing in the toolset/vault before loading the module. " +
+        "Set it with set_module_description (target level, party size, henchmen count, estimated playtime; " +
+        "never a plot spoiler).",
+      "Mod_Description",
+    );
+  }
+
   // ─── Area list vs actual resources ──────────────────────────────────────
   const listed = new Set(listOf(doc, "Mod_Area_list").map((a) => getFieldStr(a, "Area_Name").toLowerCase()));
   for (const areaResref of index.areas.keys()) {

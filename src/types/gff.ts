@@ -121,3 +121,10 @@ export function setFieldNum(obj: Record<string, unknown>, fieldName: string, val
 export function setFieldStr(obj: Record<string, unknown>, fieldName: string, value: string, gffType: string = "cexostring"): void {
   setField(obj, fieldName, gffType, value);
 }
+
+/** Set a cexolocstring field's English (language 0) text. Creates the field if it doesn't exist.
+ *  Replaces the whole locstring value (every other language entry, if any, is dropped) — this
+ *  project only ever writes language 0. */
+export function setFieldLocStr(obj: Record<string, unknown>, fieldName: string, text: string): void {
+  setField(obj, fieldName, "cexolocstring", { "0": text });
+}

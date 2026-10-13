@@ -244,8 +244,18 @@ When all sub-skills complete and the module is repacked, deliver a spoiler-free 
 
 Then ask:
 
-> *"Would you like a copy of the adventure document saved to your reports folder? (Warning: it contains full spoilers!)"*
+> *"Would you like a copy of the DM guide saved to your reports folder? It's written for running this as a tabletop session — full spoilers, naturally."*
 
-If the user says yes and `MCP_FOLDER_USERREPORTS` is set, copy the final `adventure.md` from the MCP temp directory to `$MCP_FOLDER_USERREPORTS/<AdventureTitle>.md`, where `<AdventureTitle>` is the adventure title exactly as written with spaces preserved (e.g., `The Bones Beneath.md`).
+`/adventure-rewards` always writes `dm-guide.md` to the MCP temp directory as part of
+finishing the module (see its Phase 7c) — this is the file to offer, not the raw
+`adventure.md` build log. If the user says yes and `MCP_FOLDER_USERREPORTS` is set, copy
+`dm-guide.md` to `$MCP_FOLDER_USERREPORTS/<AdventureTitle> - DM Guide.md`, where
+`<AdventureTitle>` is the adventure title exactly as written with spaces preserved (e.g.,
+`The Bones Beneath - DM Guide.md`).
 
-If `MCP_FOLDER_USERREPORTS` is not set, tell the user the env var isn't configured and give them the temp directory path so they can copy it manually.
+If `MCP_FOLDER_USERREPORTS` is not set, tell the user the env var isn't configured and
+give them the temp directory path so they can copy it manually.
+
+The module's in-toolset description (`Mod_Description`) is already set by this point —
+`/adventure-rewards` Phase 7b does this automatically, with no spoilers. No further
+action needed.
