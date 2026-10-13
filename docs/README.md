@@ -4,6 +4,7 @@
 |---|---|
 | Where does an object go, which way does it face, what is its Z? Why do tiles rotate the way they do? What is a tileset's height step? | [object-placement-and-tilesets.md](object-placement-and-tilesets.md) — verified spatial conventions, with the real-data evidence and the tools' resulting behaviour |
 | What does the area generation pipeline do, step by step, in plain language? | [AREA_GENERATION_PIPELINE.md](AREA_GENERATION_PIPELINE.md) |
+| What does each of the 9 `/create-adventure` phases decide, in what order, and what takes priority when things compete (budget, space, attention)? | [MODULE_CREATION_PIPELINE.md](MODULE_CREATION_PIPELINE.md) |
 | What is every rule, formula and threshold in the `/create-adventure` pipeline and its tools? (and where do skills and code disagree?) | [generation-rules-reference.md](generation-rules-reference.md) |
 | How should multi-room architecture be stamped instead of solved tile by tile? *(design only, not implemented)* | [area-prefabs-spec.md](area-prefabs-spec.md) |
 | How does the encounter-difficulty checker combine creatures, and what happens with an unset CR? | [encounter-difficulty-findings.md](encounter-difficulty-findings.md) |
