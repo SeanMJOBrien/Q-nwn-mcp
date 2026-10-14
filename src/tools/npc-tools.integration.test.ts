@@ -211,6 +211,51 @@ describe("build_npc_stat_block", () => {
     }
   });
 
+  it("deferLeveling: writes ClassLevel as 1 but keeps every stat computed for the real target level, via HENCH_LEVEL", async () => {
+    // Real, confirmed bug this closes: a_hen_join/a_hen_spawn's leveling loop
+    // (for i = GetHitDice(...); i < HENCH_LEVEL; i++) never runs when
+    // ClassList is already saved at the target level — GetHitDice() reports
+    // that level from the moment the blueprint is saved, at spawn exactly as
+    // much as at hire. The engine then never sees a real level-up event, and
+    // GetMemorizedSpellCountByLevel() silently returns fewer slots than the
+    // 2DA promises for any level past the first. deferLeveling writes
+    // ClassLevel=1 so that loop has real ground to climb, while every other
+    // stat (ability scores, FeatList, SkillList, HP) stays computed for the
+    // real level 5.
+    loadClassRaceTables(mockIndex);
+    const key = "defer_npc.utc";
+    mockIndex.parsedGff.set(key, makeBlueprintUtc() as unknown as GffDocument);
+    mockIndex.resources.set(key, { resref: "defer_npc", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_stat_block",
+        arguments: { resref: "defer_npc", race: "6", classId: "4", level: "5", powerLevel: "elite", deferLeveling: true },
+      });
+      const parsed = parseResult(result) as { success: boolean; hp: number; warnings: string[] };
+      expect(parsed.success).toBe(true);
+      expect(parsed.warnings).toEqual([]);
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const classList = (doc.ClassList as { value: GffObj[] }).value;
+      expect((classList[0].ClassLevel as { value: number }).value).toBe(1); // deferred, not 5
+      expect((classList[0].Class as { value: number }).value).toBe(4); // class itself unaffected
+
+      const varTable = (doc.VarTable as { value: GffObj[] }).value;
+      const henchLevel = varTable.find((v) => (v.Name as { value: string }).value === "HENCH_LEVEL");
+      expect(henchLevel).toBeDefined();
+      expect((henchLevel!.Value as { value: number }).value).toBe(5); // the REAL target level
+
+      // HP/feats/skills were computed for level 5, not the deferred level 1.
+      const featList = (doc.FeatList as { value: GffObj[] }).value;
+      expect(featList.length).toBeGreaterThan(3); // more than a level-1 creature would ever have
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("complexity: 'simple' yields no bonus-feat-slot picks", async () => {
     loadClassRaceTables(mockIndex);
     const key = "test_npc_simple.utc";

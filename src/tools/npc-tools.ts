@@ -29,10 +29,10 @@ import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
-import { getFieldList, getFieldNum, getFieldStr, setField } from "../types/gff.js";
+import { getFieldList, getFieldNum, getFieldStr, setField, setFieldNum } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 import { EQUIP_SLOT_MAP } from "../util/equip-slots.js";
-import { getGitDoc, resolveBlueprint, writeBackGit } from "../util/git-helpers.js";
+import { getGitDoc, mergeVarTable, resolveBlueprint, writeBackGit } from "../util/git-helpers.js";
 import { buildNpcStatBlock, type PowerLevel } from "../util/npc-stat-block.js";
 import { pickWeaponPreference } from "../util/npc-weapon-preferences.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
@@ -129,9 +129,16 @@ export function registerNpcTools(server: McpServer): void {
         .describe(
           "'full' (default) computes every feat category including PC-style class bonus-feat slots (Weapon Specialization, Cleave->Great Cleave, metamagic, epic feats). 'simple' skips that category — for a background NPC the plot just calls a plain 'warrior'/'adept' rather than a named PC-progression character: still competent (racial/automatic-class/generic feat slots unaffected), just without the full advancement chain.",
         ),
+      deferLeveling: z
+        .boolean()
+        .optional()
+        .describe(
+          "For a companion that will go through a_hen_join/a_hen_spawn's live LevelUpHenchman() loop: compute every stat (ability scores, FeatList, SkillList, HP) for the real target `level` as normal, but write ClassList's own ClassLevel as 1 and set a HENCH_LEVEL VarTable local to the real target level. " +
+            "Without this, a companion's ClassList already equals its HENCH_LEVEL from the moment it's built, so that leveling loop's own `for (i = GetHitDice(...); i < nTargetLevel; i++)` never runs — meaning the engine never sees a real level-up event, and GetMemorizedSpellCountByLevel() silently returns fewer real spell slots than cls_spgn_<class>.2da promises for any level past the first (confirmed, real, user-reported bug: a Cleric/Wizard companion with empty spell slots at 2nd/3rd level despite the UI showing them as available). verify_creature's level-formula checks (hp_formula_mismatch, skill_points_formula_mismatch, ability_score_base_exceeds_elite) already read HENCH_LEVEL instead of the raw ClassLevel, so they correctly see this as the intentional pre-level state it is, not a stale-data bug.",
+        ),
     },
     { idempotentHint: true },
-    async ({ resref, race, classId, level, powerLevel, complexity }) => {
+    async ({ resref, race, classId, level, powerLevel, complexity, deferLeveling }) => {
       const index = requireIndex();
       const key = `${resref.toLowerCase()}.utc`;
       const doc = index.parsedGff.get(key);
@@ -186,6 +193,25 @@ export function registerNpcTools(server: McpServer): void {
           return entry;
         }),
       };
+
+      // deferLeveling: every stat above was computed for the real target
+      // `level`, but ClassList's own ClassLevel is deliberately rolled back
+      // to 1 here, after the fact, so a_hen_spawn/a_hen_join's leveling loop
+      // (for (i = GetHitDice(...); i < nTargetLevel; i++)) has real ground to
+      // climb — without this, GetHitDice() already reports the target level
+      // from the moment this blueprint is saved, so that loop never runs and
+      // the engine never sees a real level-up event. HENCH_LEVEL (merged via
+      // mergeVarTable, matching create_creature_blueprint's own varTable
+      // convention) carries the real target level forward for both the
+      // runtime leveling loop and verify_creature's level-formula checks.
+      // This tool only ever writes exactly one ClassList entry (`result.classes`
+      // is always a single-element array — see buildNpcStatBlock), so there's
+      // no multiclass ambiguity to guard against here.
+      if (deferLeveling) {
+        const classListEntries = getFieldList(obj, "ClassList");
+        setFieldNum(classListEntries[0], "ClassLevel", 1, "short");
+        mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: toI(level) }]);
+      }
 
       // Feats
       obj.FeatList = {
