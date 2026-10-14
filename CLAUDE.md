@@ -1954,6 +1954,77 @@ scripts to verify these rules after the creature is generated").**
   `VarTable` convention; real wealth-budget math at verify time) rather than being a
   quick, mechanically-checkable addition like the three above.
 
+**First real-module application of all the above (2026-10-13) — "The Hollow
+Communion" — found one real false-positive bug class and one real tool gap,
+both fixed; every genuine violation the new checks found was then actually
+repaired in the module, not just reported.**
+
+- **FOUND AND FIXED — `hp_formula_mismatch`/`skill_points_formula_mismatch`/
+  `starting_package_mismatch`/`ability_score_base_exceeds_elite` all
+  false-positived on non-PC "classes."** `classes.2da` has real rows for
+  `Animal` (12), `Outsider` (24), and `Commoner` (20) — all `PlayerClass=0` —
+  used for exactly the creatures you'd expect (a Dog, two Chickens, two
+  Quasits, a Hound, two Commoner-chassis villagers). None of the PC-style
+  formulas these checks compute apply to them: a Commoner's `HitDie=4`
+  average-progression isn't how the toolset actually hands out HP for a
+  background NPC, and `packages.2da`'s rows are themed sub-archetype
+  packages for the 11 *real* PC classes (row 20 is "Cleric_DeadWalker",
+  `ClassID` 2 — nothing to do with `CLASS_TYPE_COMMONER` being numbered 20
+  too) — the row-equals-classId convention only ever held for each class's
+  own iconic package, rows 0-10. **Fix:** all four checks now skip a class
+  row with an explicit `PlayerClass=0`; missing `PlayerClass` data (an older
+  test fixture, or a table loaded without that column) still behaves exactly
+  as before — this is an exclusion on a confirmed "no," not a requirement
+  for a confirmed "yes," so nothing already-correct regressed. 2 new tests.
+- **FOUND AND FIXED — no tool existed to do what `weapon_feat_non_melee_class`
+  and `invalid_feat_id` both name as their own fix ("remove the feat").**
+  `respec_weapon_feats` always re-adds a matching feat for a replacement
+  weapon (`toBaseItem` is required) — the wrong shape when a feat simply
+  shouldn't be on that class at all. **New tool: `remove_feats`** (resolves a
+  blueprint or placed instance exactly like `respec_weapon_feats` does, takes
+  a JSON array of feat ids, removes them, adds nothing). 2 new tests.
+- **Real violations found and fixed in the module itself**, confirming the
+  new rules against a module an earlier session had already built and
+  shipped: 5 creatures (`hos_thug1`/`hos_thug2`/`hos_cult2` at Str 18,
+  `hos_thug3`/`hos_cult1` at Dex 18 — all Fighter/Rogue mooks, the literal
+  "Thug fighters have 18 strength" bug reaching an already-built module) had
+  their primary ability clamped to 15 via `modify_gff_field` on both the
+  standalone blueprint and the placed GIT instance (a separate copy each,
+  per the existing "separate copy" pitfall — both needed the edit). 5
+  creatures (`boss_venn` the Cleric, `elowen` the Wizard, `elya` the Cleric,
+  `hos_cult1`/`hos_thug3` the Rogues) had a Weapon Focus/Specialization/
+  (Improved Critical for `boss_venn`) tier removed via the new `remove_feats`
+  tool, on both copies each. **`boss_venn`'s `caster_no_spells` was the real,
+  literal "Venn had no spells memorized" bug** — his `ScriptSpawn` was still
+  the stock `nw_c2_default9`, with no `create_random_abilities_system` wiring
+  at all (unlike `elowen`/`elya`, both companions whose `a_hen_join` already
+  correctly called `RA_OnSpawn` post-leveling — their `caster_no_spells` is
+  the documented, expected static-check false positive, not a real bug).
+  Fixed with a new `a_venn_spawn` wrapper (chains `nw_c2_default9`, then
+  `DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))`), wired onto both copies —
+  same honest caveat as the `compose_encounter` boss fix: Venn's `ClassList`
+  was set directly rather than through a live `LevelUpHenchman()` call, so
+  per the confirmed Tier 1 finding this only ever rolls cantrip-level slots,
+  not a full Cleric spellbook. Also set `Mod_Description` (was empty) with
+  real, non-guessed practical info pulled from the module's own `adventure.md`
+  sidecar (target level 3, party size 4, 3 companions, ~2-3hr).
+- **Left alone, deliberately**: `store_item_miscategorized` on `str_mira` (a
+  medkit in the wrong `StoreList` category) — a real, pre-existing finding,
+  but unrelated to this session's new rules and with no existing fix tool
+  (moving an item between `StoreList` categories needs a list-level edit
+  `modify_gff_field` refuses, and no dedicated store tool exists yet, unlike
+  `remove_feats` for feats). Noted rather than built, since it's a one-off,
+  not a pattern this session's actual ask touched.
+- **Confirmed, the hard way, why restart discipline matters mid-session**:
+  calling `load_module` again (forced by an MCP server restart needed to
+  pick up the `remove_feats`/`PlayerClass`-gate code changes) silently
+  reverted 10 just-applied `modify_gff_field` edits that had never been
+  repacked — the exact "never call `load_module` between an edit and its
+  repack" pitfall, triggered by a restart requirement rather than a mistaken
+  manual call. All 10 edits were simply redone immediately after, with
+  nothing else touched in between this time, and `repack_module` was called
+  as the very last step with no further edits following it.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
