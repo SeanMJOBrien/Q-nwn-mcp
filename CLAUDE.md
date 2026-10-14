@@ -2116,6 +2116,81 @@ module actually has, as built.**
   `pmh0_chest030.mdl`, `*_chest032.mdl` likewise) — ruling out a missing-mesh
   explanation too. No structural cause found from data alone.
 
+**Second playtest round on the same module (2026-10-13) — the spell-slot
+finding above is now CONFIRMED (not just "likely"), a real journal-timing
+bug was found and fixed, and a much bigger armor finding surfaced than the
+one originally reported.**
+
+- **CONFIRMED — "not all spell slots are filled" is exactly the never-really-
+  leveled-ClassList mechanism flagged above, not a guess.** User-reported
+  exact numbers match the mechanism precisely: Elowen (Wizard) has 1 empty
+  slot at both 2nd and 3rd level; Elya (Cleric) has 2 empty slots at both —
+  both are `nSlots`/`nEngineSlots` mismatches, confirmed by re-reading
+  `inc_random_abil.nss`'s own `RA_RollClass`: `nPick` is capped to
+  `min(nSlots, nPoolSize, nEngineSlots)`, and `nEngineSlots =
+  GetMemorizedSpellCountByLevel(...)` — the exact value this project
+  already confirmed reports 0 (or less than the 2DA says) for a level the
+  engine never saw a real `LevelUpHenchman()` increment grant. The UI shows
+  the 2DA-implied slot count (so the slot "exists"); the engine's real
+  per-creature count is lower (so it's never filled). **Still not fixed** —
+  same blocker as before: safely forcing real incremental leveling needs
+  `build_npc_stat_block` to support writing a companion's mechanical stats
+  for its *final* level while leaving `ClassList` at level 1, which doesn't
+  exist yet. The alternative (statically baking the missing `MemorizedList`
+  entries directly via GFF, bypassing `LevelUpHenchman` entirely) is
+  possible — this project already confirmed the real struct shape — but
+  needs its own dedicated tool (nested list write, inside `ClassList`'s own
+  list) that doesn't exist yet either; not attempted this session.
+- **FOUND AND FIXED — a real journal-timing bug, exactly as reported.**
+  `miller_house`'s `OnEnter` script (`a_qhollow_s2`) advanced `q_hollow` to
+  stage 2 the instant the party walked in the door — before either
+  investigation challenge had been attempted. **Fix:** `OnEnter` cleared
+  entirely; the stage-2 advance moved into `a_clue_rug`'s and `a_clue_seal`'s
+  own success branches instead (guarded on `q_hollow == 1` so whichever of
+  the two challenges succeeds first is the one that advances it, and the
+  other's later success doesn't re-fire it). The journal now only moves once
+  a real sign of something wrong has actually been found, matching the
+  user's stated rule generally: a journal/quest-state advance tied to an
+  area transition alone is a narrative promise the script can't keep once
+  that area holds more than one thing to discover — tie it to the specific
+  discovery event instead.
+- **A much bigger finding than the one reported — "Chainmail (AC 5) a Rogue
+  can't use" turned out not to be the actual bug; something larger was.**
+  The specific equipped item (`nw_aarcl004`, both thugs' and both cultists'
+  Chest slot) has a **real, confirmed, zero-length `PropertiesList`** —
+  verified against the authentic base-game `.uti` directly (extracted via
+  `nwn_gff`, not through any MCP summarization layer, after discovering
+  `resolve_blueprint`'s own tool output quietly runs every result through a
+  summarizer despite its description promising raw GFF — a real, separate,
+  unfixed doc/behavior mismatch in that tool). Since this project's own
+  already-verified convention is that an armor item's real mechanical AC
+  bonus lives *only* in an `ITEM_PROPERTY_AC_BONUS` item property, not in
+  any 2DA column, this item provides **zero real AC** despite visually
+  resembling chainmail — so there was never a proficiency violation to
+  flag for the Rogue specifically. **The real, bigger problem**: this
+  appears to be a whole family of base-game NPC-costume items
+  (`nw_aarcl001`-`013`, at minimum) that are purely cosmetic, and whatever
+  gear-sourcing step equipped every mook in this module (`hos_thug1/2/3`,
+  `hos_cult1/2`) picked from this cosmetic family — meaning **none of their
+  armor does anything mechanically**, not just the one the user happened to
+  notice. Checked the companion/boss-tier alternative too
+  (`nw_maarcl046`, worn by `boss_venn`/`garrick`/`capt_holt`/`gw_guard_a`):
+  it does carry a real `ITEM_PROPERTY_AC_BONUS`, but only costValue 1 (Light
+  tier) — a `nw_maarcl0XX` sampling (001/020/040/060/080/100) showed these
+  are all **magical loot-table items** (expensive, extra properties), not a
+  tiered-by-number mundane set, so even the "real" armor in this module is
+  essentially random loot-table dressing, not deliberately chosen for the
+  wearer's proficiency. **Not fixed this session** — doing this properly
+  needs a verified, curated list of real mundane base-game armor items by
+  AC tier (Light 1-3 / Medium 4-5 / Heavy 6-8), which doesn't exist in this
+  project yet (unlike `CLASS_WEAPON_PREFERENCES` for weapons) and wasn't
+  found through the searches tried this session. **This is now the
+  priority candidate for a dedicated follow-up**: build and verify that
+  curated armor table, the same way `CLASS_WEAPON_PREFERENCES` was built
+  and verified for weapons, then re-gear every creature in this module
+  (and fix whatever tool/skill step is currently sourcing from the cosmetic
+  family) against it.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
@@ -2164,6 +2239,24 @@ apply to every one of these, going forward:
   at 2 attempts per PC, each rolling the best Search/Lore rank among the triggering PC and
   their henchmen. Copy this shape for the next module that needs one, rather than re-deriving
   it; nothing about it is module-specific except the two skill/DC/flag constants.
+- **CORRECTION (2026-10-13) — the henchman-skill enumeration in the reference
+  implementation above was wrong the first time it shipped, and the user caught it live:
+  "My henchmen don't appear to be able to assist me in challenge rolls."** The original
+  version looped `GetHenchman(oPC, i)` for `i = 1..4` — a real engine function, confirmed to
+  *compile*, but never confirmed to actually enumerate a PC's associates at runtime before
+  shipping it. **Rule: compiling is not verifying.** Rewritten to use a mechanism this exact
+  module had *already* runtime-confirmed correct elsewhere: `c_hen_mine`'s own dialog
+  conditional gates on `GetMaster(oHenchman) == oPC`, proven working by the dismiss/rejoin
+  dialog flow functioning correctly. The fixed version loops
+  `GetFirstFactionMember(oPC, FALSE)`/`GetNextFactionMember(oPC, FALSE)` (bPCOnly FALSE, so it
+  walks NPCs too) filtered to `!GetIsPC(oMember) && GetMaster(oMember) == oPC`. **Still not
+  independently live-verified** — this project's live verify-server can run a creature through
+  real engine logic headlessly, but has no way to simulate an actual logged-in PC client
+  clicking a placeable, so the exact trigger path (`GetLastUsedBy()` on a real player's click)
+  couldn't be tested before shipping this correction either. If this specific mechanism still
+  doesn't work when the user retests, the next thing to check is whether `GetMaster()` itself
+  behaves differently for a dismissed-then-rejoined henchman than for one recruited fresh —
+  not yet ruled out.
 
 ### Rewards are per-player, not a divided pot
 
