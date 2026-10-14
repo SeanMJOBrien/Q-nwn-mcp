@@ -682,6 +682,29 @@ export async function verifyCreature(
         "bake the matching Armor Proficiency feat via create_creature_blueprint's `feats` param, or equip armor this creature is already proficient with",
       );
     }
+
+    // A real, confirmed gap this check's own AC-bonus lookup can't see on its
+    // own: some real base-game NPC "costume" armor items (the nw_aarcl0XX
+    // family, confirmed directly against the authentic base-game .uti — not
+    // a cloning bug) are purely cosmetic, with a genuinely EMPTY
+    // PropertiesList despite looking like real Chain/Banded/whatever armor
+    // and being costed like it. armorTierFeat() correctly treats AC bonus 0
+    // as "needs no proficiency" (the right call for a deliberately-bare
+    // clothing item like nw_cloth001, Cost ~1gp) — but a Chest item costed
+    // like real protective gear that STILL has zero AC bonus is its own
+    // distinct problem: it isn't a proficiency mismatch, it's armor that
+    // does nothing mechanically. Gated on Cost > 10 specifically so the
+    // intentional AC-0 baseline clothing convention this project already
+    // uses for companions never false-positives here.
+    if (chestEntry && acBonus === 0 && getFieldNum(chestEntry, "BaseItem") === 16 && getFieldNum(chestEntry, "Cost") > 10) {
+      report.warn(
+        "equipped_armor_no_ac_bonus",
+        `Chest-slot armor is costed at ${getFieldNum(chestEntry, "Cost")}gp like real protective gear, but carries no ITEM_PROPERTY_AC_BONUS at all — ` +
+          "it provides zero mechanical AC regardless of what it looks like or what proficiency this creature has",
+        "Equip_ItemList",
+        "use add_equipped_item_property to add a real AC_BONUS property (propertyName 1, costTable 2, costValue = the intended AC bonus), or equip a different real armor item",
+      );
+    }
   }
 
   // A creature can be individually proficient with what's equipped (the

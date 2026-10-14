@@ -829,6 +829,45 @@ describe("verifyCreature", () => {
     expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
   });
 
+  // Real, confirmed finding: some base-game NPC "costume" armor (the
+  // nw_aarcl0XX family) has a genuinely empty PropertiesList despite looking
+  // like, and being costed like, real protective gear — AC bonus 0 isn't a
+  // proficiency problem for armorTierFeat() (correctly needs no feat), but it
+  // IS a "this armor does nothing" problem worth its own warning.
+  it("flags Chest-slot armor costed like real gear but with no AC Bonus property at all", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 2, TemplateResRef: { type: "resref", value: "nw_aarcl004" }, BaseItem: { type: "int", value: 16 }, Cost: { type: "dword", value: 150 } }],
+      },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).toContain("equipped_armor_no_ac_bonus");
+  });
+
+  it("does not flag cheap baseline clothing (Cost <= 10) with no AC Bonus property", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 2, TemplateResRef: { type: "resref", value: "nw_cloth001" }, BaseItem: { type: "int", value: 16 }, Cost: { type: "dword", value: 1 } }],
+      },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("equipped_armor_no_ac_bonus");
+  });
+
+  it("does not flag Chest-slot armor that already has a real AC Bonus property, even a low one", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 3 } }] }, // ArmProfLgt
+      Equip_ItemList: { type: "list", value: [{ ...chestArmor(1), Cost: { type: "dword", value: 150 } }] },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("equipped_armor_no_ac_bonus");
+  });
+
   it("flags a caster class at its casting level with no spells in either MemorizedList or SpecAbilityList", async () => {
     const obj = makeCreature("nw_c2_default", {
       ClassList: {
