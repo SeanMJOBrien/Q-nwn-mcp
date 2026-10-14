@@ -255,6 +255,28 @@ void RA_RollClass(object oCreature, int nClassType, int nClassLevel)
     int nSpellRowCount = Get2DARowCount("spells");
     int bAnyTier2 = FALSE;
 
+    // GetSpellLevelByClass() alone is not safe to trust blindly — confirmed
+    // for real, twice, against two different classes: spells.2da rows can
+    // carry "****" directly in their OWN per-class column while still having
+    // a "Master" column pointing at a different row that DOES support the
+    // class, and the engine function resolves through that Master link
+    // rather than respecting the row's own "****". This lets a monster
+    // special-ability variant (row 716 "SuckBrain"/"Extract Brain", an
+    // Illithid attack — Cleric="****" directly, Master=50) or even an
+    // explicitly retired row (row 331 "DELETED_END_Fire" — Wiz_Sorc="****",
+    // UserType="****" directly, Master=50, the same master as SuckBrain)
+    // report a valid class/level from GetSpellLevelByClass() and get rolled
+    // into a real NPC's memorized spellbook. classes.2da's SpellTableColumn
+    // (e.g. "Cleric", "Wiz_Sorc") is the exact column name spells.2da uses
+    // per class — fetched once here and cross-checked per spell row below as
+    // a hard backstop: only a spell whose OWN row (never an inherited
+    // Master's) independently agrees with GetSpellLevelByClass()'s answer is
+    // trusted. This is deliberately NOT a replacement for
+    // GetSpellLevelByClass() (the header's "never hand-parse" design intent
+    // stands for the normal case) — it's a targeted safety filter for this
+    // one confirmed engine inheritance quirk.
+    string sClassCol = Get2DAString("classes", "SpellTableColumn", nClassType);
+
     // Bucket every spell id into its class-specific level pool in ONE pass
     // over spells.2da, rather than rescanning the whole table once per
     // populated spell level — rescanning per level can exceed the script's
@@ -293,6 +315,18 @@ void RA_RollClass(object oCreature, int nClassType, int nClassLevel)
     for (nSpellId = 0; nSpellId < nSpellRowCount; nSpellId++)
     {
         int nLvl = GetSpellLevelByClass(nClassType, nSpellId);
+        if (nLvl < 0 || nLvl > 9) continue;
+
+        // The Master-inheritance backstop (see comment above sClassCol):
+        // only trust nLvl when this exact row's own per-class column
+        // independently agrees — never a value inherited from a different
+        // row via Master.
+        if (GetStringLength(sClassCol) > 0)
+        {
+            string sOwnLevel = Get2DAString("spells", sClassCol, nSpellId);
+            if (GetStringLength(sOwnLevel) == 0 || StringToInt(sOwnLevel) != nLvl) continue;
+        }
+
         json jId = JsonInt(nSpellId);
         if (nLvl == 0) jPool0 = JsonArrayInsert(jPool0, jId);
         else if (nLvl == 1) jPool1 = JsonArrayInsert(jPool1, jId);

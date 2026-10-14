@@ -101,6 +101,24 @@ describe("generateRandomAbilitiesInclude — Tier 1 (real spellbook)", () => {
     const source = generateRandomAbilitiesInclude();
     expect(source).toContain("if (nPick > nPoolSize) nPick = nPoolSize;");
   });
+
+  it("cross-checks GetSpellLevelByClass against the spell's own 2DA column, not an inherited Master value", () => {
+    // Real, confirmed bug: GetSpellLevelByClass(nClassType, nSpellId) can
+    // report a valid class/level for a spell row whose OWN per-class column
+    // is "****" when that row's Master column points at a different row
+    // that DOES support the class — the engine resolves through Master
+    // rather than honoring the row's own "****". Confirmed twice against a
+    // real base-game spells.2da: row 716 "SuckBrain" (Extract Brain, an
+    // Illithid monster attack — Cleric="****" directly, Master=50) and row
+    // 331 "DELETED_END_Fire" (an explicitly retired row — Wiz_Sorc="****"
+    // and UserType="****" directly, Master=50, the same master) both leaked
+    // into a real NPC's randomly-rolled spellbook this way. The backstop
+    // must independently verify the row's own column before trusting nLvl.
+    const source = generateRandomAbilitiesInclude();
+    expect(source).toContain('Get2DAString("classes", "SpellTableColumn", nClassType)');
+    expect(source).toContain('Get2DAString("spells", sClassCol, nSpellId)');
+    expect(source).toMatch(/if \(GetStringLength\(sOwnLevel\) == 0 \|\| StringToInt\(sOwnLevel\) != nLvl\) continue;/);
+  });
 });
 
 describe("generateRandomAbilitiesInclude — Tier 2 (virtual ability, spontaneous casters)", () => {

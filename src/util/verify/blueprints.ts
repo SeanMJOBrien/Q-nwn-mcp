@@ -5,6 +5,7 @@
  */
 
 import { EQUIP_SLOT_MAP } from "../equip-slots.js";
+import { getVarTableEntries } from "../git-helpers.js";
 import { tableFromConstantColumn } from "../npc-stat-block.js";
 import { WEAPON_INVESTMENT_CLASS_IDS } from "../npc-weapon-preferences.js";
 import type { ResmanOptions } from "../../nim-tools.js";
@@ -291,6 +292,26 @@ export async function verifyCreature(
     }
   }
 
+  // "Deferred leveling" support: a companion built by build_npc_stat_block's
+  // deferLeveling option has its ability scores/FeatList/SkillList/HP computed
+  // for a REAL target level, but ClassList's own ClassLevel deliberately left
+  // at 1 — the level only becomes real once a_hen_spawn's LevelUpHenchman()
+  // loop actually runs it up, live, at spawn (needed so the ENGINE sees real
+  // level-up events and GetMemorizedSpellCountByLevel() stops returning 0 for
+  // every level past the first — see the "Spell-slot timing" entry in this
+  // doc for why spawn-vs-hire timing alone can't fix that without this
+  // build-time half too). HENCH_LEVEL is the existing VarTable convention
+  // a_hen_join/a_hen_spawn already read for exactly this "real target level"
+  // value — reused here (not a new key) so the three level-formula checks
+  // below compare against what the stats were ACTUALLY computed for, not the
+  // deliberately-deferred ClassList value. A creature not using this pattern
+  // (no HENCH_LEVEL, or HENCH_LEVEL == totalLevel already) is completely
+  // unaffected — effectiveLevel just equals totalLevel.
+  const henchLevelEntry = getVarTableEntries(obj).find(
+    (v) => v.name.toLowerCase() === "hench_level" && v.type === "int",
+  );
+  const effectiveLevel = Math.max(totalLevel, typeof henchLevelEntry?.value === "number" ? henchLevelEntry.value : 0);
+
   // User-specified rule: a stat may exceed 15 (the Elite Array's own ceiling) only
   // via racial adjustment or the real level-based ability increase — never from
   // picking a higher point-buy band directly. The increase count is always based on
@@ -308,7 +329,7 @@ export async function verifyCreature(
     const abilityRaceCol: Record<string, string> = {
       str: "StrAdjust", dex: "DexAdjust", con: "ConAdjust", int: "IntAdjust", wis: "WisAdjust", cha: "ChaAdjust",
     };
-    const levelIncrease = Math.floor(totalLevel / 4);
+    const levelIncrease = Math.floor(effectiveLevel / 4);
     const raceRow = twoDARow(index, "racialtypes", race);
     // PlayerClass-gated (same real-module finding as the HP/skill-points/
     // package checks below): the Elite Array point-buy convention is a PC
@@ -339,7 +360,7 @@ export async function verifyCreature(
           "ability_score_base_exceeds_elite",
           `${primaryAbil.toUpperCase()} (a class's PrimaryAbil) is ${actual} — after backing out the racial ` +
             `adjustment (${racialAdj >= 0 ? "+" : ""}${racialAdj}) and the maximum possible level-based increase ` +
-            `(+${levelIncrease}, from ${totalLevel} total level(s) across every class), the remaining base is ` +
+            `(+${levelIncrease}, from ${effectiveLevel} total level(s) across every class${effectiveLevel !== totalLevel ? ` — HENCH_LEVEL, not yet reflected in ClassList pending a real level-up pass` : ""}), the remaining base is ` +
             `${base}, above the Elite Array's own ceiling of 15 even giving every increase to this stat. A stat ` +
             "should only exceed 15 via racial adjustment or leveling, never a higher point-buy band directly.",
           abilityField[primaryAbil],
@@ -370,7 +391,7 @@ export async function verifyCreature(
   // the column, so an older fixture/table with no PlayerClass data still
   // behaves as before) fixes it without weakening the check for any creature
   // it was meant to catch.
-  if (classList.length === 1 && totalLevel >= 1) {
+  if (classList.length === 1 && effectiveLevel >= 1) {
     const classRow = twoDARow(index, "classes", classIds[0]);
     const hitDie =
       classRow && classRow.PlayerClass !== "0" && hasCell(classRow, "HitDie") ? Number(classRow.HitDie) : undefined;
@@ -378,13 +399,13 @@ export async function verifyCreature(
       const conMod = Math.floor((getFieldNum(obj, "Con") - 10) / 2);
       const avgPerLevel = Math.floor(hitDie / 2) + 1;
       let expectedHp = hitDie + conMod;
-      for (let lvl = 2; lvl <= totalLevel; lvl++) expectedHp += Math.max(1, avgPerLevel + conMod);
-      expectedHp = Math.max(totalLevel, expectedHp);
+      for (let lvl = 2; lvl <= effectiveLevel; lvl++) expectedHp += Math.max(1, avgPerLevel + conMod);
+      expectedHp = Math.max(effectiveLevel, expectedHp);
       const actualHp = getFieldNum(obj, "MaxHitPoints");
       if (actualHp !== expectedHp) {
         report.warn(
           "hp_formula_mismatch",
-          `MaxHitPoints is ${actualHp}, but the formula for a level-${totalLevel} HitDie-${hitDie} creature with ` +
+          `MaxHitPoints is ${actualHp}, but the formula for a level-${effectiveLevel} HitDie-${hitDie} creature with ` +
             `Con ${getFieldNum(obj, "Con")} gives ${expectedHp} — likely a stale value left over from a level or ` +
             "ability-score change made after HP was last computed",
           "MaxHitPoints",
@@ -401,7 +422,7 @@ export async function verifyCreature(
   // uses. Single-class only, same multiclass caution as HP above (each class's
   // own SkillPointBase/SkillsTable differ, and which levels were taken in which
   // class isn't reconstructable from the final ClassList).
-  if (classList.length === 1 && totalLevel >= 1) {
+  if (classList.length === 1 && effectiveLevel >= 1) {
     const classRow = twoDARow(index, "classes", classIds[0]);
     const raceRow = twoDARow(index, "racialtypes", race);
     if (classRow && classRow.PlayerClass !== "0") {
@@ -410,7 +431,7 @@ export async function verifyCreature(
       const extraSkillPerLevel = raceRow && hasCell(raceRow, "ExtraSkillPointsPerLevel") ? Number(raceRow.ExtraSkillPointsPerLevel) : 0;
       const perLevel = Math.max(1, skillPointBase + intMod + extraSkillPerLevel);
       const firstLevelMultiplier = raceRow && hasCell(raceRow, "FirstLevelSkillPointsMultiplier") ? Number(raceRow.FirstLevelSkillPointsMultiplier) : 4;
-      const totalSkillPoints = perLevel * firstLevelMultiplier + perLevel * (totalLevel - 1);
+      const totalSkillPoints = perLevel * firstLevelMultiplier + perLevel * (effectiveLevel - 1);
 
       const skillTable = tableFromConstantColumn(index, classRow, "SkillsTable");
       let classSkillCount = 0;
@@ -421,13 +442,13 @@ export async function verifyCreature(
         // The generator's round-robin spend always ends at exactly this total: every
         // skill gets incremented each pass until either the budget or every skill's
         // own level+3 cap is hit — equivalent in total to this closed form.
-        const cap = totalLevel + 3;
+        const cap = effectiveLevel + 3;
         const expectedSpent = Math.min(totalSkillPoints, classSkillCount * cap);
         const actualSpent = listOf(obj, "SkillList").reduce((sum, s) => sum + getFieldNum(s, "Rank"), 0);
         if (actualSpent !== expectedSpent) {
           report.warn(
             "skill_points_formula_mismatch",
-            `SkillList has ${actualSpent} total ranks spent, but the formula for a level-${totalLevel} class ` +
+            `SkillList has ${actualSpent} total ranks spent, but the formula for a level-${effectiveLevel} class ` +
               `(SkillPointBase ${skillPointBase}, Int mod ${intMod}) gives ${expectedSpent} — likely a stale ` +
               "SkillList left over from a level or ability-score change made after skills were last computed",
             "SkillList",

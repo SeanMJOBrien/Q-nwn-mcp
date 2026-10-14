@@ -581,6 +581,66 @@ describe("verifyCreature", () => {
     expect(report.warnings.filter((w) => w.code === "ability_score_base_exceeds_elite")).toHaveLength(1); // not for STR
   });
 
+  // "Deferred leveling" support (2026-10-13): a companion built with
+  // build_npc_stat_block's deferLeveling option has ClassList's ClassLevel
+  // deliberately left at 1 while every other stat (ability scores, HP,
+  // skills) is computed for the real target level, stored in the existing
+  // HENCH_LEVEL VarTable convention — a_hen_spawn's LevelUpHenchman() loop
+  // only makes ClassLevel real once it actually runs, live. The three
+  // level-formula checks must compare against HENCH_LEVEL, not the
+  // deliberately-deferred ClassLevel, or they'd all false-positive on every
+  // companion built this way.
+  it("uses HENCH_LEVEL instead of ClassLevel for the ability-score check when a companion's leveling is deliberately deferred", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Str: { type: "byte", value: 15 }, // base 15, no racial adj — fine at any level
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
+      VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "HENCH_LEVEL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 9 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        ["classes", twoDA(["PrimaryAbil"], [[4, { PrimaryAbil: "STR" }]])],
+        ["racialtypes", twoDA(["StrAdjust"], [[6, { StrAdjust: "0" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    // effectiveLevel = max(1, 9) = 9 -> levelIncrease = floor(9/4) = 2, base = 15 - 0 - 2 = 13, fine either way —
+    // this case just confirms it doesn't crash/misbehave with HENCH_LEVEL present and a safe stat.
+    expect(report.warnings.map((w) => w.code)).not.toContain("ability_score_base_exceeds_elite");
+  });
+
+  it("does not flag HP/skill-points formulas against the deferred ClassLevel when HENCH_LEVEL names the real target level", async () => {
+    // Str 17 with HENCH_LEVEL 5: base = 17 - 0 racial - floor(5/4)=1 level = 16 — still
+    // over 15, so ability_score_base_exceeds_elite SHOULD fire; HP/skill checks should
+    // use effectiveLevel (5), not the deferred ClassLevel (1), and find no mismatch
+    // since the fixture's HP/skills are plausibly computed for level 5 already.
+    const obj = makeCreature("nw_c2_default", {
+      Con: { type: "byte", value: 14 }, // +2 mod
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
+      VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "HENCH_LEVEL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 5 } }] },
+      // Level-5 d10 Con+2 HP: 10+2 (lvl1) + 4*(6+2) (lvl2-5) = 44.
+      MaxHitPoints: { type: "short", value: 44 },
+    });
+    const index = makeIndex({ twodaTables: new Map([["classes", twoDA(["HitDie"], [[4, { HitDie: "10" }]])]]) });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("hp_formula_mismatch");
+  });
+
+  it("still flags a genuine HP mismatch at the HENCH_LEVEL-derived effective level, not the deferred ClassLevel", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Con: { type: "byte", value: 14 },
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
+      VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "HENCH_LEVEL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 5 } }] },
+      MaxHitPoints: { type: "short", value: 999 }, // wildly wrong for level 5
+    });
+    const index = makeIndex({ twodaTables: new Map([["classes", twoDA(["HitDie"], [[4, { HitDie: "10" }]])]]) });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("hp_formula_mismatch");
+  });
+
   // Real, confirmed false positive: a non-PC "class" (Animal/Outsider,
   // PlayerClass=0) still carries a PrimaryAbil in classes.2da, but a monster's
   // naturally high Str/Dex has no "Elite Array point-buy" story behind it at
