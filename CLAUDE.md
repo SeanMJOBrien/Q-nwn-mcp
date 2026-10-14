@@ -2191,6 +2191,62 @@ one originally reported.**
   (and fix whatever tool/skill step is currently sourcing from the cosmetic
   family) against it.
 
+**RESOLVED (2026-10-13), third round — the user corrected the "cosmetic armor,
+not a bug" framing above, and was right to.** "ALL armors are fully
+functional and properly formed" — i.e. treat the item as real chainmail and
+fix the actual rule violation, don't explain the violation away by finding
+the data empty. This reframes the finding above correctly: an empty
+`PropertiesList` on costed-like-real-armor is itself the defect to fix, not
+evidence there's no bug to find.
+- **FIXED — new tool, `add_equipped_item_property`.** `add_item_property`
+  only ever targets a standalone item blueprint resource; there was no way
+  to add a property to a copy already embedded in a creature's
+  `Equip_ItemList` (a separate struct, same "placed instance is a separate
+  copy" pattern already documented for `ClassList`/`FeatList`). Resolves a
+  creature exactly like `remove_feats`/`respec_weapon_feats` do, appends a
+  property struct to the named slot's item.
+- **FIXED — new check, `equipped_armor_no_ac_bonus`** (`verify_creature`).
+  Generalizes the finding: Chest armor costed like real protective gear
+  (`Cost > 10`, gated there specifically so the intentional AC-0 baseline-
+  clothing convention for companions never false-positives) but carrying no
+  `ITEM_PROPERTY_AC_BONUS` at all is flagged regardless of proficiency —
+  catching "this armor does nothing" as its own class of defect, not
+  folded into (and silently excused by) the proficiency-mismatch check's
+  own correct "AC bonus 0 needs no feat" logic.
+- **FIXED — every real violation in the module.** Used the new tool to give
+  real, tier-matched `ITEM_PROPERTY_AC_BONUS` values to all 5 originally-
+  flagged mooks (`hos_thug1/2/3`, `hos_cult1/2` — Fighters to AC 6/Heavy,
+  Rogues capped at AC 3/Light, matching each one's own actual `FeatList`
+  proficiency) — and the new check immediately caught 3 more real instances
+  of the identical bug the original investigation missed:
+  `gw_guard_a/b/c` at `grayward_gate` (`nw_aarcl008`, same cosmetic family,
+  same fix). `verify_all` is clean of every `armor_proficiency_mismatch`/
+  `equipped_armor_no_ac_bonus` finding across the whole module afterward.
+  **Still open, deliberately not done this round**: `capt_holt`/`garrick`/
+  `boss_venn`'s `nw_maarcl046` (a real but very weak AC-1 magical loot item,
+  not a *broken* item) — out of scope for this fix, since it's a "weak
+  gear" problem, not a "does nothing" one.
+
+**Spell-slot timing — a user-proposed fix (spawn leveling instead of hire
+leveling) was examined and corrected, not adopted as-is.** The user asked
+whether moving the `LevelUpHenchman()` loop from `a_hen_join` (hire) to
+`a_hen_spawn` (spawn) would fix the empty-slot problem, reasoning the
+companion would already be "leveled" by the time it's recruited. **It
+would not, and the reason matters for any future attempt at this**:
+`GetHitDice()` reads the *static* `ClassList` level that `build_npc_stat_block`
+already wrote into the `.utc` at build time — that value is 3 (the final
+level) from the very first moment the object exists, at spawn exactly as
+much as at hire. Moving the loop earlier doesn't create a starting level
+below the target; without that, `for (i = GetHitDice(...); i <
+nTargetLevel; i++)` is a no-op wherever it's called, since nothing happens
+*between* spawn and hire to change what `GetHitDice()` returns. The real
+fix is still the build-time one already identified above (`ClassList`
+written at level 1, final stats everywhere else) — moving the runtime loop
+to spawn is a legitimate complementary change once that exists (it avoids
+a visible mid-game "my companion just got stronger" moment right at
+recruit), but doesn't substitute for it. Not applied this session pending
+the user's go-ahead on the build-time half.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
