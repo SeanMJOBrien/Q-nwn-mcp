@@ -573,4 +573,70 @@ export function registerNpcTools(server: McpServer): void {
       };
     },
   );
+
+  // ─── remove_feats ────────────────────────────────────────────────────────
+  // Gap found applying verify_creature to a real module: several checks
+  // (weapon_feat_non_melee_class, invalid_feat_id) name "remove the feat" as
+  // their fix, but no tool actually did a plain removal — respec_weapon_feats
+  // always re-adds a matching feat for a replacement weapon (toBaseItem is
+  // required), which is the wrong shape when the fix is "this class shouldn't
+  // have a per-weapon investment feat at all," not "retarget it."
+
+  server.tool(
+    "remove_feats",
+    "Remove specific feats from a creature's FeatList by feat.2da row id, with nothing added back. " +
+      "Use this for verify_creature findings whose fix is a plain removal — e.g. weapon_feat_non_melee_class " +
+      "(a Weapon Focus/Specialization/Improved Critical tier on a class that shouldn't have one) or invalid_feat_id. " +
+      "For swapping a weapon-investment tier onto a different weapon (not removing it outright), use respec_weapon_feats instead.",
+    {
+      resref: z.string().optional().describe("Blueprint resref to edit"),
+      area: z.string().optional().describe("Area resref, when editing a placed instance (with `tag`)"),
+      tag: z.string().optional().describe("Tag of the placed instance to edit (with `area`)"),
+      feats: z.string().describe('JSON array of feat.2da row ids to remove, e.g. "[95,133]"'),
+    },
+    { idempotentHint: true },
+    async ({ resref, area, tag, feats }) => {
+      const index = requireIndex();
+      const target = await resolveCreatureTarget(
+        index,
+        resref,
+        area,
+        tag,
+        "remove_feats",
+        `Remove feats from ${tag ?? resref}`,
+      );
+      if ("error" in target) return { content: [{ type: "text", text: target.error }] };
+      const { obj: creature, save } = target;
+
+      const toRemove = new Set<number>(JSON.parse(feats));
+      const featList = listOf(creature, "FeatList");
+      const before = featList.map((f) => getFieldNum(f, "Feat"));
+      const removed = before.filter((f) => toRemove.has(f));
+      const kept = before.filter((f) => !toRemove.has(f));
+
+      creature.FeatList = {
+        type: "list",
+        value: kept.map((f) => ({ __struct_id: 1, Feat: { type: "word", value: f } })),
+      };
+      await save();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                target: target.label,
+                removed,
+                notFound: [...toRemove].filter((f) => !before.includes(f)),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+  );
 }

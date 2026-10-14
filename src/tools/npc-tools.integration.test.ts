@@ -541,3 +541,68 @@ describe("respec_weapon_feats", () => {
     }
   });
 });
+
+describe("remove_feats", () => {
+  it("removes the named feats and leaves the rest untouched", async () => {
+    const key = "cleric_npc.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "cleric_npc" },
+        FeatList: {
+          type: "list",
+          value: [
+            { __struct_id: 1, Feat: { type: "word", value: 46 } }, // Simple Weapon Proficiency, kept
+            { __struct_id: 1, Feat: { type: "word", value: 95 } }, // Weapon Focus: Morningstar, removed
+            { __struct_id: 1, Feat: { type: "word", value: 133 } }, // Weapon Specialization: Morningstar, removed
+          ],
+        },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "cleric_npc", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({ name: "remove_feats", arguments: { resref: "cleric_npc", feats: "[95,133]" } });
+      const parsed = parseResult(result) as { success: boolean; removed: number[]; notFound: number[] };
+      expect(parsed.success).toBe(true);
+      expect(parsed.removed.sort((a, b) => a - b)).toEqual([95, 133]);
+      expect(parsed.notFound).toEqual([]);
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const feats = (doc.FeatList as { value: GffObj[] }).value.map((f) => (f.Feat as { value: number }).value);
+      expect(feats).toEqual([46]);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("reports feat ids that weren't present as notFound, without erroring", async () => {
+    const key = "no_match.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "no_match" },
+        FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 46 } }] },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "no_match", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({ name: "remove_feats", arguments: { resref: "no_match", feats: "[999]" } });
+      const parsed = parseResult(result) as { success: boolean; removed: number[]; notFound: number[] };
+      expect(parsed.success).toBe(true);
+      expect(parsed.removed).toEqual([]);
+      expect(parsed.notFound).toEqual([999]);
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const feats = (doc.FeatList as { value: GffObj[] }).value.map((f) => (f.Feat as { value: number }).value);
+      expect(feats).toEqual([46]);
+    } finally {
+      await cleanup();
+    }
+  });
+});
