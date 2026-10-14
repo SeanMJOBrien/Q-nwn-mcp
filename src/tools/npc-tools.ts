@@ -639,4 +639,95 @@ export function registerNpcTools(server: McpServer): void {
       };
     },
   );
+
+  // ─── add_equipped_item_property ─────────────────────────────────────────
+  // Gap found while investigating a real armor-mechanics bug: several base-
+  // game NPC "costume" armor items (the `nw_aarcl0XX` family, at minimum)
+  // have a genuinely empty PropertiesList — confirmed directly against the
+  // real base-game .uti, not a copying bug — so they provide zero real AC
+  // bonus despite looking like Chain/Banded/whatever armor. add_item_property
+  // only ever targets a standalone item blueprint resource; there was no way
+  // to add a property to an item already embedded in a creature's
+  // Equip_ItemList (a different struct entirely, per the documented
+  // "placed instance is a separate copy" pattern this project already
+  // knows about for ClassList/FeatList).
+
+  server.tool(
+    "add_equipped_item_property",
+    "Add an item property (itempropdef.2da row) to an item already equipped on a creature's Equip_ItemList, by slot. " +
+      "Use this to give a cosmetic-only armor piece (empty PropertiesList — common on some base-game NPC costume items) a real " +
+      "ITEM_PROPERTY_AC_BONUS (propertyName 1, costTable 2, costValue = the AC bonus 0-8) so its mechanical AC matches its " +
+      "visual tier, and verify_creature's armor_proficiency_mismatch check has something real to compare against. " +
+      "For a standalone item blueprint (not yet equipped on anyone), use add_item_property instead.",
+    {
+      resref: z.string().optional().describe("Blueprint resref to edit"),
+      area: z.string().optional().describe("Area resref, when editing a placed instance (with `tag`)"),
+      tag: z.string().optional().describe("Tag of the placed instance to edit (with `area`)"),
+      slot: z.string().describe("Equip slot name: head, chest, boots, arms, righthand, lefthand, cloak, leftring, rightring, neck, belt, arrows, bullets, bolts"),
+      propertyName: numParam("itempropdef.2da row — e.g. 1 for AC_BONUS"),
+      subType: optNumParam("Subtype value (default 0)"),
+      costTable: optNumParam("Cost table index — e.g. 2 for AC_BONUS's cost table"),
+      costValue: numParam("Cost value — e.g. the AC bonus amount for propertyName 1"),
+      param1: optNumParam("Param1 table index (default 255 = no param)"),
+      param1Value: optNumParam("Param1 value (default 0)"),
+    },
+    { idempotentHint: true },
+    async ({ resref, area, tag, slot, propertyName, subType, costTable, costValue, param1, param1Value }) => {
+      const index = requireIndex();
+      const target = await resolveCreatureTarget(
+        index,
+        resref,
+        area,
+        tag,
+        "add_equipped_item_property",
+        `Add item property on ${tag ?? resref}`,
+      );
+      if ("error" in target) return { content: [{ type: "text", text: target.error }] };
+      const { obj: creature, save } = target;
+
+      const slotId = EQUIP_SLOT_MAP[slot.toLowerCase()];
+      if (slotId === undefined) {
+        return { content: [{ type: "text", text: `Unknown slot '${slot}'. Valid: ${Object.keys(EQUIP_SLOT_MAP).join(", ")}` }] };
+      }
+
+      const equipList = listOf(creature, "Equip_ItemList");
+      const item = equipList.find((e) => (e as { __struct_id?: number }).__struct_id === slotId) as GffObj | undefined;
+      if (!item) {
+        return { content: [{ type: "text", text: `Nothing equipped in slot '${slot}' on ${target.label}` }] };
+      }
+
+      const properties = getFieldList(item, "PropertiesList");
+      properties.push({
+        __struct_id: 0,
+        PropertyName: { type: "word", value: toI(propertyName) },
+        Subtype: { type: "word", value: toI(subType, 0) },
+        CostTable: { type: "byte", value: toI(costTable, 0) },
+        CostValue: { type: "word", value: toI(costValue) },
+        Param1: { type: "byte", value: toI(param1, 255) },
+        Param1Value: { type: "byte", value: toI(param1Value, 0) },
+        ChanceAppear: { type: "byte", value: 100 },
+      } as unknown as GffObj);
+      item.PropertiesList = { type: "list", value: properties };
+
+      await save();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                target: target.label,
+                slot,
+                added: { propertyName: toI(propertyName), subType: toI(subType, 0), costTable: toI(costTable, 0), costValue: toI(costValue) },
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+  );
 }

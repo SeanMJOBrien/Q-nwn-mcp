@@ -606,3 +606,68 @@ describe("remove_feats", () => {
     }
   });
 });
+
+describe("add_equipped_item_property", () => {
+  it("adds an AC_BONUS property to the item in the named slot", async () => {
+    const key = "thug_npc.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "thug_npc" },
+        Equip_ItemList: {
+          type: "list",
+          value: [
+            { __struct_id: 2, BaseItem: { type: "int", value: 16 }, TemplateResRef: { type: "resref", value: "nw_aarcl004" }, PropertiesList: { type: "list", value: [] } },
+          ],
+        },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "thug_npc", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "add_equipped_item_property",
+        arguments: { resref: "thug_npc", slot: "chest", propertyName: "1", costTable: "2", costValue: "5" },
+      });
+      const parsed = parseResult(result) as { success: boolean; slot: string };
+      expect(parsed.success).toBe(true);
+      expect(parsed.slot).toBe("chest");
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const chest = (doc.Equip_ItemList as { value: GffObj[] }).value[0];
+      const props = (chest.PropertiesList as { value: GffObj[] }).value;
+      expect(props).toHaveLength(1);
+      expect((props[0].PropertyName as { value: number }).value).toBe(1);
+      expect((props[0].CostValue as { value: number }).value).toBe(5);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("reports an error when the slot has nothing equipped", async () => {
+    const key = "bare_npc.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "bare_npc" },
+        Equip_ItemList: { type: "list", value: [] },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "bare_npc", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "add_equipped_item_property",
+        arguments: { resref: "bare_npc", slot: "chest", propertyName: "1", costValue: "5" },
+      });
+      const text = (result.content as Array<{ type: string; text?: string }>)[0]?.text ?? "";
+      expect(text).toContain("Nothing equipped");
+    } finally {
+      await cleanup();
+    }
+  });
+});
