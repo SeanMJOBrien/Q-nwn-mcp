@@ -310,9 +310,23 @@ export async function verifyCreature(
     };
     const levelIncrease = Math.floor(totalLevel / 4);
     const raceRow = twoDARow(index, "racialtypes", race);
+    // PlayerClass-gated (same real-module finding as the HP/skill-points/
+    // package checks below): the Elite Array point-buy convention is a PC
+    // character-creation concept. A non-PC "class" (Animal/Outsider/Commoner,
+    // PlayerClass=0) still carries a PrimaryAbil value in classes.2da, but
+    // nothing about that value means "this monster's stat was point-bought" —
+    // a demon or beast can legitimately have a high natural Str/Dex with no
+    // leveling/racial story behind it. Excluding non-PC classes here avoids a
+    // latent false positive on exactly this kind of creature (confirmed by
+    // checking a real Outsider-class monster while building this check out).
     const candidates = new Set(
       classIds
-        .map((id) => twoDARow(index, "classes", id)?.PrimaryAbil?.toLowerCase())
+        .map((id) => twoDARow(index, "classes", id))
+        // Missing PlayerClass data isn't treated as "exclude" — only an
+        // explicit "0" does, so a fixture/table without the column still
+        // behaves as before.
+        .filter((row): row is Record<string, string> => !!row && row.PlayerClass !== "0")
+        .map((row) => row.PrimaryAbil?.toLowerCase())
         .filter((a): a is string => !!a && !!abilityField[a]),
     );
     for (const primaryAbil of candidates) {
@@ -344,9 +358,22 @@ export async function verifyCreature(
   // necessarily ClassList[0]), which isn't reconstructable from the final
   // ClassList alone — skipped rather than guessed, same caution as the ability-
   // score check above before its multiclass fix.
+  //
+  // PlayerClass-gated (found applying this check to a real module, 2026-10-13):
+  // non-PC "classes" (Animal=12, Outsider=24, Commoner=20, PlayerClass=0 in
+  // classes.2da) don't follow this leveling formula at all — e.g. Commoner's
+  // HitDie=4 average-progression doesn't match how the toolset actually hands
+  // out HP for a background NPC, and "Animal"/"Outsider" are monster-type
+  // stand-ins, not a real class progression. Confirmed false-positive on real
+  // creatures (a Dog, a Chicken, two Quasits, a Hound, two Commoners) before
+  // this gate — excluding an explicit PlayerClass=0 row (never the absence of
+  // the column, so an older fixture/table with no PlayerClass data still
+  // behaves as before) fixes it without weakening the check for any creature
+  // it was meant to catch.
   if (classList.length === 1 && totalLevel >= 1) {
     const classRow = twoDARow(index, "classes", classIds[0]);
-    const hitDie = classRow && hasCell(classRow, "HitDie") ? Number(classRow.HitDie) : undefined;
+    const hitDie =
+      classRow && classRow.PlayerClass !== "0" && hasCell(classRow, "HitDie") ? Number(classRow.HitDie) : undefined;
     if (hitDie !== undefined && Number.isFinite(hitDie)) {
       const conMod = Math.floor((getFieldNum(obj, "Con") - 10) / 2);
       const avgPerLevel = Math.floor(hitDie / 2) + 1;
@@ -377,7 +404,7 @@ export async function verifyCreature(
   if (classList.length === 1 && totalLevel >= 1) {
     const classRow = twoDARow(index, "classes", classIds[0]);
     const raceRow = twoDARow(index, "racialtypes", race);
-    if (classRow) {
+    if (classRow && classRow.PlayerClass !== "0") {
       const skillPointBase = hasCell(classRow, "SkillPointBase") ? Number(classRow.SkillPointBase) : 0;
       const intMod = Math.floor((getFieldNum(obj, "Int") - 10) / 2);
       const extraSkillPerLevel = raceRow && hasCell(raceRow, "ExtraSkillPointsPerLevel") ? Number(raceRow.ExtraSkillPointsPerLevel) : 0;
@@ -417,7 +444,18 @@ export async function verifyCreature(
   // henchman-only block) beyond its narrower "stuck at 0" case and beyond
   // henchmen specifically, since the convention is universal, not companion-only.
   // Single-class only — the convention itself has no defined multiclass answer.
-  if (classList.length === 1) {
+  //
+  // PlayerClass-gated, same real-module finding as the HP/skill-points checks
+  // above: packages.2da's rows are themed sub-archetype packages for the 11
+  // real PC classes (e.g. row 12 is "Druid_Gray" with ClassID 3, row 20 is
+  // "Cleric_DeadWalker" with ClassID 2, row 24 is "Fighter_Pirate" with
+  // ClassID 4) — the row-equals-classId convention only actually holds for
+  // each class's own iconic package (rows 0-10). A non-PC chassis (Commoner=20,
+  // Animal=12, Outsider=24, all PlayerClass=0) has no real "iconic package" at
+  // all, and this check was coincidentally reading an unrelated PC-class
+  // package row that happens to share its row number with the monster class
+  // ID — confirmed false-positive on real Commoner/Animal/Outsider creatures.
+  if (classList.length === 1 && twoDARow(index, "classes", classIds[0])?.PlayerClass !== "0") {
     const startingPackage = getFieldNum(obj, "StartingPackage");
     if (startingPackage !== classIds[0]) {
       report.warn(

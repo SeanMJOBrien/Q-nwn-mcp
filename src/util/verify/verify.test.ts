@@ -581,6 +581,24 @@ describe("verifyCreature", () => {
     expect(report.warnings.filter((w) => w.code === "ability_score_base_exceeds_elite")).toHaveLength(1); // not for STR
   });
 
+  // Real, confirmed false positive: a non-PC "class" (Animal/Outsider,
+  // PlayerClass=0) still carries a PrimaryAbil in classes.2da, but a monster's
+  // naturally high Str/Dex has no "Elite Array point-buy" story behind it at
+  // all — this must not fire for it.
+  it("does not flag a non-PC class's PrimaryAbil even when it exceeds 15", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Race: { type: "byte", value: 6 },
+      Str: { type: "byte", value: 20 },
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 12 }, ClassLevel: { type: "short", value: 2 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["classes", twoDA(["PrimaryAbil", "PlayerClass"], [[12, { PrimaryAbil: "STR", PlayerClass: "0" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).not.toContain("ability_score_base_exceeds_elite");
+  });
+
   // HP, skill points, and StartingPackage vs. the same formulas build_npc_stat_block
   // itself uses — a stale value left over from a level/stat change, surfaced the same
   // way the ability-score check above catches a stale/mis-generated stat.
@@ -661,6 +679,42 @@ describe("verifyCreature", () => {
     const report = new Report("t", "utc");
     await verifyCreature(report, makeIndex(), obj);
     expect(report.warnings.map((w) => w.code)).not.toContain("starting_package_mismatch");
+  });
+
+  // Real, confirmed false positive found applying this check to a real module:
+  // packages.2da's rows are themed sub-archetype packages for the 11 real PC
+  // classes, not "one row per class ID" — row 20 is "Cleric_DeadWalker"
+  // (ClassID 2), which has nothing to do with CLASS_TYPE_COMMONER (20). A
+  // non-PC chassis (Commoner/Animal/Outsider, PlayerClass=0) has no real
+  // "iconic package" at all, so the row-equals-classId convention — and the
+  // HP/skill-points formulas, same root cause — must not apply to it.
+  it("does not flag StartingPackage/HP/SkillList for a non-PC class (PlayerClass=0), even when they'd mismatch the PC-style formula", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      StartingPackage: { type: "byte", value: 0 }, // "mismatches" class 20 by the row-equals-classId reading
+      Con: { type: "byte", value: 10 },
+      MaxHitPoints: { type: "short", value: 2 }, // wildly below any PC-style HitDie formula
+      Int: { type: "byte", value: 10 },
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 20 }, ClassLevel: { type: "short", value: 1 } }] },
+      SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 0 } }] },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([
+        [
+          "classes",
+          twoDA(
+            ["PlayerClass", "HitDie", "SkillPointBase", "SkillsTable"],
+            [[20, { PlayerClass: "0", HitDie: "4", SkillPointBase: "1", SkillsTable: "CLS_SKILL_CLER" }]],
+          ),
+        ],
+        ["cls_skill_cler", twoDA(["SkillIndex", "ClassSkill"], [[0, { SkillIndex: "1", ClassSkill: "1" }]])],
+      ]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    const codes = report.warnings.map((w) => w.code);
+    expect(codes).not.toContain("starting_package_mismatch");
+    expect(codes).not.toContain("hp_formula_mismatch");
+    expect(codes).not.toContain("skill_points_formula_mismatch");
   });
 
   // Real, shipped bug: a Salt Gate Crossbowman had Point Blank Shot + Rapid
