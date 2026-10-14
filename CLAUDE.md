@@ -2317,6 +2317,26 @@ user live-testing between fixes.**
   with `repack_module` called right away afterward and nothing else in
   between.
 
+**FOUND AND FIXED (2026-10-13), fifth round — "The Grayward Hold guards and
+Captain leave loot bags, rather than lootable bodies, like all of the other
+NPCs."** Confirmed directly: `capt_holt`/`gw_guard_a`/`gw_guard_b`/`gw_guard_c`
+all had `Lootable=0`, unlike every ordinary Hostile-faction mook in the
+module (`Lootable=1`) — exactly the documented NWN mechanic ("GFF
+`Dropable`/`Lootable` can be silently overridden at runtime" pitfall's sibling
+case: here the GFF field itself, not a runtime override, was wrong). A
+`Lootable=0` creature's items still drop, just as a separate bag placeable
+rather than a directly-lootable corpse. Root cause: these four are
+Defender-faction, built via the orchestrator's bespoke "combat-capable Key
+NPC" recipe (Custom Mechanics #3's persuasion-to-combat flip) rather than
+`/adventure-challenges`' standard Hostile-mook pipeline, which sets
+`Lootable=1` by default — the bespoke recipe never set it at all, silently
+leaving the GFF default. **Fix:** `Lootable` set to 1 on all 4 (both
+blueprint and placed instance). **Not generalized into a new check this
+round** — a real, valuable candidate (a combat-capable, non-companion Key
+NPC with equipped items and `Lootable=0`, no `LOOT_INTENTIONAL` marker)
+worth building next time this class of NPC shows up again, but out of
+scope for a single-instance fix already applied by hand.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
