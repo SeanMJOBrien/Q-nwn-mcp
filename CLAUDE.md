@@ -2025,6 +2025,97 @@ repaired in the module, not just reported.**
   nothing else touched in between this time, and `repack_module` was called
   as the very last step with no further edits following it.
 
+**Live-playtest follow-up on the same module (2026-10-13) — four more user
+reports from actually playing the fixed build. Two real, fixed bugs; one
+significant architectural finding surfaced but deliberately not acted on
+without confirmation; two reports that don't match any creature this
+module actually has, as built.**
+
+- **FIXED — a dismissed henchman could offer to rejoin, play the "I'm with
+  you" line, and then never actually follow.** Two real, independent bugs in
+  the shared `a_hen_join`/`a_hen_leave` scripts (used by every companion —
+  the fix applies to all of them with no per-creature wiring needed):
+  1. `a_hen_leave` (dismiss) incremented nothing, but also never *decremented*
+     `HC_HENCH_COUNT` — the module-level "how many companions have been
+     recruited" counter `a_hen_join` checks against the 3-companion party
+     cap. Dismissing and recruiting enough times to reach 3 total joins in a
+     playthrough permanently blocked every future recruit or rejoin, even
+     with the party well under its real cap. **Fix:** decrement on dismiss,
+     floored at 0, so the counter tracks "currently recruited" rather than
+     "ever recruited."
+  2. `a_hen_join` called `AddHenchman()` but never explicitly told the
+     associate AI to follow. `a_hen_follow`/`a_hen_stay` (the in-dialog
+     "Stay close"/"Hold this position" options) both work by sending a silent
+     shout (`HENCHMAN_CMD_FOLLOW`/`HENCHMAN_CMD_STANDGROUND`) that the stock
+     associate AI listens for — a plain local-variable state that
+     `RemoveHenchman` does **not** reset. A companion dismissed while
+     standing-ground, then re-recruited, had no reason to ever leave that
+     state: nothing re-sent the follow shout. **Fix:** `a_hen_join` now sends
+     `HENCHMAN_CMD_FOLLOW` right after `AddHenchman`, the same way
+     `a_hen_follow` does — every (re)join now starts in a known, explicit
+     follow state regardless of whatever stand-ground state carried over
+     from before dismissal.
+- **SIGNIFICANT FINDING, NOT YET ACTED ON — this module's companions never
+  actually go through a real incremental `LevelUpHenchman()` pass, which
+  likely means the documented "Cleric/Druid/Paladin/Ranger companions get a
+  full multi-level spellbook" finding (under "Random caster abilities" below)
+  does not actually apply to companions built the way this module's are.**
+  `a_hen_join`'s leveling loop is `for (i = GetHitDice(oHenchman); i <
+  nTargetLevel; i++) LevelUpHenchman(...)` — it only runs levels the
+  creature hasn't "reached" yet. But `build_npc_stat_block` (and
+  `create_creature_blueprint`) write `ClassList` directly to the creature's
+  final intended level, not level 1 — confirmed directly: `elowen`/`elya`'s
+  blueprints carry `ClassLevel: 3` *and* a `HENCH_LEVEL` VarTable local also
+  set to `3`. `GetHitDice()` on such a creature already reports 3, so the
+  loop's condition (`i < nTargetLevel`) is false from the very first
+  check — **the loop never executes a single real `LevelUpHenchman()` call,
+  for any companion built this way.** The companion was never "leveled" by
+  the function at all; its `ClassList` level was simply asserted directly at
+  build time. This means a companion caster is in the *exact* same
+  never-really-leveled position as `boss_venn` (built the same way, with no
+  recruit event at all) — the confirmed Tier 1 structural limitation
+  (`SetMemorizedSpell`/`GetMemorizedSpellCountByLevel` returning 0 for any
+  spell level the engine never saw a real level-up event grant) would apply
+  to `elya` (Cleric) exactly as much as it applies to a Wizard, contradicting
+  the earlier finding that Cleric/Druid/Paladin/Ranger are exempt from the
+  cap — that finding was established against a *different* test setup (a
+  companion blueprint that genuinely started below its `HENCH_LEVEL` and so
+  exercised the loop for real), not against how this project's own
+  `build_npc_stat_block`-based companion recipe actually builds a blueprint.
+  **Likely, but not confirmed, explanation for "not all spell slots are
+  filled on all caster NPCs."** **Deliberately not fixed yet**: forcing the
+  loop to run for real needs the blueprint's `ClassList` to start below
+  `HENCH_LEVEL` (e.g. level 1) — but `LevelUpHenchman()` also auto-spends
+  skill points per level gained, and this creature's `SkillList` already
+  carries the *final* level's full spend (computed by `build_npc_stat_block`
+  for level 3 directly) — rewriting `ClassList` to level 1 without also
+  resetting `SkillList` risks the per-level LevelUpHenchman pass *adding*
+  more skill points on top of an already-fully-spent list, double-counting
+  them. This needs a real design decision (does `build_npc_stat_block` need
+  a "pre-level" mode that writes everything *except* `ClassList` at the
+  final level, specifically for companions meant to go through this join
+  flow?) and live confirmation before being applied retroactively to an
+  already-played module, not a same-session guess.
+- **Two reports that don't match anything this module actually has, as
+  built — flagged back to the user rather than guessed at.** (1) "The Road
+  Thug caster has no spells and no clothes": all 3 `forest_ambush` Road
+  Thugs are Fighter (`hos_thug1`/`hos_thug2`) or Rogue (`hos_thug3`) — none
+  casts spells, confirmed against both the live `ClassList` and
+  `adventure.md`'s own design intent ("mundane human thugs"). (2) "One
+  'lesser cultist' wears no clothes": `hos_cult1` and `hos_cult2` (the only
+  two creatures named "Lesser Cultist," in `grayward_hall`) were checked
+  byte-for-byte via direct GFF parsing (not grep, which produced a false
+  positive mid-investigation when a struct boundary was misjudged by eye —
+  worth remembering as its own lesson: never trust a manual line-range grep
+  over actually parsing nested GFF JSON) — both carry a complete, valid 18
+  of 18 `ArmorPart_*` fields on their Chest item, identical in shape to each
+  other and to every other creature wearing the same two base-game armor
+  pieces (`nw_aarcl004`/`nw_aarcl005`) elsewhere in this module. The specific
+  model files for both creatures' exact variant numbers were confirmed to
+  exist for both genders in the base game key table (`pfh0_chest030.mdl`/
+  `pmh0_chest030.mdl`, `*_chest032.mdl` likewise) — ruling out a missing-mesh
+  explanation too. No structural cause found from data alone.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs

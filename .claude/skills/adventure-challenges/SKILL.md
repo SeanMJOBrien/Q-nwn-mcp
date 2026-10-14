@@ -322,6 +322,18 @@ best-affordable armor the creature is actually proficient with.**
    a cheaper banded mail (AC Bonus 6) if the remaining budget covers it; a Light-proficient
    rogue with proficiency capping it at AC Bonus 3 should still get the best AC-Bonus-3 item
    available, not a cheaper AC-Bonus-1 one, once the weapon is paid for.
+4. **Base AC outranks enchantment — never trade down base AC for a magic bonus.** Compare
+   armor options by their *base* AC Bonus first (the armor's own item property, before any
+   enchantment), not by total price or "is it magic." Only reach for a magical item when it's
+   the magical version of the SAME highest-base-AC item the creature can already afford
+   mundane — i.e. check "can they afford the highest base-AC item in their tier at all" first;
+   if yes, THEN check "can they also afford that exact item's enchanted version instead of the
+   mundane one," and upgrade to the enchanted version only if so. A cheaper magical item with a
+   *lower* base AC than what the creature could otherwise afford mundane is never the right
+   pick — e.g. a Heavy-proficient boss who can afford mundane Full Plate (AC Bonus 8) outright
+   should get it over a Half-Plate +1 (AC Bonus 7 + enchantment) even if the +1 version is
+   cheaper or the creature has leftover gold either way; only upgrade to Full Plate +1 if that
+   specific enchanted item is itself affordable.
 
 Apply the same rules to **henchmen and companions** — a recruitable NPC that joins the party is
 geared by its own class and level exactly as a hostile is, and its gear is visible to the player

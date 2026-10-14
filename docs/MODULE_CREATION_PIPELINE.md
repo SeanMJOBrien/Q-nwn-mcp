@@ -145,7 +145,10 @@ with no mechanical property** — an empty chest slot isn't a valid default.
 **Gear priority (shared with Challenges, see below):** weapon first, then armor second
 with whatever gold remains — armor tier comes from the creature's own baked Armor
 Proficiency feat, never from taste, and within that tier the highest-AC option the
-remaining budget affords wins over a cheaper "good enough" one.
+remaining budget affords wins over a cheaper "good enough" one. **Base AC outranks
+enchantment**: compare by base AC Bonus first, and only reach for a magical item when
+it's the enchanted version of that same highest-affordable-base-AC item — never trade
+down base AC for a cheaper magic bonus.
 
 **Casters get randomized spells by default** — `create_random_abilities_system`,
 wired onto the creature's spawn/end-round scripts, is the project-wide default for
