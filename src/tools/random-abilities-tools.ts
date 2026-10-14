@@ -87,11 +87,18 @@ export function registerRandomAbilitiesTools(server: McpServer): void {
       "WIRING (chain, never replace): write a tiny per-role wrapper script that calls ExecuteScript() on the " +
       "creature's original ScriptSpawn/ScriptEndRound first, then RA_OnSpawn/RA_OnEndRound, and pass it via " +
       "create_creature_blueprint's `scripts` param — same pattern already used for a Key NPC's a_ra_spawn. " +
-      "For a companion, RA_OnSpawn must instead be called from the RECRUIT script (a_hen_join), after its " +
-      "LevelUpHenchman() loop completes, not from raw ScriptSpawn (a_hen_spawn) — SetMemorizedSpell() silently " +
-      "no-ops on an unleveled creature, so calling RA_OnSpawn before leveling can only ever roll cantrips. " +
-      "A caster that needs a fixed, story-specific ability instead: don't wire it this way, use the existing " +
-      "`spells` param (SpecAbilityList) as before.",
+      "For a companion: SetMemorizedSpell() silently no-ops on an unleveled creature, so RA_OnSpawn must run " +
+      "AFTER a real LevelUpHenchman() loop, not before — but it does NOT need to wait for the RECRUIT script " +
+      "(a_hen_join) to do that leveling. Pair this with build_npc_stat_block's `deferLeveling` option (writes " +
+      "ClassList at level 1, every other stat at the real target level, HENCH_LEVEL set to that target) and " +
+      "run the SAME leveling loop + RA_OnSpawn call from raw ScriptSpawn (a_hen_spawn) instead — the companion " +
+      "is then already fully leveled, with real spells at every level, well before the player ever recruits " +
+      "it, and a_hen_join just adds the (already-leveled) companion to the party. Without deferLeveling, " +
+      "ClassList already equals the target level from the moment the blueprint is saved, so ANY leveling loop " +
+      "(wherever it's called from) is a no-op and GetMemorizedSpellCountByLevel() silently returns fewer real " +
+      "slots than the 2DA promises for any level past the first — confirmed, real, user-reported bug this " +
+      "combination fixes. A caster that needs a fixed, story-specific ability instead: don't wire it this way, " +
+      "use the existing `spells` param (SpecAbilityList) as before.",
     {
       resref: z.string().optional().describe("Include resref to write (default inc_random_abil, max 16 chars)"),
       castChancePercent: optNumParam(

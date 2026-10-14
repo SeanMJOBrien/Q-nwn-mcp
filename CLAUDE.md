@@ -2247,6 +2247,76 @@ a visible mid-game "my companion just got stronger" moment right at
 recruit), but doesn't substitute for it. Not applied this session pending
 the user's go-ahead on the build-time half.
 
+**BUILT (2026-10-13), fourth round — the user gave the go-ahead ("work on the
+NPC spellbook, slot, assignment changes") and three more real bugs were
+found and fixed along the way, two of them independently confirmed by the
+user live-testing between fixes.**
+
+- **BUILT — `build_npc_stat_block`'s `deferLeveling` option**, the build-time
+  half this whole investigation had been missing: computes every stat
+  (ability scores, FeatList, SkillList, HP) for the real target level as
+  normal, then rolls `ClassList`'s own `ClassLevel` back to 1 and sets
+  `HENCH_LEVEL` to the real target via `mergeVarTable`. `hp_formula_mismatch`/
+  `skill_points_formula_mismatch`/`ability_score_base_exceeds_elite` in
+  `verify/blueprints.ts` now compare
+  against `effectiveLevel = max(totalLevel, HENCH_LEVEL)` instead of raw
+  `totalLevel`, so a creature using this pattern doesn't false-positive
+  against its own deliberately-deferred `ClassLevel`. A creature not using
+  the pattern is unaffected (`effectiveLevel` just equals `totalLevel`).
+- **BUILT — moved the companion leveling loop + `RA_OnSpawn` call from
+  `a_hen_join` (recruit) to `a_hen_spawn` (raw spawn)**, now that
+  `deferLeveling` gives it real ground to climb. The companion is fully
+  leveled, with real per-level spell slots, well before the player ever
+  recruits it; `a_hen_join` just adds the already-leveled companion to the
+  party. `create_random_abilities_system`'s own tool description updated to
+  recommend this pairing instead of the old "call RA_OnSpawn from a_hen_join"
+  guidance, which is now superseded.
+- **FOUND AND FIXED — a real, significant engine-interaction bug in
+  `inc_random_abil.nss`'s spell pool, independently confirmed twice by the
+  user live-testing:** `GetSpellLevelByClass(nClassType, nSpellId)` can
+  report a valid class/level for a spell row whose OWN per-class column is
+  `"****"` when that row's `Master` column points at a DIFFERENT row that
+  DOES support the class — the engine resolves through `Master` rather than
+  honoring the row's own `"****"`. Confirmed against real base-game
+  `spells.2da`: row 716 "SuckBrain" (Extract Brain, an Illithid monster
+  attack — `Cleric="****"` directly, `Master=50`) leaked into Elya's
+  (Cleric) rolled spellbook, and row 331 "DELETED_END_Fire" (an explicitly
+  retired row — `Wiz_Sorc="****"` and `UserType="****"` directly, `Master=50`,
+  the same master) leaked into Elowen's (Wizard). Both are monster/retired
+  rows that should never appear in a real caster's spellbook. **Fix:** a
+  backstop in `RA_RollClass`'s bucketing pass — cross-check the spell's own
+  2DA column (via `classes.2da`'s `SpellTableColumn`) directly against
+  `GetSpellLevelByClass()`'s answer, and only trust it when they agree.
+  This is NOT a replacement for `GetSpellLevelByClass()` (the file's own
+  "never hand-parse" design intent stands for the normal case) — it's a
+  targeted safety filter for this one confirmed inheritance quirk. This bug
+  affects every module `create_random_abilities_system` has ever generated
+  for, not just this one — worth re-running `/systest-module` or regenerating
+  `inc_random_abil.nss` in any other module using this system.
+- **FOUND AND FIXED — a second, independent HC_HENCH_COUNT gap: death never
+  decremented it, only dismiss did.** User-reported: "I can hire all three.
+  I can dismiss and rehire all three. But I cannot hire them once that
+  henchman dies and is hired again." The engine's own henchman AI
+  automatically drops a dead associate from the party, but nothing told the
+  party-cap counter that happened — `a_hen_leave` (dismiss) already got this
+  fix two rounds ago, but a companion's `ScriptDeath` was still the stock
+  `x0_ch_hen_death` directly, unwrapped. **Fix:** new `a_hen_death` wrapper
+  (chains `x0_ch_hen_death`, then decrements `HC_HENCH_COUNT`, floored at 0),
+  wired onto all 3 companions' `ScriptDeath` (both blueprint and placed
+  instance). Once all 3 slots had ever been filled across a playthrough and
+  one companion died, every future recruit — even of a different companion
+  entirely — was permanently blocked before this fix.
+- **Confirmed again, the hard way, why restart discipline matters**: this
+  round hit the exact `load_module`-after-restart pitfall a second time —
+  the HENCH_LEVEL-aware verify fix needed a restart to take effect, and the
+  forced `load_module` to resume afterward silently reverted every
+  unrepacked edit from earlier in the SAME round (the ClassLevel=1 writes,
+  the rewritten `a_hen_spawn`/`a_hen_join`, the regenerated
+  `inc_random_abil.nss`) — confirmed directly by re-reading `elowen.utc` and
+  finding `ClassLevel` back at 3. All of it was redone immediately after,
+  with `repack_module` called right away afterward and nothing else in
+  between.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
