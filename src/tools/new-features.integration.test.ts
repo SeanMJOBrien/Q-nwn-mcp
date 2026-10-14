@@ -1851,3 +1851,70 @@ describe("validate_module OnSpawn lootable/droppable override scanner", () => {
     }
   });
 });
+
+describe("validate_module journal-advanced-on-area-enter scanner", () => {
+  async function writeScript(resref: string, source: string): Promise<void> {
+    const filePath = path.join(tempDir, `${resref}.nss`);
+    await fs.writeFile(filePath, source);
+    mockIndex.resources.set(`${resref}.nss`, { resref, extension: "nss", filePath, sizeBytes: source.length });
+  }
+
+  function makeAreDoc(onEnter: string): GffObj {
+    return { OnEnter: { type: "resref", value: onEnter } } as unknown as GffObj;
+  }
+
+  it("flags an area whose OnEnter script calls AddJournalQuestEntry", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    await writeScript("a_qenter", "void main() { AddJournalQuestEntry(\"q_test\", 2, GetEnteringObject()); }");
+    mockIndex.parsedGff.set("testarea.git", makeGitDoc() as GffObj);
+    mockIndex.parsedGff.set("testarea.are", makeAreDoc("a_qenter") as unknown as GffObj);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 0, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string; message: string }> };
+      const found = parsed.warnings.find((w) => w.type === "journal_advanced_on_area_enter");
+      expect(found).toBeDefined();
+      expect(found?.message).toContain("a_qenter");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag an area whose OnEnter script never touches AddJournalQuestEntry", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    await writeScript("a_qenter_plain", "void main() { }");
+    mockIndex.parsedGff.set("testarea.git", makeGitDoc() as GffObj);
+    mockIndex.parsedGff.set("testarea.are", makeAreDoc("a_qenter_plain") as unknown as GffObj);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 0, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "journal_advanced_on_area_enter")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("does not flag an area with no OnEnter script at all", async () => {
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    mockIndex.parsedGff.set("testarea.git", makeGitDoc() as GffObj);
+    mockIndex.parsedGff.set("testarea.are", makeAreDoc("") as unknown as GffObj);
+    mockIndex.areas.set("testarea", { resref: "testarea", name: "T", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 0, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
+
+    try {
+      const result = await client.callTool({ name: "validate_module", arguments: {} });
+      const parsed = parseResult(result) as { warnings: Array<{ type: string }> };
+      expect(parsed.warnings.find((w) => w.type === "journal_advanced_on_area_enter")).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+});
