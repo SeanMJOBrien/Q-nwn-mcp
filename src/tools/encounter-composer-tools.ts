@@ -42,14 +42,19 @@
  *   party-size adjustment formula is applied.
  */
 
+import fs from "fs/promises";
+import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
+import { jsonToGff } from "../nim-tools.js";
 import { ensureRandomAbilitiesInclude } from "./random-abilities-tools.js";
-import type { GffObj } from "../types/gff.js";
+import { ensureSpecAbilityInclude } from "./spec-ability-tools.js";
+import type { GffDocument, GffObj } from "../types/gff.js";
 import { buildCreatureBlueprint } from "../util/creature-builder.js";
 import { findSimpleWalkableSpots, placeCreatureCore } from "../util/creature-placer.js";
 import { buildNpcStatBlock } from "../util/npc-stat-block.js";
+import { buildSpecAbilityListEntries } from "../util/spec-ability-pool.js";
 import { writeAndCompileScript } from "../util/script-writer.js";
 import { ARCHETYPES, getArchetype, pickSupportCandidate } from "../util/encounter-archetypes.js";
 import {
@@ -128,8 +133,19 @@ export function registerEncounterComposerTools(server: McpServer): void {
           "Area resref to build and place into. Omit for a dry-run (plan only, no module needed). When given, needs " +
             "a module already loaded (load_module) and that area to exist in it.",
         ),
+      casterSystem: z
+        .enum(["special_abilities", "random_abilities"])
+        .optional()
+        .describe(
+          "Which random-caster system wires the boss's spells (only matters if the archetype's class is a real " +
+            "spellcaster). Default 'special_abilities' (SpecAbilityList, via inc_spec_ability.nss) — unlike " +
+            "'random_abilities' (the previous MemorizedList-based system), it isn't capped to cantrip-level " +
+            "spells by this boss's class levels being set directly rather than through a live LevelUpHenchman() " +
+            "pass (a confirmed real limitation of the previous system for exactly this use). Pass " +
+            "'random_abilities' only to deliberately use the previous method.",
+        ),
     },
-    async ({ role, bossCR, targetEL, partyLevel, partySize, area }) => {
+    async ({ role, bossCR, targetEL, partyLevel, partySize, area, casterSystem }) => {
       const archetype = getArchetype(role);
       if (!archetype) {
         return {
@@ -270,12 +286,44 @@ export function registerEncounterComposerTools(server: McpServer): void {
       // Spellcasting classes get zero spells from buildNpcStatBlock (it
       // deliberately doesn't compute MemorizedList) and zero from
       // buildCreatureBlueprint (no `spells` param passed here) — another
-      // confirmed real bug ("Thug caster had no spells"). Wire the runtime
-      // random-abilities system when the archetype's class actually supports
-      // it, per each archetype's own documented tier (see the caveat field).
+      // confirmed real bug ("Thug caster had no spells"). Wire a runtime
+      // random-caster system when the archetype's class actually supports
+      // it. Default is special_abilities (SpecAbilityList) — see this
+      // tool's own casterSystem param doc for why: unlike random_abilities,
+      // it isn't gated by a live LevelUpHenchman() pass this boss never gets.
+      const isCasterClass = TIER1_CASTER_CLASSES.has(archetype.classId) || TIER2_CASTER_CLASSES.has(archetype.classId);
       let bossScripts: Record<string, string> | undefined;
       const spellWiringWarnings: string[] = [];
-      if (TIER1_CASTER_CLASSES.has(archetype.classId) || TIER2_CASTER_CLASSES.has(archetype.classId)) {
+      let specAbilityEntries: Awaited<ReturnType<typeof buildSpecAbilityListEntries>>["entries"] | undefined;
+
+      if (isCasterClass && casterSystem !== "random_abilities") {
+        const include = await ensureSpecAbilityInclude(index);
+        const built = buildSpecAbilityListEntries(
+          index,
+          [{ classId: archetype.classId, classLevel: bossLevel }],
+          statBlock.abilityScores,
+          false, // dormant — SA_OnSpawn resets/rerolls on every real spawn
+          bossResref,
+        );
+        spellWiringWarnings.push(...built.warnings);
+        if (built.entries.length > 0) {
+          specAbilityEntries = built.entries;
+          const spawnWrapper = `ce_${archetype.name.slice(0, 3)}_spn`.slice(0, 16);
+          const spawnSource =
+            `#include "${include.includeName}"\n\n` +
+            `void main()\n{\n    ExecuteScript("nw_c2_default9", OBJECT_SELF);\n` +
+            `    DelayCommand(0.5, SA_OnSpawn(OBJECT_SELF));\n}\n`;
+          const spawnWritten = await writeAndCompileScript(index, spawnWrapper, spawnSource, true);
+          if (spawnWritten.compiled) {
+            bossScripts = { ScriptSpawn: spawnWrapper };
+          } else {
+            spellWiringWarnings.push(`Special-abilities spawn wrapper failed to compile: ${spawnWritten.compilerOutput}`);
+            specAbilityEntries = undefined;
+          }
+        } else {
+          spellWiringWarnings.push("No eligible special abilities were found for this archetype's class/level.");
+        }
+      } else if (isCasterClass && casterSystem === "random_abilities") {
         const include = await ensureRandomAbilitiesInclude(index);
         const isTier2 = TIER2_CASTER_CLASSES.has(archetype.classId);
         const spawnWrapper = `ce_${archetype.name.slice(0, 3)}_spn`.slice(0, 16);
@@ -292,6 +340,7 @@ export function registerEncounterComposerTools(server: McpServer): void {
           // live LevelUpHenchman() call only ever gets cantrip (level 0) slots from
           // SetMemorizedSpell() — there is no recruit-style event for a hostile boss to
           // level through. This still closes "no spells at all," not "full spellbook."
+          // (This is exactly the limitation the default special_abilities system avoids.)
           spellWiringWarnings.push(
             "RA_OnSpawn is wired, but this boss's class levels were set directly (never " +
               "run through a live LevelUpHenchman() pass) — per this project's own confirmed " +
@@ -345,6 +394,36 @@ export function registerEncounterComposerTools(server: McpServer): void {
         result.success = false;
         result.error = `Failed to build boss blueprint: ${buildResult.error}`;
         return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+      }
+
+      // Write the baked (special_abilities) pool directly onto the just-built
+      // blueprint doc, before placement, so the placed instance inherits it —
+      // buildCreatureBlueprint's own `spells` param wasn't used above because
+      // it writes every entry ready=1 unconditionally, not the sorted/dormant
+      // shape SA_OnSpawn expects (see buildSpecAbilityListEntries's doc comment).
+      if (specAbilityEntries) {
+        const bossKey = `${bossResref}.utc`;
+        const bossBlueprintDoc = index.parsedGff.get(bossKey) as GffObj;
+        bossBlueprintDoc.SpecAbilityList = {
+          type: "list",
+          value: specAbilityEntries.map((e) => ({
+            __struct_id: 0,
+            Spell: { type: "word", value: e.spell },
+            SpellCasterLevel: { type: "byte", value: e.classLevel },
+            SpellFlags: { type: "byte", value: e.ready ? 1 : 0 },
+          })),
+        };
+        // Persist to disk too — placeCreatureCore's resolveBlueprint reads
+        // the in-memory parsedGff first (already updated above) so the
+        // PLACED instance inherits this correctly either way, but the
+        // standalone blueprint FILE must also be flushed or repack_module
+        // (which packs from disk, not from parsedGff) would ship a
+        // SpecAbilityList-less .utc alongside a populated placed instance.
+        const bossFilePath = path.join(index.tempDir, bossKey);
+        await jsonToGff(bossBlueprintDoc as GffDocument, bossFilePath);
+        const bossStat = await fs.stat(bossFilePath);
+        const bossEntry = index.resources.get(bossKey);
+        if (bossEntry) bossEntry.sizeBytes = bossStat.size;
       }
 
       const bossSpot = spots[0];

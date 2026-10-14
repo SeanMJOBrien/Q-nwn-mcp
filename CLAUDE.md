@@ -638,6 +638,30 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
 
 ## Known Pitfalls
 
+- **FIXED — the local compile toolchain's `nwscript.nss` can silently predate real NWN:EE engine functions, with a
+  cryptic error that looks like a syntax bug in the generated script.** Found building the Special-Abilities
+  random-caster system (`spec-ability-script.ts`): `create_spec_ability_system`'s generated include failed to
+  compile with `inc_spec_ability.nss(103): ERROR: PARSING VARIABLE LIST [DECL_VARLIST_SEPARATOR(0,0):LEFT_BRACKET]`
+  — nothing about that line was actually wrong. **Root cause, confirmed directly**: `nwn_script_comp`
+  ("the official compiler library," part of `neverwinter.nim`) reads `nwscript.nss` dynamically as a real resman
+  resource from `NWN_FOLDER_DATA`, not from anything bundled in the compiler binary — isolated with a 3-line
+  minimal repro (`int n = GetSpellAbilityCount(OBJECT_SELF);`) that failed identically. This project's deployment
+  is a headless server with **no real NWN client install** (confirmed with the user) — `NWN_FOLDER_DATA` is a bare
+  resource dump with no launcher to patch it, so its `nwscript.nss` had quietly fallen behind: it lacked
+  `GetSpellAbilityCount`/`GetSpellAbilitySpell`/`GetSpellAbilityReady`/`SetSpellAbilityReady` (all four, confirmed
+  by extracting and grepping it directly) despite having ~7,353 other declarations including fairly recent-looking
+  ones. **Fix, requiring no change to the user's actual game data at all**: `src/nwscript-override/nwscript.nss`
+  is a committed, version-controlled, newer `nwscript.nss` (sourced from a sibling NWN project checkout on the
+  same machine that already had one — `~/git/shieldlands/ee-base-scripts/nwscript.nss`, confirmed newest by file
+  date) copied to `dist/nwscript-override/` at build time (package.json's build step, same pattern as
+  `src/templates/`) and added to every compile's resman `dirs` list in `module-loader.ts`'s `buildResmanOptions()`
+  — `dirs` is loose-file override search, same priority semantics as `NWN_FOLDER_USER/override/`, so this exact
+  mechanism is what makes it work with zero other code changes. Verified both the broken and fixed state directly
+  via `nwn_script_comp` before and after adding `--dirs=<that path>`. **If a future generator needs an engine
+  function and hits the same parse-error signature, check whether this override's `nwscript.nss` actually declares
+  it before assuming the generated script is wrong** — and if it's missing, this file is the one to update (no
+  separate update script exists for it, unlike the vendored binaries in `../nwn-tools/UPDATING.md`, since it's a
+  single committed text file — just copy a newer one over it from wherever one is available).
 - **FIXED — `server.tool(name, description, schema, {}, handler)` with an EMPTY
   annotations object silently breaks the tool: every real call fails with
   `typedHandler is not a function`.** Found while writing the first integration
@@ -2803,6 +2827,39 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
     script, because only the include's source was being regenerated between test
     iterations — always recompile every wrapper script after changing an include it
     depends on, not just the include itself.
+- **BUILT (2026-10-14) — a second, now-default caster system (`SpecAbilityList`
+  instead of `MemorizedList`), full design/findings in
+  `docs/special-abilities-system.md`.** `inc_spec_ability.nss`
+  (`create_spec_ability_system`) + `bake_spec_ability_pool` sidestep
+  `GetMemorizedSpellCountByLevel()`'s cantrip-only ceiling entirely, because
+  `SpecAbilityList` isn't gated by it — this is the same mechanism base-game
+  monsters have always used for innate spell-like abilities. Tradeoff: nothing
+  can add a new ability to `SpecAbilityList` at runtime
+  (`SetSpellAbilityReady()` only toggles an *existing* entry), so the full
+  candidate pool is baked at build time (reading `classes.2da`/
+  `cls_spgn_<class>.2da`/`spells.2da` directly, plus the real D&D 3.5
+  ability-modifier bonus-spell formula) and `SA_OnSpawn` marks a real-slot-
+  sized random subset ready each spawn — **confirmed live** against a
+  14-creature test arena (`run_live_verification`): e.g. a level-12 Wizard,
+  139 pool entries baked, 28 marked ready at real spawn. `LevelUpHenchman` is
+  irrelevant to this system either way — it never touches `SpecAbilityList`.
+  **Now the project-wide default**: `/create-adventure`'s pre-flight asks
+  Special Abilities (default) vs. Random Abilities (fallback, unchanged) and
+  records the choice in `adventure.md`; `/adventure-actors` and
+  `compose_encounter` both branch on it, the latter via a `casterSystem`
+  param (default `special_abilities`) that also fixes the Random Abilities
+  system's boss-specific cantrip ceiling (a boss's `ClassList` is set
+  directly, the exact shape that cap depends on).
+  **User-facing "toolbar" finding, confirmed not a bug**: a `SpecAbilityList`
+  entry marked ready auto-populates the in-game Spellbook/Powers panel
+  (`GUI_PANEL_SPELLBOOK`) with zero manual step — that's what the `Ready`
+  flag is for. The literal bottom hotbar (`GUI_PANEL_RADIAL_QUICKBAR`) is
+  **never** auto-populated by the engine, for any ability/spell/item, for any
+  creature — confirmed by grepping the full `nwscript.nss`: there is no
+  quickbar-setter function at all. A DM possessing a caster still has to
+  manually drag each wanted ability from the Spellbook panel onto a hotbar
+  slot; nothing server-side can do that step. See the doc for the full
+  write-up and the live log evidence.
 - **FIXED — the feat/spell/equipment bug class (no feats, no spells, wrong equip slot,
   wrong-weight armor, no melee backup, inconsistent cross-area appearance) is now
   caught automatically, and the actual root cause was a documentation gap, not a code

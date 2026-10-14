@@ -110,7 +110,8 @@ export const CLASS_WEAPON_PREFERENCES: Record<number, WeaponPreference[] | null>
  * reproducible content, never rolls dice, so weapon variety has to come from
  * a stable function of the creature's own identity, not Math.random().
  */
-function seedHash(seed: string): number {
+/** Exported for spec-ability-tools.ts's deterministic markReady subset pick — same reproducible-content convention. */
+export function seedHash(seed: string): number {
   let hash = 0x811c9dc5;
   for (let i = 0; i < seed.length; i++) {
     hash ^= seed.charCodeAt(i);

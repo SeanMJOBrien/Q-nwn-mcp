@@ -115,6 +115,58 @@ a non-companion Key NPC, but the **Ability scores**, **`FeatList`**, **Skill poi
 and **Equipment** subsections below apply to any combat-capable creature regardless of
 whether it's recruitable.
 
+#### Step 0: Check which caster spell system this adventure uses
+
+Read `adventure.md`'s `## Module` section's `Caster System` field (set once, during
+`/create-adventure`'s own pre-flight — this sub-skill never asks the user). Default to
+**Special Abilities** if the field is missing (an older `adventure.md` written before
+this field existed).
+
+- **Special Abilities (default)** — use the recipe in "Special Abilities recipe
+  (default)" immediately below, for Step 1's shared scripts and Step 3's
+  `create_creature_blueprint` call. **Simpler than the Random Abilities path**: there's
+  no leveling-timing dance to get right, because `bake_spec_ability_pool` computes the
+  pool from the blueprint's own ability scores/`ClassList`/`HENCH_LEVEL` directly — it
+  doesn't depend on a live `LevelUpHenchman()` pass having run yet, unlike
+  `RA_OnSpawn`'s `SetMemorizedSpell()`.
+- **Random Abilities** (the user explicitly chose the previous method) — skip to Step 1
+  below and follow it exactly as written; that section (and everything under "Casters
+  get randomized spells by default, computed at runtime" later in this file) documents
+  that path unchanged.
+
+**Special Abilities recipe (default):**
+
+Shared scripts (once per module, same idempotency check as Step 1: `list_resources
+(pattern: "a_hen_*")` — if `a_hen_join` already exists, skip):
+
+| Resref | Purpose |
+|--------|---------|
+| `c_hen_free`, `c_hen_mine`, `a_hen_stay`, `a_hen_follow` | Identical to Step 1 below — not caster-system-specific. |
+| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark, call `SPEC_VerifyCreature`. **No `RA_OnSpawn`/`SA_OnSpawn` call here** — unlike the Random Abilities path, spells are already resolved by the time this runs (see below). |
+| `a_hen_leave` | Identical to Step 1 below. |
+| `a_hen_spawn` | `#include "inc_spec_check"` + `#include "inc_spec_ability"`, then `ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF)`, `DelayCommand(0.5, SA_OnSpawn(OBJECT_SELF))`, then `SPEC_SelfTestOnSpawn(OBJECT_SELF)`. Calling `SA_OnSpawn` here (raw spawn, not recruit) is safe and correct — see above for why, unlike `RA_OnSpawn`. |
+| `a_hen_endround` | Not needed for this system — leave `ScriptEndRound` at its henchman default (don't override it in Step 3's `scripts` param). |
+
+Also at module-load time (Step 2 below, same `a_mod_load`/`SetMaxHenchmen` logic): call
+`create_spec_ability_system()` once per module instead of `create_random_abilities_system()`,
+if `inc_spec_ability` doesn't already exist.
+
+Per companion, after Step 3's `create_creature_blueprint` call (ability scores/`FeatList`/
+equipment already set per the rest of this phase): call `bake_spec_ability_pool(resref:
+"<name>")` once, before placement. It reads the blueprint's own `HENCH_LEVEL` automatically
+(no extra param needed) and bakes a dormant, sorted-by-level pool — `SA_OnSpawn` activates
+a real-slot-sized random subset on every spawn. Step 3's `scripts` override becomes
+`'{"ScriptSpawn": "a_hen_spawn"}'` only (no `ScriptEndRound` override — leave it at the
+henchman default). As with the Random Abilities path: **omit `bake_spec_ability_pool` and
+the `scripts` override entirely only when this specific companion needs a fixed,
+story-specific ability instead of a random one** — fall back to plain `henchman: true`
+default scripts and set `spells` (`SpecAbilityList`) by hand via `create_creature_blueprint`.
+
+---
+
+**Random Abilities variant (only when `adventure.md`'s `Caster System` field says so) —
+Step 1 onward documents this path in full:**
+
 #### Step 1: Shared scripts (once per module)
 
 **Idempotency check:** `list_resources(pattern: "a_hen_*")`. If `a_hen_join` already

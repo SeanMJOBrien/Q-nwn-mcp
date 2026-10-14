@@ -66,21 +66,21 @@ export const ARCHETYPES: Record<string, ArchetypeRecipe> = {
     naturalSupport: "undead_minion",
     spellThemeKeywords: ["death", "undead", "negative", "animate"],
     equipmentThemeKeywords: ["robe", "staff", "dagger"],
-    // Confirmed in this project's own prior live-engine investigation
-    // (CLAUDE.md, "Random caster abilities" / "Tier 1 real-runtime
-    // findings"): create_random_abilities_system's Tier 1 path (which a
-    // Wizard uses) is capped at cantrips + 1st-level spells for Wizard
-    // specifically — Cleric/Druid/Paladin/Ranger get a full multi-level
-    // random spellbook, but Wizard's level-2+ slots read back empty from
-    // the engine even after a real LevelUpHenchman() pass, and three
-    // separate NWNX investigation attempts failed to find a fix. A
-    // necromancer built this way will only ever randomize cantrips and
-    // 1st-level spells at runtime — real, not a guess, and worth surfacing
-    // to a caller rather than silently shipping a disappointing caster.
+    // STALE LIMITATION, NO LONGER THE DEFAULT (2026-10-14): the original
+    // caveat here described create_random_abilities_system's Tier 1 path
+    // (MemorizedList via SetMemorizedSpell) capping a Wizard at cantrips +
+    // 1st-level spells — confirmed, unresolved, three failed NWNX attempts
+    // (see CLAUDE.md's "Random caster abilities" section). compose_encounter
+    // now defaults to the special_abilities system (SpecAbilityList), which
+    // isn't gated by GetMemorizedSpellCountByLevel() at all, so this
+    // limitation only applies when casterSystem:"random_abilities" is
+    // explicitly requested — see compose_encounter's own param description.
     caveat:
-      "Wizard (this archetype's class) is capped at cantrips + 1st-level spells by " +
-      "create_random_abilities_system's Tier 1 path — a confirmed, unresolved engine " +
-      "limitation (see CLAUDE.md's Random caster abilities section), not a guess.",
+      "By default (special_abilities system) this archetype's Wizard class has no known spell-level " +
+      "limitation. Only if compose_encounter is called with casterSystem:'random_abilities' does the " +
+      "previous, confirmed limitation apply: that system's Tier 1 path (MemorizedList via " +
+      "SetMemorizedSpell) caps a Wizard at cantrips + 1st-level spells — see CLAUDE.md's Random caster " +
+      "abilities section.",
   },
 };
 

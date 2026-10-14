@@ -11,6 +11,7 @@
 | How would an LLM ask for "a necromancer for a CR 6 battle" and get a built, balanced roster back? *(design only, not implemented)* | [encounter-composer-spec.md](encounter-composer-spec.md) |
 | How does the parametrized PQJ quest system work? | [pqj-quest-system.md](pqj-quest-system.md) |
 | What happened when random caster abilities ran on a real headless server? | [random-abilities-runtime-findings.md](random-abilities-runtime-findings.md) |
+| How does the Special-Abilities caster system (the project-wide default) work, and how does a DM actually see/use the abilities in-game? | [special-abilities-system.md](special-abilities-system.md) |
 | Can a module be run to verify behaviour the static `verify_*` tools cannot see? | [runtime-verification-spec.md](runtime-verification-spec.md) |
 | What is the full test plan and its test cases? | [TEST_PLAN.md](TEST_PLAN.md) |
 | Which module exercises companions and the verification gate end to end? | [siege-module-spec.md](siege-module-spec.md) |

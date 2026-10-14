@@ -33,7 +33,9 @@ Before starting the pipeline, resolve these with the user:
 
 5. **Area building mode.** Ask: "How should areas be built — **Full** (the pipeline designs and decorates every area automatically, default) or **Scaffold** (the pipeline lays out correct room shapes and story beats using only the simplest, most reliable tiles, then you finish decorating by hand in the toolset)?" Scaffold is worth recommending when the user mentions they'll be tweaking the module themselves afterward, or that they prefer hand-placed tiles/scenery — undoing a fully solver-decorated area to redo it manually is more work than starting from a plain scaffold. If they pick Scaffold, also ask: "Smallest possible footprint per area, for you to expand outward yourself, or a normal-sized area with the plain scaffold treatment?" Record the answer as `Area Mode: Full`, `Area Mode: Scaffold`, or `Area Mode: Scaffold (Minimal)` in the `## Module` section below — `/adventure-areas` reads this field.
 
-6. **Adventure title & module creation.** Before invoking any sub-skill:
+6. **Caster spell system.** Warn, then ask: *"Caster NPCs (companions and spellcasting bosses) get a randomized spell/ability selection by default, using a system called Special Abilities — it's the current default, but it's newer and still being evaluated against this project's older, more battle-tested Random Abilities system. Which should this adventure use — **Special Abilities** (default) or **Random Abilities** (the previous method)?"* Record the answer in the `## Module` section below as `Caster System: Special Abilities` or `Caster System: Random Abilities` — default to Special Abilities if the user has no preference. `/adventure-actors` and `compose_encounter` (invoked by `/adventure-challenges`/`/adventure-affordances` for a spellcasting boss) both read this field; neither asks the user again.
+
+7. **Adventure title & module creation.** Before invoking any sub-skill:
    - Invent a compelling adventure title based on the user's prompt.
    - Pitch it to the user in a casual, enthusiastic way: *"How about **'[Title]'**? If that sounds fun, I'll create the module and we'll get started!"*
    - If the user doesn't like it, propose a different title. Keep iterating until they're happy.
@@ -52,6 +54,7 @@ Before starting the pipeline, resolve these with the user:
        - **Party Size:** [1-4]
        - **Difficulty:** [Normal/Hard]
        - **Area Mode:** [Full / Scaffold / Scaffold (Minimal)]
+       - **Caster System:** [Special Abilities / Random Abilities]
        ```
      - Call `create_module` with both `name` and `filename` set to the **adventure title exactly as written** (e.g., `name: "The Harvest of Bones"`, `filename: "The Harvest of Bones"`). The .mod file will be saved as `The Harvest of Bones.mod`.
    - If a module is already loaded and the user wants to add to it, skip module creation.

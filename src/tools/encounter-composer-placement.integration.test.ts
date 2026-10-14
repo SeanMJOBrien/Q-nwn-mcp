@@ -64,6 +64,44 @@ vi.mock("../util/walkmesh.js", () => ({
     ground.walkable(x, y) ? { ok: true, z: 0 } : { ok: false, reason: "mock: not walkable" }),
 }));
 
+/**
+ * Minimal real-shaped classes/cls_spgn_wiz/spells 2DA fixture for Wizard
+ * (necromancer's archetype class) — the Special-Abilities system (the
+ * default casterSystem) needs real 2DA data to compute any pool at all,
+ * unlike the old random-abilities system, which computed everything at
+ * runtime and needed none of this at build time.
+ */
+function twoDATables(): Map<string, { columns: string[]; rows: Map<number, Record<string, string>> }> {
+  const tables = new Map<string, { columns: string[]; rows: Map<number, Record<string, string>> }>();
+  tables.set("classes", {
+    columns: ["SpellCaster", "SpellGainTable", "SpellTableColumn", "SpellcastingAbil", "MinCastingLevel"],
+    rows: new Map([
+      [
+        10,
+        {
+          SpellCaster: "1",
+          SpellGainTable: "CLS_SPGN_WIZ",
+          SpellTableColumn: "Wiz_Sorc",
+          SpellcastingAbil: "INT",
+          MinCastingLevel: "1",
+        },
+      ],
+    ]),
+  });
+  tables.set("cls_spgn_wiz", {
+    columns: ["SpellLevel0", "SpellLevel1"],
+    rows: new Map([[5, { SpellLevel0: "4", SpellLevel1: "2" }]]), // row index = classLevel(6) - 1
+  });
+  tables.set("spells", {
+    columns: ["Wiz_Sorc"],
+    rows: new Map([
+      [10, { Wiz_Sorc: "0" }],
+      [11, { Wiz_Sorc: "1" }],
+    ]),
+  });
+  return tables;
+}
+
 function createMockIndex(): ModuleIndex {
   return {
     modPath: "/fake/mod.mod",
@@ -77,7 +115,7 @@ function createMockIndex(): ModuleIndex {
     creatures: [],
     items: [],
     parsedGff: new Map(),
-    twodaTables: new Map(),
+    twodaTables: twoDATables(),
     customTlk: null,
     baseTlk: null,
     hakList: [],
@@ -270,7 +308,7 @@ describe("compose_encounter — placement mode", () => {
     }
   });
 
-  it("gives the boss a real stat block, baseline clothing, and wires the random-abilities spawn script (regression: 'Thug caster had no clothes/spells')", async () => {
+  it("gives the boss a real stat block, baseline clothing, and wires the special-abilities spawn script by default (regression: 'Thug caster had no clothes/spells')", async () => {
     await setupArea();
     addItemBlueprint("nw_cloth001");
     const { client, cleanup } = await createTestClient();
@@ -283,19 +321,48 @@ describe("compose_encounter — placement mode", () => {
         placed?: { boss: { resref: string; spellsWired: boolean; spellWiringWarnings?: string[] } };
       };
       expect(parsed.placed?.boss.spellsWired).toBe(true);
-      expect(parsed.placed?.boss.spellWiringWarnings?.join(" ")).toContain("LevelUpHenchman");
+      expect(parsed.placed?.boss.spellWiringWarnings).toBeUndefined();
 
       const bossDoc = mockIndex.parsedGff.get(`${parsed.placed!.boss.resref}.utc`) as GffObj;
       const feats = (bossDoc.FeatList as { value: GffObj[] } | undefined)?.value ?? [];
       expect(feats.length).toBeGreaterThan(0);
 
+      // SpecAbilityList is baked (dormant, sorted by level) — SA_OnSpawn
+      // activates a real-slot-sized subset at actual runtime, which this
+      // mocked build-time test never executes, so every entry is SpellFlags=0
+      // here by design (see buildSpecAbilityListEntries's doc comment).
+      const specAbilities = (bossDoc.SpecAbilityList as { value: GffObj[] } | undefined)?.value ?? [];
+      expect(specAbilities.length).toBeGreaterThan(0);
+      const levels = specAbilities.map((e) => (e.Spell as { value: number }).value);
+      expect(levels).toEqual([10, 11]); // sorted: Wiz_Sorc level-0 spell (id 10) before level-1 (id 11)
+
       const equip = (bossDoc.Equip_ItemList as { value: GffObj[] } | undefined)?.value ?? [];
       const chest = equip.find((e) => e.__struct_id === 2); // EQUIP_SLOT_MAP.chest
       expect((chest?.TemplateResRef as { value: string } | undefined)?.value).toBe("nw_cloth001");
 
-      // The spawn wrapper script exists and includes the random-abilities system.
-      expect(mockIndex.resources.has("inc_random_abil.nss")).toBe(true);
+      // The spawn wrapper script exists and includes the special-abilities system.
+      expect(mockIndex.resources.has("inc_spec_ability.nss")).toBe(true);
       expect([...mockIndex.resources.keys()].some((k) => k.startsWith("ce_nec_spn"))).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("falls back to the random-abilities system when casterSystem:'random_abilities' is explicitly requested", async () => {
+    await setupArea();
+    addItemBlueprint("nw_cloth001");
+    const { client, cleanup } = await createTestClient();
+    try {
+      const result = await client.callTool({
+        name: "compose_encounter",
+        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea", casterSystem: "random_abilities" },
+      });
+      const parsed = json(result) as {
+        placed?: { boss: { spellsWired: boolean; spellWiringWarnings?: string[] } };
+      };
+      expect(parsed.placed?.boss.spellsWired).toBe(true);
+      expect(parsed.placed?.boss.spellWiringWarnings?.join(" ")).toContain("LevelUpHenchman");
+      expect(mockIndex.resources.has("inc_random_abil.nss")).toBe(true);
     } finally {
       await cleanup();
     }

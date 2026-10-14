@@ -964,6 +964,26 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).not.toContain("caster_no_spells");
   });
 
+  it("still flags a caster whose SpecAbilityList is non-empty but entirely not-ready (dormant bake_spec_ability_pool pool)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 9 }, ClassLevel: { type: "short", value: 5 } }],
+      },
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+      SpecAbilityList: {
+        type: "list",
+        value: [{ __struct_id: 0, Spell: { type: "word", value: 24 }, SpellCasterLevel: { type: "byte", value: 5 }, SpellFlags: { type: "byte", value: 0 } }],
+      },
+    });
+    const index = makeIndex({
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, index, obj);
+    expect(report.warnings.map((w) => w.code)).toContain("caster_no_spells");
+  });
+
   it("does not flag a caster below its class's MinCastingLevel", async () => {
     const obj = makeCreature("nw_c2_default", {
       ClassList: {

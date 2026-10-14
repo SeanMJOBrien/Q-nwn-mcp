@@ -1,41 +1,42 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { registerAdventureTools } from "./tools/adventure-tools.js";
 import { registerAnalysisTools } from "./tools/analysis-tools.js";
 import { registerAreaTools } from "./tools/area-tools.js";
 import { registerBlueprintTools } from "./tools/blueprint-tools.js";
 import { registerBulkTools } from "./tools/bulk-tools.js";
 import { registerCoreReadTools } from "./tools/core-read.js";
 import { registerCreatureTools } from "./tools/creature-tools.js";
-import { registerDialogTools } from "./tools/dialog-tools.js";
 import { registerDatabaseTools } from "./tools/database-tools.js";
-import { registerModuleTools } from "./tools/module-tools.js";
+import { registerDialogTools } from "./tools/dialog-tools.js";
 import { registerDialogWriteTools } from "./tools/dialog-write-tools.js";
+import { registerEncounterComposerTools } from "./tools/encounter-composer-tools.js";
 import { registerEncounterTools } from "./tools/encounter-tools.js";
+import { registerFactionTools } from "./tools/faction-tools.js";
+import { registerGearTools } from "./tools/gear-tools.js";
 import { registerItemTools } from "./tools/item-tools.js";
 import { registerJournalTools } from "./tools/journal-tools.js";
 import { registerLookupTools } from "./tools/lookup-tools.js";
+import { registerModuleTools } from "./tools/module-tools.js";
+import { registerNpcTools } from "./tools/npc-tools.js";
 import { registerObjectMgmtTools } from "./tools/object-mgmt-tools.js";
 import { registerPaintTools } from "./tools/paint-tools.js";
 import { registerPlacementTools } from "./tools/placement-tools.js";
-import { registerResmanTools } from "./tools/resman-tools.js";
-import { registerScriptTools } from "./tools/script-tools.js";
-import { registerTilesetTools } from "./tools/tileset-tools.js";
-import { registerFactionTools } from "./tools/faction-tools.js";
-import { registerUndoTools } from "./tools/undo-tools.js";
-import { registerWriteTools } from "./tools/write-tools.js";
-import { registerAdventureTools } from "./tools/adventure-tools.js";
-import { registerWebTools } from "./tools/web-tools.js";
-import { registerVerifyTools } from "./tools/verify-tools.js";
-import { registerRewardTools } from "./tools/reward-tools.js";
-import { registerGearTools } from "./tools/gear-tools.js";
-import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
-import { registerSpecAssertTools } from "./tools/spec-assert-tools.js";
-import { registerEncounterComposerTools } from "./tools/encounter-composer-tools.js";
-import { registerNpcTools } from "./tools/npc-tools.js";
 import { registerRandomAbilitiesTools } from "./tools/random-abilities-tools.js";
+import { registerResmanTools } from "./tools/resman-tools.js";
+import { registerRewardTools } from "./tools/reward-tools.js";
+import { registerScriptTools } from "./tools/script-tools.js";
+import { registerSpecAbilityTools } from "./tools/spec-ability-tools.js";
+import { registerSpecAssertTools } from "./tools/spec-assert-tools.js";
+import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
+import { registerSystestTools } from "./tools/systest-tools.js";
+import { registerTilesetTools } from "./tools/tileset-tools.js";
+import { registerUndoTools } from "./tools/undo-tools.js";
 import { registerVariableTools } from "./tools/variable-tools.js";
 import { registerVerifyServerTools } from "./tools/verify-server-tools.js";
-import { registerSystestTools } from "./tools/systest-tools.js";
+import { registerVerifyTools } from "./tools/verify-tools.js";
+import { registerWebTools } from "./tools/web-tools.js";
+import { registerWriteTools } from "./tools/write-tools.js";
 
 const server = new McpServer({
   name: "nwn-mcp",
@@ -78,6 +79,7 @@ registerSpecAssertTools(server);
 registerEncounterComposerTools(server);
 registerNpcTools(server);
 registerRandomAbilitiesTools(server);
+registerSpecAbilityTools(server);
 registerSystestTools(server);
 
 // ── Adventure creator tools ─────────────────────────────────────────────

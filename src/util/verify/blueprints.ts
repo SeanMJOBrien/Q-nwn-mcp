@@ -545,7 +545,15 @@ export async function verifyCreature(
     const hasMemorized = classList.some((cls) =>
       Array.from({ length: 10 }, (_, lvl) => listOf(cls, `MemorizedList${lvl}`).length > 0).some(Boolean),
     );
-    const hasSpecAbilities = listOf(obj, "SpecAbilityList").length > 0;
+    // Checks for at least one READY entry, not just a non-empty list —
+    // bake_spec_ability_pool (the Special-Abilities random-caster system)
+    // deliberately bakes its oversized candidate pool with every entry's
+    // SpellFlags=0 (not ready) by default, since the pool alone grants
+    // nothing usable until something marks a real-slot-sized subset ready
+    // (SA_OnSpawn at runtime, or markReady:true as a static fallback) — a
+    // dormant pool is exactly as mute as having no spells at all, and a
+    // length-only check would have missed that.
+    const hasSpecAbilities = listOf(obj, "SpecAbilityList").some((entry) => getFieldNum(entry, "SpellFlags") === 1);
     if (!hasMemorized && !hasSpecAbilities) {
       report.warn(
         "caster_no_spells",

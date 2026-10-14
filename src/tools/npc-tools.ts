@@ -46,13 +46,14 @@ const CASTER_CLASS_IDS = new Set([1, 2, 3, 6, 7, 9, 10]); // Bard, Cleric, Druid
 
 // ─── Shared target resolution (blueprint OR placed instance) ──────────────
 
-interface CreatureTarget {
+export interface CreatureTarget {
   obj: GffObj;
   label: string;
   save: () => Promise<void>;
 }
 
-async function resolveCreatureTarget(
+/** Shared by spec-ability-tools.ts's bake_spec_ability_pool — same blueprint-or-placed-instance resolution. */
+export async function resolveCreatureTarget(
   index: ModuleIndex,
   resref: string | undefined,
   area: string | undefined,
@@ -689,7 +690,11 @@ export function registerNpcTools(server: McpServer): void {
       resref: z.string().optional().describe("Blueprint resref to edit"),
       area: z.string().optional().describe("Area resref, when editing a placed instance (with `tag`)"),
       tag: z.string().optional().describe("Tag of the placed instance to edit (with `area`)"),
-      slot: z.string().describe("Equip slot name: head, chest, boots, arms, righthand, lefthand, cloak, leftring, rightring, neck, belt, arrows, bullets, bolts"),
+      slot: z
+        .string()
+        .describe(
+          "Equip slot name: head, chest, boots, arms, righthand, lefthand, cloak, leftring, rightring, neck, belt, arrows, bullets, bolts",
+        ),
       propertyName: numParam("itempropdef.2da row — e.g. 1 for AC_BONUS"),
       subType: optNumParam("Subtype value (default 0)"),
       costTable: optNumParam("Cost table index — e.g. 2 for AC_BONUS's cost table"),
@@ -713,7 +718,9 @@ export function registerNpcTools(server: McpServer): void {
 
       const slotId = EQUIP_SLOT_MAP[slot.toLowerCase()];
       if (slotId === undefined) {
-        return { content: [{ type: "text", text: `Unknown slot '${slot}'. Valid: ${Object.keys(EQUIP_SLOT_MAP).join(", ")}` }] };
+        return {
+          content: [{ type: "text", text: `Unknown slot '${slot}'. Valid: ${Object.keys(EQUIP_SLOT_MAP).join(", ")}` }],
+        };
       }
 
       const equipList = listOf(creature, "Equip_ItemList");
@@ -746,7 +753,12 @@ export function registerNpcTools(server: McpServer): void {
                 success: true,
                 target: target.label,
                 slot,
-                added: { propertyName: toI(propertyName), subType: toI(subType, 0), costTable: toI(costTable, 0), costValue: toI(costValue) },
+                added: {
+                  propertyName: toI(propertyName),
+                  subType: toI(subType, 0),
+                  costTable: toI(costTable, 0),
+                  costValue: toI(costValue),
+                },
               },
               null,
               2,

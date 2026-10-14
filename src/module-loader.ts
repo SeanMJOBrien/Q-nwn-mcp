@@ -49,6 +49,42 @@ export async function resolveHakPaths(hakList: string[], warnings?: Array<{ type
   return hakPaths;
 }
 
+/**
+ * Committed, version-controlled nwscript.nss override directory — resolves to
+ * dist/nwscript-override/ (compiled) or src/nwscript-override/ (tsx dev),
+ * mirroring module-tools.ts's TEMPLATES_DIR pattern exactly.
+ *
+ * WHY THIS EXISTS: confirmed 2026-10-14 that this project's compile pipeline
+ * (nwn_script_comp, "the official compiler library") reads nwscript.nss
+ * dynamically as a real resman resource from NWN_FOLDER_DATA, not from
+ * anything bundled in the compiler itself — so its knowledge of engine
+ * functions is only as current as whatever nwscript.nss ships in that data
+ * directory. On a headless server with no real NWN client install (this
+ * project's actual deployment), that data directory is a bare, easily-stale
+ * resource dump with no update mechanism of its own (no Steam/Beamdog
+ * launcher to patch it). This was discovered the hard way: GetSpellAbilityCount/
+ * GetSpellAbilitySpell/GetSpellAbilityReady/SetSpellAbilityReady (needed by
+ * the Special-Abilities random-caster system, spec-ability-script.ts) failed
+ * to compile with a cryptic "PARSING VARIABLE LIST [DECL_VARLIST_SEPARATOR
+ * (0,0):LEFT_BRACKET]" error — not a real syntax problem, just this
+ * compiler's confused error recovery when it hits an identifier it's never
+ * heard of. A clean, minimal nwscript.nss already existed on this machine in
+ * several sibling NWN project checkouts (e.g. ~/git/shieldlands/ee-base-
+ * scripts/nwscript.nss) with these four functions as real declarations —
+ * confirmed by compiling a minimal repro with `--dirs` pointed at one of
+ * them, which fixed it immediately, with zero other changes.
+ *
+ * resman's `dirs` option treats later entries as higher priority (loose-file
+ * override semantics, same as NWN_FOLDER_USER's own override/ directory) —
+ * this is listed BEFORE index.tempDir so a module's own temp-dir files (if
+ * any ever shadow nwscript.nss, which none currently do) would still win.
+ * Keep this file updated by copying a current nwscript.nss here whenever a
+ * newer NWN:EE build adds functions this project's generators need —
+ * there is no separate update script for this, unlike the vendored binaries
+ * in ../nwn-tools/UPDATING.md, since this is a single committed text file.
+ */
+const NWSCRIPT_OVERRIDE_DIR = path.join(import.meta.dirname, "nwscript-override");
+
 /** Build resman options from a loaded module index, for use with resman-based tools */
 export async function buildResmanOptions(index: ModuleIndex): Promise<ResmanOptions> {
   const hakPaths = await resolveHakPaths(index.hakList);
@@ -57,7 +93,7 @@ export async function buildResmanOptions(index: ModuleIndex): Promise<ResmanOpti
     userDir: NWN_FOLDER_USER || undefined,
     // Reverse: hakList[0] = highest priority; resman loads later erfs with higher priority
     erfs: hakPaths.length > 0 ? [...hakPaths].reverse() : undefined,
-    dirs: [index.tempDir],
+    dirs: [NWSCRIPT_OVERRIDE_DIR, index.tempDir],
   };
 }
 
