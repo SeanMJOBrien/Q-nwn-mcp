@@ -2337,6 +2337,59 @@ NPC with equipped items and `Lootable=0`, no `LOOT_INTENTIONAL` marker)
 worth building next time this class of NPC shows up again, but out of
 scope for a single-instance fix already applied by hand.
 
+**TODO (2026-10-13, user-raised, not yet investigated/fixed) — two open
+questions from the sixth round, recorded rather than acted on per the
+user's explicit "add todo notes" request.**
+
+1. **The armor-AC fix two rounds ago ("Armor — you were right, I was wrong
+   to redirect") may itself have been based on a wrong premise, and needs
+   real re-investigation before touching this module's armor again.**
+   User: "There is no need to add magical AC to armor. You can purchase
+   what you can afford with the starting gold. One of the Road Thugs has
+   'Splint Mail' with 6 AC, then you added an additional +6 AC by magical
+   properties." This directly contradicts what this project verified at
+   the time: a raw `nwn_gff` extraction of the authentic base-game
+   `nw_aarcl004.uti`/`nw_aarcl005.uti` showed a genuinely empty
+   `PropertiesList` (byte-level check, not inferred), and the SAME item
+   embedded on `hos_thug1`/`hos_thug3` etc. showed the same empty list
+   *before* `add_equipped_item_property` was ever used on it. If the user
+   is seeing a real 6 AC on "Splint Mail" that predates that tool call, the
+   mechanism this project documented for where mundane armor AC comes from
+   (`ITEM_PROPERTY_AC_BONUS` only, confirmed via `armor.2da` + a real
+   community script `GetACOfArmorToEquip`) is missing something — possibly
+   a *different*, not-yet-identified source of AC for an unenchanted item
+   (the toolset inferring a nominal AC from the item's name/category for
+   display purposes, a different 2DA linkage this project hasn't found,
+   or something else entirely). **Do not add any more
+   `add_equipped_item_property` AC_BONUS properties to this module's armor
+   until this is resolved** — the `equipped_armor_no_ac_bonus` check and the
+   whole "cosmetic armor" finding may need to be revisited, not just the
+   specific items already touched. Needs a real, careful re-check (ideally
+   live, in the toolset, looking at the SPECIFIC item instance in question)
+   before any further action.
+2. **Elowen (Wizard) still shows one empty 2nd-level spell slot after the
+   deferLeveling + spawn-timing fix; Elya was not re-reported, so may
+   already be resolved.** Likely explanation, NOT yet confirmed for this
+   specific case: this project's own prior NWNX investigation (documented
+   under "Random caster abilities" → Tier 1 findings) already found that
+   Wizard specifically — unlike Cleric/Druid/Paladin/Ranger — keeps a 0
+   `GetMemorizedSpellCountByLevel()` ceiling at level 2+ *even after a
+   genuine `LevelUpHenchman()` pass*, confirmed via three independent NWNX
+   avenues (`NWNX_Creature_LevelUp`, `AddKnownSpell`,
+   `SetRemainingSpellSlots`) all hitting the identical ceiling — a
+   structural limitation tied to Wizard's `SpellbookRestricted` scribing
+   mechanic, not something this session's fix could reach. If that's what's
+   happening here, Elowen's 2nd-level slot may simply be unfixable via any
+   runtime call in this engine build, full stop — the only remaining avenue
+   would be the static `MemorizedList` GFF baking this project has
+   deliberately not built yet (see the earlier "static-spellbook-baking
+   tool" design discussion — blocked on not having a verified real sample
+   of the struct's `__struct_id`). **Not confirmed as the cause here** —
+   worth checking whether Elya (Cleric) is now actually fully fixed before
+   assuming this explanation is complete, and whether Elowen's remaining
+   gap is specifically at level 2 (matching the documented ceiling) or
+   somewhere the fix should have reached.
+
 ## Co-op / Multiplayer Rules
 
 **Every module is assumed to be party-playable by default.** A dialog action script runs
