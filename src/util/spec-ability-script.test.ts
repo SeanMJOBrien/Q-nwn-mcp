@@ -81,4 +81,16 @@ describe("generateSpecAbilityInclude", () => {
     const source = generateSpecAbilityInclude();
     expect(source).toContain("void SA_OnSpawn(object oCreature)");
   });
+
+  it("rolls class positions 1..3 (1-indexed), not 0..2 — regression for a confirmed off-by-one", () => {
+    // GetClassByPosition/GetLevelByPosition's nClassPosition is 1-indexed
+    // (1, 2, 3 — see nwscript.nss's own doc comment: "a single-class
+    // creature will only have a value in nClassLocation=1"). A 0..2 loop
+    // silently wastes position 0 (always CLASS_TYPE_INVALID) and misses
+    // real position 3 for a genuine triple-multiclass creature, confirmed
+    // live via run_live_verification against the Spec Ability Arena module.
+    const source = generateSpecAbilityInclude();
+    expect(source).toContain("for (p = 1; p <= 3; p++)");
+    expect(source).toContain("SA_RollClass(oCreature, GetClassByPosition(p, oCreature), GetLevelByPosition(p, oCreature));");
+  });
 });

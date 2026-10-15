@@ -168,7 +168,11 @@ describe("generateRandomAbilitiesInclude — entry points and naming", () => {
 
   it("rolls every class position so a multiclass creature gets every eligible caster class considered", () => {
     const source = generateRandomAbilitiesInclude();
-    expect(source).toContain("for (i = 0; i < 3; i++)");
+    // GetClassByPosition/GetLevelByPosition's nClassPosition is 1-indexed
+    // (1, 2, 3) — a 0..2 loop silently wastes position 0 (always
+    // CLASS_TYPE_INVALID) and misses real position 3 for a triple-multiclass
+    // creature. Regression test for that exact bug.
+    expect(source).toContain("for (i = 1; i <= 3; i++)");
     expect(source).toContain("RA_RollClass(oCreature, GetClassByPosition(i, oCreature), GetLevelByPosition(i, oCreature));");
   });
 

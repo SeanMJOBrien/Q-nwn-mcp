@@ -53,10 +53,13 @@
  * class that doesn't exist in the loaded data.
  */
 
+import type { GffObj } from "../types/gff.js";
+import { getFieldNum } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
-import { seedHash } from "./npc-weapon-preferences.js";
+import { getVarTableEntries } from "./git-helpers.js";
 import { tableFromConstantColumn } from "./npc-stat-block.js";
-import { hasCell, twoDARow } from "./verify/common.js";
+import { seedHash } from "./npc-weapon-preferences.js";
+import { hasCell, listOf, twoDARow } from "./verify/common.js";
 
 export interface SpecAbilityPoolEntry {
   spell: number;
@@ -271,4 +274,68 @@ export function buildSpecAbilityListEntries(
   }));
 
   return { entries, breakdown, warnings };
+}
+
+/**
+ * Shared glue between bake_spec_ability_pool (spec-ability-tools.ts) and
+ * level_creature (npc-tools.ts) — reads a creature's own ability scores and
+ * ClassList (honoring a `deferLeveling` HENCH_LEVEL override for a
+ * single-class creature, same convention verify/blueprints.ts's
+ * effectiveLevel already uses), and returns the full sorted entry set ready
+ * to write onto SpecAbilityList. Lives here, not in a tools file, so both
+ * callers can import it without creating a tools-file import cycle
+ * (spec-ability-tools.ts already imports resolveCreatureTarget FROM
+ * npc-tools.ts — a reverse import would be circular).
+ *
+ * Does not write SpecAbilityList or save anything itself — callers differ
+ * slightly in what else they report alongside the write, so they stay in
+ * charge of that.
+ */
+export function bakeSpecAbilityPoolForCreature(
+  index: ModuleIndex,
+  creature: GffObj,
+  markReady: boolean,
+  readySeed: string,
+): {
+  entries: SpecAbilityListEntry[];
+  breakdown: SpecAbilityPoolResult[];
+  warnings: string[];
+  henchLevelApplied?: number;
+} {
+  const abilityScores: AbilityScoreSet = {
+    str: getFieldNum(creature, "Str"),
+    dex: getFieldNum(creature, "Dex"),
+    con: getFieldNum(creature, "Con"),
+    int: getFieldNum(creature, "Int"),
+    wis: getFieldNum(creature, "Wis"),
+    cha: getFieldNum(creature, "Cha"),
+  };
+
+  const classList = listOf(creature, "ClassList");
+  const henchLevelEntry = getVarTableEntries(creature).find(
+    (v) => v.name.toLowerCase() === "hench_level" && v.type === "int",
+  );
+  const henchLevel = typeof henchLevelEntry?.value === "number" ? henchLevelEntry.value : undefined;
+
+  const classPositions = classList.map((cls) => {
+    const classId = getFieldNum(cls, "Class");
+    const rawLevel = getFieldNum(cls, "ClassLevel");
+    const classLevel = classList.length === 1 && henchLevel ? Math.max(rawLevel, henchLevel) : rawLevel;
+    return { classId, classLevel };
+  });
+
+  const { entries, breakdown, warnings } = buildSpecAbilityListEntries(
+    index,
+    classPositions,
+    abilityScores,
+    markReady,
+    readySeed,
+  );
+
+  return {
+    entries,
+    breakdown,
+    warnings,
+    ...(henchLevel && classList.length === 1 ? { henchLevelApplied: henchLevel } : {}),
+  };
 }

@@ -67,13 +67,98 @@ void main()
 }
 ```
 
-`SA_OnSpawn` un-readies every existing `SpecAbilityList` slot, then calls `SA_RollClass`
-once per class position (`GetClassByPosition`/`GetLevelByPosition`, read live). For each
-spell level, it recomputes the real slot count **live** (base `cls_spgn` row + the same
-bonus-spell formula using `GetAbilityModifier()` at the moment of spawn — so an ability
-score that changed after the bake is honoured for *slot count*), buckets the baked pool's
-indices by level, shuffles, and marks a real-slot-sized subset ready via
-`SetSpellAbilityReady()`.
+### The complete NWScript-only algorithm, step by step
+
+This section describes **only** what runs in the shipped engine at spawn time — no MCP,
+no TypeScript, no build-time tooling. It assumes `SpecAbilityList` already has a baked
+candidate pool sitting on the creature (see "Build time" above) — this runtime half
+can only pick *which* of those already-present entries are active; it can never add one.
+
+**1. Trigger.** A tiny wrapper, chained onto the creature's real `ScriptSpawn`, calls
+`SA_OnSpawn(OBJECT_SELF)` via `DelayCommand(0.5, ...)` (not inline — gives the call a
+fresh instruction budget, separate from whatever the original spawn script already
+burned):
+
+```
+#include "inc_spec_ability"
+void main()
+{
+    ExecuteScript("nw_c2_default9", OBJECT_SELF); // the creature's real original ScriptSpawn
+    DelayCommand(0.5, SA_OnSpawn(OBJECT_SELF));
+}
+```
+
+**2. `SA_OnSpawn(oCreature)` — the entry point.**
+- Validity check (`GetIsObjectValid`) — no-op on an invalid object.
+- Reads `GetSpellAbilityCount(oCreature)` (how many `SpecAbilityList` entries exist) and
+  calls `SetSpellAbilityReady(oCreature, i, FALSE)` on every single one. This guarantees
+  a clean slate every spawn — nothing from a previous roll (or a stray `markReady:true`
+  bake) carries over.
+- Loops the creature's class positions and calls `SA_RollClass` once per position:
+  ```
+  int p;
+  for (p = 1; p <= 3; p++)
+      SA_RollClass(oCreature, GetClassByPosition(p, oCreature), GetLevelByPosition(p, oCreature));
+  ```
+  **`nClassPosition` is 1-indexed** (1, 2, or 3 — confirmed from `nwscript.nss`'s own doc
+  comment: "a single-class creature will only have a value in nClassLocation=1"). A
+  single-class creature (the common case) only has real data at position 1; positions 2
+  and 3 come back `CLASS_TYPE_INVALID`/level 0 and `SA_RollClass` no-ops on them
+  immediately. A genuine triple-multiclass creature gets all three positions rolled
+  independently, each against that class's own slot table.
+
+**3. `SA_RollClass(oCreature, nClassType, nClassLevel)` — one class position's roll.**
+Eligibility gates, in order, any one of which no-ops the whole function for this
+position:
+- `nClassType == CLASS_TYPE_INVALID` (no class in this position).
+- `classes.2da`'s `SpellCaster` column for this class isn't `"1"`.
+- No `SpellGainTable` or `SpellTableColumn` cell for this class.
+- `nClassLevel` is below this class's `MinCastingLevel` (e.g. a level-3 Paladin: real
+  class, real spellcasting tables exist, but Paladins don't cast until level 4 — no-op).
+- `GetSpellAbilityCount(oCreature) == 0` (nothing was ever baked onto this creature).
+
+Once past the gates:
+- **Ability modifier**: reads `classes.2da`'s `SpellcastingAbil` column (`STR`.."CHA"),
+  maps it to the matching `ABILITY_*` constant, and calls
+  `GetAbilityModifier(nAbilConst, oCreature)` — live, at this exact moment, off the
+  creature's *current* ability scores.
+- **Bucket the pool by spell level, in one pass.** Loops every index `0..GetSpellAbilityCount-1`,
+  reads `GetSpellAbilitySpell(oCreature, i)` to get the spell id, looks that id up in
+  `spells.2da`'s column named by `SpellTableColumn` (e.g. Wizard's `Wiz_Sorc` column) to
+  get that spell's level **for this specific class**, and appends the index `i` into one
+  of ten flat JSON arrays (one per spell level 0-9) — not a nested array, not a `switch`
+  assigning a json local per case, both deliberately avoided (see the code comment for
+  why; same defensive shape `inc_random_abil.nss` uses for its own, larger scan).
+- **For each spell level 0-9, compute the real slot count:**
+  - `nBase` = `cls_spgn_<class>.2da`'s `SpellLevel<N>` cell at row `nClassLevel - 1`
+    (0 if `"****"` or the row doesn't exist).
+  - `nBonus` = the D&D 3.5 PHB Table 1-1 ability-modifier bonus-spell formula, for spell
+    levels 1-9 only (never for level 0/cantrips): `(nAbilMod - nSpellLvl) / 4 + 1` when
+    `nAbilMod >= nSpellLvl`, else `0`. This is computed directly in `SA_BonusSpells` —
+    it isn't encoded in any 2DA.
+  - `nSlots = nBase + nBonus`. If `nSlots <= 0`, this spell level gets nothing.
+- **Pick which pool entries fill those slots.** Takes that spell level's bucket (the
+  `SpecAbilityList` indices gathered above), shuffles it with the engine's own
+  `JsonArrayTransform(jPool, JSON_ARRAY_SHUFFLE)`, caps the pick count at
+  `min(nSlots, bucket size)`, and calls `SetSpellAbilityReady(oCreature, <index>, TRUE)`
+  for each of the chosen indices.
+
+**4. Net effect**: by the time `SA_OnSpawn` returns, every spell level the creature's
+class/level/ability-score combination legitimately qualifies for has exactly the right
+*number* of `Ready` entries (never more than the real rules allow, never fewer than the
+pool can supply), and *which* specific spells those are is re-randomized independently
+every time the module loads — because the shuffle+pick happens fresh on every call, with
+no stored state from the previous spawn.
+
+**Idempotent by design**: calling `SA_OnSpawn` again on the same creature (e.g. after a
+companion's deferred-leveling pass completes) is safe — it always starts by un-readying
+everything, so there's no accumulation across repeated calls.
+
+**FIXED (2026-10-15)** — the position loop above used to run `0..2` instead of `1..3`,
+confirmed live while demonstrating the "level up a creature" recipe. Position 0 is
+always invalid, so single- and dual-class creatures were accidentally unaffected (their
+real positions 1-2 still fell inside the old range) — only a genuine triple-multiclass
+creature ever lost a position's worth of rolling. See CLAUDE.md's matching entry.
 
 **Caveat on pool membership vs. slot count**: slot *count* is recomputed live every
 spawn; pool *membership* (which spells even exist as candidates) is fixed at whatever
@@ -193,6 +278,73 @@ was reverted after this run — it was never meant to ship.
   which is exactly the shape that caps Random Abilities' Tier 1 path at cantrips — Special
   Abilities has no such ceiling, so a directly-leveled boss now gets a real multi-level
   spell/ability pool out of the box.
+
+## TODO — handle a live level-up after the pool was already baked
+
+`bake_spec_ability_pool` fixes the candidate pool's *membership* at whatever class
+level the blueprint had when it ran. A henchman/NPC that is later leveled up for real
+(a live `LevelUpHenchman()` pass — independent of this system, since that call never
+touches `SpecAbilityList` either way) can end up with a higher `ClassList` level than
+the baked pool accounts for. `SA_OnSpawn` then has no higher-level spells to pick from,
+so the creature's slot allotment at the new level is never actually filled — new spell
+slots exist (the engine/2DA say so) but nothing is available to fill them.
+
+Not designed or implemented yet. Two real directions, neither started:
+
+- **(a) A live re-bake.** Would need an NWScript-side equivalent of
+  `computeSpecAbilityPool` that can *extend* `SpecAbilityList` at the moment of
+  level-up — blocked by the same "nothing can add a new ability to `SpecAbilityList`
+  at runtime" limitation this whole system exists to work around (`SetSpellAbilityReady`
+  only toggles an existing entry). May need a GFF-level append from outside the running
+  engine instead of a pure-NWScript fix, which doesn't fit this system's "everything
+  happens at `OnSpawn`" model at all.
+- **(b) A documented rule + a real check.** Require `bake_spec_ability_pool` to be
+  re-run after any live leveling event, and add a `verify_creature` comparison of the
+  baked pool's maximum represented class level against the creature's actual current
+  `ClassList` level, flagging a mismatch instead of trusting the skill doc alone to
+  remember the rule (the same "corrections become rules validated by script" discipline
+  this project applies everywhere else).
+
+## TODO — auto-fill the DM quickbar at bake time, not just the Spellbook panel
+
+Right now every ready ability still needs a human to manually drag it from the
+Spellbook/Powers radial onto a hotbar slot each session (see "How a DM actually sees
+and uses these abilities in-game" above). Real investigation started on whether this
+can be automated — confirmed facts below, not guesses:
+
+- **A real PC `.bic` save file DOES carry a `QBList` field** — checked directly via
+  `nwn_gff` against a real, actually-played character. 36 structs, each
+  `{QBObjectType (byte), QBINTParam1 (int), QBMultiClass (byte), QBDomainLevel (byte),
+  QBMetaType (byte)}`. Sampling that character's real quickbar: `QBObjectType=2`
+  entries carry `QBINTParam1` values matching that character's own memorized
+  `spells.2da` row ids — strongly suggesting `2` means "cast this spell by id."
+  `QBObjectType=4` appeared on what looks like a feat-use slot.
+- **A `.utc` creature blueprint has NO `QBList` field at all** — confirmed empty on a
+  real sample creature. This is currently a PC-`.bic`-only concept in the schema.
+
+Three real unknowns block building this — none safe to guess past, per this project's
+own "encode unverified data as a skip, never a guess" rule:
+
+1. Whether writing a `QBList` onto a creature's `.utc`/placed-instance GFF has ANY
+   effect on what a DM sees when possessing it, or whether DM possession's quickbar is
+   sourced from the DM's own persistent client/account state instead, independent of
+   the possessed object's own data. Unconfirmed — would need a real possession session
+   to observe; this project's headless verify-server can't do that (no graphical
+   client, a documented existing limitation).
+2. The full `QBObjectType` encoding table — only values 0/1/2/4 were seen in one
+   sample, not a verified complete mapping, and specifically whether a
+   `SpecAbilityList` entry needs the same type code as a known/memorized spell or a
+   distinct one. The client treats "Special Abilities" as a separate radial category
+   from memorized spells even though both key off the same `spells.2da` row id —
+   writing the wrong code risks corrupting whatever quickbar state does get read, not
+   just failing silently.
+3. If (1) and (2) resolve favorably: `bake_spec_ability_pool`/`create_creature_blueprint`
+   would need a new write path appending `QBList` structs for each ready-marked
+   ability, bounded to the real 36-slot limit (shared with any feats/other actions also
+   being auto-filled), plus a decision on ordering/overflow when a creature has more
+   ready abilities than slots.
+
+Not designed or implemented yet.
 
 ## Spec Ability Arena module
 

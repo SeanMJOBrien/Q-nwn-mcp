@@ -66,6 +66,7 @@ export function registerBlueprintTools(server: McpServer): void {
       startingPackage: optNumParam("packages.2da row. Determines the picks LevelUpHenchman() makes when levelling this creature at runtime."),
       varTable: z.string().optional().describe('JSON array of local variables to set on the blueprint, merged by name: [{"name":"HENCH_LEVEL","type":"int","value":5}]. type is one of int|float|string.'),
     },
+    { destructiveHint: true },
     async ({ resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation, str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment, inventory, lootable, henchman, scripts, soundset, startingPackage, varTable }) => {
       const index = requireIndex();
 
@@ -128,6 +129,7 @@ export function registerBlueprintTools(server: McpServer): void {
       respawns: z.boolean().optional().describe("Whether encounter respawns after cleared (default false)"),
       respawnTime: optNumParam("Seconds until respawn (default 300)"),
     },
+    { destructiveHint: true },
     async ({ resref, tag, name, creatures, sourceResref, active, difficulty, maxCreatures, recCreatures, respawns, respawnTime }) => {
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
@@ -229,6 +231,7 @@ export function registerBlueprintTools(server: McpServer): void {
       identifyPrice: optNumParam("Identification cost (default 100)"),
       inventory: z.string().optional().describe("JSON array of inventory items: [{resref: 'nw_it_mpotion001', infinite?: true, category?: 0}]. Category: 0=Armor, 1=Weapons, 2=Potions/Scrolls, 3=Wands/Magic, 4=Misc (default 4). Items are resolved from module or base game."),
     },
+    { destructiveHint: true },
     async ({ resref, tag, name, sourceResref, markUp, markDown, storeGold, maxBuyPrice, identifyPrice, inventory }) => {
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
@@ -387,6 +390,7 @@ export function registerBlueprintTools(server: McpServer): void {
       oneShot: z.boolean().optional().describe("Trap fires once then disables (default true)"),
       size: optNumParam("Trigger square size in meters (default 4.0)"),
     },
+    { destructiveHint: true },
     async ({ resref, tag, name, scriptOnEnter, sourceResref, detectDC, disarmDC, oneShot, size }) => {
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();

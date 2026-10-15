@@ -130,6 +130,8 @@
  * files are portable to any other vanilla module verbatim.
  */
 
+import { classPositionRollLoop } from "./nwscript-snippets.js";
+
 export interface RandomAbilitiesOptions {
   /** Include resref to write, so the usage comment names the real file. */
   includeName?: string;
@@ -400,13 +402,19 @@ void RA_RollClass(object oCreature, int nClassType, int nClassLevel)
 // Call once from a chained OnSpawn wrapper (see the header comment above).
 // Rolls every class position oCreature has — safe to call on a non-caster,
 // which no-ops on every position.
+//
+// GetClassByPosition/GetLevelByPosition's nClassPosition is 1-indexed (1, 2,
+// or 3 — see nwscript.nss's own doc comment: "a single-class creature will
+// only have a value in nClassLocation=1"). Loop 1..3, NOT 0..2 — 0 is always
+// CLASS_TYPE_INVALID and silently wastes an iteration, and a 0..2 loop (the
+// original, buggy version of this function) misses real position 3 entirely
+// for a genuine triple-multiclass creature, even though it happens to still
+// catch positions 1-2 since those fall inside 0..2's range too.
 void RA_OnSpawn(object oCreature)
 {
     if (!GetIsObjectValid(oCreature)) return;
 
-    int i;
-    for (i = 0; i < 3; i++)
-        RA_RollClass(oCreature, GetClassByPosition(i, oCreature), GetLevelByPosition(i, oCreature));
+    ${classPositionRollLoop("i", "RA_RollClass")}
 }
 
 // Call from a chained ScriptEndRound wrapper. No-op unless RA_OnSpawn stored

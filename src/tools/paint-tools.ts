@@ -38,6 +38,7 @@ export function registerPaintTools(server: McpServer): void {
       tileset: z.string().describe("Tileset resref (e.g., 'ttf01' for forest)"),
       defaultTerrain: z.string().optional().describe("Default terrain type (defaults to tileset's first terrain)"),
     },
+    { destructiveHint: true },
     async ({ resref, name, width: widthStr, height: heightStr, tileset: tilesetResref, defaultTerrain }) => {
       const width = parseInt(widthStr, 10);
       const height = parseInt(heightStr, 10);

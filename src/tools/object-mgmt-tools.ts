@@ -112,6 +112,7 @@ export function registerObjectMgmtTools(server: McpServer): void {
       tag: z.string().describe("Base tag for naming. Max 11 chars to avoid script resref truncation collisions. Trigger tag = 'tr_<tag>' (32-char limit), waypoint tag = 'wp_<tag>' (32-char limit), script resref = 'a_tr_<tag>' (16-char resref limit — this is the constraint). Use short abbreviated tags like 'vil_inn', 'cave_vil'."),
       triggerBlueprint: z.string().optional().describe("UTT blueprint resref for the trigger (default: 'nw_yourfeet' or generic trigger)"),
     },
+    { destructiveHint: true },
     async ({ sourceArea, sourceX, sourceY, sourceZ, targetArea, targetX, targetY, targetZ, tag, triggerBlueprint }) => {
       const sxN = toF(sourceX), syN = toF(sourceY), szN = toF(sourceZ);
       const txN = toF(targetX), tyN = toF(targetY), tzN = toF(targetZ);

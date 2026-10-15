@@ -157,6 +157,7 @@ export function registerDialogWriteTools(server: McpServer): void {
           "JSON array of dialog tree nodes: [{ speaker: 'npc'|'pc', text: string, script?: string, condition?: string, children?: [...] }]",
         ),
     },
+    { destructiveHint: true },
     async ({ resref, nodes }) => {
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
@@ -259,6 +260,7 @@ export function registerDialogWriteTools(server: McpServer): void {
       script: z.string().optional().describe("Action script resref (runs when node plays)"),
       condition: z.string().optional().describe("Condition script on the link from parent"),
     },
+    { destructiveHint: true },
     async ({ dialog, parentIndex, parentType, text, script, condition }) => {
       const index = requireIndex();
       const parentIdx = toI(parentIndex);

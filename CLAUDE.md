@@ -2827,6 +2827,56 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
     script, because only the include's source was being regenerated between test
     iterations — always recompile every wrapper script after changing an include it
     depends on, not just the include itself.
+- **BUILT (2026-10-15) — reliability/efficiency pass via the `mcp-builder` skill, triggered by this session's own
+  manual 6-call NPC-leveling dance.** Findings and fixes, in the order built:
+  1. `build_npc_stat_block` gained `area`/`tag` support (mirroring `bake_spec_ability_pool`'s existing pattern) —
+     previously resref-only, which forced a delete+re-place dance to re-level an already-placed creature.
+  2. New tool **`level_creature`** — one call changes a single-class creature's level up OR down by a delta,
+     recomputing the full stat block (`applyNpcStatBlock`, factored out of `build_npc_stat_block`'s handler) AND
+     re-baking its Special-Abilities pool, directly on whichever object was targeted. Leveling down is real here
+     (not subject to `LevelUpHenchman`'s up-only, zero-automatic-feats limitation) because this rewrites the GFF
+     stat block directly rather than calling any live engine leveling function.
+  3. New static test `tool-registration-shape.test.ts` — parses the real TypeScript AST of every `src/tools/*.ts`
+     file and fails if a `server.tool()` call's annotations position (arg 4 of 5) is a literal `{}` — the exact
+     shape that silently broke `start_web_editor` (see the Known Pitfalls entry above). Previously caught only by
+     accident; now gated by `npm run verify`.
+  4. New shared helper `classPositionRollLoop` (`util/nwscript-snippets.ts`) — the identical 1-indexed
+     `GetClassByPosition`/`GetLevelByPosition` loop (see the fix entry above) is now generated from one function
+     instead of hand-duplicated across `random-abilities-script.ts` and `spec-ability-script.ts`, so a future fix
+     (or a future third generator) can't reintroduce that bug independently.
+  5. Filled in missing tool annotations: 18 mutating tools (`create_module`, `create_area`, `create_dialog`,
+     `create_faction`, `create_creature_blueprint` and its blueprint-type siblings, `compose_encounter`,
+     `adventure_create_transition`, `create_area_transition`, journal/write/clone tools, `query_database`) had no
+     `destructiveHint`/`idempotentHint` at all — confirmed via real AST parsing (not a text-regex guess, which
+     produced false positives against `move_object`/`fix_object_heights`, both already annotated). `create_journal`
+     got `idempotentHint: true` instead (it already no-ops safely if one exists); the rest got `destructiveHint: true`.
+     159 tools total; only `undo_last_change`/`start_web_editor` remain intentionally bare.
+  6. New tool **`build_npc_level_library`** — batch-builds one correctly-leveled blueprint per level in a
+     requested array (e.g. `[1,3,5,8,10,12,15,18,20]`), server-side in one call via the existing
+     `buildCreatureBlueprint`/`applyNpcStatBlock`/`bakeSpecAbilityPoolForCreature` building blocks — for the
+     prebuilt-resref-library pattern (feeding a future in-game dialog-driven leveler, since nothing can be
+     level-adjusted correctly by pure NWScript at runtime — no `AddFeat`/`RemoveFeat`/`SetAbilityScore` exist).
+     A level whose resref already exists is skipped per-level, not aborting the whole batch.
+  7. Normalized `isError` across the tool-execution-failure returns this round touched. Only 2 of 36 tool files
+     used the MCP SDK's `isError:true` convention — the rest return a failed lookup/validation as an ordinary
+     successful-looking text response, which means a client has no protocol-level signal that the call didn't do
+     what was asked (it has to parse the message text itself). New shared helper
+     `targetErrorResult()` (`npc-tools.ts`, next to `resolveCreatureTarget`) fixes this for all 7 call sites of
+     the shared blueprint-or-placed-instance resolution pattern at once (`build_npc_stat_block`, `level_creature`,
+     `equip_npc_by_role`, `respec_weapon_feats`, `remove_feats`, `add_equipped_item_property`,
+     `bake_spec_ability_pool`) — DRY in the same spirit as item 4 above, not a one-off patch per tool.
+     `level_creature`'s multiclass refusal and `create_spec_ability_system`'s resref-too-16-chars check got the
+     same treatment directly. `build_npc_level_library`'s batch result only sets `isError` when EVERY requested
+     level failed — a partial batch produced real, usable output, so it correctly stays a normal result with
+     `success:false` and a per-level `results` array, not a protocol-level failure. **Deliberately scoped to the
+     tools touched by this round's work, not a sweep of all 159 tools** — converting every early-return across
+     the whole codebase would need a case-by-case judgment call (informational result vs. genuine failure) this
+     pass didn't have the context budget to make safely for tools it didn't already have open; the convention
+     (and the new shared helper) are there for the next tool that needs it.
+  New tests: 6 for `build_npc_stat_block`/`level_creature` (placed-instance write path, up/down leveling, pool
+  widening, clamping, multiclass refusal, MemorizedList-creature warning), 3 for `build_npc_level_library`
+  (batch build, partial-failure skip, all-failed `isError`), 2 for the annotations-shape guard, 2 isError
+  regression assertions added to existing tests. `npm run verify`: 791 passed, 48 test files, all checks green.
 - **BUILT (2026-10-14) — a second, now-default caster system (`SpecAbilityList`
   instead of `MemorizedList`), full design/findings in
   `docs/special-abilities-system.md`.** `inc_spec_ability.nss`
@@ -2860,6 +2910,80 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   manually drag each wanted ability from the Spellbook panel onto a hotbar
   slot; nothing server-side can do that step. See the doc for the full
   write-up and the live log evidence.
+  **TODO — handle a live level-up after the pool was already baked.**
+  `bake_spec_ability_pool` fixes the candidate pool's membership at whatever
+  class level the blueprint had when it ran; a henchman/NPC that is later
+  leveled up for real (a live `LevelUpHenchman()` pass, independent of this
+  system since it never touches `SpecAbilityList`) can end up with a higher
+  `ClassList` level than the baked pool accounts for, so `SA_OnSpawn` has no
+  higher-level spells to pick from and the creature's slot allotment at the
+  new level is never actually filled — the exact "new spells aren't enabled
+  to match the proper slot count" gap. No tool currently detects or re-bakes
+  this automatically; the correct fix is either (a) a live-callable re-bake
+  (an NWScript-side equivalent of `computeSpecAbilityPool` that can extend
+  `SpecAbilityList` at the moment of level-up — blocked by the same "nothing
+  can add a new ability to `SpecAbilityList` at runtime" limitation this
+  whole system exists to work around, so this may need a GFF-level append
+  instead of a pure-NWScript fix), or (b) a documented rule that
+  `bake_spec_ability_pool` must always be re-run after any live leveling
+  event, with a real check (e.g. a `verify_creature` comparison of baked
+  pool's max level against the creature's actual current class level) to
+  catch a module that skipped it. Not designed or implemented yet.
+  **TODO — auto-fill the DM quickbar at bake time, not just the Spellbook panel.**
+  Currently, every ready ability still needs a human to manually drag it from the
+  Spellbook/Powers radial onto a hotbar slot each session (see the "toolbar" finding
+  above). Real investigation started, confirmed rather than guessed: a real PC `.bic`
+  save file (checked directly via `nwn_gff`) DOES carry a `QBList` field — 36 structs,
+  each `{QBObjectType (byte), QBINTParam1 (int), QBMultiClass (byte), QBDomainLevel
+  (byte), QBMetaType (byte)}`. Sampling one real character's quickbar: `QBObjectType=2`
+  entries carry `QBINTParam1` values matching that character's actual memorized
+  spells.2da row ids (strongly suggesting `2` = "cast this spell by id"); `QBObjectType=4`
+  appears for what looks like a feat slot. **But a `.utc` creature blueprint has NO
+  `QBList` field at all** (confirmed empty on a real sample creature) — this is
+  currently a PC-`.bic`-only concept in the schema, and three real unknowns block
+  building this, none of them safe to guess past:
+  1. Whether writing a `QBList` onto a creature's `.utc`/placed-instance GFF has ANY
+     effect on what a DM sees when possessing it, or whether DM possession's quickbar
+     is sourced from the DM's own persistent client/account state instead, independent
+     of the possessed object's own data. Unconfirmed — would need a real possession
+     session to observe, which this project's headless verify-server cannot do (no
+     graphical client).
+  2. The full `QBObjectType` encoding table — only values 0/1/2/4 were seen in one
+     sample, not a verified complete mapping, and specifically whether a
+     `SpecAbilityList` entry needs the same type code as a known/memorized spell or a
+     distinct one (the client treats "Special Abilities" as a separate category from
+     memorized spells in the radial even though both key off the same `spells.2da` row
+     id — writing the wrong code risks corrupting whatever quickbar state does get
+     read, not just failing silently).
+  3. If (1) and (2) resolve favorably: `bake_spec_ability_pool`/`create_creature_blueprint`
+     would need a new write path appending `QBList` structs for each ready-marked
+     ability, bounded to the real 36-slot limit (shared with any feats/other actions
+     also being auto-filled), plus a decision on ordering/overflow when a creature has
+     more ready abilities than slots. Not designed or implemented yet.
+- **FIXED (2026-10-15) — both caster systems' class-position loop had an
+  off-by-one, confirmed live via `run_live_verification` while demonstrating
+  the "level up a creature" recipe above, not just read from source.**
+  `GetClassByPosition`/`GetLevelByPosition`'s `nClassPosition` is
+  **1-indexed** (1, 2, or 3 — `nwscript.nss`'s own doc comment: "a
+  single-class creature will only have a value in nClassLocation=1"). Both
+  `RA_OnSpawn` (`inc_random_abil.nss`, the original Random Abilities system —
+  already shipped in every module built with it, including The Hollow
+  Communion) and `SA_OnSpawn` (`inc_spec_ability.nss`) looped `0..2` instead
+  of `1..3`. Impact is narrow and explains why this went unnoticed through
+  every prior live test: position 0 is always `CLASS_TYPE_INVALID` (a wasted
+  no-op iteration), but positions 1 and 2 — the real slots for every
+  single-class or dual-class creature, which covers essentially every NPC
+  this project generates — still fall inside a `0..2` range and rolled
+  correctly. Only a genuine **triple-multiclass** creature (a real position 3)
+  silently never had its third class's spells/abilities rolled at all.
+  **Fix**: both loops changed to `for (i = 1; i <= 3; i++)` in
+  `random-abilities-script.ts`/`spec-ability-script.ts`. Regression tests
+  added to both `*.test.ts` files pinning the corrected loop text. Any
+  already-shipped module's `inc_random_abil.nss`/`inc_spec_ability.nss` needs
+  `create_random_abilities_system`/`create_spec_ability_system` re-run (after
+  an MCP restart to pick up this fix) to actually get the corrected include —
+  regenerating the TypeScript source alone has no effect on an already-built
+  module until that tool is re-run against it.
 - **FIXED — the feat/spell/equipment bug class (no feats, no spells, wrong equip slot,
   wrong-weight armor, no melee backup, inconsistent cross-area appearance) is now
   caught automatically, and the actual root cause was a documentation gap, not a code

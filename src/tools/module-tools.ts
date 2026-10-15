@@ -213,6 +213,7 @@ export function registerModuleTools(server: McpServer): void {
       name: z.string().describe("Module display name (e.g., 'The Lost Tomb')"),
       filename: z.string().describe("Module filename without .mod extension (e.g., 'the-lost-tomb')"),
     },
+    { destructiveHint: true },
     async ({ name, filename }) => {
       if (!NWN_FOLDER_USER) {
         return { content: [{ type: "text", text: "NWN_FOLDER_USER environment variable is not set. Cannot determine modules directory." }] };

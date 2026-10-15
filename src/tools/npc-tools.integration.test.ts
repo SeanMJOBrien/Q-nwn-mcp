@@ -362,6 +362,411 @@ describe("build_npc_stat_block", () => {
       });
       const text = (result.content as Array<{ text?: string }>)[0]?.text ?? "";
       expect(text).toContain("No nonexistent.utc");
+      // isError:true — a failed target resolution is a tool execution failure,
+      // not a successful-looking text response (MCP best practice).
+      expect(result.isError).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("writes onto a PLACED instance when given area+tag instead of resref (regression: used to only support a standalone blueprint)", async () => {
+    loadClassRaceTables(mockIndex);
+    const gitKey = "arena.git";
+    mockIndex.parsedGff.set(gitKey, {
+      __data_type: "GIT ",
+      "Creature List": {
+        type: "list",
+        value: [makeBlueprintUtc({ Tag: { type: "cexostring", value: "def_pal" } })],
+      },
+    } as unknown as GffDocument);
+    mockIndex.resources.set(gitKey, {
+      resref: "arena",
+      extension: "git",
+      filePath: path.join(tempDir, gitKey),
+      sizeBytes: 1,
+    });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_stat_block",
+        arguments: { area: "arena", tag: "def_pal", race: "6", classId: "4", level: "5", powerLevel: "elite" },
+      });
+      const parsed = parseResult(result) as { success: boolean; target: string; hp: number };
+      expect(parsed.success).toBe(true);
+      expect(parsed.target).toBe("arena:def_pal");
+      expect(parsed.hp).toBeGreaterThan(0);
+
+      const gitDoc = mockIndex.parsedGff.get(gitKey) as GffObj;
+      const creature = (gitDoc["Creature List"] as { value: GffObj[] }).value[0];
+      const classList = (creature.ClassList as { value: GffObj[] }).value;
+      expect((classList[0].ClassLevel as { value: number }).value).toBe(5);
+      const featList = (creature.FeatList as { value: GffObj[] }).value;
+      expect(featList.length).toBeGreaterThan(0);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+/** Wizard (class 10) with full spellcasting columns, for level_creature's SpecAbilityList re-bake tests. */
+function loadWizardClassTableWithSpells(index: ModuleIndex): void {
+  index.twodaTables.set(
+    "classes",
+    twoDA(
+      [
+        "HitDie",
+        "FeatsTable",
+        "BonusFeatsTable",
+        "SkillsTable",
+        "SkillPointBase",
+        "PrimaryAbil",
+        "SpellCaster",
+        "SpellGainTable",
+        "SpellTableColumn",
+        "SpellcastingAbil",
+        "MinCastingLevel",
+      ],
+      [
+        [
+          10,
+          {
+            HitDie: "4",
+            FeatsTable: "CLS_FEAT_WIZ",
+            BonusFeatsTable: "CLS_BFEAT_WIZ",
+            SkillsTable: "CLS_SKILL_WIZ",
+            SkillPointBase: "2",
+            PrimaryAbil: "INT",
+            SpellCaster: "1",
+            SpellGainTable: "CLS_SPGN_WIZ",
+            SpellTableColumn: "Wiz_Sorc",
+            SpellcastingAbil: "INT",
+            MinCastingLevel: "1",
+          },
+        ],
+      ],
+    ),
+  );
+  index.twodaTables.set(
+    "cls_feat_wiz",
+    twoDA(
+      ["FeatLabel", "FeatIndex", "List", "GrantedOnLevel"],
+      [[0, { FeatLabel: "WeapProfWizard", FeatIndex: "51", List: "3", GrantedOnLevel: "1" }]],
+    ),
+  );
+  index.twodaTables.set(
+    "cls_bfeat_wiz",
+    twoDA(["Bonus"], Array.from({ length: 10 }, (_, i) => [i, { Bonus: "0" }] as [number, Record<string, string>])),
+  );
+  index.twodaTables.set(
+    "cls_skill_wiz",
+    twoDA(["SkillLabel", "SkillIndex", "ClassSkill"], [[0, { SkillLabel: "Spellcraft", SkillIndex: "8", ClassSkill: "1" }]]),
+  );
+  // Rows 0-2 are low-level (levels 1-3); row 7 (level 8) gets wider slots so a level-up from 5 to 8 widens the pool.
+  index.twodaTables.set(
+    "cls_spgn_wiz",
+    twoDA(
+      ["SpellLevel0", "SpellLevel1", "SpellLevel2", "SpellLevel3"],
+      [
+        [4, { SpellLevel0: "4", SpellLevel1: "2", SpellLevel2: "1" }], // level 5
+        [7, { SpellLevel0: "4", SpellLevel1: "3", SpellLevel2: "2", SpellLevel3: "1" }], // level 8
+      ],
+    ),
+  );
+  index.twodaTables.set(
+    "spells",
+    twoDA(
+      ["Wiz_Sorc"],
+      [
+        [10, { Wiz_Sorc: "0" }],
+        [11, { Wiz_Sorc: "1" }],
+        [12, { Wiz_Sorc: "2" }],
+        [13, { Wiz_Sorc: "3" }],
+      ],
+    ),
+  );
+}
+
+describe("level_creature", () => {
+  it("levels a blueprint UP by delta, recomputing the full stat block and widening the SpecAbilityList pool", async () => {
+    loadWizardClassTableWithSpells(mockIndex);
+    const key = "elowen.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "elowen" },
+        ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 10 }, ClassLevel: { type: "short", value: 5 } }] },
+        SpecAbilityList: { type: "list", value: [{ __struct_id: 0, Spell: { type: "word", value: 10 }, SpellCasterLevel: { type: "byte", value: 5 }, SpellFlags: { type: "byte", value: 0 } }] },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "elowen", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "level_creature",
+        arguments: { resref: "elowen", delta: "3" },
+      });
+      const parsed = parseResult(result) as {
+        success: boolean;
+        previousLevel: number;
+        newLevel: number;
+        specAbility: { totalPoolSize: number; readyCount: number };
+      };
+      expect(parsed.success).toBe(true);
+      expect(parsed.previousLevel).toBe(5);
+      expect(parsed.newLevel).toBe(8);
+      // Level 8's cls_spgn row unlocks spell level 3 (id 13), widening the pool beyond level 5's.
+      expect(parsed.specAbility.totalPoolSize).toBeGreaterThan(1);
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const classList = (doc.ClassList as { value: GffObj[] }).value;
+      expect((classList[0].ClassLevel as { value: number }).value).toBe(8);
+      const pool = (doc.SpecAbilityList as { value: GffObj[] }).value;
+      expect(pool.some((e) => (e.Spell as { value: number }).value === 13)).toBe(true); // 3rd-level spell now eligible
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("levels DOWN by a negative delta — not subject to LevelUpHenchman's up-only limitation, since this rewrites the stat block directly", async () => {
+    loadWizardClassTableWithSpells(mockIndex);
+    const key = "elowen.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "elowen" },
+        ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 10 }, ClassLevel: { type: "short", value: 8 } }] },
+        SpecAbilityList: { type: "list", value: [] },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "elowen", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "level_creature",
+        arguments: { resref: "elowen", delta: "-3" },
+      });
+      const parsed = parseResult(result) as { success: boolean; previousLevel: number; newLevel: number };
+      expect(parsed.success).toBe(true);
+      expect(parsed.previousLevel).toBe(8);
+      expect(parsed.newLevel).toBe(5);
+
+      const doc = mockIndex.parsedGff.get(key) as GffObj;
+      const classList = (doc.ClassList as { value: GffObj[] }).value;
+      expect((classList[0].ClassLevel as { value: number }).value).toBe(5);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("clamps the result to the 1-20 range instead of going out of bounds", async () => {
+    loadClassRaceTables(mockIndex);
+    const key = "test_npc.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 18 } }] },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "test_npc", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "level_creature",
+        arguments: { resref: "test_npc", delta: "10" },
+      });
+      const parsed = parseResult(result) as { newLevel: number };
+      expect(parsed.newLevel).toBe(20); // 18 + 10 = 28, clamped to 20
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("refuses a multiclass creature — only single-class is supported, matching build_npc_stat_block's own scope", async () => {
+    loadClassRaceTables(mockIndex);
+    const key = "multi.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        ClassList: {
+          type: "list",
+          value: [
+            { __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } },
+            { __struct_id: 2, Class: { type: "int", value: 8 }, ClassLevel: { type: "short", value: 2 } },
+          ],
+        },
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "multi", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "level_creature",
+        arguments: { resref: "multi", delta: "1" },
+      });
+      const text = (result.content as Array<{ text?: string }>)[0]?.text ?? "";
+      expect(text).toContain("single-class");
+      expect(result.isError).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("warns, without crashing, when a caster class has no SpecAbilityList to re-bake (older MemorizedList-based creature)", async () => {
+    loadWizardClassTableWithSpells(mockIndex);
+    const key = "oldstyle.utc";
+    mockIndex.parsedGff.set(
+      key,
+      makeBlueprintUtc({
+        Tag: { type: "cexostring", value: "oldstyle" },
+        ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 10 }, ClassLevel: { type: "short", value: 5 } }] },
+        // No SpecAbilityList at all — this creature uses the older MemorizedList system.
+      }) as unknown as GffDocument,
+    );
+    mockIndex.resources.set(key, { resref: "oldstyle", extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "level_creature",
+        arguments: { resref: "oldstyle", delta: "1" },
+      });
+      const parsed = parseResult(result) as { success: boolean; specAbility: unknown; warnings: string[] };
+      expect(parsed.success).toBe(true);
+      expect(parsed.specAbility).toBeUndefined();
+      expect(parsed.warnings.some((w) => w.includes("MemorizedList-based"))).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+describe("build_npc_level_library", () => {
+  it("batch-builds one correctly-leveled blueprint per requested level, each with a widening SpecAbilityList pool", async () => {
+    loadWizardClassTableWithSpells(mockIndex);
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_level_library",
+        arguments: {
+          resrefPrefix: "sa_wiz",
+          name: "Library Wizard",
+          race: "6",
+          classId: "10",
+          levels: "[5,8]",
+        },
+      });
+      const parsed = parseResult(result) as {
+        success: boolean;
+        builtCount: number;
+        totalRequested: number;
+        results: Array<{ level: number; resref: string; success: boolean; hp: number; specAbilityPoolSize: number }>;
+      };
+      expect(parsed.success).toBe(true);
+      expect(parsed.builtCount).toBe(2);
+      expect(parsed.totalRequested).toBe(2);
+      expect(parsed.results.map((r) => r.resref)).toEqual(["sa_wiz_lvl05", "sa_wiz_lvl08"]);
+      // Level 8's pool is wider than level 5's — unlocks 3rd-level spells per loadWizardClassTableWithSpells.
+      expect(parsed.results[1].specAbilityPoolSize).toBeGreaterThan(parsed.results[0].specAbilityPoolSize);
+
+      const lvl5 = mockIndex.parsedGff.get("sa_wiz_lvl05.utc") as GffObj;
+      expect((lvl5.FirstName as { value: Record<string, string> }).value["0"]).toBe("Library Wizard (Level 5)");
+      const classList5 = (lvl5.ClassList as { value: GffObj[] }).value;
+      expect((classList5[0].ClassLevel as { value: number }).value).toBe(5);
+
+      const lvl8 = mockIndex.parsedGff.get("sa_wiz_lvl08.utc") as GffObj;
+      const classList8 = (lvl8.ClassList as { value: GffObj[] }).value;
+      expect((classList8[0].ClassLevel as { value: number }).value).toBe(8);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("skips (not aborts) a level whose resref already exists, reporting the error for just that level", async () => {
+    loadClassRaceTables(mockIndex);
+    mockIndex.parsedGff.set("sa_fight_lvl03.utc", makeBlueprintUtc() as unknown as GffDocument);
+    mockIndex.resources.set("sa_fight_lvl03.utc", {
+      resref: "sa_fight_lvl03",
+      extension: "utc",
+      filePath: path.join(tempDir, "sa_fight_lvl03.utc"),
+      sizeBytes: 1,
+    });
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_level_library",
+        arguments: {
+          resrefPrefix: "sa_fight",
+          name: "Library Fighter",
+          race: "6",
+          classId: "4",
+          levels: "[3,5]",
+          bakeSpecAbilities: false,
+        },
+      });
+      const parsed = parseResult(result) as {
+        success: boolean;
+        builtCount: number;
+        results: Array<{ level: number; resref: string; success: boolean; error?: string }>;
+      };
+      expect(parsed.success).toBe(false); // one level failed
+      expect(parsed.builtCount).toBe(1); // but the other still built
+      expect(parsed.results[0]).toMatchObject({ level: 3, success: false });
+      expect(parsed.results[0].error).toContain("already exists");
+      expect(parsed.results[1]).toMatchObject({ level: 5, success: true });
+
+      expect(mockIndex.parsedGff.has("sa_fight_lvl05.utc")).toBe(true);
+      // A partial batch produced real, usable output (one level really did
+      // build) — not a tool execution failure, even though parsed.success
+      // is false for the batch as a whole. isError is reserved for the
+      // all-failed case, tested separately below.
+      expect(result.isError).toBeUndefined();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("marks the whole result isError:true when EVERY requested level fails (nothing usable was produced)", async () => {
+    loadClassRaceTables(mockIndex);
+    for (const lvl of ["03", "05"]) {
+      const key = `sa_all_fail_lvl${lvl}.utc`;
+      mockIndex.parsedGff.set(key, makeBlueprintUtc() as unknown as GffDocument);
+      mockIndex.resources.set(key, { resref: `sa_all_fail_lvl${lvl}`, extension: "utc", filePath: path.join(tempDir, key), sizeBytes: 1 });
+    }
+
+    const { registerNpcTools } = await import("./npc-tools.js");
+    const { client, cleanup } = await createTestClient(registerNpcTools);
+    try {
+      const result = await client.callTool({
+        name: "build_npc_level_library",
+        arguments: {
+          resrefPrefix: "sa_all_fail",
+          name: "Library Fighter",
+          race: "6",
+          classId: "4",
+          levels: "[3,5]",
+          bakeSpecAbilities: false,
+        },
+      });
+      const parsed = parseResult(result) as { success: boolean; builtCount: number };
+      expect(parsed.success).toBe(false);
+      expect(parsed.builtCount).toBe(0);
+      expect(result.isError).toBe(true);
     } finally {
       await cleanup();
     }

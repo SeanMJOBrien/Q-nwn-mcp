@@ -112,6 +112,7 @@ export function registerJournalTools(server: McpServer): void {
     {
       resref: z.string().optional().describe("JRL resref (default: 'module')"),
     },
+    { idempotentHint: true },
     async ({ resref }) => {
       const index = requireIndex();
 
@@ -166,6 +167,7 @@ export function registerJournalTools(server: McpServer): void {
       comment: z.string().optional().describe("Builder comment (not shown in-game)"),
       xp: optNumParam("Experience reward (default 0)"),
     },
+    { destructiveHint: true },
     async ({ tag, name, priority, comment, xp }) => {
       const priorityN = toI(priority, 0), xpN = toI(xp, 0);
       const index = requireIndex();
@@ -219,6 +221,7 @@ export function registerJournalTools(server: McpServer): void {
       text: z.string().describe("Journal entry text shown to the player"),
       end: z.boolean().optional().describe("Whether this entry marks quest completion (default false)"),
     },
+    { destructiveHint: true },
     async ({ questTag, id, text, end }) => {
       const idN = toI(id);
       const index = requireIndex();

@@ -112,6 +112,7 @@ export function registerWriteTools(server: McpServer): void {
       addCost: optNumParam("Additional cost modifier"),
       properties: z.string().optional().describe("JSON array of item properties. Each: {propertyName, subType?, costTable?, costValue?, param1?, param1Value?} — only propertyName is required, the rest default to 0. PropertyName is the row index in itempropdef.2da; verify with resolve_2da rather than assuming. Common rows: 6=Enhancement Bonus (weapons/armour, costTable=2, costValue=bonus 1-20), 1=AC/Armor Bonus (costTable=2, costValue=bonus), 16=Damage Bonus (subType=damage type, costTable=2, costValue=amount), 0=Ability Bonus (subType=ability 0-5, costValue=bonus)"),
     },
+    { destructiveHint: true },
     async ({ resref, tag, name, baseItem, sourceResref, cost, description, plot, stackSize, charges, addCost, properties }) => {
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
@@ -258,6 +259,7 @@ export function registerWriteTools(server: McpServer): void {
       sourceType: z.string().describe("Source resource extension"),
       newResref: z.string().describe("New resref for the clone"),
     },
+    { destructiveHint: true },
     async ({ sourceResref, sourceType, newResref }) => {
       const index = requireIndex();
       const sourceKey = `${sourceResref.toLowerCase()}.${sourceType.toLowerCase()}`;

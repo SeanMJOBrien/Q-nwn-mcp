@@ -66,6 +66,7 @@ export function registerAdventureTools(server: McpServer): void {
           "How much in-story time this transition represents: 'short' (a walk/quick jump — weather should plausibly stay similar on both sides) or 'long' (many hours/days of travel — weather may plausibly differ). Omit if unknown; validate_module's weather_variance_implausible check only ever fires on a transition explicitly marked 'short' with very different ChanceRain/ChanceSnow/ChanceLightning on the two sides — it never guesses from an unset value.",
         ),
     },
+    { destructiveHint: true },
     async ({ areaA, aX, aY, areaB, bX, bY, tag, travelTime }) => {
       const axN = toF(aX), ayN = toF(aY);
       const bxN = toF(bX), byN = toF(bY);

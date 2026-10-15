@@ -42,6 +42,7 @@ export function registerFactionTools(server: McpServer): void {
       global: optNumParam("Global flag (0 or 1, default 0)"),
       defaultReputation: optNumParam("Default reputation toward all existing factions (0-100, default 50)"),
     },
+    { destructiveHint: true },
     async ({ name, parentId, global: globalFlag, defaultReputation }) => {
       const parentIdN = toI(parentId, 4294967295);
       const globalN = toI(globalFlag, 0);

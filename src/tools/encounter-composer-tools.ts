@@ -145,6 +145,7 @@ export function registerEncounterComposerTools(server: McpServer): void {
             "'random_abilities' only to deliberately use the previous method.",
         ),
     },
+    { destructiveHint: true },
     async ({ role, bossCR, targetEL, partyLevel, partySize, area, casterSystem }) => {
       const archetype = getArchetype(role);
       if (!archetype) {

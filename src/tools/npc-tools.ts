@@ -7,10 +7,18 @@
  *
  * Tools:
  * - build_npc_stat_block: race -> racial feats -> ability scores -> class ->
- *   class feats -> skill points -> HP, on an existing creature blueprint.
- *   Primarily for Henchmen for now (companions are always built as a
- *   blueprint before placement) — general-NPC support is a documented future
- *   extension, not a limitation of the underlying computation.
+ *   class feats -> skill points -> HP, on an existing creature blueprint OR
+ *   a placed instance (resref, or area+tag). Primarily for Henchmen for now
+ *   (companions are always built as a blueprint before placement) —
+ *   general-NPC support is a documented future extension, not a limitation
+ *   of the underlying computation.
+ * - level_creature: change an existing creature's level up OR down by a
+ *   delta in one call — build_npc_stat_block's full stat-block recompute
+ *   PLUS a Special-Abilities pool re-bake, written directly onto whichever
+ *   object (blueprint or placed instance) was targeted. Exists because
+ *   leveling an already-placed creature used to need manual delete+
+ *   re-place to sync the instance (build_npc_stat_block only ever wrote a
+ *   standalone blueprint) — this closes that gap in one call.
  * - equip_npc_by_role: validates and equips caller-supplied gear against the
  *   creature's actual baked proficiency feats (never guesses a real item
  *   resref — the caller still sources items via list_blueprints/
@@ -32,10 +40,12 @@ import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldNum, getFieldStr, setField, setFieldNum } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 import { EQUIP_SLOT_MAP } from "../util/equip-slots.js";
+import { buildCreatureBlueprint } from "../util/creature-builder.js";
 import { getGitDoc, mergeVarTable, resolveBlueprint, writeBackGit } from "../util/git-helpers.js";
 import { buildNpcStatBlock, type PowerLevel } from "../util/npc-stat-block.js";
 import { pickWeaponPreference } from "../util/npc-weapon-preferences.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
+import { bakeSpecAbilityPoolForCreature } from "../util/spec-ability-pool.js";
 import { snapshotGitForUndo } from "../util/undo.js";
 import { checkEquipProficiency, verifyCreature } from "../util/verify/blueprints.js";
 import { hasCell, listOf, Report, twoDARow } from "../util/verify/common.js";
@@ -94,20 +104,188 @@ export async function resolveCreatureTarget(
   return { error: "Provide either `resref` (a blueprint) or both `area` and `tag` (a placed instance)" };
 }
 
+/**
+ * Shared MCP tool-result shape for a failed resolveCreatureTarget() call.
+ * Sets isError:true — per MCP best practice, a tool execution failure (the
+ * requested target doesn't exist) should be reported at the result level,
+ * not returned as an ordinary successful-looking text response, so a client
+ * can tell "ran, but failed" apart from "ran and succeeded" without having
+ * to parse the message text itself. Centralizing this also means every
+ * resolveCreatureTarget call site (7, across npc-tools.ts and
+ * spec-ability-tools.ts, as of this writing) gets the fix identically
+ * rather than needing the same one-line change repeated by hand.
+ */
+export function targetErrorResult(target: { error: string }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError: true;
+} {
+  return { content: [{ type: "text", text: target.error }], isError: true };
+}
+
+export interface NpcStatBlockParams {
+  race: number;
+  classId: number;
+  level: number;
+  powerLevel?: PowerLevel;
+  complexity?: "full" | "simple";
+  deferLeveling?: boolean;
+  /** Seed for deterministic bonus/generic feat-slot weapon picks — pass the target's resref/tag. */
+  seed: string;
+}
+
+export interface NpcStatBlockApplyResult {
+  result: ReturnType<typeof buildNpcStatBlock>;
+  raceWarning: string[];
+  casterWarning: string[];
+}
+
+/**
+ * The core of build_npc_stat_block, factored out so level_creature can reuse
+ * it against either a blueprint or a placed instance (via CreatureTarget)
+ * without duplicating the race->ability scores->class->feats->skills->HP
+ * write sequence. Mutates `target.obj` in place; callers call `target.save()`
+ * themselves once they're done (level_creature also bakes a spec-ability
+ * pool before saving, so the save has to happen after both steps).
+ */
+export function applyNpcStatBlock(
+  index: ModuleIndex,
+  target: CreatureTarget,
+  params: NpcStatBlockParams,
+): NpcStatBlockApplyResult {
+  const obj = target.obj;
+
+  const result = buildNpcStatBlock(index, {
+    race: params.race,
+    classId: params.classId,
+    level: params.level,
+    powerLevel: params.powerLevel ?? "elite",
+    seed: params.seed,
+    complexity: params.complexity ?? "full",
+  });
+
+  const existingRace = getFieldNum(obj, "Race");
+  const raceWarning =
+    existingRace !== params.race
+      ? [
+          `Blueprint's existing Race field (${existingRace}) differs from race param (${params.race}) — this tool only writes the mechanical stat block, not identity fields; update Race/Appearance_Type separately if that mismatch is real.`,
+        ]
+      : [];
+
+  // Ability scores
+  setField(obj, "Str", "byte", result.abilityScores.str);
+  setField(obj, "Dex", "byte", result.abilityScores.dex);
+  setField(obj, "Con", "byte", result.abilityScores.con);
+  setField(obj, "Int", "byte", result.abilityScores.int);
+  setField(obj, "Wis", "byte", result.abilityScores.wis);
+  setField(obj, "Cha", "byte", result.abilityScores.cha);
+
+  // Classes — merge onto any existing ClassList entry for the same class rather than
+  // replacing it outright. A blueprint can already carry static spells baked directly
+  // into ClassList[n].MemorizedList0-9 (the documented GFF struct format — see
+  // CLAUDE.md's "Static spell-baking IS possible" section); blindly overwriting the
+  // whole list here would silently wipe them, a real, confirmed-possible contributor
+  // to a caster shipping with no spells memorized.
+  const existingClasses = getFieldList(obj, "ClassList");
+  obj.ClassList = {
+    type: "list",
+    value: result.classes.map((c) => {
+      const existing = existingClasses.find((e) => getFieldNum(e, "Class") === c.class);
+      const entry: GffObj = existing ? { ...existing } : { __struct_id: 2 };
+      entry.Class = { type: "int", value: c.class };
+      entry.ClassLevel = { type: "short", value: c.level };
+      return entry;
+    }),
+  };
+
+  // deferLeveling: every stat above was computed for the real target
+  // `level`, but ClassList's own ClassLevel is deliberately rolled back
+  // to 1 here, after the fact, so a_hen_spawn/a_hen_join's leveling loop
+  // (for (i = GetHitDice(...); i < nTargetLevel; i++)) has real ground to
+  // climb — without this, GetHitDice() already reports the target level
+  // from the moment this blueprint is saved, so that loop never runs and
+  // the engine never sees a real level-up event. HENCH_LEVEL (merged via
+  // mergeVarTable, matching create_creature_blueprint's own varTable
+  // convention) carries the real target level forward for both the
+  // runtime leveling loop and verify_creature's level-formula checks.
+  // This tool only ever writes exactly one ClassList entry (`result.classes`
+  // is always a single-element array — see buildNpcStatBlock), so there's
+  // no multiclass ambiguity to guard against here.
+  if (params.deferLeveling) {
+    const classListEntries = getFieldList(obj, "ClassList");
+    setFieldNum(classListEntries[0], "ClassLevel", 1, "short");
+    mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: params.level }]);
+  }
+
+  // Feats
+  obj.FeatList = {
+    type: "list",
+    value: result.feats.map((f) => ({ __struct_id: 1, Feat: { type: "word", value: f.feat } })),
+  };
+
+  // SkillList — a fixed-size list (skills.2da row count, default 28), Rank byte per entry.
+  const skillCount = index.twodaTables.get("skills")?.rows.size || 28;
+  const ranks = new Map(result.skillRanks.map((s) => [s.skillIndex, s.rank]));
+  obj.SkillList = {
+    type: "list",
+    value: Array.from({ length: skillCount }, (_, i) => ({
+      __struct_id: 0,
+      Rank: { type: "byte", value: ranks.get(i) ?? 0 },
+    })),
+  };
+
+  // HP
+  setField(obj, "MaxHitPoints", "short", result.hp);
+  setField(obj, "CurrentHitPoints", "short", result.hp);
+  setField(obj, "HitPoints", "short", result.hp);
+
+  // StartingPackage — packages.2da row = class ID convention, verified elsewhere in this project.
+  setField(obj, "StartingPackage", "byte", result.startingPackage);
+
+  // Spellcasting-class-with-no-spells check. build_npc_stat_block deliberately doesn't
+  // compute spells — see this project's own documented gap ("a non-companion Key NPC
+  // never gets a live LevelUpHenchman() call... needs its spells param populated at
+  // build time"). Confirmed real, shipped instance of exactly this: a Key NPC built
+  // this way with no spells ever added. Non-mutating reads only (listOf, never
+  // getFieldList) — this is a read-only check, not a write.
+  const casterClasses = result.classes.filter((c) => CASTER_CLASS_IDS.has(c.class));
+  const hasAnySpells =
+    listOf(obj, "SpecAbilityList").length > 0 ||
+    getFieldList(obj, "ClassList").some((cls) =>
+      Array.from({ length: 10 }, (_, lvl) => listOf(cls, `MemorizedList${lvl}`).length > 0).some(Boolean),
+    );
+  const casterWarning =
+    casterClasses.length > 0 && !hasAnySpells
+      ? [
+          `classId ${casterClasses.map((c) => c.class).join(", ")} is a spellcasting class, but this ` +
+            "blueprint has no spells anywhere (no SpecAbilityList, no ClassList MemorizedList entries) — " +
+            "build_npc_stat_block does not compute them. Populate create_creature_blueprint's `spells` param " +
+            "for a fixed loadout, or wire create_random_abilities_system (chained onto ScriptSpawn) for a " +
+            "random one, before this NPC is used in play. A non-companion caster never gets a live " +
+            "LevelUpHenchman() call to grant spells any other way.",
+        ]
+      : [];
+
+  return { result, raceWarning, casterWarning };
+}
+
 export function registerNpcTools(server: McpServer): void {
   // ─── build_npc_stat_block ───────────────────────────────────────────────
 
   server.tool(
     "build_npc_stat_block",
-    "Compute and write a full mechanical stat block (ability scores, FeatList, SkillList, HP, StartingPackage) onto an EXISTING creature blueprint (.utc, created via create_creature_blueprint), following the canonical race->racial feats->ability scores->class->class feats->skill points->HP creation order. " +
+    "Compute and write a full mechanical stat block (ability scores, FeatList, SkillList, HP, StartingPackage) onto an EXISTING creature blueprint OR a placed instance, following the canonical race->racial feats->ability scores->class->class feats->skill points->HP creation order. " +
       "Reads race_feat_<race>.2da, cls_feat_<class>.2da (List=3 automatic feats), cls_bfeat_<class>.2da (bonus feat slots), cls_skill_<class>.2da (class skills), and classes.2da/racialtypes.2da live from the loaded module — nothing hardcoded except a small curated per-class weapon preference used to fill bonus/generic feat slots. " +
-      "Deterministic, no dice rolling: 'elite' power level uses the literal Elite Array (15/14/13/12/10/8); other levels use a D&D 3.5 point-buy budget. Primarily intended for Henchmen (companions are always built as a blueprint before placement); works on any single-class creature blueprint. Does not set race/appearance/gender/name — those are create_creature_blueprint's job, set them first.",
+      "Deterministic, no dice rolling: 'elite' power level uses the literal Elite Array (15/14/13/12/10/8); other levels use a D&D 3.5 point-buy budget. Primarily intended for Henchmen (companions are always built as a blueprint before placement); works on any single-class creature blueprint or placed instance. Does not set race/appearance/gender/name — those are create_creature_blueprint's job, set them first. " +
+      "For re-leveling an ALREADY-PLACED creature in one call (no manual delete+re-place dance to sync the instance), prefer level_creature instead.",
     {
       resref: z
         .string()
+        .optional()
         .describe(
-          "Existing creature blueprint resref (must already exist — create it with create_creature_blueprint first)",
+          "Existing creature blueprint resref (must already exist — create it with create_creature_blueprint first). Omit when using area+tag instead.",
         ),
+      area: z.string().optional().describe("Area resref, when targeting a placed instance (with `tag`)"),
+      tag: z.string().optional().describe("Tag of the placed instance to target (with `area`)"),
       race: numParam("Racial type (racialtypes.2da row, 0-6 for the standard PC races)"),
       classId: numParam(
         "Class (classes.2da row). Class IDs: 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger 8=Rogue 9=Sorcerer 10=Wizard",
@@ -139,136 +317,29 @@ export function registerNpcTools(server: McpServer): void {
         ),
     },
     { idempotentHint: true },
-    async ({ resref, race, classId, level, powerLevel, complexity, deferLeveling }) => {
+    async ({ resref, area, tag, race, classId, level, powerLevel, complexity, deferLeveling }) => {
       const index = requireIndex();
-      const key = `${resref.toLowerCase()}.utc`;
-      const doc = index.parsedGff.get(key);
-      if (!doc) {
-        return {
-          content: [
-            { type: "text", text: `No ${key} in the module — create it with create_creature_blueprint first.` },
-          ],
-        };
-      }
-      const obj = doc as GffObj;
+      const target = await resolveCreatureTarget(
+        index,
+        resref,
+        area,
+        tag,
+        "build_npc_stat_block",
+        `Build stat block for ${tag ?? resref}`,
+      );
+      if ("error" in target) return targetErrorResult(target);
 
-      const result = buildNpcStatBlock(index, {
+      const { result, raceWarning, casterWarning } = applyNpcStatBlock(index, target, {
         race: toI(race),
         classId: toI(classId),
         level: toI(level),
-        powerLevel: (powerLevel as PowerLevel | undefined) ?? "elite",
-        seed: resref,
-        complexity: (complexity as "full" | "simple" | undefined) ?? "full",
+        powerLevel: powerLevel as PowerLevel | undefined,
+        complexity: complexity as "full" | "simple" | undefined,
+        deferLeveling,
+        seed: target.label,
       });
 
-      const existingRace = getFieldNum(obj, "Race");
-      const raceWarning =
-        existingRace !== toI(race)
-          ? [
-              `Blueprint's existing Race field (${existingRace}) differs from race param (${toI(race)}) — this tool only writes the mechanical stat block, not identity fields; update Race/Appearance_Type separately if that mismatch is real.`,
-            ]
-          : [];
-
-      // Ability scores
-      setField(obj, "Str", "byte", result.abilityScores.str);
-      setField(obj, "Dex", "byte", result.abilityScores.dex);
-      setField(obj, "Con", "byte", result.abilityScores.con);
-      setField(obj, "Int", "byte", result.abilityScores.int);
-      setField(obj, "Wis", "byte", result.abilityScores.wis);
-      setField(obj, "Cha", "byte", result.abilityScores.cha);
-
-      // Classes — merge onto any existing ClassList entry for the same class rather than
-      // replacing it outright. A blueprint can already carry static spells baked directly
-      // into ClassList[n].MemorizedList0-9 (the documented GFF struct format — see
-      // CLAUDE.md's "Static spell-baking IS possible" section); blindly overwriting the
-      // whole list here would silently wipe them, a real, confirmed-possible contributor
-      // to a caster shipping with no spells memorized.
-      const existingClasses = getFieldList(obj, "ClassList");
-      obj.ClassList = {
-        type: "list",
-        value: result.classes.map((c) => {
-          const existing = existingClasses.find((e) => getFieldNum(e, "Class") === c.class);
-          const entry: GffObj = existing ? { ...existing } : { __struct_id: 2 };
-          entry.Class = { type: "int", value: c.class };
-          entry.ClassLevel = { type: "short", value: c.level };
-          return entry;
-        }),
-      };
-
-      // deferLeveling: every stat above was computed for the real target
-      // `level`, but ClassList's own ClassLevel is deliberately rolled back
-      // to 1 here, after the fact, so a_hen_spawn/a_hen_join's leveling loop
-      // (for (i = GetHitDice(...); i < nTargetLevel; i++)) has real ground to
-      // climb — without this, GetHitDice() already reports the target level
-      // from the moment this blueprint is saved, so that loop never runs and
-      // the engine never sees a real level-up event. HENCH_LEVEL (merged via
-      // mergeVarTable, matching create_creature_blueprint's own varTable
-      // convention) carries the real target level forward for both the
-      // runtime leveling loop and verify_creature's level-formula checks.
-      // This tool only ever writes exactly one ClassList entry (`result.classes`
-      // is always a single-element array — see buildNpcStatBlock), so there's
-      // no multiclass ambiguity to guard against here.
-      if (deferLeveling) {
-        const classListEntries = getFieldList(obj, "ClassList");
-        setFieldNum(classListEntries[0], "ClassLevel", 1, "short");
-        mergeVarTable(obj, [{ name: "HENCH_LEVEL", type: "int", value: toI(level) }]);
-      }
-
-      // Feats
-      obj.FeatList = {
-        type: "list",
-        value: result.feats.map((f) => ({ __struct_id: 1, Feat: { type: "word", value: f.feat } })),
-      };
-
-      // SkillList — a fixed-size list (skills.2da row count, default 28), Rank byte per entry.
-      const skillCount = index.twodaTables.get("skills")?.rows.size || 28;
-      const ranks = new Map(result.skillRanks.map((s) => [s.skillIndex, s.rank]));
-      obj.SkillList = {
-        type: "list",
-        value: Array.from({ length: skillCount }, (_, i) => ({
-          __struct_id: 0,
-          Rank: { type: "byte", value: ranks.get(i) ?? 0 },
-        })),
-      };
-
-      // HP
-      setField(obj, "MaxHitPoints", "short", result.hp);
-      setField(obj, "CurrentHitPoints", "short", result.hp);
-      setField(obj, "HitPoints", "short", result.hp);
-
-      // StartingPackage — packages.2da row = class ID convention, verified elsewhere in this project.
-      setField(obj, "StartingPackage", "byte", result.startingPackage);
-
-      // Spellcasting-class-with-no-spells check. build_npc_stat_block deliberately doesn't
-      // compute spells — see this project's own documented gap ("a non-companion Key NPC
-      // never gets a live LevelUpHenchman() call... needs its spells param populated at
-      // build time"). Confirmed real, shipped instance of exactly this: a Key NPC built
-      // this way with no spells ever added. Non-mutating reads only (listOf, never
-      // getFieldList) — this is a read-only check, not a write.
-      const casterClasses = result.classes.filter((c) => CASTER_CLASS_IDS.has(c.class));
-      const hasAnySpells =
-        listOf(obj, "SpecAbilityList").length > 0 ||
-        getFieldList(obj, "ClassList").some((cls) =>
-          Array.from({ length: 10 }, (_, lvl) => listOf(cls, `MemorizedList${lvl}`).length > 0).some(Boolean),
-        );
-      const casterWarning =
-        casterClasses.length > 0 && !hasAnySpells
-          ? [
-              `classId ${casterClasses.map((c) => c.class).join(", ")} is a spellcasting class, but this ` +
-                "blueprint has no spells anywhere (no SpecAbilityList, no ClassList MemorizedList entries) — " +
-                "build_npc_stat_block does not compute them. Populate create_creature_blueprint's `spells` param " +
-                "for a fixed loadout, or wire create_random_abilities_system (chained onto ScriptSpawn) for a " +
-                "random one, before this NPC is used in play. A non-companion caster never gets a live " +
-                "LevelUpHenchman() call to grant spells any other way.",
-            ]
-          : [];
-
-      const filePath = path.join(index.tempDir, key);
-      await jsonToGff(doc, filePath);
-      const stat = await fs.stat(filePath);
-      const entry = index.resources.get(key);
-      if (entry) entry.sizeBytes = stat.size;
-      index.parsedGff.set(key, doc);
+      await target.save();
 
       return {
         content: [
@@ -277,7 +348,7 @@ export function registerNpcTools(server: McpServer): void {
             text: JSON.stringify(
               {
                 success: true,
-                resref,
+                target: target.label,
                 abilityScores: result.abilityScores,
                 classes: result.classes,
                 featCount: result.feats.length,
@@ -293,6 +364,306 @@ export function registerNpcTools(server: McpServer): void {
             ),
           },
         ],
+      };
+    },
+  );
+
+  // ─── level_creature ─────────────────────────────────────────────────────
+
+  server.tool(
+    "level_creature",
+    "Change a creature's level (up OR down) by a delta, in one call — recomputes its FULL stat block at the new level " +
+      "(build_npc_stat_block's race->racial feats->ability scores->class->class feats->skill points->HP sequence) " +
+      "AND re-bakes its Special-Abilities pool (bake_spec_ability_pool) to match, then writes both directly onto " +
+      "the SAME object (blueprint or placed instance) — no delete+re-place dance needed to sync a placed instance. " +
+      "Reads the creature's CURRENT race and single ClassList entry to determine class and current level; `delta` " +
+      "is added to the current level and clamped to 1-20 (negative deltas level DOWN — this writes a fresh stat " +
+      "block for the new level directly via GFF, so it isn't subject to the live engine's LevelUpHenchman() " +
+      "one-way-only limitation). Only works on single-class creatures, matching build_npc_stat_block's own scope. " +
+      "Does not touch equipment, name, or race/appearance. " +
+      "NOTE on spells specifically: the Special-Abilities pool's membership (which spells exist as candidates) is " +
+      "rebuilt fresh at the new level every call, so raising OR lowering level both correctly widen/narrow which " +
+      "spells are eligible — there is no 'pool was baked too low' staleness to worry about, unlike re-leveling a " +
+      "creature that still uses the OLDER inc_random_abil.nss/MemorizedList system. Only use this on a creature " +
+      "already using the Special-Abilities system (has a non-empty SpecAbilityList, or is about to be wired to " +
+      "it) — a MemorizedList-based caster's spells are not recomputed by this tool at all.",
+    {
+      resref: z.string().optional().describe("Blueprint resref to re-level. Omit when using area+tag instead."),
+      area: z.string().optional().describe("Area resref, when targeting a placed instance (with `tag`)"),
+      tag: z.string().optional().describe("Tag of the placed instance to target (with `area`)"),
+      delta: numParam(
+        "Level change, positive or negative (e.g. '3' to level up 3, '-5' to level down 5). Result is clamped to 1-20.",
+      ),
+      powerLevel: z
+        .enum(["elite", "low", "standard", "tougher", "epic"])
+        .optional()
+        .describe("Ability-score generation band for the recomputed stat block — see build_npc_stat_block (default elite)."),
+      complexity: z
+        .enum(["full", "simple"])
+        .optional()
+        .describe("Feat-computation complexity for the recomputed stat block — see build_npc_stat_block (default full)."),
+      markReady: z
+        .boolean()
+        .optional()
+        .describe(
+          "Passed through to the spec-ability re-bake (default false, dormant pool — SA_OnSpawn activates a " +
+            "real subset at the creature's next spawn). See bake_spec_ability_pool's own markReady doc.",
+        ),
+    },
+    { idempotentHint: false },
+    async ({ resref, area, tag, delta, powerLevel, complexity, markReady }) => {
+      const index = requireIndex();
+      const target = await resolveCreatureTarget(
+        index,
+        resref,
+        area,
+        tag,
+        "level_creature",
+        `Level ${tag ?? resref} by ${delta}`,
+      );
+      if ("error" in target) return targetErrorResult(target);
+      const { obj } = target;
+
+      const classList = listOf(obj, "ClassList");
+      if (classList.length !== 1) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `level_creature only supports a single-class creature (found ${classList.length} ClassList entries on ${target.label}).`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const classId = getFieldNum(classList[0], "Class");
+      const currentLevel = getFieldNum(classList[0], "ClassLevel");
+      const race = getFieldNum(obj, "Race");
+      const newLevel = Math.max(1, Math.min(20, currentLevel + toI(delta)));
+
+      const { result, raceWarning, casterWarning } = applyNpcStatBlock(index, target, {
+        race,
+        classId,
+        level: newLevel,
+        powerLevel: powerLevel as PowerLevel | undefined,
+        complexity: complexity as "full" | "simple" | undefined,
+        seed: target.label,
+      });
+
+      const hadSpecAbilities = listOf(obj, "SpecAbilityList").length > 0;
+      let specAbility: { totalPoolSize: number; readyCount: number } | undefined;
+      if (hadSpecAbilities) {
+        const { entries } = bakeSpecAbilityPoolForCreature(index, obj, markReady ?? false, target.label);
+        obj.SpecAbilityList = {
+          type: "list",
+          value: entries.map((e) => ({
+            __struct_id: 0,
+            Spell: { type: "word", value: e.spell },
+            SpellCasterLevel: { type: "byte", value: e.classLevel },
+            SpellFlags: { type: "byte", value: e.ready ? 1 : 0 },
+          })),
+        };
+        specAbility = { totalPoolSize: entries.length, readyCount: entries.filter((e) => e.ready).length };
+      }
+
+      await target.save();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                target: target.label,
+                previousLevel: currentLevel,
+                newLevel,
+                delta: toI(delta),
+                abilityScores: result.abilityScores,
+                featCount: result.feats.length,
+                hp: result.hp,
+                specAbility,
+                warnings: [
+                  ...raceWarning,
+                  ...result.warnings,
+                  ...casterWarning,
+                  ...(!hadSpecAbilities && CASTER_CLASS_IDS.has(classId)
+                    ? [
+                        "This is a spellcasting class but had no SpecAbilityList to re-bake — if this creature " +
+                          "uses the older MemorizedList-based Random Abilities system instead, its spells were " +
+                          "NOT recomputed by this call.",
+                      ]
+                    : []),
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+  );
+
+  // ─── build_npc_level_library ───────────────────────────────────────────
+
+  server.tool(
+    "build_npc_level_library",
+    "Batch-build a resref library of correctly-leveled creature blueprints for one race/class — one " +
+      "build_npc_stat_block (+ bake_spec_ability_pool) pass per level in `levels`, done server-side in a single " +
+      "call instead of an LLM looping N separate tool calls. Each blueprint is named " +
+      "`<resrefPrefix>_lvl<NN>` (zero-padded, e.g. sa_wiz_lvl05, sa_wiz_lvl20). " +
+      "Intended for a 'spawn the correct pre-built level X creature' recipe (e.g. an in-game dialog-driven " +
+      "leveler) where every hard part — ability scores, FeatList, SkillList, HP, and (if bakeSpecAbilities) a " +
+      "correctly-leveled Special-Abilities pool — has to already be correct at build time, since none of it is " +
+      "script-writable at runtime in vanilla NWScript (no AddFeat/RemoveFeat/SetRace/SetAbilityScore exist at " +
+      "all, and LevelUpHenchman() grants zero automatic feats). " +
+      "A level whose resref already exists is skipped (per-level, not aborting the whole batch) — rerun with a " +
+      "different resrefPrefix, or clean up the existing blueprints first.",
+    {
+      resrefPrefix: z
+        .string()
+        .describe("Resref prefix for every blueprint in this library, e.g. 'sa_wiz'. Final resrefs are '<prefix>_lvl<NN>'."),
+      name: z.string().describe("Base display name — each blueprint's FirstName becomes '<name> (Level N)'."),
+      race: numParam("Racial type (racialtypes.2da row, 0-6 for the standard PC races)"),
+      classId: numParam(
+        "Class (classes.2da row). Class IDs: 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger 8=Rogue 9=Sorcerer 10=Wizard",
+      ),
+      levels: z.string().describe("JSON array of target levels to build, e.g. '[1,3,5,8,10,12,15,18,20]'."),
+      appearance: optNumParam(
+        "Appearance row from appearance.2da. Defaults to the same value as `race` — the verified convention for " +
+          "the 7 standard PC races (set race and appearance to the same number, no chassis clone needed).",
+      ),
+      gender: optNumParam("Gender (0=male, 1=female)"),
+      faction: optNumParam("Faction ID"),
+      powerLevel: z
+        .enum(["elite", "low", "standard", "tougher", "epic"])
+        .optional()
+        .describe("Ability-score generation band for every level built — see build_npc_stat_block (default elite)."),
+      complexity: z
+        .enum(["full", "simple"])
+        .optional()
+        .describe("Feat-computation complexity for every level built — see build_npc_stat_block (default full)."),
+      bakeSpecAbilities: z
+        .boolean()
+        .optional()
+        .describe(
+          "Also bake a Special-Abilities pool at each level (default true). Set false for a non-caster class, " +
+            "or when this library will use the older MemorizedList-based Random Abilities system instead.",
+        ),
+      markReady: z
+        .boolean()
+        .optional()
+        .describe("Passed through to each level's spec-ability bake — see bake_spec_ability_pool's own doc (default false)."),
+    },
+    { destructiveHint: true },
+    async ({ resrefPrefix, name, race, classId, levels, appearance, gender, faction, powerLevel, complexity, bakeSpecAbilities, markReady }) => {
+      const index = requireIndex();
+      const raceN = toI(race);
+      const classIdN = toI(classId);
+      const levelList: number[] = JSON.parse(levels);
+      const doBakeSpec = bakeSpecAbilities ?? true;
+
+      const results: Array<{
+        level: number;
+        resref: string;
+        success: boolean;
+        error?: string;
+        hp?: number;
+        featCount?: number;
+        specAbilityPoolSize?: number;
+      }> = [];
+
+      for (const level of levelList) {
+        const resref = `${resrefPrefix}_lvl${String(level).padStart(2, "0")}`;
+
+        const buildResult = await buildCreatureBlueprint(index, {
+          resref,
+          tag: resref,
+          name: `${name} (Level ${level})`,
+          race: raceN,
+          appearance: appearance !== undefined ? toI(appearance) : raceN,
+          gender: gender !== undefined ? toI(gender) : undefined,
+          faction: faction !== undefined ? toI(faction) : undefined,
+          classes: [{ class: classIdN, level }],
+        });
+        if (!buildResult.success) {
+          results.push({ level, resref, success: false, error: buildResult.error });
+          continue;
+        }
+
+        const target = await resolveCreatureTarget(
+          index,
+          resref,
+          undefined,
+          undefined,
+          "build_npc_level_library",
+          `Build level ${level} library entry`,
+        );
+        if ("error" in target) {
+          results.push({ level, resref, success: false, error: target.error });
+          continue;
+        }
+
+        const { result: statResult } = applyNpcStatBlock(index, target, {
+          race: raceN,
+          classId: classIdN,
+          level,
+          powerLevel: powerLevel as PowerLevel | undefined,
+          complexity: complexity as "full" | "simple" | undefined,
+          seed: resref,
+        });
+
+        let specAbilityPoolSize: number | undefined;
+        if (doBakeSpec) {
+          const { entries } = bakeSpecAbilityPoolForCreature(index, target.obj, markReady ?? false, resref);
+          target.obj.SpecAbilityList = {
+            type: "list",
+            value: entries.map((e) => ({
+              __struct_id: 0,
+              Spell: { type: "word", value: e.spell },
+              SpellCasterLevel: { type: "byte", value: e.classLevel },
+              SpellFlags: { type: "byte", value: e.ready ? 1 : 0 },
+            })),
+          };
+          specAbilityPoolSize = entries.length;
+        }
+
+        await target.save();
+        results.push({
+          level,
+          resref,
+          success: true,
+          hp: statResult.hp,
+          featCount: statResult.feats.length,
+          specAbilityPoolSize,
+        });
+      }
+
+      const builtCount = results.filter((r) => r.success).length;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: results.every((r) => r.success),
+                builtCount,
+                totalRequested: levelList.length,
+                results,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+        // Only the all-failed case is a genuine tool execution failure — a
+        // partial batch (some levels built, some skipped because their
+        // resref already existed) produced real, usable output, so it stays
+        // a normal result; the per-level `results` array is where a caller
+        // finds out which ones failed and why.
+        ...(results.length > 0 && builtCount === 0 ? { isError: true } : {}),
       };
     },
   );
@@ -343,7 +714,7 @@ export function registerNpcTools(server: McpServer): void {
         "equip_npc_by_role",
         `Equip ${tag ?? resref}`,
       );
-      if ("error" in target) return { content: [{ type: "text", text: target.error }] };
+      if ("error" in target) return targetErrorResult(target);
       const { obj: creature, save } = target;
 
       let equipMap: Record<string, string>;
@@ -492,7 +863,7 @@ export function registerNpcTools(server: McpServer): void {
         "respec_weapon_feats",
         `Respec weapon feats on ${tag ?? resref}`,
       );
-      if ("error" in target) return { content: [{ type: "text", text: target.error }] };
+      if ("error" in target) return targetErrorResult(target);
       const { obj: creature, save } = target;
 
       const toRow = twoDARow(index, "baseitems", toI(toBaseItem));
@@ -632,7 +1003,7 @@ export function registerNpcTools(server: McpServer): void {
         "remove_feats",
         `Remove feats from ${tag ?? resref}`,
       );
-      if ("error" in target) return { content: [{ type: "text", text: target.error }] };
+      if ("error" in target) return targetErrorResult(target);
       const { obj: creature, save } = target;
 
       const toRemove = new Set<number>(JSON.parse(feats));
@@ -713,7 +1084,7 @@ export function registerNpcTools(server: McpServer): void {
         "add_equipped_item_property",
         `Add item property on ${tag ?? resref}`,
       );
-      if ("error" in target) return { content: [{ type: "text", text: target.error }] };
+      if ("error" in target) return targetErrorResult(target);
       const { obj: creature, save } = target;
 
       const slotId = EQUIP_SLOT_MAP[slot.toLowerCase()];

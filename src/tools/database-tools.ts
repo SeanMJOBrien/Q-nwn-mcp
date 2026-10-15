@@ -179,6 +179,7 @@ export function registerDatabaseTools(server: McpServer): void {
       params: z.string().optional().describe("JSON array of bind parameters (e.g. '[\"value1\", 42]')"),
       limit: numParam("Max rows to return for SELECT queries (default 500)").optional(),
     },
+    { destructiveHint: true },
     async ({ database, sql, params, limit }) => {
       const maxRows = toI(limit, 500);
       const bindParams = params ? JSON.parse(params) : [];

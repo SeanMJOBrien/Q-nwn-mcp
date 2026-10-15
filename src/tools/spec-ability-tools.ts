@@ -21,14 +21,11 @@ import fsPromises from "fs/promises";
 import path from "path";
 import { z } from "zod";
 import { requireIndex } from "../module-loader.js";
-import { getFieldNum } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
-import { getVarTableEntries } from "../util/git-helpers.js";
 import { writeAndCompileScript } from "../util/script-writer.js";
-import { buildSpecAbilityListEntries } from "../util/spec-ability-pool.js";
+import { bakeSpecAbilityPoolForCreature } from "../util/spec-ability-pool.js";
 import { generateSpecAbilityInclude } from "../util/spec-ability-script.js";
-import { listOf } from "../util/verify/common.js";
-import { resolveCreatureTarget } from "./npc-tools.js";
+import { resolveCreatureTarget, targetErrorResult } from "./npc-tools.js";
 
 /** Probe resref used to prove the include compiles. Removed before returning. */
 const PROBE_RESREF = "_sa_probe";
@@ -134,49 +131,15 @@ export function registerSpecAbilityTools(server: McpServer): void {
         "bake_spec_ability_pool",
         `Bake special-ability pool for ${tag ?? resref}`,
       );
-      if ("error" in target) return { content: [{ type: "text", text: target.error }] };
+      if ("error" in target) return targetErrorResult(target);
       const { obj: creature, save } = target;
 
-      const abilityScores = {
-        str: getFieldNum(creature, "Str"),
-        dex: getFieldNum(creature, "Dex"),
-        con: getFieldNum(creature, "Con"),
-        int: getFieldNum(creature, "Int"),
-        wis: getFieldNum(creature, "Wis"),
-        cha: getFieldNum(creature, "Cha"),
-      };
-
-      const classList = listOf(creature, "ClassList");
-
-      // build_npc_stat_block's deferLeveling option leaves ClassList's own
-      // ClassLevel at 1 on purpose (real stats are computed for the target
-      // level, but the level only becomes real once a_hen_spawn's
-      // LevelUpHenchman() loop runs it up live) — HENCH_LEVEL is the existing
-      // VarTable convention that carries the real target, reused here exactly
-      // like verify/blueprints.ts's effectiveLevel so this tool bakes a pool
-      // for the creature's REAL level, not the deliberately-deferred one.
-      // Only applied for a single-class creature, matching every other
-      // HENCH_LEVEL-aware check in this project — a multiclass creature using
-      // this pattern isn't something this project's generation side produces.
-      const henchLevelEntry = getVarTableEntries(creature).find(
-        (v) => v.name.toLowerCase() === "hench_level" && v.type === "int",
-      );
-      const henchLevel = typeof henchLevelEntry?.value === "number" ? henchLevelEntry.value : undefined;
-
-      const classPositions = classList.map((cls) => {
-        const classId = getFieldNum(cls, "Class");
-        const rawLevel = getFieldNum(cls, "ClassLevel");
-        const classLevel = classList.length === 1 && henchLevel ? Math.max(rawLevel, henchLevel) : rawLevel;
-        return { classId, classLevel };
-      });
-
-      const { entries, breakdown, warnings: allWarnings } = buildSpecAbilityListEntries(
-        index,
-        classPositions,
-        abilityScores,
-        markReady ?? false,
-        target.label,
-      );
+      const {
+        entries,
+        breakdown,
+        warnings: allWarnings,
+        henchLevelApplied,
+      } = bakeSpecAbilityPoolForCreature(index, creature, markReady ?? false, target.label);
 
       creature.SpecAbilityList = {
         type: "list",
@@ -202,8 +165,8 @@ export function registerSpecAbilityTools(server: McpServer): void {
                 totalPoolSize: entries.length,
                 readyCount,
                 markReady: markReady ?? false,
-                ...(henchLevel && classList.length === 1
-                  ? { henchLevelApplied: henchLevel, note: "Pool baked against HENCH_LEVEL, not ClassList's deferred level." }
+                ...(henchLevelApplied
+                  ? { henchLevelApplied, note: "Pool baked against HENCH_LEVEL, not ClassList's deferred level." }
                   : {}),
                 byClass: breakdown.map((b) => ({
                   classId: b.classId,
@@ -265,6 +228,7 @@ export function registerSpecAbilityTools(server: McpServer): void {
       if (includeName.length > 16) {
         return {
           content: [{ type: "text", text: `resref "${includeName}" exceeds NWN's 16-character limit.` }],
+          isError: true,
         };
       }
 
