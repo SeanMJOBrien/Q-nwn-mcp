@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { flattenDialog, renderDialogText, extractDialogScripts } from "./dialog-walker.js";
+import { describe, expect, it } from "vitest";
 import type { GffDocument } from "../types/gff.js";
+import { extractDialogScripts, flattenDialog, renderDialogText } from "./dialog-walker.js";
 
 /**
  * Build a minimal DLG document for testing.
@@ -46,9 +46,7 @@ function makeSimpleDlg(): GffDocument {
           Script: { type: "resref", value: "" },
           EntriesList: {
             type: "list",
-            value: [
-              { __struct_id: 0, Index: { type: "dword", value: 1 }, Active: { type: "resref", value: "" } },
-            ],
+            value: [{ __struct_id: 0, Index: { type: "dword", value: 1 }, Active: { type: "resref", value: "" } }],
           },
         },
         {
@@ -61,9 +59,7 @@ function makeSimpleDlg(): GffDocument {
     },
     StartingList: {
       type: "list",
-      value: [
-        { __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } },
-      ],
+      value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
     },
   } as unknown as GffDocument;
 }
@@ -109,9 +105,7 @@ function makeScriptedDlg(): GffDocument {
           Script: { type: "resref", value: "" },
           EntriesList: {
             type: "list",
-            value: [
-              { __struct_id: 0, Index: { type: "dword", value: 1 }, Active: { type: "resref", value: "" } },
-            ],
+            value: [{ __struct_id: 0, Index: { type: "dword", value: 1 }, Active: { type: "resref", value: "" } }],
           },
         },
       ],
@@ -138,9 +132,7 @@ function makeCyclicDlg(): GffDocument {
           Script: { type: "resref", value: "" },
           RepliesList: {
             type: "list",
-            value: [
-              { __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } },
-            ],
+            value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
           },
         },
       ],
@@ -154,9 +146,72 @@ function makeCyclicDlg(): GffDocument {
           Script: { type: "resref", value: "" },
           EntriesList: {
             type: "list",
+            value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
+          },
+        },
+      ],
+    },
+    StartingList: {
+      type: "list",
+      value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
+    },
+  } as unknown as GffDocument;
+}
+
+/**
+ * DLG with a native Quest/QuestEntry field on entry 1, and ActionParams/
+ * ConditionParams set to exercise the dialog-params reading added alongside it.
+ *
+ * StartingList → Entry 0 (ConditionParams: quest=q_test, op=atmost, stage=0)
+ *   → Reply 0
+ *     → Entry 1 (Quest=q_test, QuestEntry=10, ActionParams: reward_gold=50)
+ */
+function makeNativeFieldDlg(): GffDocument {
+  return {
+    __data_type: "DLG ",
+    EntryList: {
+      type: "list",
+      value: [
+        {
+          __struct_id: 0,
+          Text: { type: "cexolocstring", value: { "0": "I could use some help." } },
+          Script: { type: "resref", value: "" },
+          Quest: { type: "cexostring", value: "" },
+          RepliesList: {
+            type: "list",
+            value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
+          },
+        },
+        {
+          __struct_id: 1,
+          Text: { type: "cexolocstring", value: { "0": "Well done." } },
+          Script: { type: "resref", value: "q_act" },
+          Quest: { type: "cexostring", value: "q_test" },
+          QuestEntry: { type: "dword", value: 10 },
+          ActionParams: {
+            type: "list",
             value: [
-              { __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } },
+              {
+                __struct_id: 0,
+                Key: { type: "cexostring", value: "reward_gold" },
+                Value: { type: "cexostring", value: "50" },
+              },
             ],
+          },
+          RepliesList: { type: "list", value: [] },
+        },
+      ],
+    },
+    ReplyList: {
+      type: "list",
+      value: [
+        {
+          __struct_id: 0,
+          Text: { type: "cexolocstring", value: { "0": "I'll help." } },
+          Script: { type: "resref", value: "" },
+          EntriesList: {
+            type: "list",
+            value: [{ __struct_id: 0, Index: { type: "dword", value: 1 }, Active: { type: "resref", value: "" } }],
           },
         },
       ],
@@ -164,7 +219,31 @@ function makeCyclicDlg(): GffDocument {
     StartingList: {
       type: "list",
       value: [
-        { __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } },
+        {
+          __struct_id: 0,
+          Index: { type: "dword", value: 0 },
+          Active: { type: "resref", value: "q_chk" },
+          ConditionParams: {
+            type: "list",
+            value: [
+              {
+                __struct_id: 0,
+                Key: { type: "cexostring", value: "quest" },
+                Value: { type: "cexostring", value: "q_test" },
+              },
+              {
+                __struct_id: 1,
+                Key: { type: "cexostring", value: "op" },
+                Value: { type: "cexostring", value: "atmost" },
+              },
+              {
+                __struct_id: 2,
+                Key: { type: "cexostring", value: "stage" },
+                Value: { type: "cexostring", value: "0" },
+              },
+            ],
+          },
+        },
       ],
     },
   } as unknown as GffDocument;
@@ -227,6 +306,31 @@ describe("flattenDialog", () => {
     expect(nodes[0].children).toHaveLength(0);
   });
 
+  it("reads a native Quest/QuestEntry field with no script involved", () => {
+    const nodes = flattenDialog(makeNativeFieldDlg());
+    const advanceNode = nodes[0].children[0].children[0];
+    expect(advanceNode.text).toBe("Well done.");
+    expect(advanceNode.quest).toBe("q_test");
+    expect(advanceNode.questEntry).toBe(10);
+  });
+
+  it("omits quest/questEntry on a node with an empty Quest field", () => {
+    const nodes = flattenDialog(makeNativeFieldDlg());
+    expect(nodes[0].quest).toBeUndefined();
+    expect(nodes[0].questEntry).toBeUndefined();
+  });
+
+  it("reads a node's ActionParams into a plain key->value map", () => {
+    const nodes = flattenDialog(makeNativeFieldDlg());
+    const advanceNode = nodes[0].children[0].children[0];
+    expect(advanceNode.actionParams).toEqual({ reward_gold: "50" });
+  });
+
+  it("reads a link's ConditionParams onto the child node it leads to", () => {
+    const nodes = flattenDialog(makeNativeFieldDlg());
+    expect(nodes[0].conditionParams).toEqual({ quest: "q_test", op: "atmost", stage: "0" });
+  });
+
   it("returns empty array for dialog with empty starting list", () => {
     const dlg = {
       __data_type: "DLG ",
@@ -260,6 +364,14 @@ describe("renderDialogText", () => {
     expect(text).toContain("[if: sc_has_item]");
   });
 
+  it("includes native quest/questEntry and param annotations", () => {
+    const nodes = flattenDialog(makeNativeFieldDlg());
+    const text = renderDialogText(nodes);
+    expect(text).toContain("[quest: q_test -> 10]");
+    expect(text).toContain('{params: {"reward_gold":"50"}}');
+    expect(text).toContain('params={"quest":"q_test","op":"atmost","stage":"0"}');
+  });
+
   it("indents nested levels", () => {
     const nodes = flattenDialog(makeSimpleDlg());
     const text = renderDialogText(nodes);
@@ -267,15 +379,15 @@ describe("renderDialogText", () => {
     // Root NPC line should have no indent
     expect(lines[0]).toMatch(/^\[NPC/);
     // PC replies should be indented one level
-    const pcLine = lines.find(l => l.includes("[PC #0]"));
-    expect(pcLine).toMatch(/^  \[PC/);
+    const pcLine = lines.find((l) => l.includes("[PC #0]"));
+    expect(pcLine).toMatch(/^ {2}\[PC/);
   });
 });
 
 describe("extractDialogScripts", () => {
   it("finds starting list condition scripts", () => {
     const refs = extractDialogScripts("test_dlg", makeScriptedDlg());
-    const startCondition = refs.find(r => r.scriptResref === "sc_check_quest");
+    const startCondition = refs.find((r) => r.scriptResref === "sc_check_quest");
     expect(startCondition).toBeDefined();
     expect(startCondition!.fieldName).toBe("Active");
     expect(startCondition!.nodeType).toBe("entry");
@@ -284,7 +396,7 @@ describe("extractDialogScripts", () => {
 
   it("finds entry action scripts", () => {
     const refs = extractDialogScripts("test_dlg", makeScriptedDlg());
-    const action = refs.find(r => r.scriptResref === "sc_give_reward");
+    const action = refs.find((r) => r.scriptResref === "sc_give_reward");
     expect(action).toBeDefined();
     expect(action!.fieldName).toBe("Script");
     expect(action!.nodeType).toBe("entry");
@@ -293,7 +405,7 @@ describe("extractDialogScripts", () => {
 
   it("finds reply link condition scripts", () => {
     const refs = extractDialogScripts("test_dlg", makeScriptedDlg());
-    const replyCondition = refs.find(r => r.scriptResref === "sc_has_item");
+    const replyCondition = refs.find((r) => r.scriptResref === "sc_has_item");
     expect(replyCondition).toBeDefined();
     expect(replyCondition!.fieldName).toBe("Active");
   });
@@ -303,19 +415,19 @@ describe("extractDialogScripts", () => {
       __data_type: "DLG ",
       EntryList: {
         type: "list",
-        value: [{
-          __struct_id: 0,
-          Text: { type: "cexolocstring", value: { "0": "Hi" } },
-          Script: { type: "resref", value: "" },
-          RepliesList: { type: "list", value: [] },
-        }],
+        value: [
+          {
+            __struct_id: 0,
+            Text: { type: "cexolocstring", value: { "0": "Hi" } },
+            Script: { type: "resref", value: "" },
+            RepliesList: { type: "list", value: [] },
+          },
+        ],
       },
       ReplyList: { type: "list", value: [] },
       StartingList: {
         type: "list",
-        value: [
-          { __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } },
-        ],
+        value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
       },
     } as unknown as GffDocument;
     expect(extractDialogScripts("empty_dlg", dlg)).toEqual([]);
@@ -330,7 +442,7 @@ describe("extractDialogScripts", () => {
 
   it("includes text context in refs", () => {
     const refs = extractDialogScripts("test_dlg", makeScriptedDlg());
-    const action = refs.find(r => r.scriptResref === "sc_give_reward");
+    const action = refs.find((r) => r.scriptResref === "sc_give_reward");
     expect(action!.text).toBe("Well done!");
   });
 });

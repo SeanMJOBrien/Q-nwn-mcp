@@ -6,13 +6,13 @@
  * - verify_quest_completability tool
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import path from "path";
-import os from "os";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import fs from "fs/promises";
+import os from "os";
+import path from "path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GffDocument, GffObj } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
@@ -97,7 +97,7 @@ function makeGitDoc(): GffDocument {
     "Placeable List": { type: "list", value: [] },
     "Door List": { type: "list", value: [] },
     "Encounter List": { type: "list", value: [] },
-    "TriggerList": { type: "list", value: [] },
+    TriggerList: { type: "list", value: [] },
     WaypointList: { type: "list", value: [] },
     SoundList: { type: "list", value: [] },
     StoreList: { type: "list", value: [] },
@@ -141,7 +141,7 @@ async function createTestClient(
 }
 
 function parseResult(result: { content: Array<{ type: string; text?: string }> }): unknown {
-  const textBlock = result.content.find(c => c.type === "text");
+  const textBlock = result.content.find((c) => c.type === "text");
   return textBlock?.text ? JSON.parse(textBlock.text) : null;
 }
 
@@ -173,7 +173,21 @@ describe("placement collision detection", () => {
 
     mockIndex.parsedGff.set("testarea.git", git);
     mockIndex.parsedGff.set("testarea.are", makeAreDoc());
-    mockIndex.areas.set("testarea", { resref: "testarea", name: "Test Area", width: 4, height: 4, tileset: "ttf01", creatureCount: 1, placeableCount: 0, doorCount: 0, waypointCount: 0, triggerCount: 0, encounterCount: 0, soundCount: 0, storeCount: 0 });
+    mockIndex.areas.set("testarea", {
+      resref: "testarea",
+      name: "Test Area",
+      width: 4,
+      height: 4,
+      tileset: "ttf01",
+      creatureCount: 1,
+      placeableCount: 0,
+      doorCount: 0,
+      waypointCount: 0,
+      triggerCount: 0,
+      encounterCount: 0,
+      soundCount: 0,
+      storeCount: 0,
+    });
 
     // Write a mock UTC blueprint
     const utcDoc = {
@@ -199,7 +213,7 @@ describe("placement collision detection", () => {
 
       // Collision is a hard block, not a warning: the tool returns a plain-text
       // refusal naming the offending object rather than a JSON success payload.
-      const text = result.content.find(c => c.type === "text")?.text ?? "";
+      const text = result.content.find((c) => c.type === "text")?.text ?? "";
       expect(text).toContain("Placement blocked");
       expect(text).toContain("existing_npc");
 
@@ -224,7 +238,21 @@ describe("placement collision detection", () => {
 
     mockIndex.parsedGff.set("testarea.git", git);
     mockIndex.parsedGff.set("testarea.are", makeAreDoc());
-    mockIndex.areas.set("testarea", { resref: "testarea", name: "Test Area", width: 4, height: 4, tileset: "ttf01", creatureCount: 1, placeableCount: 0, doorCount: 0, waypointCount: 0, triggerCount: 0, encounterCount: 0, soundCount: 0, storeCount: 0 });
+    mockIndex.areas.set("testarea", {
+      resref: "testarea",
+      name: "Test Area",
+      width: 4,
+      height: 4,
+      tileset: "ttf01",
+      creatureCount: 1,
+      placeableCount: 0,
+      doorCount: 0,
+      waypointCount: 0,
+      triggerCount: 0,
+      encounterCount: 0,
+      soundCount: 0,
+      storeCount: 0,
+    });
 
     const utcDoc = {
       __data_type: "UTC ",
@@ -268,14 +296,47 @@ describe("create_area_transition", () => {
     mockIndex.parsedGff.set("forest.are", makeAreDoc());
     mockIndex.parsedGff.set("cave.git", gitTarget);
     mockIndex.parsedGff.set("cave.are", makeAreDoc());
-    mockIndex.areas.set("forest", { resref: "forest", name: "Forest", width: 4, height: 4, tileset: "ttf01", creatureCount: 0, placeableCount: 0, doorCount: 0, waypointCount: 0, triggerCount: 0, encounterCount: 0, soundCount: 0, storeCount: 0 });
-    mockIndex.areas.set("cave", { resref: "cave", name: "Cave", width: 4, height: 4, tileset: "tdc01", creatureCount: 0, placeableCount: 0, doorCount: 0, waypointCount: 0, triggerCount: 0, encounterCount: 0, soundCount: 0, storeCount: 0 });
+    mockIndex.areas.set("forest", {
+      resref: "forest",
+      name: "Forest",
+      width: 4,
+      height: 4,
+      tileset: "ttf01",
+      creatureCount: 0,
+      placeableCount: 0,
+      doorCount: 0,
+      waypointCount: 0,
+      triggerCount: 0,
+      encounterCount: 0,
+      soundCount: 0,
+      storeCount: 0,
+    });
+    mockIndex.areas.set("cave", {
+      resref: "cave",
+      name: "Cave",
+      width: 4,
+      height: 4,
+      tileset: "tdc01",
+      creatureCount: 0,
+      placeableCount: 0,
+      doorCount: 0,
+      waypointCount: 0,
+      triggerCount: 0,
+      encounterCount: 0,
+      soundCount: 0,
+      storeCount: 0,
+    });
     // Write GIT files to disk (writeBackGit needs them)
     const forestGitPath = path.join(tempDir, "forest.git");
     const caveGitPath = path.join(tempDir, "cave.git");
     await fs.writeFile(forestGitPath, JSON.stringify(gitSource));
     await fs.writeFile(caveGitPath, JSON.stringify(gitTarget));
-    mockIndex.resources.set("forest.git", { resref: "forest", extension: "git", filePath: forestGitPath, sizeBytes: 100 });
+    mockIndex.resources.set("forest.git", {
+      resref: "forest",
+      extension: "git",
+      filePath: forestGitPath,
+      sizeBytes: 100,
+    });
     mockIndex.resources.set("cave.git", { resref: "cave", extension: "git", filePath: caveGitPath, sizeBytes: 100 });
 
     // Write a minimal trigger blueprint
@@ -288,7 +349,12 @@ describe("create_area_transition", () => {
     };
     const uttPath = path.join(tempDir, "nw_yourfeet.utt");
     await fs.writeFile(uttPath, JSON.stringify(uttDoc));
-    mockIndex.resources.set("nw_yourfeet.utt", { resref: "nw_yourfeet", extension: "utt", filePath: uttPath, sizeBytes: 100 });
+    mockIndex.resources.set("nw_yourfeet.utt", {
+      resref: "nw_yourfeet",
+      extension: "utt",
+      filePath: uttPath,
+      sizeBytes: 100,
+    });
     mockIndex.parsedGff.set("nw_yourfeet.utt", uttDoc as unknown as GffDocument);
 
     const { registerObjectMgmtTools } = await import("./object-mgmt-tools.js");
@@ -480,7 +546,21 @@ describe("verify_quest_completability", () => {
       Mod_Entry_Area: { type: "resref", value: "town" },
     } as unknown as GffDocument;
     mockIndex.parsedGff.set("module.ifo", ifoDoc);
-    mockIndex.areas.set("town", { resref: "town", name: "Town", width: 4, height: 4, tileset: "ttf01", creatureCount: 0, placeableCount: 0, doorCount: 0, waypointCount: 0, triggerCount: 0, encounterCount: 0, soundCount: 0, storeCount: 0 });
+    mockIndex.areas.set("town", {
+      resref: "town",
+      name: "Town",
+      width: 4,
+      height: 4,
+      tileset: "ttf01",
+      creatureCount: 0,
+      placeableCount: 0,
+      doorCount: 0,
+      waypointCount: 0,
+      triggerCount: 0,
+      encounterCount: 0,
+      soundCount: 0,
+      storeCount: 0,
+    });
     mockIndex.parsedGff.set("town.git", makeGitDoc());
 
     // JRL with a quest that has entries but no scripts reference them
@@ -499,8 +579,18 @@ describe("verify_quest_completability", () => {
             EntryList: {
               type: "list",
               value: [
-                { __struct_id: 0, ID: { type: "dword", value: 1 }, Text: { type: "cexolocstring", value: { "0": "Find the missing villager" } }, End: { type: "word", value: 0 } },
-                { __struct_id: 1, ID: { type: "dword", value: 2 }, Text: { type: "cexolocstring", value: { "0": "Villager rescued!" } }, End: { type: "word", value: 1 } },
+                {
+                  __struct_id: 0,
+                  ID: { type: "dword", value: 1 },
+                  Text: { type: "cexolocstring", value: { "0": "Find the missing villager" } },
+                  End: { type: "word", value: 0 },
+                },
+                {
+                  __struct_id: 1,
+                  ID: { type: "dword", value: 2 },
+                  Text: { type: "cexolocstring", value: { "0": "Villager rescued!" } },
+                  End: { type: "word", value: 1 },
+                },
               ],
             },
           },
@@ -529,9 +619,9 @@ describe("verify_quest_completability", () => {
 
       const gaps = quests[0].gaps as string[];
       // Should flag that journal entries have no scripts
-      expect(gaps.some(g => g.includes("entry 1") || g.includes("AddJournalQuestEntry"))).toBe(true);
+      expect(gaps.some((g) => g.includes("entry 1") || g.includes("AddJournalQuestEntry"))).toBe(true);
       // Should flag no quest-giver dialog
-      expect(gaps.some(g => g.includes("dialog"))).toBe(true);
+      expect(gaps.some((g) => g.includes("dialog"))).toBe(true);
     } finally {
       await cleanup();
     }
@@ -557,22 +647,40 @@ describe("verify_quest_completability", () => {
 
     mockIndex.parsedGff.set("town.git", git);
     mockIndex.parsedGff.set("town.are", makeAreDoc());
-    mockIndex.areas.set("town", { resref: "town", name: "Town", width: 4, height: 4, tileset: "ttf01", creatureCount: 1, placeableCount: 0, doorCount: 0, waypointCount: 0, triggerCount: 0, encounterCount: 0, soundCount: 0, storeCount: 0 });
+    mockIndex.areas.set("town", {
+      resref: "town",
+      name: "Town",
+      width: 4,
+      height: 4,
+      tileset: "ttf01",
+      creatureCount: 1,
+      placeableCount: 0,
+      doorCount: 0,
+      waypointCount: 0,
+      triggerCount: 0,
+      encounterCount: 0,
+      soundCount: 0,
+      storeCount: 0,
+    });
 
     // Set up dialog with quest script
     const dlgDoc = {
       __data_type: "DLG ",
-      StartingList: { type: "list", value: [
-        { __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } },
-      ] },
-      EntryList: { type: "list", value: [
-        {
-          __struct_id: 0,
-          Text: { type: "cexolocstring", value: { "0": "Will you help?" } },
-          Script: { type: "resref", value: "a_q_start" },
-          RepliesList: { type: "list", value: [] },
-        },
-      ] },
+      StartingList: {
+        type: "list",
+        value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
+      },
+      EntryList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Text: { type: "cexolocstring", value: { "0": "Will you help?" } },
+            Script: { type: "resref", value: "a_q_start" },
+            RepliesList: { type: "list", value: [] },
+          },
+        ],
+      },
       ReplyList: { type: "list", value: [] },
     } as unknown as GffDocument;
     mockIndex.parsedGff.set("dlg_giver.dlg", dlgDoc);
@@ -584,8 +692,18 @@ describe("verify_quest_completability", () => {
     const endPath = path.join(tempDir, "a_q_end.nss");
     await fs.writeFile(startPath, startScript);
     await fs.writeFile(endPath, endScript);
-    mockIndex.resources.set("a_q_start.nss", { resref: "a_q_start", extension: "nss", filePath: startPath, sizeBytes: startScript.length });
-    mockIndex.resources.set("a_q_end.nss", { resref: "a_q_end", extension: "nss", filePath: endPath, sizeBytes: endScript.length });
+    mockIndex.resources.set("a_q_start.nss", {
+      resref: "a_q_start",
+      extension: "nss",
+      filePath: startPath,
+      sizeBytes: startScript.length,
+    });
+    mockIndex.resources.set("a_q_end.nss", {
+      resref: "a_q_end",
+      extension: "nss",
+      filePath: endPath,
+      sizeBytes: endScript.length,
+    });
 
     // JRL
     const jrlDoc = {
@@ -603,8 +721,18 @@ describe("verify_quest_completability", () => {
             EntryList: {
               type: "list",
               value: [
-                { __struct_id: 0, ID: { type: "dword", value: 1 }, Text: { type: "cexolocstring", value: { "0": "Find the item" } }, End: { type: "word", value: 0 } },
-                { __struct_id: 1, ID: { type: "dword", value: 2 }, Text: { type: "cexolocstring", value: { "0": "Item found!" } }, End: { type: "word", value: 1 } },
+                {
+                  __struct_id: 0,
+                  ID: { type: "dword", value: 1 },
+                  Text: { type: "cexolocstring", value: { "0": "Find the item" } },
+                  End: { type: "word", value: 0 },
+                },
+                {
+                  __struct_id: 1,
+                  ID: { type: "dword", value: 2 },
+                  Text: { type: "cexolocstring", value: { "0": "Item found!" } },
+                  End: { type: "word", value: 1 },
+                },
               ],
             },
           },
@@ -634,6 +762,150 @@ describe("verify_quest_completability", () => {
 
       const giver = quests[0].questGiver as Record<string, unknown>;
       expect(giver.dialog).toBe("dlg_giver");
+      expect(giver.area).toBe("town");
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("reports quest as completable via native Quest/QuestEntry fields, with no AddJournalQuestEntry script anywhere", async () => {
+    const ifoDoc = {
+      __data_type: "IFO ",
+      Mod_Entry_Area: { type: "resref", value: "town" },
+    } as unknown as GffDocument;
+    mockIndex.parsedGff.set("module.ifo", ifoDoc);
+
+    const git = makeGitDoc();
+    const creatureList = (git as GffObj)["Creature List"] as { type: string; value: GffObj[] };
+    creatureList.value.push({
+      __struct_id: 4,
+      Tag: { type: "cexostring", value: "quest_giver" },
+      Conversation: { type: "resref", value: "dlg_native_giver" },
+      XPosition: { type: "float", value: 15.0 },
+      YPosition: { type: "float", value: 15.0 },
+    } as unknown as GffObj);
+    mockIndex.parsedGff.set("town.git", git);
+    mockIndex.parsedGff.set("town.are", makeAreDoc());
+    mockIndex.areas.set("town", {
+      resref: "town",
+      name: "Town",
+      width: 4,
+      height: 4,
+      tileset: "ttf01",
+      creatureCount: 1,
+      placeableCount: 0,
+      doorCount: 0,
+      waypointCount: 0,
+      triggerCount: 0,
+      encounterCount: 0,
+      soundCount: 0,
+      storeCount: 0,
+    });
+
+    // Dialog whose two nodes advance the journal via plain Quest/QuestEntry
+    // fields — no Script field anywhere, so there is nothing for the
+    // AddJournalQuestEntry regex to ever find. Entry 1 is reached via a
+    // reply link (an unlinked, orphaned node would be as unreachable to
+    // this scan as it would be to a real player — same as flattenDialog's
+    // existing reachability-only tree walk).
+    const dlgDoc = {
+      __data_type: "DLG ",
+      StartingList: {
+        type: "list",
+        value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
+      },
+      EntryList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Text: { type: "cexolocstring", value: { "0": "Will you help?" } },
+            Script: { type: "resref", value: "" },
+            Quest: { type: "cexostring", value: "q_native" },
+            QuestEntry: { type: "dword", value: 1 },
+            RepliesList: {
+              type: "list",
+              value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
+            },
+          },
+          {
+            __struct_id: 1,
+            Text: { type: "cexolocstring", value: { "0": "Item found!" } },
+            Script: { type: "resref", value: "" },
+            Quest: { type: "cexostring", value: "q_native" },
+            QuestEntry: { type: "dword", value: 2 },
+            RepliesList: { type: "list", value: [] },
+          },
+        ],
+      },
+      ReplyList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Text: { type: "cexolocstring", value: { "0": "I'll help." } },
+            Script: { type: "resref", value: "" },
+            EntriesList: {
+              type: "list",
+              value: [{ __struct_id: 0, Index: { type: "dword", value: 1 }, Active: { type: "resref", value: "" } }],
+            },
+          },
+        ],
+      },
+    } as unknown as GffDocument;
+    mockIndex.parsedGff.set("dlg_native_giver.dlg", dlgDoc);
+
+    const jrlDoc = {
+      __data_type: "JRL ",
+      Categories: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Tag: { type: "cexostring", value: "q_native" },
+            Name: { type: "cexolocstring", value: { "0": "Native Quest" } },
+            Priority: { type: "dword", value: 0 },
+            XP: { type: "dword", value: 50 },
+            Comment: { type: "cexostring", value: "" },
+            EntryList: {
+              type: "list",
+              value: [
+                {
+                  __struct_id: 0,
+                  ID: { type: "dword", value: 1 },
+                  Text: { type: "cexolocstring", value: { "0": "Find the item" } },
+                  End: { type: "word", value: 0 },
+                },
+                {
+                  __struct_id: 1,
+                  ID: { type: "dword", value: 2 },
+                  Text: { type: "cexolocstring", value: { "0": "Item found!" } },
+                  End: { type: "word", value: 1 },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    } as unknown as GffDocument;
+    mockIndex.parsedGff.set("module.jrl", jrlDoc);
+
+    const { registerAnalysisTools } = await import("./analysis-tools.js");
+    const { client, cleanup } = await createTestClient(registerAnalysisTools);
+
+    try {
+      const result = await client.callTool({
+        name: "verify_quest_completability",
+        arguments: {},
+      });
+
+      const parsed = parseResult(result) as Record<string, unknown>;
+      const quests = parsed.quests as Array<Record<string, unknown>>;
+      expect(quests[0].completable).toBe(true);
+      expect(quests[0].gaps).toBeUndefined();
+
+      const giver = quests[0].questGiver as Record<string, unknown>;
+      expect(giver.dialog).toBe("dlg_native_giver");
       expect(giver.area).toBe("town");
     } finally {
       await cleanup();

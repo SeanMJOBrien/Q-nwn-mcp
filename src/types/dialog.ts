@@ -6,6 +6,12 @@ export interface FlatDialogNode {
   condition?: string;
   children: FlatDialogNode[];
   isLeaf: boolean;
+  /** Native journal-advance fields (Quest/QuestEntry) — set with no script at all. */
+  quest?: string;
+  questEntry?: number;
+  /** EE script parameters, read as plain Key->Value maps; omitted when empty. */
+  actionParams?: Record<string, string>;
+  conditionParams?: Record<string, string>;
 }
 
 export interface DialogPath {

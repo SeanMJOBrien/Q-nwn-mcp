@@ -38,9 +38,18 @@ function twoDA(columns: string[], rows: Array<[number, Record<string, string>]>)
 /** A creature with all 13 script fields wired to the given set. */
 function makeCreature(scriptPrefix: string, extra: Record<string, unknown> = {}): GffObj {
   const fields = [
-    "ScriptAttacked", "ScriptDamaged", "ScriptDeath", "ScriptDialogue",
-    "ScriptDisturbed", "ScriptEndRound", "ScriptHeartbeat", "ScriptOnBlocked",
-    "ScriptOnNotice", "ScriptRested", "ScriptSpawn", "ScriptSpellAt",
+    "ScriptAttacked",
+    "ScriptDamaged",
+    "ScriptDeath",
+    "ScriptDialogue",
+    "ScriptDisturbed",
+    "ScriptEndRound",
+    "ScriptHeartbeat",
+    "ScriptOnBlocked",
+    "ScriptOnNotice",
+    "ScriptRested",
+    "ScriptSpawn",
+    "ScriptSpellAt",
     "ScriptUserDefine",
   ];
   const obj: GffObj = {
@@ -197,7 +206,13 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_bow" },
+            BaseItem: { type: "int", value: 8 },
+          },
+        ],
       },
     });
     const index = makeIndex({
@@ -215,7 +230,11 @@ describe("verifyCreature", () => {
       Equip_ItemList: {
         type: "list",
         value: [
-          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_bow" },
+            BaseItem: { type: "int", value: 8 },
+          },
           {
             __struct_id: 2048,
             TemplateResRef: { type: "resref", value: "nw_waegar001" },
@@ -241,7 +260,11 @@ describe("verifyCreature", () => {
       Equip_ItemList: {
         type: "list",
         value: [
-          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_bow" },
+            BaseItem: { type: "int", value: 8 },
+          },
           {
             __struct_id: 2048,
             TemplateResRef: { type: "resref", value: "nw_waegar001" },
@@ -269,7 +292,11 @@ describe("verifyCreature", () => {
       Equip_ItemList: {
         type: "list",
         value: [
-          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } },
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_bow" },
+            BaseItem: { type: "int", value: 8 },
+          },
           {
             __struct_id: 2048,
             TemplateResRef: { type: "resref", value: "nw_waegar001" },
@@ -294,7 +321,11 @@ describe("verifyCreature", () => {
       Equip_ItemList: {
         type: "list",
         value: [
-          { __struct_id: 16, TemplateResRef: { type: "resref", value: "some_xbow" }, BaseItem: { type: "int", value: 7 } },
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_xbow" },
+            BaseItem: { type: "int", value: 7 },
+          },
           {
             __struct_id: 8192, // EQUIP_SLOT_MAP.bolts
             TemplateResRef: { type: "resref", value: "nw_wambo001" },
@@ -359,7 +390,13 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_axe" }, BaseItem: { type: "int", value: 2 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_axe" },
+            BaseItem: { type: "int", value: 2 },
+          },
+        ],
       },
     });
     const index = makeIndex({
@@ -375,7 +412,13 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_axe" }, BaseItem: { type: "int", value: 2 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_axe" },
+            BaseItem: { type: "int", value: 2 },
+          },
+        ],
       },
     });
     const index = makeIndex({
@@ -432,7 +475,13 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] }, // WeapFocWHam
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "light_mace" }, BaseItem: { type: "int", value: 9 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "light_mace" },
+            BaseItem: { type: "int", value: 9 },
+          },
+        ],
       },
     });
     const index = makeIndex({
@@ -448,7 +497,13 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] },
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "warhammer" }, BaseItem: { type: "int", value: 5 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "warhammer" },
+            BaseItem: { type: "int", value: 5 },
+          },
+        ],
       },
     });
     const index = makeIndex({
@@ -464,7 +519,10 @@ describe("verifyCreature", () => {
   // equipped, since the problem is the feat existing on a non-melee class at all.
   it("flags a weapon-investment feat on a non-melee class (Cleric)", async () => {
     const obj = makeCreature("nw_c2_default", {
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 2 }, ClassLevel: { type: "short", value: 5 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 2 }, ClassLevel: { type: "short", value: 5 } }],
+      },
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] }, // WeapFocWHam
     });
     const index = makeIndex({
@@ -478,7 +536,10 @@ describe("verifyCreature", () => {
   it("does not flag a weapon-investment feat on Fighter/Barbarian/Paladin/Ranger", async () => {
     for (const classId of [4, 0, 6, 7]) {
       const obj = makeCreature("nw_c2_default", {
-        ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: classId }, ClassLevel: { type: "short", value: 5 } }] },
+        ClassList: {
+          type: "list",
+          value: [{ __struct_id: 2, Class: { type: "int", value: classId }, ClassLevel: { type: "short", value: 5 } }],
+        },
         FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 115 } }] },
       });
       const index = makeIndex({
@@ -497,7 +558,10 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 6 },
       Str: { type: "byte", value: 17 }, // level 3, no increases yet (needs level 4+); no racial adj -> base 17
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }],
+      },
     });
     const index = makeIndex({
       twodaTables: new Map([
@@ -514,7 +578,10 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 6 },
       Str: { type: "byte", value: 17 }, // level 9: +2 from leveling (levels 4,8) on a base-15 primary -> 17
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 9 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 9 } }],
+      },
     });
     const index = makeIndex({
       twodaTables: new Map([
@@ -544,7 +611,16 @@ describe("verifyCreature", () => {
     });
     const index = makeIndex({
       twodaTables: new Map([
-        ["classes", twoDA(["PrimaryAbil"], [[4, { PrimaryAbil: "STR" }], [0, { PrimaryAbil: "STR" }]])],
+        [
+          "classes",
+          twoDA(
+            ["PrimaryAbil"],
+            [
+              [4, { PrimaryAbil: "STR" }],
+              [0, { PrimaryAbil: "STR" }],
+            ],
+          ),
+        ],
         ["racialtypes", twoDA(["StrAdjust"], [[6, { StrAdjust: "0" }]])],
       ]),
     });
@@ -569,7 +645,16 @@ describe("verifyCreature", () => {
     });
     const index = makeIndex({
       twodaTables: new Map([
-        ["classes", twoDA(["PrimaryAbil"], [[4, { PrimaryAbil: "STR" }], [10, { PrimaryAbil: "INT" }]])],
+        [
+          "classes",
+          twoDA(
+            ["PrimaryAbil"],
+            [
+              [4, { PrimaryAbil: "STR" }],
+              [10, { PrimaryAbil: "INT" }],
+            ],
+          ),
+        ],
         ["racialtypes", twoDA(["StrAdjust", "IntAdjust"], [[6, { StrAdjust: "0", IntAdjust: "0" }]])],
       ]),
     });
@@ -594,8 +679,21 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 6 },
       Str: { type: "byte", value: 15 }, // base 15, no racial adj — fine at any level
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
-      VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "HENCH_LEVEL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 9 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }],
+      },
+      VarTable: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Name: { type: "cexostring", value: "HENCH_LEVEL" },
+            Type: { type: "dword", value: 1 },
+            Value: { type: "int", value: 9 },
+          },
+        ],
+      },
     });
     const index = makeIndex({
       twodaTables: new Map([
@@ -617,8 +715,21 @@ describe("verifyCreature", () => {
     // since the fixture's HP/skills are plausibly computed for level 5 already.
     const obj = makeCreature("nw_c2_default", {
       Con: { type: "byte", value: 14 }, // +2 mod
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
-      VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "HENCH_LEVEL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 5 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }],
+      },
+      VarTable: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Name: { type: "cexostring", value: "HENCH_LEVEL" },
+            Type: { type: "dword", value: 1 },
+            Value: { type: "int", value: 5 },
+          },
+        ],
+      },
       // Level-5 d10 Con+2 HP: 10+2 (lvl1) + 4*(6+2) (lvl2-5) = 44.
       MaxHitPoints: { type: "short", value: 44 },
     });
@@ -631,8 +742,21 @@ describe("verifyCreature", () => {
   it("still flags a genuine HP mismatch at the HENCH_LEVEL-derived effective level, not the deferred ClassLevel", async () => {
     const obj = makeCreature("nw_c2_default", {
       Con: { type: "byte", value: 14 },
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
-      VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "HENCH_LEVEL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 5 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }],
+      },
+      VarTable: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Name: { type: "cexostring", value: "HENCH_LEVEL" },
+            Type: { type: "dword", value: 1 },
+            Value: { type: "int", value: 5 },
+          },
+        ],
+      },
       MaxHitPoints: { type: "short", value: 999 }, // wildly wrong for level 5
     });
     const index = makeIndex({ twodaTables: new Map([["classes", twoDA(["HitDie"], [[4, { HitDie: "10" }]])]]) });
@@ -649,10 +773,15 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 6 },
       Str: { type: "byte", value: 20 },
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 12 }, ClassLevel: { type: "short", value: 2 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 12 }, ClassLevel: { type: "short", value: 2 } }],
+      },
     });
     const index = makeIndex({
-      twodaTables: new Map([["classes", twoDA(["PrimaryAbil", "PlayerClass"], [[12, { PrimaryAbil: "STR", PlayerClass: "0" }]])]]),
+      twodaTables: new Map([
+        ["classes", twoDA(["PrimaryAbil", "PlayerClass"], [[12, { PrimaryAbil: "STR", PlayerClass: "0" }]])],
+      ]),
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
@@ -666,7 +795,10 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Con: { type: "byte", value: 14 }, // +2 mod
       MaxHitPoints: { type: "short", value: 999 }, // wildly wrong for level 3, d10, +2 Con
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }],
+      },
     });
     const index = makeIndex({ twodaTables: new Map([["classes", twoDA(["HitDie"], [[4, { HitDie: "10" }]])]]) });
     const report = new Report("t", "utc");
@@ -678,7 +810,10 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Con: { type: "byte", value: 14 },
       MaxHitPoints: { type: "short", value: 10 + 2 + 2 * (6 + 2) },
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }],
+      },
     });
     const index = makeIndex({ twodaTables: new Map([["classes", twoDA(["HitDie"], [[4, { HitDie: "10" }]])]]) });
     const report = new Report("t", "utc");
@@ -689,12 +824,18 @@ describe("verifyCreature", () => {
   it("flags a SkillList total that doesn't match the SkillPointBase/Int-mod formula", async () => {
     const obj = makeCreature("nw_c2_default", {
       Int: { type: "byte", value: 10 }, // mod 0
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }],
+      },
       SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 0 } }] }, // 0 spent
     });
     const index = makeIndex({
       twodaTables: new Map([
-        ["classes", twoDA(["SkillPointBase", "SkillsTable"], [[4, { SkillPointBase: "2", SkillsTable: "CLS_SKILL_FIGHT" }]])],
+        [
+          "classes",
+          twoDA(["SkillPointBase", "SkillsTable"], [[4, { SkillPointBase: "2", SkillsTable: "CLS_SKILL_FIGHT" }]]),
+        ],
         ["cls_skill_fight", twoDA(["SkillIndex", "ClassSkill"], [[0, { SkillIndex: "1", ClassSkill: "1" }]])],
       ]),
     });
@@ -707,12 +848,18 @@ describe("verifyCreature", () => {
   it("does not flag a SkillList total matching the formula", async () => {
     const obj = makeCreature("nw_c2_default", {
       Int: { type: "byte", value: 10 },
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 1 } }],
+      },
       SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 4 } }] }, // hits the level+3=4 cap
     });
     const index = makeIndex({
       twodaTables: new Map([
-        ["classes", twoDA(["SkillPointBase", "SkillsTable"], [[4, { SkillPointBase: "2", SkillsTable: "CLS_SKILL_FIGHT" }]])],
+        [
+          "classes",
+          twoDA(["SkillPointBase", "SkillsTable"], [[4, { SkillPointBase: "2", SkillsTable: "CLS_SKILL_FIGHT" }]]),
+        ],
         ["cls_skill_fight", twoDA(["SkillIndex", "ClassSkill"], [[0, { SkillIndex: "1", ClassSkill: "1" }]])],
       ]),
     });
@@ -724,7 +871,10 @@ describe("verifyCreature", () => {
   it("flags StartingPackage that doesn't match the packages.2da row-equals-classId convention", async () => {
     const obj = makeCreature("nw_c2_default", {
       StartingPackage: { type: "byte", value: 0 },
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }],
+      },
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, makeIndex(), obj);
@@ -734,7 +884,10 @@ describe("verifyCreature", () => {
   it("does not flag StartingPackage matching its class", async () => {
     const obj = makeCreature("nw_c2_default", {
       StartingPackage: { type: "byte", value: 4 },
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }],
+      },
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, makeIndex(), obj);
@@ -754,7 +907,10 @@ describe("verifyCreature", () => {
       Con: { type: "byte", value: 10 },
       MaxHitPoints: { type: "short", value: 2 }, // wildly below any PC-style HitDie formula
       Int: { type: "byte", value: 10 },
-      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 20 }, ClassLevel: { type: "short", value: 1 } }] },
+      ClassList: {
+        type: "list",
+        value: [{ __struct_id: 2, Class: { type: "int", value: 20 }, ClassLevel: { type: "short", value: 1 } }],
+      },
       SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 0 } }] },
     });
     const index = makeIndex({
@@ -786,7 +942,9 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 30 } }] }, // Rapid Shot
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "xbow" }, BaseItem: { type: "int", value: 7 } }],
+        value: [
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "xbow" }, BaseItem: { type: "int", value: 7 } },
+        ],
       },
     });
     const index = makeIndex({
@@ -808,7 +966,9 @@ describe("verifyCreature", () => {
       },
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "xbow" }, BaseItem: { type: "int", value: 7 } }],
+        value: [
+          { __struct_id: 16, TemplateResRef: { type: "resref", value: "xbow" }, BaseItem: { type: "int", value: 7 } },
+        ],
       },
     });
     const index = makeIndex({
@@ -824,7 +984,13 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 30 } }] },
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "longbow" }, BaseItem: { type: "int", value: 8 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "longbow" },
+            BaseItem: { type: "int", value: 8 },
+          },
+        ],
       },
     });
     const index = makeIndex({
@@ -881,7 +1047,13 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 2, TemplateResRef: { type: "resref", value: "some_armor" }, BaseItem: { type: "int", value: 16 } }],
+        value: [
+          {
+            __struct_id: 2,
+            TemplateResRef: { type: "resref", value: "some_armor" },
+            BaseItem: { type: "int", value: 16 },
+          },
+        ],
       },
     });
     const report = new Report("t", "utc");
@@ -898,7 +1070,14 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 2, TemplateResRef: { type: "resref", value: "nw_aarcl004" }, BaseItem: { type: "int", value: 16 }, Cost: { type: "dword", value: 150 } }],
+        value: [
+          {
+            __struct_id: 2,
+            TemplateResRef: { type: "resref", value: "nw_aarcl004" },
+            BaseItem: { type: "int", value: 16 },
+            Cost: { type: "dword", value: 150 },
+          },
+        ],
       },
     });
     const report = new Report("t", "utc");
@@ -910,7 +1089,14 @@ describe("verifyCreature", () => {
     const obj = makeCreature("nw_c2_default", {
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 2, TemplateResRef: { type: "resref", value: "nw_cloth001" }, BaseItem: { type: "int", value: 16 }, Cost: { type: "dword", value: 1 } }],
+        value: [
+          {
+            __struct_id: 2,
+            TemplateResRef: { type: "resref", value: "nw_cloth001" },
+            BaseItem: { type: "int", value: 16 },
+            Cost: { type: "dword", value: 1 },
+          },
+        ],
       },
     });
     const report = new Report("t", "utc");
@@ -937,7 +1123,9 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
     });
     const index = makeIndex({
-      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+      twodaTables: new Map([
+        ["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])],
+      ]),
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
@@ -953,11 +1141,20 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
       SpecAbilityList: {
         type: "list",
-        value: [{ __struct_id: 0, Spell: { type: "word", value: 24 }, SpellCasterLevel: { type: "byte", value: 5 }, SpellFlags: { type: "byte", value: 1 } }],
+        value: [
+          {
+            __struct_id: 0,
+            Spell: { type: "word", value: 24 },
+            SpellCasterLevel: { type: "byte", value: 5 },
+            SpellFlags: { type: "byte", value: 1 },
+          },
+        ],
       },
     });
     const index = makeIndex({
-      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+      twodaTables: new Map([
+        ["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])],
+      ]),
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
@@ -973,11 +1170,20 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
       SpecAbilityList: {
         type: "list",
-        value: [{ __struct_id: 0, Spell: { type: "word", value: 24 }, SpellCasterLevel: { type: "byte", value: 5 }, SpellFlags: { type: "byte", value: 0 } }],
+        value: [
+          {
+            __struct_id: 0,
+            Spell: { type: "word", value: 24 },
+            SpellCasterLevel: { type: "byte", value: 5 },
+            SpellFlags: { type: "byte", value: 0 },
+          },
+        ],
       },
     });
     const index = makeIndex({
-      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+      twodaTables: new Map([
+        ["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])],
+      ]),
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
@@ -994,7 +1200,9 @@ describe("verifyCreature", () => {
     });
     const index = makeIndex({
       // Paladin: SpellCaster=1 but doesn't cast until level 4 under 3.5 rules.
-      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[6, { SpellCaster: "1", MinCastingLevel: "4" }]])]]),
+      twodaTables: new Map([
+        ["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[6, { SpellCaster: "1", MinCastingLevel: "4" }]])],
+      ]),
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
@@ -1006,11 +1214,19 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_bow" },
+            BaseItem: { type: "int", value: 8 },
+          },
+        ],
       },
     });
     const index = makeIndex({
-      twodaTables: new Map([["baseitems", twoDA(["RangedWeapon", "DieToRoll"], [[8, { RangedWeapon: "20", DieToRoll: "6" }]])]]),
+      twodaTables: new Map([
+        ["baseitems", twoDA(["RangedWeapon", "DieToRoll"], [[8, { RangedWeapon: "20", DieToRoll: "6" }]])],
+      ]),
     });
     const report = new Report("t", "utc");
     await verifyCreature(report, index, obj);
@@ -1022,7 +1238,13 @@ describe("verifyCreature", () => {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
       Equip_ItemList: {
         type: "list",
-        value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "some_bow" }, BaseItem: { type: "int", value: 8 } }],
+        value: [
+          {
+            __struct_id: 16,
+            TemplateResRef: { type: "resref", value: "some_bow" },
+            BaseItem: { type: "int", value: 8 },
+          },
+        ],
       },
       ItemList: {
         type: "list",
@@ -1205,7 +1427,9 @@ describe("verifyStore", () => {
     const item = storeItem(0, 42, "nw_wspku001");
     const obj = storeWithItem(1, item);
     const index = makeIndex({
-      resources: new Map([["nw_wspku001.uti", { resref: "nw_wspku001", extension: "uti", filePath: "", sizeBytes: 0 }]]),
+      resources: new Map([
+        ["nw_wspku001.uti", { resref: "nw_wspku001", extension: "uti", filePath: "", sizeBytes: 0 }],
+      ]),
     });
     const report = new Report("t", "utm");
     verifyStore(report, index, obj);
@@ -1436,9 +1660,7 @@ describe("verifyDoor", () => {
   it("does not flag a locked door when the area has a waypoint", () => {
     const waypoint = { __struct_id: 5, Tag: { type: "cexostring", value: "wp_behind_gate" } };
     const index = makeIndex({
-      parsedGff: new Map([
-        ["darea.git", { WaypointList: { type: "list", value: [waypoint] } } as unknown as GffObj],
-      ]),
+      parsedGff: new Map([["darea.git", { WaypointList: { type: "list", value: [waypoint] } } as unknown as GffObj]]),
     });
     const report = new Report("d", "utd");
     verifyDoor(report, index, makeLockedDoor(), { areaResref: "darea" });
@@ -1525,7 +1747,9 @@ describe("verifyDialog", () => {
     } as unknown as GffObj;
 
     const index = makeIndex({
-      resources: new Map([["c_hen_mine.ncs", { resref: "c_hen_mine", extension: "ncs", filePath: "/x", sizeBytes: 1 }]]),
+      resources: new Map([
+        ["c_hen_mine.ncs", { resref: "c_hen_mine", extension: "ncs", filePath: "/x", sizeBytes: 1 }],
+      ]),
     });
     const report = new Report("t", "dlg");
     verifyDialog(report, index, doc);
@@ -1591,15 +1815,58 @@ describe("verifyJournal", () => {
     await verifyJournal(report, makeIndex(), questDoc([{ id: 1, end: true }]));
     expect(report.errors.map((e) => e.code)).toContain("quest_never_awarded");
   });
+
+  const dlgWithNativeField = (tag: string, entryId: number) =>
+    ({
+      __data_type: "DLG ",
+      StartingList: {
+        type: "list",
+        value: [{ __struct_id: 0, Index: { type: "dword", value: 0 }, Active: { type: "resref", value: "" } }],
+      },
+      EntryList: {
+        type: "list",
+        value: [
+          {
+            __struct_id: 0,
+            Text: { type: "cexolocstring", value: { "0": "stage" } },
+            Script: { type: "resref", value: "" },
+            Quest: { type: "cexostring", value: tag },
+            QuestEntry: { type: "dword", value: entryId },
+            RepliesList: { type: "list", value: [] },
+          },
+        ],
+      },
+      ReplyList: { type: "list", value: [] },
+    }) as unknown as GffObj;
+
+  it("does not flag quest_never_awarded when a dialog node sets native Quest/QuestEntry fields, with no AddJournalQuestEntry script anywhere", async () => {
+    const report = new Report("t", "jrl");
+    const index = makeIndex({ parsedGff: new Map([["dlg_amulet.dlg", dlgWithNativeField("q_amulet", 1)]]) });
+    await verifyJournal(report, index, questDoc([{ id: 1, end: true }]));
+    expect(report.errors.map((e) => e.code)).not.toContain("quest_never_awarded");
+  });
+
+  it("still flags quest_entry_unreachable for a second entry no native field or script covers", async () => {
+    const report = new Report("t", "jrl");
+    const index = makeIndex({ parsedGff: new Map([["dlg_amulet.dlg", dlgWithNativeField("q_amulet", 1)]]) });
+    await verifyJournal(report, index, questDoc([{ id: 1 }, { id: 2, end: true }]));
+    expect(report.errors.map((e) => e.code)).not.toContain("quest_never_awarded");
+    expect(report.warnings.map((w) => w.code)).toContain("quest_entry_unreachable");
+  });
+
+  it("is case-insensitive matching a native Quest field against the journal tag, same as the script-regex path", async () => {
+    const report = new Report("t", "jrl");
+    const index = makeIndex({ parsedGff: new Map([["dlg_amulet.dlg", dlgWithNativeField("Q_AMULET", 1)]]) });
+    await verifyJournal(report, index, questDoc([{ id: 1, end: true }]));
+    expect(report.errors.map((e) => e.code)).not.toContain("quest_never_awarded");
+  });
 });
 
 describe("verifyModuleInfo", () => {
   const ifoDoc = (description?: string) =>
     ({
       Mod_Entry_Area: { type: "resref", value: "" },
-      ...(description !== undefined
-        ? { Mod_Description: { type: "cexolocstring", value: { "0": description } } }
-        : {}),
+      ...(description !== undefined ? { Mod_Description: { type: "cexolocstring", value: { "0": description } } } : {}),
     }) as unknown as GffObj;
 
   it("warns when Mod_Description is empty (never set, or set with empty/whitespace text)", () => {

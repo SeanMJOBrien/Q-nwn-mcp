@@ -1,22 +1,26 @@
-import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireIndex, indexAreaCreatures } from "../module-loader.js";
-import { numParam, optNumParam, toI } from "../util/params.js";
-import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "../types/gff.js";
-import type { GffObj, GffDocument } from "../types/gff.js";
-import { buildTagToAreaMap, buildAreaTransitions } from "./tileset-tools.js";
-import { isBaseGameResource, isBaseGameScript, loadScriptSources } from "../util/verify/common.js";
-import { flattenDialog } from "../util/dialog-walker.js";
+import { z } from "zod";
+import { indexAreaCreatures, requireIndex } from "../module-loader.js";
 import type { FlatDialogNode } from "../types/dialog.js";
+import type { GffDocument, GffObj } from "../types/gff.js";
+import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import type { CreatureRecord } from "../types/module.js";
+import { flattenDialog } from "../util/dialog-walker.js";
 import { bandDifficulty, clusterHostiles } from "../util/encounter-difficulty.js";
+import { numParam, optNumParam, toI } from "../util/params.js";
+import { isBaseGameResource, isBaseGameScript, loadScriptSources } from "../util/verify/common.js";
+import { buildAreaTransitions, buildTagToAreaMap } from "./tileset-tools.js";
 
 export function registerAnalysisTools(server: McpServer): void {
-
   server.tool(
     "get_dependency_graph",
     "Show resource dependency graph. Resources depend on other resources via script references, conversation assignments, etc.",
-    { resource: z.string().optional().describe("Focus on a specific resource (e.g., 'forest.git'), or omit for full graph") },
+    {
+      resource: z
+        .string()
+        .optional()
+        .describe("Focus on a specific resource (e.g., 'forest.git'), or omit for full graph"),
+    },
     { readOnlyHint: true, idempotentHint: true },
     async ({ resource }) => {
       const index = requireIndex();
@@ -28,7 +32,7 @@ export function registerAnalysisTools(server: McpServer): void {
           const toFile = `${scriptResref}.nss`;
           const hasSource = index.resources.has(toFile);
           const toCompiled = `${scriptResref}.ncs`;
-          const target = hasSource ? toFile : (index.resources.has(toCompiled) ? toCompiled : toFile);
+          const target = hasSource ? toFile : index.resources.has(toCompiled) ? toCompiled : toFile;
           edges.push({
             from: usage.resourceFile,
             to: target,
@@ -56,9 +60,7 @@ export function registerAnalysisTools(server: McpServer): void {
       let filtered = edges;
       if (resource) {
         const needle = resource.toLowerCase();
-        filtered = edges.filter(e =>
-          e.from.toLowerCase() === needle || e.to.toLowerCase() === needle
-        );
+        filtered = edges.filter((e) => e.from.toLowerCase() === needle || e.to.toLowerCase() === needle);
       }
 
       // Build node set
@@ -69,12 +71,14 @@ export function registerAnalysisTools(server: McpServer): void {
       }
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({ nodes: [...nodes], edges: filtered }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ nodes: [...nodes], edges: filtered }, null, 2),
+          },
+        ],
       };
-    }
+    },
   );
 
   server.tool(
@@ -126,15 +130,19 @@ export function registerAnalysisTools(server: McpServer): void {
       }
 
       return { content: [{ type: "text", text: JSON.stringify(orphans, null, 2) }] };
-    }
+    },
   );
 
   server.tool(
     "get_balance_report",
     "Analyze creature difficulty and item values per area. Includes a per-area class-composition tally (caster presence, class counts) — informational only: a caster is not a hard requirement for a good encounter, just something that sometimes improves the mechanics/variety. Pass effectivePartySize to also see total CR per party member. Pass partyLevel to additionally get a real D&D 3.5 Encounter Level (EL) difficulty read on the area's Hostile-faction (1) creatures: they're grouped by CR into clusters (EL combination is only verified for same-CR groups — see docs/encounter-difficulty-findings.md), each cluster's EL is banded against partyLevel (trivial/easy/standard/hard/deadly, using this project's own documented EL=APL/EL=APL+4 anchors), and any creature with ChallengeRating unset (0) has its CR estimated from total character level (verified against 505 real creatures from ~/tfndev, flagged in the output as crEstimated rather than blended in silently).",
     {
-      effectivePartySize: optNumParam("Party size to divide each area's total CR by, for a rough per-member difficulty figure"),
-      partyLevel: optNumParam("Average party level — adds a real EL-based difficulty read on each area's Hostile-faction creatures, clustered by CR (see tool description)"),
+      effectivePartySize: optNumParam(
+        "Party size to divide each area's total CR by, for a rough per-member difficulty figure",
+      ),
+      partyLevel: optNumParam(
+        "Average party level — adds a real EL-based difficulty read on each area's Hostile-faction creatures, clustered by CR (see tool description)",
+      ),
     },
     { readOnlyHint: true, idempotentHint: true },
     async ({ effectivePartySize, partyLevel }) => {
@@ -160,8 +168,8 @@ export function registerAnalysisTools(server: McpServer): void {
         const areaCreatures: CreatureRecord[] = [];
         if (gitDoc) indexAreaCreatures(areaResref, gitDoc, areaCreatures);
 
-        const crs = areaCreatures.map(c => c.cr);
-        const hps = areaCreatures.map(c => c.hp);
+        const crs = areaCreatures.map((c) => c.cr);
+        const hps = areaCreatures.map((c) => c.hp);
         const totalCR = crs.reduce((a, b) => a + b, 0);
 
         const classCounts: Record<number, number> = {};
@@ -175,12 +183,12 @@ export function registerAnalysisTools(server: McpServer): void {
 
         let difficulty: Record<string, unknown> | undefined;
         if (apl !== undefined) {
-          const hostiles = areaCreatures.filter(c => c.faction === 1);
+          const hostiles = areaCreatures.filter((c) => c.faction === 1);
           const clusters = clusterHostiles(hostiles);
           difficulty = {
             partyLevel: apl,
             hostileCount: hostiles.length,
-            clusters: clusters.map(cl => ({
+            clusters: clusters.map((cl) => ({
               cr: cl.cr,
               count: cl.count,
               el: cl.el,
@@ -188,8 +196,7 @@ export function registerAnalysisTools(server: McpServer): void {
               crEstimated: cl.anyEstimatedCR,
               tags: cl.tags,
             })),
-            note:
-              "One EL per same-CR cluster, not a single collapsed area figure — mixed-CR combination isn't verified yet (docs/encounter-difficulty-findings.md). This is per-area, not per-fight: this pipeline places hostiles individually rather than via Encounter blueprints, so there's no formal grouping of which creatures are meant to fight together at once.",
+            note: "One EL per same-CR cluster, not a single collapsed area figure — mixed-CR combination isn't verified yet (docs/encounter-difficulty-findings.md). This is per-area, not per-fight: this pipeline places hostiles individually rather than via Encounter blueprints, so there's no formal grouping of which creatures are meant to fight together at once.",
           };
         }
 
@@ -197,25 +204,31 @@ export function registerAnalysisTools(server: McpServer): void {
           area: areaResref,
           areaName: summary.name,
           creatureCount: areaCreatures.length,
-          crStats: crs.length > 0 ? {
-            min: Math.min(...crs),
-            max: Math.max(...crs),
-            average: crs.reduce((a, b) => a + b, 0) / crs.length,
-            total: totalCR,
-            ...(partySize ? { perPartyMember: totalCR / partySize } : {}),
-          } : null,
+          crStats:
+            crs.length > 0
+              ? {
+                  min: Math.min(...crs),
+                  max: Math.max(...crs),
+                  average: crs.reduce((a, b) => a + b, 0) / crs.length,
+                  total: totalCR,
+                  ...(partySize ? { perPartyMember: totalCR / partySize } : {}),
+                }
+              : null,
           ...(difficulty ? { difficulty } : {}),
-          hpStats: hps.length > 0 ? {
-            min: Math.min(...hps),
-            max: Math.max(...hps),
-            average: hps.reduce((a, b) => a + b, 0) / hps.length,
-          } : null,
+          hpStats:
+            hps.length > 0
+              ? {
+                  min: Math.min(...hps),
+                  max: Math.max(...hps),
+                  average: hps.reduce((a, b) => a + b, 0) / hps.length,
+                }
+              : null,
           composition: {
             classCounts,
             casterPresent,
             note: "Informational only — a caster is not a hard requirement, but one often improves encounter mechanics/variety.",
           },
-          creatures: areaCreatures.map(c => ({
+          creatures: areaCreatures.map((c) => ({
             tag: c.tag,
             name: `${c.firstName} ${c.lastName}`.trim(),
             cr: c.cr,
@@ -226,7 +239,7 @@ export function registerAnalysisTools(server: McpServer): void {
         });
       }
 
-      const itemReport = index.items.map(item => ({
+      const itemReport = index.items.map((item) => ({
         tag: item.tag,
         name: item.name,
         baseItem: item.baseItem,
@@ -235,12 +248,14 @@ export function registerAnalysisTools(server: McpServer): void {
       }));
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({ areas: areaReports, items: itemReport }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ areas: areaReports, items: itemReport }, null, 2),
+          },
+        ],
       };
-    }
+    },
   );
 
   server.tool(
@@ -251,8 +266,8 @@ export function registerAnalysisTools(server: McpServer): void {
     async () => {
       const index = requireIndex();
 
-      const scriptCount = [...index.resources.values()].filter(r => r.extension === "nss").length;
-      const compiledCount = [...index.resources.values()].filter(r => r.extension === "ncs").length;
+      const scriptCount = [...index.resources.values()].filter((r) => r.extension === "nss").length;
+      const compiledCount = [...index.resources.values()].filter((r) => r.extension === "ncs").length;
 
       // Find quest variables by scanning scripts
       const questVars = new Set<string>();
@@ -265,14 +280,16 @@ export function registerAnalysisTools(server: McpServer): void {
           for (const match of source.matchAll(regex)) {
             questVars.add(match[1]);
           }
-        } catch { /* skip */ }
+        } catch {
+          /* skip */
+        }
       }
 
       const summary = {
         moduleName: index.moduleName,
         modPath: index.modPath,
         totalResources: index.resources.size,
-        areas: [...index.areas.values()].map(a => ({
+        areas: [...index.areas.values()].map((a) => ({
           resref: a.resref,
           name: a.name,
           size: `${a.width}x${a.height}`,
@@ -282,7 +299,7 @@ export function registerAnalysisTools(server: McpServer): void {
         })),
         totalCreatures: index.creatures.length,
         totalItems: index.items.length,
-        dialogs: [...index.dialogs.values()].map(d => ({
+        dialogs: [...index.dialogs.values()].map((d) => ({
           resref: d.resref,
           entries: d.entryCount,
           replies: d.replyCount,
@@ -296,7 +313,7 @@ export function registerAnalysisTools(server: McpServer): void {
       };
 
       return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
-    }
+    },
   );
 
   server.tool(
@@ -415,7 +432,12 @@ export function registerAnalysisTools(server: McpServer): void {
       // Race/Appearance_Type/primary-class combinations for what's meant to
       // be one character.
       {
-        interface Identity { area: string; race: number; appearance: number; primaryClass: number | undefined }
+        interface Identity {
+          area: string;
+          race: number;
+          appearance: number;
+          primaryClass: number | undefined;
+        }
         const byTag = new Map<string, Identity[]>();
         for (const [areaResref] of index.areas) {
           const gitDoc = index.parsedGff.get(`${areaResref}.git`);
@@ -595,30 +617,56 @@ export function registerAnalysisTools(server: McpServer): void {
       }
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            errorCount: errors.length,
-            warningCount: warnings.length,
-            errors,
-            warnings,
-          }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                errorCount: errors.length,
+                warningCount: warnings.length,
+                errors,
+                warnings,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
-    }
+    },
   );
 
   // ─── suggest_encounter ────────────────────────────────────────────────
 
   /** NWN CR→XP table (CR 1-20 for single creature vs party of 1) */
   const CR_XP: Record<number, number> = {
-    1: 50, 2: 100, 3: 150, 4: 200, 5: 250, 6: 300, 7: 350, 8: 400,
-    9: 450, 10: 500, 11: 550, 12: 600, 13: 650, 14: 700, 15: 750,
-    16: 800, 17: 850, 18: 900, 19: 950, 20: 1000,
+    1: 50,
+    2: 100,
+    3: 150,
+    4: 200,
+    5: 250,
+    6: 300,
+    7: 350,
+    8: 400,
+    9: 450,
+    10: 500,
+    11: 550,
+    12: 600,
+    13: 650,
+    14: 700,
+    15: 750,
+    16: 800,
+    17: 850,
+    18: 900,
+    19: 950,
+    20: 1000,
   };
 
   const DIFFICULTY_MULT: Record<string, number> = {
-    easy: 0.5, medium: 1.0, hard: 1.5, deadly: 2.0,
+    easy: 0.5,
+    medium: 1.0,
+    hard: 1.5,
+    deadly: 2.0,
   };
 
   server.tool(
@@ -660,14 +708,22 @@ export function registerAnalysisTools(server: McpServer): void {
 
       if (creatures.length === 0) {
         return {
-          content: [{
-            type: "text",
-            text: JSON.stringify({
-              xpBudget,
-              note: theme ? `No creature blueprints matching theme "${theme}"` : "No creature blueprints found in module",
-              suggestions: [],
-            }, null, 2),
-          }],
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  xpBudget,
+                  note: theme
+                    ? `No creature blueprints matching theme "${theme}"`
+                    : "No creature blueprints found in module",
+                  suggestions: [],
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
 
@@ -679,7 +735,11 @@ export function registerAnalysisTools(server: McpServer): void {
         byCR.set(c.cr, arr);
       }
 
-      const suggestions: Array<{ type: string; creatures: Array<{ resref: string; name: string; cr: number }>; totalXP: number }> = [];
+      const suggestions: Array<{
+        type: string;
+        creatures: Array<{ resref: string; name: string; cr: number }>;
+        totalXP: number;
+      }> = [];
 
       const getXP = (cr: number) => CR_XP[Math.round(cr)] || Math.round(cr * 50);
 
@@ -706,7 +766,7 @@ export function registerAnalysisTools(server: McpServer): void {
         const picks = squadPool.slice(0, count);
         suggestions.push({
           type: `Squad (${count}x)`,
-          creatures: picks.map(p => ({ resref: p.resref, name: p.name, cr: p.cr })),
+          creatures: picks.map((p) => ({ resref: p.resref, name: p.name, cr: p.cr })),
           totalXP: picks.reduce((sum, p) => sum + getXP(p.cr), 0) * size,
         });
       }
@@ -717,7 +777,11 @@ export function registerAnalysisTools(server: McpServer): void {
       if (swarmPool.length > 0) {
         const count = Math.min(5 + Math.floor(mult * 2), 8);
         const pick = swarmPool[0];
-        const swarmCreatures = Array.from({ length: count }, () => ({ resref: pick.resref, name: pick.name, cr: pick.cr }));
+        const swarmCreatures = Array.from({ length: count }, () => ({
+          resref: pick.resref,
+          name: pick.name,
+          cr: pick.cr,
+        }));
         suggestions.push({
           type: `Swarm (${count}x)`,
           creatures: swarmCreatures,
@@ -726,17 +790,23 @@ export function registerAnalysisTools(server: McpServer): void {
       }
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            partyLevel: level,
-            partySize: size,
-            difficulty: difficulty || "medium",
-            xpBudget,
-            availableCreatures: creatures.length,
-            suggestions,
-          }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                partyLevel: level,
+                partySize: size,
+                difficulty: difficulty || "medium",
+                xpBudget,
+                availableCreatures: creatures.length,
+                suggestions,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
     },
   );
@@ -770,7 +840,7 @@ export function registerAnalysisTools(server: McpServer): void {
       const graph: Record<string, string[]> = {};
       for (const [areaResref] of index.areas) {
         const transitions = buildAreaTransitions(index, areaResref, tagToArea);
-        const targets = [...new Set(transitions.map(t => t.targetArea))];
+        const targets = [...new Set(transitions.map((t) => t.targetArea))];
         graph[areaResref] = targets;
       }
 
@@ -780,7 +850,7 @@ export function registerAnalysisTools(server: McpServer): void {
       reachable.add(start);
       while (queue.length > 0) {
         const current = queue.shift()!;
-        for (const neighbor of (graph[current] || [])) {
+        for (const neighbor of graph[current] || []) {
           if (!reachable.has(neighbor)) {
             reachable.add(neighbor);
             queue.push(neighbor);
@@ -789,19 +859,25 @@ export function registerAnalysisTools(server: McpServer): void {
       }
 
       const allAreas = [...index.areas.keys()];
-      const unreachable = allAreas.filter(a => !reachable.has(a));
+      const unreachable = allAreas.filter((a) => !reachable.has(a));
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            startArea: start,
-            reachable: [...reachable],
-            unreachable,
-            graph,
-            fullyConnected: unreachable.length === 0,
-          }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                startArea: start,
+                reachable: [...reachable],
+                unreachable,
+                graph,
+                fullyConnected: unreachable.length === 0,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
     },
   );
@@ -861,7 +937,9 @@ export function registerAnalysisTools(server: McpServer): void {
             const { readFile } = await import("fs/promises");
             const src = await readFile(entry.filePath, "utf-8");
             scriptSources.set(entry.resref, src);
-          } catch { /* skip unreadable */ }
+          } catch {
+            /* skip unreadable */
+          }
         }
       }
 
@@ -872,12 +950,18 @@ export function registerAnalysisTools(server: McpServer): void {
           try {
             const tree = flattenDialog(doc, 15);
             dialogTrees.set(key.replace(".dlg", ""), tree);
-          } catch { /* skip broken dialogs */ }
+          } catch {
+            /* skip broken dialogs */
+          }
         }
       }
 
       // Find which scripts reference which quest tags
-      function findScriptsForQuest(questTag: string): { startScripts: string[]; endScripts: string[]; stageScripts: Map<number, string[]> } {
+      function findScriptsForQuest(questTag: string): {
+        startScripts: string[];
+        endScripts: string[];
+        stageScripts: Map<number, string[]>;
+      } {
         const startScripts: string[] = [];
         const endScripts: string[] = [];
         const stageScripts = new Map<number, string[]>();
@@ -893,11 +977,34 @@ export function registerAnalysisTools(server: McpServer): void {
           }
         }
 
+        // Native Quest/QuestEntry dialog fields advance a stage with no script call
+        // at all (confirmed via nwscript-docs/AddJournalQuestEntry.md — the toolset's
+        // own "Other Actions" tab). Union this in as a second, independent source: a
+        // stage covered only by a native field would otherwise read as "no script
+        // found" and false-positive quest_never_awarded — the same class of false
+        // positive already documented for PQJ-wrapped quests, except here the data is
+        // a plain GFF field, not buried behind a wrapper chain, so it's directly
+        // readable instead of needing a tracer. Recorded as a "native:<dlg>" sentinel
+        // so findDialogWithScript below can resolve it straight to that dialog.
+        for (const [dlgResref, tree] of dialogTrees) {
+          function scanForNativeField(node: FlatDialogNode): void {
+            if (node.quest === questTag && typeof node.questEntry === "number") {
+              const existing = stageScripts.get(node.questEntry) || [];
+              existing.push(`native:${dlgResref}`);
+              stageScripts.set(node.questEntry, existing);
+            }
+            for (const child of node.children) scanForNativeField(child);
+          }
+          for (const root of tree) scanForNativeField(root);
+        }
+
         return { startScripts, endScripts, stageScripts };
       }
 
-      // Find which dialog has a script reference
+      // Find which dialog has a script reference — or, for a native-field stage,
+      // the dialog findScriptsForQuest's sentinel already names directly.
       function findDialogWithScript(scriptResref: string): string | null {
+        if (scriptResref.startsWith("native:")) return scriptResref.slice("native:".length);
         for (const [dlgResref, tree] of dialogTrees) {
           function searchNode(node: FlatDialogNode): boolean {
             if (node.script === scriptResref) return true;
@@ -949,7 +1056,7 @@ export function registerAnalysisTools(server: McpServer): void {
         }
 
         // Check for end entry
-        const hasEndEntry = journalEntries.some(e => e.end);
+        const hasEndEntry = journalEntries.some((e) => e.end);
         if (!hasEndEntry) {
           gaps.push("No journal entry marked as 'end' — quest can never complete");
         }
@@ -961,7 +1068,9 @@ export function registerAnalysisTools(server: McpServer): void {
         for (const je of journalEntries) {
           const scripts = stageScripts.get(je.id);
           if (!scripts || scripts.length === 0) {
-            gaps.push(`Journal entry ${je.id} ("${je.text.substring(0, 40)}...") has no script calling AddJournalQuestEntry("${questTag}", ${je.id})`);
+            gaps.push(
+              `Journal entry ${je.id} ("${je.text.substring(0, 40)}...") has no script calling AddJournalQuestEntry("${questTag}", ${je.id}) and no dialog node with native Quest/QuestEntry fields set to it`,
+            );
           }
         }
 
@@ -1001,14 +1110,20 @@ export function registerAnalysisTools(server: McpServer): void {
       }
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            questCount: questResults.length,
-            allCompletable: questResults.every(q => q.completable),
-            quests: questResults,
-          }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                questCount: questResults.length,
+                allCompletable: questResults.every((q) => q.completable),
+                quests: questResults,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
     },
   );

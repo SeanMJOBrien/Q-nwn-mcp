@@ -1,6 +1,27 @@
-import { getFieldStr, getFieldLocStr, getFieldList, getFieldNum } from "../types/gff.js";
+import type { DialogScriptRef, FlatDialogNode } from "../types/dialog.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
-import type { FlatDialogNode, DialogScriptRef } from "../types/dialog.js";
+import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
+import { getScriptParams } from "./dialog-params.js";
+
+/** Attaches quest/questEntry/actionParams to an already-built node, in place. Only
+ *  sets what's actually present, so a plain node (the overwhelming majority) carries
+ *  none of these optional fields at all. */
+function attachNativeQuestFields(node: FlatDialogNode, raw: GffObj): void {
+  const quest = getFieldStr(raw, "Quest");
+  if (quest) {
+    node.quest = quest;
+    node.questEntry = getFieldNum(raw, "QuestEntry");
+  }
+  const actionParams = getScriptParams(raw, "ActionParams");
+  if (Object.keys(actionParams).length > 0) node.actionParams = actionParams;
+}
+
+/** Same idea as attachNativeQuestFields, but for a link's ConditionParams — there is
+ *  no native non-script equivalent for a condition, so only params are read here. */
+function readConditionParams(raw: GffObj): Record<string, string> | undefined {
+  const conditionParams = getScriptParams(raw, "ConditionParams");
+  return Object.keys(conditionParams).length > 0 ? conditionParams : undefined;
+}
 
 /**
  * Flatten a DLG document into a readable tree structure.
@@ -16,7 +37,7 @@ export function flattenDialog(dlg: GffDocument, maxDepth: number = 10): FlatDial
   for (const start of startingList) {
     const idx = getFieldNum(start, "Index");
     const active = getFieldStr(start, "Active");
-    const node = walkEntry(entries, replies, idx, active, visited, 0, maxDepth);
+    const node = walkEntry(entries, replies, idx, active, readConditionParams(start), visited, 0, maxDepth);
     if (node) roots.push(node);
   }
 
@@ -28,9 +49,10 @@ function walkEntry(
   replies: GffObj[],
   entryIdx: number,
   condition: string | undefined,
+  conditionParams: Record<string, string> | undefined,
   visited: Set<string>,
   depth: number,
-  maxDepth: number
+  maxDepth: number,
 ): FlatDialogNode | null {
   const key = `entry:${entryIdx}`;
   if (depth > maxDepth) return null;
@@ -48,9 +70,11 @@ function walkEntry(
     text,
     script: script || undefined,
     condition: condition || undefined,
+    conditionParams,
     children: [],
     isLeaf: replyLinks.length === 0 || isRecursive,
   };
+  attachNativeQuestFields(node, entry);
 
   if (isRecursive) return node;
   visited.add(key);
@@ -58,7 +82,16 @@ function walkEntry(
   for (const link of replyLinks) {
     const replyIdx = getFieldNum(link, "Index");
     const replyActive = getFieldStr(link, "Active");
-    const child = walkReply(entries, replies, replyIdx, replyActive, visited, depth + 1, maxDepth);
+    const child = walkReply(
+      entries,
+      replies,
+      replyIdx,
+      replyActive,
+      readConditionParams(link),
+      visited,
+      depth + 1,
+      maxDepth,
+    );
     if (child) node.children.push(child);
   }
 
@@ -71,9 +104,10 @@ function walkReply(
   replies: GffObj[],
   replyIdx: number,
   condition: string | undefined,
+  conditionParams: Record<string, string> | undefined,
   visited: Set<string>,
   depth: number,
-  maxDepth: number
+  maxDepth: number,
 ): FlatDialogNode | null {
   if (depth > maxDepth) return null;
   if (replyIdx < 0 || replyIdx >= replies.length) return null;
@@ -89,14 +123,25 @@ function walkReply(
     text,
     script: script || undefined,
     condition: condition || undefined,
+    conditionParams,
     children: [],
     isLeaf: entryLinks.length === 0,
   };
+  attachNativeQuestFields(node, reply);
 
   for (const link of entryLinks) {
     const entryIdx = getFieldNum(link, "Index");
     const entryActive = getFieldStr(link, "Active");
-    const child = walkEntry(entries, replies, entryIdx, entryActive, visited, depth + 1, maxDepth);
+    const child = walkEntry(
+      entries,
+      replies,
+      entryIdx,
+      entryActive,
+      readConditionParams(link),
+      visited,
+      depth + 1,
+      maxDepth,
+    );
     if (child) node.children.push(child);
   }
 
@@ -110,11 +155,16 @@ export function renderDialogText(nodes: FlatDialogNode[], indent: number = 0): s
 
   for (const node of nodes) {
     const prefix = node.type === "npc" ? "NPC" : "PC";
-    const condStr = node.condition ? ` [if: ${node.condition}]` : "";
+    const condParamsStr = node.conditionParams ? ` params=${JSON.stringify(node.conditionParams)}` : "";
+    const condStr = node.condition ? ` [if: ${node.condition}${condParamsStr}]` : "";
     const scriptStr = node.script ? ` {runs: ${node.script}}` : "";
+    const questStr = node.quest ? ` [quest: ${node.quest} -> ${node.questEntry}]` : "";
+    const actionParamsStr = node.actionParams ? ` {params: ${JSON.stringify(node.actionParams)}}` : "";
     const leafStr = node.isLeaf && node.children.length === 0 ? " [END]" : "";
 
-    lines.push(`${pad}[${prefix} #${node.index}]${condStr} "${node.text}"${scriptStr}${leafStr}`);
+    lines.push(
+      `${pad}[${prefix} #${node.index}]${condStr} "${node.text}"${scriptStr}${actionParamsStr}${questStr}${leafStr}`,
+    );
 
     if (node.children.length > 0) {
       lines.push(renderDialogText(node.children, indent + 1));
@@ -137,7 +187,14 @@ export function extractDialogScripts(dialogResref: string, dlg: GffDocument): Di
     if (active) {
       const idx = getFieldNum(start, "Index");
       const text = idx < entries.length ? getFieldLocStr(entries[idx], "Text") : "";
-      refs.push({ dialog: dialogResref, nodeType: "entry", nodeIndex: idx, fieldName: "Active", scriptResref: active, text });
+      refs.push({
+        dialog: dialogResref,
+        nodeType: "entry",
+        nodeIndex: idx,
+        fieldName: "Active",
+        scriptResref: active,
+        text,
+      });
     }
   }
 
@@ -146,14 +203,28 @@ export function extractDialogScripts(dialogResref: string, dlg: GffDocument): Di
     const script = getFieldStr(entry, "Script");
     const text = getFieldLocStr(entry, "Text");
     if (script) {
-      refs.push({ dialog: dialogResref, nodeType: "entry", nodeIndex: i, fieldName: "Script", scriptResref: script, text });
+      refs.push({
+        dialog: dialogResref,
+        nodeType: "entry",
+        nodeIndex: i,
+        fieldName: "Script",
+        scriptResref: script,
+        text,
+      });
     }
     // Check reply link conditions
     for (const link of getFieldList(entry, "RepliesList")) {
       const active = getFieldStr(link, "Active");
       if (active) {
         const replyIdx = getFieldNum(link, "Index");
-        refs.push({ dialog: dialogResref, nodeType: "reply", nodeIndex: replyIdx, fieldName: "Active", scriptResref: active, text });
+        refs.push({
+          dialog: dialogResref,
+          nodeType: "reply",
+          nodeIndex: replyIdx,
+          fieldName: "Active",
+          scriptResref: active,
+          text,
+        });
       }
     }
   });
@@ -163,13 +234,27 @@ export function extractDialogScripts(dialogResref: string, dlg: GffDocument): Di
     const script = getFieldStr(reply, "Script");
     const text = getFieldLocStr(reply, "Text");
     if (script) {
-      refs.push({ dialog: dialogResref, nodeType: "reply", nodeIndex: i, fieldName: "Script", scriptResref: script, text });
+      refs.push({
+        dialog: dialogResref,
+        nodeType: "reply",
+        nodeIndex: i,
+        fieldName: "Script",
+        scriptResref: script,
+        text,
+      });
     }
     for (const link of getFieldList(reply, "EntriesList")) {
       const active = getFieldStr(link, "Active");
       if (active) {
         const entryIdx = getFieldNum(link, "Index");
-        refs.push({ dialog: dialogResref, nodeType: "entry", nodeIndex: entryIdx, fieldName: "Active", scriptResref: active, text });
+        refs.push({
+          dialog: dialogResref,
+          nodeType: "entry",
+          nodeIndex: entryIdx,
+          fieldName: "Active",
+          scriptResref: active,
+          text,
+        });
       }
     }
   });

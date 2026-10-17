@@ -2,9 +2,11 @@
  * .jrl journal checker, and the module/faction checkers.
  */
 
+import type { FlatDialogNode } from "../../types/dialog.js";
 import type { GffObj } from "../../types/gff.js";
 import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
+import { flattenDialog } from "../dialog-walker.js";
 import { checkScriptRef, listOf, loadScriptSources, type Report } from "./common.js";
 
 export async function verifyJournal(report: Report, index: ModuleIndex, doc: GffObj): Promise<void> {
@@ -16,8 +18,13 @@ export async function verifyJournal(report: Report, index: ModuleIndex, doc: Gff
 
   // Collect every AddJournalQuestEntry(tag, id) pair the module's scripts make,
   // so we can check both directions: entries nothing can award, and awards
-  // pointing at entries that don't exist.
+  // pointing at entries that don't exist. Unioned with every dialog node's native
+  // Quest/QuestEntry field (the toolset's own script-free journal-advance
+  // mechanism, confirmed via nwscript-docs/AddJournalQuestEntry.md) — a quest
+  // advanced only by a native field would otherwise read as "never awarded",
+  // same false-positive class already documented for PQJ-wrapped quests.
   const scriptedAwards = collectScriptedJournalAwards(await loadScriptSources(index));
+  mergeNativeFieldAwards(scriptedAwards, index);
 
   for (const [i, category] of categories.entries()) {
     const tag = getFieldStr(category, "Tag");
@@ -75,9 +82,9 @@ export async function verifyJournal(report: Report, index: ModuleIndex, doc: Gff
     if (!awarded || awarded.size === 0) {
       report.error(
         "quest_never_awarded",
-        `Quest "${tag}" is never awarded — no script calls AddJournalQuestEntry("${tag}", ...), so the player can never receive it`,
+        `Quest "${tag}" is never awarded — no script calls AddJournalQuestEntry("${tag}", ...) and no dialog node sets native Quest/QuestEntry fields to it, so the player can never receive it`,
         `Categories.${i}.Tag`,
-        "add an AddJournalQuestEntry call in the quest-giver dialog's action script",
+        "add an AddJournalQuestEntry call in the quest-giver dialog's action script, or set Quest/QuestEntry directly on a dialog node",
       );
     } else {
       for (const id of seen.keys()) {
@@ -99,6 +106,27 @@ export async function verifyJournal(report: Report, index: ModuleIndex, doc: Gff
           );
         }
       }
+    }
+  }
+}
+
+/** Mutates `awards` in place, adding every (tag, questEntry) pair found on a native
+ *  Quest/QuestEntry dialog field across every .dlg in the module. */
+function mergeNativeFieldAwards(awards: Map<string, Set<number>>, index: ModuleIndex): void {
+  function scanNode(node: FlatDialogNode): void {
+    if (node.quest && typeof node.questEntry === "number") {
+      const tag = node.quest.toLowerCase();
+      if (!awards.has(tag)) awards.set(tag, new Set());
+      awards.get(tag)!.add(node.questEntry);
+    }
+    for (const child of node.children) scanNode(child);
+  }
+  for (const [key, doc] of index.parsedGff) {
+    if (!key.endsWith(".dlg")) continue;
+    try {
+      for (const root of flattenDialog(doc)) scanNode(root);
+    } catch {
+      /* skip broken dialogs */
     }
   }
 }
