@@ -4,6 +4,10 @@ MCP (Model Context Protocol) server for Neverwinter Nights Enhanced Edition modu
 
 ## Working Style
 
+- **The TODO list tracks every branch and commit not yet merged into `master`** (user rule, 2026-11-07). Keep
+  Project Health TODO #15 current: after every commit, merge, new branch or branch deletion, re-run
+  `git fetch --prune` and `git rev-list --count origin/master..<branch>` for each branch and update the entry.
+  A branch leaves the list only once it is merged (count 0) or deliberately deleted.
 - **Do NOT auto-export HTML reports** after creating or painting areas. Only export reports when the user explicitly asks for one.
 - **Always repack after creating/painting test areas** so the user can see them in the toolset. Mention that you repacked.
 - **MCP server restart required after code changes.** After editing TypeScript source and running `npm run build`, the MCP server must be restarted for new/changed tools to become available. Ask the user to restart before attempting to use newly added tools.
@@ -95,7 +99,8 @@ The rest are open.
 9. **TODO — stale parallel branches.** 8+ feature branches on origin
    (`area-avenue-rotation`, `encounter-difficulty-checker`, `random-caster-abilities`,
    etc.) with no visible cleanup convention — raises cherry-pick/merge-conflict risk
-   and makes auditing "what's actually in master" harder.
+   and makes auditing "what's actually in master" harder. **Convention now set (2026-11-07):** #15 tracks every
+   unmerged branch and commit; the 11 branches listed there as fully merged can be deleted.
 10. ~~**DONE — `CHANGELOG.md` was stale, not missing.**~~ Correction to the
     original finding: the file exists (added in the v1.2.0 release commit) but
     stopped at `[1.2.0]` while `package.json` had moved to `1.3.1`. Backfilled
@@ -167,6 +172,31 @@ The rest are open.
       2026-11-07), so no skill text has to change for the fix itself; once it forges, add it to
       `adventure-challenges` Phase 3 as the way to build a balanced boss group. Docs to update with it:
       `docs/encounter-composer-spec.md` and `docs/special-abilities-system.md` (both describe the old caster wiring).
+
+15. **TODO (standing, user rule 2026-11-07) — branches and commits not yet merged into `master`.**
+    Checked 2026-11-07 after `git fetch --prune`. Update after every commit or merge.
+    - **Merged 2026-11-07:** `systest-live-run-and-generalized-spec` was fast-forwarded into `master` (the SPEC_* assertions,
+      encounter composer, Hollow Communion playtest fixes, Special-Abilities caster system, creature forge, weapon feat
+      packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
+      (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
+      resolved. The working branch is now 0 ahead of `master`.
+    - **`moonglow-run-plugin`** (pushed) — still shows 11 commits ahead by hash, but all of its content is now in `master`
+      (`417da53` as a cherry-pick, the rest as equivalent patches). Safe to delete.
+    - **`area-avenue-rotation`** (pushed) — 9 commits, `2558742`..`9f568dc`: rotation support for stamped tile groups,
+      protected avenues between feature groups, the rotation-handedness fix and its revert, orphaned-tile notes, a
+      per-tileset test TODO, and the `nwscript-docs/` reference (`9f568dc`). Undecided since #13: review and merge, or delete.
+      **Not merged 2026-11-07:** a trial merge conflicts in `CLAUDE.md`, `src/tools/adventure-tools.ts` and
+      `src/util/tileset.test.ts`, and its rotation work predates the 2026-10-02 counter-clockwise correction (it also holds a
+      handedness fix and its revert), so it needs a real review against the live oracle first. `nwscript-docs/` is already in
+      `master` by another route.
+    - **Fully merged (0 commits ahead of `master`), safe to delete:** `area-design-survey-and-verification`,
+      `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
+      `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
+      `spatial-conventions-and-variable-tools`, `weapon-preference-variety` (local and, where present, `origin/`).
+    - **Uncommitted work in the working tree** (not commits, listed so it isn't lost): `analyze_walkmesh`
+      (`src/util/walkmesh-analysis.ts` + test, `analysis-tools.ts`, `nwn-object-placement` skill, `CHANGELOG.md`; untested on real
+      areas), the `create_area` default-tile fix (`tile-solver.ts`/`.test.ts`, `paint-tools.ts`, its `CLAUDE.md` entry), and
+      `graphify-out/`.
 
 ## Design Intent
 
