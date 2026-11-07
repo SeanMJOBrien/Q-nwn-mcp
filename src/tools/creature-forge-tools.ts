@@ -69,6 +69,8 @@ export interface ForgeParams {
   weapons?: number[];
   /** Script the wrapper runs first; default: the creature's current ScriptSpawn. */
   originalSpawn?: string;
+  /** spells.2da rows always picked first at their spell level (a boss's signature spell). */
+  pinnedSpells?: number[];
 }
 
 export interface ForgeResult {
@@ -187,6 +189,14 @@ export async function forgeCreature(
     if (p) pools[String(classId)] = p;
   }
   vars.push({ name: "MCP_SA_POOL", type: "string", value: Object.keys(pools).length > 0 ? JSON.stringify(pools) : "" });
+
+  // Pinned spells must be on one of the creature's class lists, or they can never be picked.
+  const pinned = (params.pinnedSpells ?? []).filter((spell) => {
+    const onList = Object.values(pools).some((p) => Object.values(p).some((ids) => ids.includes(spell)));
+    if (!onList) warnings.push(`pinned spell ${spell} is not on any of this creature's class spell lists — ignored`);
+    return onList;
+  });
+  vars.push({ name: "MCP_SA_PINNED", type: "string", value: pinned.join(",") });
   if (Object.keys(pools).length > 0) obj.SpecAbilityList = { type: "list", value: [] };
 
   // 4. Gear settings. With an allowance, start from baseline clothing and creature-only slots.
@@ -290,8 +300,9 @@ export function registerCreatureForgeTools(server: McpServer): void {
       "requirements; package feat order), fits alignment to the class, then sets the levelling plan: at spawn " +
       "LevelUpHenchman takes it to `level` (or the party's average level + `levelRel`), it buys gear from the module's " +
       "stores within a gold allowance that grows with level (role share x `gearWealth`, default 0.5; proficiency-checked, since the " +
-      "engine refuses to equip items a creature isn't proficient with), and casters get spell abilities with the correct " +
-      "spells, caster level and slots per day. Target a blueprint (`resref`) or a placed instance (`area`+`tag`); call it " +
+      "engine refuses to equip items a creature isn't proficient with; ranged creatures also get a melee backup weapon in " +
+      "their inventory; every purchase is logged as a [CL_LOOT] line that run_live_verification returns), and casters get " +
+      "spell abilities with the correct spells, caster level and slots per day (`pinnedSpells` are always picked first). Target a blueprint (`resref`) or a placed instance (`area`+`tag`); call it " +
       "for both copies. Needs create_creature_level_system once per module. Placed creatures spawn at module load, before " +
       "any PC exists, so use an absolute `level` for them; `levelRel` suits creatures spawned later by script or encounter.",
     {
@@ -311,6 +322,10 @@ export function registerCreatureForgeTools(server: McpServer): void {
       gearWealth: z.string().optional().describe("Allowance multiplier on the role share (default 0.5; 0 keeps current gear)"),
       weapons: z.string().optional().describe("JSON array of preferred baseitems.2da rows"),
       originalSpawn: z.string().optional().describe("Spawn script to run before levelling (default: the creature's current ScriptSpawn)"),
+      pinnedSpells: z
+        .string()
+        .optional()
+        .describe("JSON array of spells.2da rows a caster always gets first at their spell level (e.g. a boss's signature spell)"),
     },
     { destructiveHint: true },
     async (args) => {
@@ -320,11 +335,13 @@ export function registerCreatureForgeTools(server: McpServer): void {
       if ("error" in target) return targetErrorResult(target);
       let plan: number[] | undefined;
       let weapons: number[] | undefined;
+      let pinnedSpells: number[] | undefined;
       try {
         plan = args.plan ? (JSON.parse(args.plan) as number[]) : undefined;
         weapons = args.weapons ? (JSON.parse(args.weapons) as number[]) : undefined;
+        pinnedSpells = args.pinnedSpells ? (JSON.parse(args.pinnedSpells) as number[]) : undefined;
       } catch {
-        return { content: [{ type: "text", text: "plan and weapons must be JSON arrays of numbers" }], isError: true };
+        return { content: [{ type: "text", text: "plan, weapons and pinnedSpells must be JSON arrays of numbers" }], isError: true };
       }
       const result = await forgeCreature(index, resmanOpts, target, {
         race: toI(args.race),
@@ -340,6 +357,7 @@ export function registerCreatureForgeTools(server: McpServer): void {
         gearWealth: args.gearWealth !== undefined ? toF(args.gearWealth) : undefined,
         weapons,
         originalSpawn: args.originalSpawn,
+        pinnedSpells,
       });
       await target.save();
       const hasSystem = index.resources.has(`${CREATURE_LEVEL_WRAPPER}.ncs`);

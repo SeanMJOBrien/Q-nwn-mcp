@@ -19,9 +19,10 @@ Use this instead of hand-building stat blocks, gear and spell wiring. You supply
 
 1. Once per module: `create_creature_level_system` (optional `stores`: JSON array of store tags/resrefs NPCs may buy from; default four base-game stores).
 2. For each class-based creature, call `forge_creature` on the blueprint (`resref`) AND on each placed copy (`area` + `tag`), with: `race`, `classId`, `level` (absolute target; use this for anything placed in an area, since placed creatures spawn at module load before PCs exist), `gearRole` (`pc` for companions, `elite` for bosses and named leaders, `standard` for rank and file, `mook` for fodder), optional `gearWealth` (multiplier on the role share, default 0.5), `powerLevel` (`tougher`/`epic` only for bosses), `complexity: "simple"` for commoner-tier NPCs, `plan` (class id per level) for multiclass, and `originalSpawn` (`x0_ch_hen_spawn` for companions, `nw_c2_default9` otherwise).
-3. What happens at spawn: the creature is a legal level-1 build; `LevelUpHenchman` levels it to the target (live-verified to add every automatic feat and no illegal ones); it buys proficient gear from the stores within a level-scaled allowance (unspent allowance is discarded, never given as gold); casters get spell abilities with the right spells, caster level and slots per day; then it logs `[SPEC_OK]`/`[SPEC_FAIL]` lines that `run_live_verification` reports.
-4. Don't add your own spell wrappers (`a_hen_spawn`, `a_ra_spawn`, `SA_OnSpawn`) or `bake_spec_ability_pool` for a forged creature, and don't add `ITEM_PROPERTY_AC_BONUS` to give armor AC: mundane armor already has base AC from its torso part.
-5. Animals, outsiders and other monster-class creatures are not forged yet; build those as before.
+3. Optional: `pinnedSpells` (JSON array of `spells.2da` rows a caster always gets first, e.g. a boss's signature spell).
+4. What happens at spawn: the creature is a legal level-1 build; `LevelUpHenchman` levels it to the target (live-verified to add every automatic feat and no illegal ones); it buys proficient gear from the stores within a level-scaled allowance (unspent allowance is discarded, never given as gold); archers also buy a melee backup weapon; casters get spell abilities with the right spells, caster level and slots per day; every purchase is logged as a `[CL_LOOT]` line for `/adventure-rewards`; then it logs `[SPEC_OK]`/`[SPEC_FAIL]` lines that `run_live_verification` reports.
+5. Don't add your own spell wrappers (`a_hen_spawn`, `a_ra_spawn`, `SA_OnSpawn`) or `bake_spec_ability_pool` for a forged creature, and don't add `ITEM_PROPERTY_AC_BONUS` to give armor AC: mundane armor already has base AC from its torso part.
+6. Animals, outsiders and other monster-class creatures are not forged. Choosing a ready-made monster from the default or custom palette (`list_blueprints`, `resman_search`, `place_creature`) is the right approach for them; don't build them from scratch.
 
 ## Workflow
 
@@ -182,85 +183,6 @@ For each dangerous area, design enemy encounters with tactical diversity.
 
 ---
 
-### Phase 4: Lookup Feat and Spell IDs
-
-Before creating creature blueprints, look up the IDs you need.
-
-**Feats:** Use `search_2da(table="feat", column="LABEL", value="...")` to find feat IDs. The row number IS the feat ID. Key feats to look up:
-
-| Feat | Search value | Used by |
-|------|-------------|---------|
-| Power Attack | `PowerAtk` | Melee |
-| Cleave | `Cleave` | Melee |
-| Weapon Focus (by weapon) | `WeapFoc` | Melee |
-| Dodge | `Dodge` | All |
-| Toughness | `Toughness` | Tank |
-| Point Blank Shot | `PointBlank` | Ranged |
-| Rapid Shot | `RapidShot` | Ranged |
-| Combat Casting | `CombCast` | Caster/Healer |
-| Spell Focus (by school) | `SpellFoc` | Caster |
-
-This table is for **bonus/flavor feats only** — the ones a build chooses (Power Attack,
-Weapon Focus, Spell Focus, etc.). **Never hand-pick proficiency feats from it.** Use the
-automatic-class-feats procedure below instead — that's what the DMG rules actually
-enforce, and hand-picking here is exactly how this module shipped 56 soldiers unable to
-wear their own armor (see Known Pitfalls in the project CLAUDE.md).
-
-**Automatic class feats — "spawn at 1st level, level up to target" (mandatory, not optional).**
-A creature's `feats` array must model what a character actually gets by leveling 1→N in
-that class, not a hand-picked subset. Proficiencies (weapon, armor, shield) and other
-class features (Turn Undead, Sneak Attack, Bardic Knowledge, Familiar, Wild Shape, crafting
-feats, etc.) are granted **automatically by the class**, not chosen — and NWN's own data
-says exactly which, at which level. Do the lookup instead of guessing:
-
-1. `resolve_2da(table: "classes", row: "<classId>", column: "FeatsTable")` → e.g. `CLS_FEAT_FIGHT`. Lowercase it for the next call (`cls_feat_fight`).
-2. Read every row of that table (`resolve_2da(table: "cls_feat_<class>", row: "<n>")` per row, or `search_2da` if you only need specific ones). A row is an **automatic grant** — include it — when `GrantedOnLevel` is a number between `1` and the creature's target level (inclusive) and is not `-1` (eligible-but-unchosen bonus-feat-pool entry) or `99` (toolset player-tool menu item, not a real feat). `FeatIndex` is the feat ID to put in the `feats` array.
-3. Do this **once per class actually used** and cache the result (which feat IDs apply at which level) — reuse across every creature of that class rather than re-deriving per creature.
-4. Add the role-appropriate bonus/flavor feats from the table above **on top of**, never instead of, this automatic set.
-
-Class → feats-table quick reference (row IDs per `create_creature_blueprint`'s `classes` doc):
-
-| Class | Row | Table |
-|---|---|---|
-| Barbarian | 0 | `cls_feat_barb` |
-| Bard | 1 | `cls_feat_bard` |
-| Cleric | 2 | `cls_feat_cler` |
-| Druid | 3 | `cls_feat_druid` |
-| Fighter | 4 | `cls_feat_fight` |
-| Monk | 5 | `cls_feat_monk` |
-| Paladin | 6 | `cls_feat_pal` |
-| Ranger | 7 | `cls_feat_rang` |
-| Rogue | 8 | `cls_feat_rog` |
-| Sorcerer | 9 | `cls_feat_sorc` |
-| Wizard | 10 | `cls_feat_wiz` |
-
-Worked example — Fighter (`cls_feat_fight`), automatic grants at level 1: `WeapProfSim`(46),
-`WeapProfMar`(45), `ArmProfLgt`(3), `ArmProfMed`(4), `ArmProfHvy`(2), `Shield`(32) — the
-**full** proficiency chain, all at once, because a 1st-level Fighter gets all of it as a
-class feature. This is why "just grant Heavy Armor Proficiency for a heavily-armored
-Fighter" was wrong: the real rule isn't tiered-by-role, it's granted-in-full-by-class.
-
-**Spells:** Use `search_2da(table="spells", column="Label", value="...")` to find spell IDs. The row number IS the spell ID. Key spells to look up:
-
-| Spell | Search value | Used by |
-|-------|-------------|---------|
-| Magic Missile | `Magic_Missile` | Caster |
-| Burning Hands | `Burning_Hands` | Caster |
-| Fireball | `Fireball` | Caster |
-| Lightning Bolt | `Lightning_Bolt` | Caster |
-| Melf's Acid Arrow | `Melfs_Acid_Arrow` | Caster |
-| Cure Light Wounds | `Cure_Light_Wounds` | Healer |
-| Cure Moderate Wounds | `Cure_Moderate_Wounds` | Healer |
-| Cure Serious Wounds | `Cure_Serious_Wounds` | Healer |
-| Hold Person | `Hold_Person` | Healer/Caster |
-| Sleep | `Sleep` | Caster (low level) |
-| Ray of Frost | `Ray_of_Frost` | Caster (cantrip) |
-| Flame Strike | `Flame_Strike` | Healer |
-
-**Cache the IDs** — look up all needed feats and spells once at the start, then reuse the IDs across all creature blueprints.
-
----
-
 ### Phase 5: Create Hostile Creature Blueprints
 
 **Collision check:** Before calling `create_creature_blueprint(resref: "foo")`:
@@ -270,131 +192,41 @@ Fighter" was wrong: the real rule isn't tiered-by-role, it's granted-in-full-by-
 
 For each enemy type needed, create a blueprint with `create_creature_blueprint`.
 
-**Key principle:** Pick ANY source creature for its **appearance** (visual model). Then independently set **combat role** via classes, feats, spells, and equipment. A goblin shaman is a goblin body with Wizard class, spell-like abilities, and robes. A skeleton warrior is a skeleton body with Fighter class, weapon feats, and a sword.
+**Key principle:** Pick ANY source creature for its **appearance** (visual model). Then set its **combat role** with `forge_creature`. A goblin shaman is a goblin body forged as a Wizard; a skeleton warrior is a skeleton body forged as a Fighter.
 
-**For each creature, call `create_creature_blueprint` with:**
+**For each creature, call `create_creature_blueprint` with identity only:**
 - `sourceResref` — base game creature for appearance (see Reference Tables)
 - `resref` — `hos_[type]` or `boss_[name]` (max 16 chars)
 - `tag` — same as resref
 - `name` — display name (e.g., "Goblin Warrior", "Skeleton Mage")
 - `faction` — **always `"1"`** (Hostile)
 - `lootable` — **always `true`** (hostile creatures must leave lootable corpses so players can take their equipment)
-- `cr` — challenge rating scaled to target level (see Stat Scaling)
-- `hp` — hit points scaled to difficulty tier
-- `str`, `dex`, `con`, `int`, `wis`, `cha` — ability scores by role
-- `naturalAC` — for monsters without armor
-- `classes` — JSON array setting the combat class
-- `feats` — JSON array of feat IDs for combat style
-- `spells` — JSON array of spell-like abilities (for casters/healers)
-- `equipment` — JSON object mapping slots to base game item resrefs (for humanoids)
+- `naturalAC` — monsters only (see Stat Scaling)
 
-**Gear every NPC randomly, from its class and level.** Two creatures of the same class and
-level should not come off the line identically — pick from the class's legal options rather
-than always reaching for the same longsword. The class decides *what kind* of gear; the level
-decides *how much* (via `get_wealth_budget`, below); the roll decides *which*.
+**Then forge every class-based creature** (after placing it, on the blueprint and on each placed copy) — see "Creature forge" at the top of this skill:
 
-| Class | Weapon pool (roll one) | Armour | Shield |
-|---|---|---|---|
-| Fighter | any martial: longsword, battleaxe, warhammer, greatsword, halberd, longbow | any, to budget | if one-handed |
-| Barbarian | greataxe, greatsword, battleaxe | medium (hide, chain shirt) | no |
-| Ranger | longbow, shortbow, two shortswords | light/medium | no |
-| Rogue | shortsword, dagger, rapier, light crossbow | leather, studded leather | no |
-| Cleric | mace, morningstar, warhammer | any, to budget | yes |
-| Paladin | longsword, warhammer, mace | heavy | yes |
-| Druid | scimitar, club, quarterstaff, sling | hide, leather (**no metal**) | wood only |
-| Monk | kama, quarterstaff, or unarmed | **none** | **no** |
-| Bard | rapier, longsword, shortbow | light only | small |
-| Wizard / Sorcerer | quarterstaff, dagger, light crossbow | **none** | **no** |
+```
+forge_creature(resref: "hos_gobwar", race: "<race>", classId: "4", level: "<level>", gearRole: "standard",
+               originalSpawn: "nw_c2_default9")
+forge_creature(area: "<area>", tag: "hos_gobwar", race: "<race>", classId: "4", level: "<level>",
+               gearRole: "standard", originalSpawn: "nw_c2_default9")
+```
 
-**Hard constraints — these are proficiency and mechanics, not taste.** A monk or caster in
-armour loses the class's defining ability; a druid in metal armour is prohibited outright; a
-non-proficient wielder takes attack penalties that quietly break the CR you costed. Check the
-weapon's `ReqFeat0..4` in `baseitems.2da` when in doubt.
+Choose the inputs from the encounter design, not by hand-building stats:
+- `classId` from "By Combat Role" below (and the guard class distribution in Phase 1.5).
+- `level` from the creature's tier in "Stat Scaling" (CR ≈ character level).
+- `gearRole`: `mook` for fodder, `standard` for rank and file, `elite` for bosses and named lieutenants. A classed NPC with full PC wealth is worth **CR +1**, so count an `elite` creature's gear in the EL maths from Phase 1.5.
+- `powerLevel: "tougher"` (or `"epic"`) only for a boss.
+- `pinnedSpells` for a caster whose plot needs a specific spell (a boss's signature spell): JSON array of `spells.2da` rows, always picked first at their level.
 
-Then size it: `get_wealth_budget(level: "<level>", role: "<pc|elite|standard|mook>")` and spend
-against real blueprint costs from `resolve_blueprint`. A level-3 `standard` guard gets ~1,350gp
-— chainmail (150) + longsword (15) + large shield (50) leaves plenty, so the roll can afford a
-better armour grade rather than a magic weapon. Reserve enchantments for `elite`.
+Archers buy a melee backup weapon automatically. Every creature logs one `[CL_LOOT]` line listing its purchases; `/adventure-rewards` reads those through `run_live_verification`.
 
-**Purchase order and armor selection — buy the weapon first, then spend what's left on the
-best-affordable armor the creature is actually proficient with.**
-1. **Weapon (and shield, if the role calls for one) first.** Spend the weapon's share of the
-   budget (`get_wealth_budget`'s per-slot split is a reference starting point, not a hard
-   wall — a cheap mundane weapon is fine; a magic one for an `elite`/boss eats more of it).
-2. **Armor tier comes from the creature's baked Armor Proficiency feat, never from taste.**
-   Read the creature's `FeatList`: Light (feat 3) → AC Bonus 1-3 armor only, Medium (feat 4) →
-   up to AC Bonus 5, Heavy (feat 2) → up to AC Bonus 8 — the exact mapping `adventure-actors`'
-   Equipment section and `verify_creature`'s `armor_proficiency_mismatch` check both use.
-   Never pick an item whose AC Bonus exceeds what the baked feat allows, even if gold remains.
-3. **Within that proficiency tier, spend what's left on the highest-AC (and therefore usually
-   highest-price) option that fits — not the cheapest "good enough" one.** A Heavy-proficient
-   boss with 400gp left over after its weapon should walk away in full plate (AC Bonus 8) over
-   a cheaper banded mail (AC Bonus 6) if the remaining budget covers it; a Light-proficient
-   rogue with proficiency capping it at AC Bonus 3 should still get the best AC-Bonus-3 item
-   available, not a cheaper AC-Bonus-1 one, once the weapon is paid for.
-4. **Base AC outranks enchantment — never trade down base AC for a magic bonus.** Compare
-   armor options by their *base* AC Bonus first (the armor's own item property, before any
-   enchantment), not by total price or "is it magic." Only reach for a magical item when it's
-   the magical version of the SAME highest-base-AC item the creature can already afford
-   mundane — i.e. check "can they afford the highest base-AC item in their tier at all" first;
-   if yes, THEN check "can they also afford that exact item's enchanted version instead of the
-   mundane one," and upgrade to the enchanted version only if so. A cheaper magical item with a
-   *lower* base AC than what the creature could otherwise afford mundane is never the right
-   pick — e.g. a Heavy-proficient boss who can afford mundane Full Plate (AC Bonus 8) outright
-   should get it over a Half-Plate +1 (AC Bonus 7 + enchantment) even if the +1 version is
-   cheaper or the creature has leftover gold either way; only upgrade to Full Plate +1 if that
-   specific enchanted item is itself affordable.
+The forge writes a legal level-1 build; at spawn the creature levels to `level`, buys gear it is proficient with from the module's stores within its allowance, and casters get spell abilities with the right spells, slots and caster level. Don't set `cr`, `hp`, ability scores, `classes`, `feats`, `spells` or `equipment` yourself, and don't add AC properties to armor (mundane armor has base AC from its torso part).
 
-Apply the same rules to **henchmen and companions** — a recruitable NPC that joins the party is
-geared by its own class and level exactly as a hostile is, and its gear is visible to the player
-for the whole adventure, so it is the worst place to leave a default loadout.
+**Monsters** (non-humanoid, monster classes) aren't forged. Choosing a ready-made creature from the default or custom palette (see Creature Source Blueprints; find more with `list_blueprints`/`resman_search`) and placing it as-is is the right approach — its stats, claws, hide and abilities are already authored. Only override `naturalAC`, `cr`, `hp` or spells (see the Monster template below) when the encounter needs a different strength than any palette creature offers.
 
-For visual variety on top of the mechanical roll, see Phase 7c (`create_gear_randomizer`).
+**A creature that must carry a specific plot item** (the boss's named blade): forge it with `gearWealth: "0"` so it keeps its current gear, then equip the item with `set_creature_equipment`. To make a custom one:
 
-**Equipment rules:**
-- **Melee fighters:** weapon (righthand) + shield (lefthand) + armor (chest). Most use swords and shields. Mix in maces, axes, warhammers for variety.
-- **Ranged fighters:** bow (righthand) + light armor (chest). No shield.
-- **Casters:** staff or dagger (righthand) + robes (chest). No shield.
-- **Healers:** mace or morningstar (righthand) + shield (lefthand) + medium armor (chest).
-- **Tanks:** greatsword/greataxe (righthand, two-handed so no lefthand) + heavy armor (chest).
-- **Monsters** (non-humanoid): No equipment — use `naturalAC` instead of armor, rely on stats and spells.
-
-**Gear budget — how much equipment a creature should be carrying.**
-
-Call `get_wealth_budget(level: "<target level>", role: "<role>")`. It returns a total gold
-budget, a per-slot split, and the enhancement tier that budget affords, derived from D&D 3.5
-DMG Table 5-1 (wealth by level). **This table already is "starting gold for a character
-built at that level"** — it's not a per-level income rate to sum, it's the cumulative total
-a character has if they were generated straight at level N (the same table 3.5e uses for
-starting gold on above-1st-level PCs). So `role: "standard"` already means "equip this
-creature with half of what a same-level PC would start with" — no separate calculation
-needed. Roles and their share of a PC's wealth:
-
-| Role | Share | Use for |
-|------|-------|---------|
-| `pc` | 100% | The player's own expected wealth — the yardstick |
-| `elite` | 100% | Bosses and named lieutenants |
-| `standard` | 50% | Ordinary classed enemies |
-| `mook` | 25% | Fodder |
-
-**The `elite` share is a real 3.5e rule, and it has a cost:** a classed NPC given full PC
-wealth is worth **CR +1**. Equipping a boss to `elite` therefore raises its effective CR by one
-— count that in the EL maths from Phase 1.5 rather than treating the gear as free flavour.
-The `standard`/`mook` shares below it are project heuristics, not book rules.
-
-**A budget is not a price list.** NWN prices magic items from the `Cost` column of
-`itempropdef.2da`, not the 3.5e formula, and the two disagree substantially — a +1 longsword is
-about 1,650 gp in NWN against roughly 2,315 by the book. Always spend against the *actual*
-blueprint cost from `resolve_blueprint`, never against a computed book price.
-
-**Magic item guidelines:**
-- **Standard enemies:** Mundane equipment only.
-- **Elite enemies:** Minor magic items (+1 weapons or armor). Only 1-2 magic items per creature. Use base game magic item resrefs (e.g., `nw_wswmls002` for a +1 longsword).
-- **Bosses:** Moderate magic items (+1 to +2). 2-3 magic items. Magic items should not exceed the wielder's power level.
-- **Never infer a magic item's bonus from its resref number.** The trailing digits are not an
-  enchantment ladder — for longswords, `002` is +1, `010` is +2 and `012` is +3. Call
-  `resolve_blueprint` and read the Enhancement property's `costValue` (and the item's cost)
-  before equipping it or counting it against a budget.
 - **Custom enchanted items:** When base game magic items don't fit the theme, create custom enchanted items with `create_item_blueprint` using `sourceResref` + `properties`:
   ```
   create_item_blueprint(
@@ -408,7 +240,7 @@ blueprint cost from `resolve_blueprint`, never against a computed book price.
   ```
   Common property IDs: `6`=**Enhancement Bonus** (costValue=bonus), `16`=Damage Bonus (subType=damage type, costValue=dice), `0`=Ability Bonus, `20`=Damage Resistance, `56`=Attack Bonus. Row 6 is Enhancement and row 56 is Attack Bonus in `itempropdef.2da` — they are commonly transposed, and the swap silently produces a weaker, cheaper item. Verify any unfamiliar ID with `resolve_2da(table: "itempropdef", row: "<id>")`.
   Always set the `description` parameter on custom enchanted items — 1-2 sentences describing the enchantment and tying it to the adventure's plot or the creature who wields it (e.g., `"A frost-rimed blade carried by the Blackgrove's cursed guardian. Cold radiates from the steel."`). These items become player loot on kill, so their descriptions should feel rewarding to read.
-- All magic items equipped on creatures are noted in adventure.md for `/adventure-rewards` to analyze as potential player loot.
+- Note every plot item you equip in adventure.md for `/adventure-rewards`. Gear bought at spawn isn't listed here; `/adventure-rewards` reads it from the `[CL_LOOT]` log lines.
 
 ---
 
@@ -569,6 +401,10 @@ void main() {
 
 Then point the placed creatures' `ScriptSpawn` at it exactly as in Phase 7b step 2.
 
+**Not for forged creatures yet.** A forged creature's `ScriptSpawn` must stay `cf_spawn`, and
+its gear is bought after the spawn script runs, so the randomizer would only recolour its
+starting clothing. Use it on unforged groups only.
+
 **Constraints that matter:**
 - **Colours are always safe; models are not.** Armour colours are a fixed 0-175 palette and weapon
   colours 1-4, so any value in range is valid on any item. Weapon *model* indices are valid
@@ -638,58 +474,26 @@ Call `repack_module()` to save all changes.
 
 ## Stat Scaling
 
-Scale creature stats based on the adventure's target level. Appearance is independent — a beholder can be CR 2 with reduced stats.
+Pick each creature's **level** and **CR** from its tier; `forge_creature` computes its stats. Appearance is independent — a beholder can be CR 2.
 
-**The "Natural AC" column below applies to the Monster (Non-Humanoid) role only.** For every
-humanoid role (Melee, Tank, Ranged, Caster, Healer) reach the AC target through armor/shield
-`equipment`, not by setting `naturalAC` — D&D 3.5e reserves natural armor for a creature's innate
-hide (dragons, oozes, monsters); a Fighter or Ranger's AC comes from what they're wearing.
-Confirmed against a large, live, balanced PW's real combat roster (n=201 pure-PC-class NPCs):
-**80% have `NaturalAC=0` outright**, and the average never exceeds ~1 until CR 12+. Setting
-`naturalAC` on a humanoid boss to hit the number in this table is the wrong reading of it — that
-number describes total AC, and a humanoid should get there via gear, the same way the Combat Role
-Templates below already build Fighters and Rangers.
+**Natural AC applies to monsters only.** Humanoids get their AC from the gear they buy at spawn; 80% of real pure-PC-class NPCs have `NaturalAC=0`.
 
-### By Difficulty Tier
+| Target level | Tier | CR / level | `gearRole` | Monster Natural AC |
+|---|---|---|---|---|
+| 1-3 | Minion | 0.5-1 | mook | 0-1 |
+| 1-3 | Standard | 1-2 | standard | 1-2 |
+| 1-3 | Elite | 2-3 | standard | 2-3 |
+| 1-3 | Boss | 3-4 | elite | 3-5 |
+| 4-6 | Minion | 2-3 | mook | 1-2 |
+| 4-6 | Standard | 3-5 | standard | 2-3 |
+| 4-6 | Elite | 5-6 | standard | 3-4 |
+| 4-6 | Boss | 6-8 | elite | 4-6 |
+| 7-10 | Minion | 4-6 | mook | 2-3 |
+| 7-10 | Standard | 6-8 | standard | 3-4 |
+| 7-10 | Elite | 8-10 | standard | 4-6 |
+| 7-10 | Boss | 10-12 | elite | 6-8 |
 
-**Target level 1-3:**
-
-| Tier | CR | HP | Primary Stat | Secondary Stats | Natural AC |
-|------|-----|------|-------------|-----------------|------------|
-| Minion | 0.5-1 | 6-12 | 12-13 | 10-11 | 0-1 |
-| Standard | 1-2 | 12-20 | 13-14 | 10-12 | 1-2 |
-| Elite | 2-3 | 20-30 | 14-15 | 11-13 | 2-3 |
-| Boss | 3-4 | 30-45 | 16-18 | 12-14 | 3-5 |
-
-**Target level 4-6:**
-
-| Tier | CR | HP | Primary Stat | Secondary Stats | Natural AC |
-|------|-----|------|-------------|-----------------|------------|
-| Minion | 2-3 | 15-25 | 13-14 | 10-12 | 1-2 |
-| Standard | 3-5 | 25-40 | 14-15 | 11-13 | 2-3 |
-| Elite | 5-6 | 40-55 | 15 | 12-14 | 3-4 |
-| Boss | 6-8 | 55-75 | 18-20 | 14-16 | 4-6 |
-
-**Target level 7-10:**
-
-| Tier | CR | HP | Primary Stat | Secondary Stats | Natural AC |
-|------|-----|------|-------------|-----------------|------------|
-| Minion | 4-6 | 25-40 | 14-15 | 11-13 | 2-3 |
-| Standard | 6-8 | 40-55 | 15 | 12-14 | 3-4 |
-| Elite | 8-10 | 55-75 | 15 | 14-16 | 4-6 |
-| Boss | 10-12 | 75-100 | 20-22 | 16-18 | 6-8 |
-
-**Primary stat** = the stat most relevant to the role (STR for melee, DEX for ranged, INT for wizard, WIS for cleric, CHA for sorcerer). **Secondary stats** = everything else.
-
-**Rule: no non-Boss tier's Primary Stat exceeds 15 — the Elite Array's own ceiling
-(`build_npc_stat_block`'s default `powerLevel: "elite"`, 15/14/13/12/10/8) — at any
-target level.** Confirmed real, reported bug this closes: a plain "Standard"-tier Thug
-(Fighter, not a boss) built with 18 Strength, from an earlier version of this table that
-let Minion/Standard/Elite climb past 15 as target level increased. Difficulty still
-escalates with level through CR/HP/secondary stats/Natural AC — Primary Stat alone just
-stops climbing once it hits the Elite Array's ceiling, which is why "Elite" tier settles
-at a flat 15 instead of continuing to rise. **Only Boss may exceed 15**, and already did
-at every bracket above — that part of the table was correct as originally written.
+Only a boss uses `powerLevel: "tougher"` or `"epic"`; everyone else stays at the default `elite` array, so no non-boss primary stat starts above 15.
 
 ### By Combat Role
 
@@ -712,45 +516,7 @@ together make up 14% of a real roster and weren't previously covered here.
 
 ## Combat Role Templates
 
-### Melee Fighter
-```
-classes: [{"class": 4, "level": <target>}]
-feats: [<WeaponProfMartial>, <ArmorProfHeavy>, <ShieldProf>, <PowerAttack>, <WeaponFocus>]
-spells: (none)
-equipment: {"righthand": "<sword/mace>", "lefthand": "<shield>", "chest": "<armor>"}
-```
-
-### Tank (Two-Hander)
-```
-classes: [{"class": 0, "level": <target>}]
-feats: [<WeaponProfMartial>, <ArmorProfHeavy>, <PowerAttack>, <Cleave>, <Toughness>]
-spells: (none)
-equipment: {"righthand": "<greatsword/greataxe>", "chest": "<heavy armor>"}
-```
-
-### Ranged Fighter
-```
-classes: [{"class": 7, "level": <target>}]
-feats: [<WeaponProfMartial>, <ArmorProfLight>, <PointBlankShot>, <RapidShot>]
-spells: (none)
-equipment: {"righthand": "<longbow/shortbow>", "chest": "<leather>"}
-```
-
-### Caster (Wizard)
-```
-classes: [{"class": 10, "level": <target>}]
-feats: [<WeaponProfSimple>, <CombatCasting>, <SpellFocusEvoc>]
-spells: [{"spell": <MagicMissile>, "level": <target>}, {"spell": <Fireball>, "level": <target>}]
-equipment: {"righthand": "<quarterstaff/dagger>", "chest": "<robes>"}
-```
-
-### Healer (Cleric)
-```
-classes: [{"class": 2, "level": <target>}]
-feats: [<WeaponProfSimple>, <ArmorProfMedium>, <ShieldProf>, <CombatCasting>]
-spells: [{"spell": <CureLightWounds>, "level": <target>}, {"spell": <HoldPerson>, "level": <target>}]
-equipment: {"righthand": "<mace/morningstar>", "lefthand": "<shield>", "chest": "<chainmail/scale>"}
-```
+Class-based roles are forged (see Phase 5). Only monsters keep a hand-written template:
 
 ### Monster (Non-Humanoid)
 ```
@@ -863,55 +629,6 @@ Pick for **appearance only** — stats, class, feats, spells, and equipment are 
 
 ---
 
-## Equipment Reference
-
-### Weapons
-
-Use `resman_search(pattern="nw_w")` to find specific weapons. Common patterns:
-
-| Weapon | Mundane Resref | Magic +1 | Notes |
-|--------|---------------|----------|-------|
-| Longsword | `nw_wswls001` | `nw_wswmls002` | Most common sword |
-| Shortsword | `nw_wswss001` | `nw_wswmss002` | Light sword |
-| Battleaxe | `nw_waxbt001` | `nw_waxmbt002` | One-handed axe |
-| Mace | `nw_wblml001` | `nw_wblmml002` | Blunt weapon |
-| Morningstar | `nw_wblms001` | `nw_wblmms002` | Spiked mace |
-| Warhammer | `nw_wblhw001` | `nw_wblmhw002` | Hammer |
-| Dagger | `nw_wswdg001` | `nw_wswmdg002` | Small blade |
-| Greatsword | `nw_wswgs001` | `nw_wswmgs002` | Two-handed sword |
-| Greataxe | `nw_waxgr001` | `nw_waxmgr002` | Two-handed axe |
-| Halberd | `nw_wplhb001` | `nw_wplmhb002` | Polearm |
-| Quarterstaff | `nw_wdbqs001` | `nw_wdbmqs002` | Two-handed staff |
-| Longbow | `nw_wbwln001` | `nw_wbwmln002` | Ranged |
-| Shortbow | `nw_wbwsh001` | `nw_wbwmsh002` | Ranged (light) |
-| Light Crossbow | `nw_wbwxl001` | `nw_wbwmxl002` | Ranged (mechanical) |
-
-### Armor
-
-| Armor | Mundane Resref | Magic +1 | AC Bonus |
-|-------|---------------|----------|----------|
-| Cloth/Robes | `nw_cloth001` | — | 0 |
-| Padded | `nw_aarcl001` | `nw_maarcl001` | 1 |
-| Leather | `nw_aarcl004` | `nw_maarcl025` | 2 |
-| Studded Leather | `nw_aarcl005` | `nw_maarcl026` | 3 |
-| Chain Shirt | `nw_aarcl008` | `nw_maarcl029` | 4 |
-| Chainmail | `nw_aarcl009` | `nw_maarcl030` | 5 |
-| Scale Mail | `nw_aarcl006` | `nw_maarcl027` | 4 |
-| Half-Plate | `nw_aarcl011` | `nw_maarcl032` | 7 |
-| Full Plate | `nw_aarcl012` | `nw_maarcl033` | 8 |
-
-### Shields
-
-| Shield | Mundane Resref | Magic +1 |
-|--------|---------------|----------|
-| Small Shield | `nw_ashsw001` | `nw_ashmsh002` |
-| Large Shield | `nw_ashlw001` | `nw_ashmlw002` |
-| Tower Shield | `nw_ashto001` | `nw_ashmto002` |
-
-**If a resref doesn't resolve:** Use `resman_search(pattern="nw_wswls")` or similar to find the correct variant. Item naming conventions vary. The skill should verify items resolve before using them in equipment.
-
----
-
 ## Faction Rules
 
 - **ALL hostile creatures use faction 1 (Hostile).** No exceptions.
@@ -950,5 +667,5 @@ Differentiate similar creatures with a numeric suffix: `hos_gobwar`, `hos_gobmag
 - **No loot or XP.** Don't place items on the ground or assign XP values. That's `/adventure-affordances` and `/adventure-rewards`.
 - **Scale damage to level.** Trap damage and creature stats should match the adventure's target level.
 - **Magic items are loot.** Equipped magic items on defeated creatures become player loot. Note all magic items in adventure.md for `/adventure-rewards` analysis. Don't make magic items more powerful than the creature that carries them.
-- **Post-placement equipment changes.** If you need to tweak a placed creature's equipment (e.g., giving the boss a special weapon), use `set_creature_equipment(area: "[area]", tag: "[tag]", equipment: '{"righthand": "nw_wswmls002"}')`. This merges with existing equipment by default.
+- **Post-placement equipment changes.** For a forged creature, change `gearRole`/`gearWealth` and forge again rather than editing its equipment; spawn-time shopping replaces it. To give one a specific item, forge it with `gearWealth: "0"` and use `set_creature_equipment`.
 - **Difficulty calibration.** Use `suggest_encounter(partyLevel: "[level]", partySize: "1", difficulty: "medium")` to get CR-appropriate creature suggestions and validate your encounter compositions against XP budgets.

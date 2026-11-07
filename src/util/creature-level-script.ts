@@ -56,9 +56,12 @@ export function generateCreatureLevelInclude(options: CreatureLevelOptions = {})
 //   MCP_GEAR_WEALTH (float)  gear allowance multiplier; 0 = keep current gear
 //   MCP_GEAR_ROLE (string)   pc | elite | standard | mook
 //   MCP_GEAR_WEAPONS (string) comma list of preferred baseitems.2da rows
+//   MCP_SA_PINNED (string)   comma list of spells.2da rows always picked first at their level
 // At spawn it: levels up with LevelUpHenchman, buys gear from the module's stores,
 // rebuilds once (ObjectToJson/JsonToObject, state kept) to write spell abilities at
 // the right caster level and slot count, then verifies and logs [SPEC_OK]/[SPEC_FAIL].
+// Every purchase is logged as one [CL_LOOT] line per creature (and kept in MCP_GEAR_LOG)
+// so the rewards phase can see what each creature will drop.
 
 const string CL_STORES = "${stores}";
 const int CL_DROPPABLE = ${droppable ? 1 : 0};
@@ -228,7 +231,7 @@ int CL_HasFocus(object oCreature, int nBase)
 }
 
 // Best affordable, usable item for a slot across all stores (highest score, then price).
-// nKind: 0 armor, 1 weapon, 2 shield, 3 ammo, 4 accessory.
+// nKind: 0 armor, 1 weapon, 2 shield, 3 ammo, 4 accessory, 5 melee backup (any usable melee weapon).
 object CL_Pick(object oCreature, int nSlot, int nKind, int nBudget, int nAmmoBase)
 {
     object oBest = OBJECT_INVALID;
@@ -252,6 +255,9 @@ object CL_Pick(object oCreature, int nSlot, int nKind, int nBudget, int nAmmoBas
                 if (nKind == 0) bKind = nBase == BASE_ITEM_ARMOR;
                 else if (nKind == 2) bKind = bShield;
                 else if (nKind == 3) bKind = nBase == nAmmoBase;
+                else if (nKind == 5) bKind = !bShield && nBase != BASE_ITEM_ARMOR && nBase != BASE_ITEM_TORCH
+                    && nBase != BASE_ITEM_MAGICWAND && nBase != BASE_ITEM_MAGICROD && nBase != BASE_ITEM_MAGICSTAFF
+                    && CL_Cell("baseitems", "RangedWeapon", nBase) < 0;
                 else if (nKind == 1) bKind = !bShield && nBase != BASE_ITEM_ARMOR && nBase != BASE_ITEM_TORCH
                     && nBase != BASE_ITEM_MAGICWAND && nBase != BASE_ITEM_MAGICROD && nBase != BASE_ITEM_MAGICSTAFF
                     && (sWeapons == "" || CL_ListHas(sWeapons, nBase) || CL_HasFocus(oCreature, nBase));
@@ -274,12 +280,13 @@ object CL_Pick(object oCreature, int nSlot, int nKind, int nBudget, int nAmmoBas
     return oBest;
 }
 
-// Copy a store item onto the creature and equip it; returns its price (0 if nothing bought).
+// Copy a store item onto the creature and equip it into nSlot (nSlot < 0: keep it in the
+// inventory unequipped). Records the purchase in MCP_GEAR_LOG. Returns the price paid.
 int CL_Buy(object oCreature, object oStoreItem, int nSlot, int nStack)
 {
     if (!GetIsObjectValid(oStoreItem)) return 0;
     int nPrice = GetGoldPieceValue(oStoreItem);
-    object oOld = GetItemInSlot(nSlot, oCreature);
+    object oOld = nSlot >= 0 ? GetItemInSlot(nSlot, oCreature) : OBJECT_INVALID;
     object oItem = CopyItem(oStoreItem, oCreature, TRUE);
     if (!GetIsObjectValid(oItem)) return 0;
     if (nStack > 0)
@@ -290,7 +297,11 @@ int CL_Buy(object oCreature, object oStoreItem, int nSlot, int nStack)
     SetIdentified(oItem, TRUE);
     SetDroppableFlag(oItem, CL_DROPPABLE);
     if (GetIsObjectValid(oOld)) DestroyObject(oOld);
-    AssignCommand(oCreature, ActionEquipItem(oItem, nSlot));
+    if (nSlot >= 0) AssignCommand(oCreature, ActionEquipItem(oItem, nSlot));
+    string sEntry = GetResRef(oItem) + "@" + (nSlot >= 0 ? IntToString(nSlot) : "inv")
+        + (nStack > 0 ? "x" + IntToString(nStack) : "") + ":" + IntToString(nPrice);
+    string sLog = GetLocalString(oCreature, "MCP_GEAR_LOG");
+    SetLocalString(oCreature, "MCP_GEAR_LOG", sLog == "" ? sEntry : sLog + "," + sEntry);
     return nPrice;
 }
 
@@ -317,6 +328,10 @@ void CL_GearDone(object oCreature)
     SetLocalInt(oCreature, "MCP_GOLD_AFTER_GEAR", GetGold(oCreature));
     CL_Log(GetTag(oCreature) + " gear spent=" + IntToString(GetLocalInt(oCreature, "MCP_GEAR_SPENT"))
         + "/" + IntToString(GetLocalInt(oCreature, "MCP_GEAR_TOTAL")));
+    // One line per creature for the rewards phase: resref@slot[xstack]:gp, slot = INVENTORY_SLOT_* or "inv".
+    WriteTimestampedLogEntry("[CL_LOOT] tag=" + GetTag(oCreature) + " resref=" + GetResRef(oCreature)
+        + " area=" + GetTag(GetArea(oCreature)) + " droppable=" + IntToString(CL_DROPPABLE)
+        + " items=" + GetLocalString(oCreature, "MCP_GEAR_LOG"));
     // Equipping is queued as actions; give them time before the rebuild snapshots the creature.
     DelayCommand(2.0, CL_Finish(oCreature));
 }
@@ -346,6 +361,21 @@ void CL_GearOffhand(object oCreature)
         int nAmmoSlot = nAmmoType == 1 ? INVENTORY_SLOT_ARROWS : nAmmoType == 2 ? INVENTORY_SLOT_BOLTS : INVENTORY_SLOT_BULLETS;
         int nCount = nAmmoType == 3 ? 15 : 24;
         CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, nAmmoSlot, 3, CL_GearLeft(oCreature, 10), nAmmoBase), nAmmoSlot, nCount));
+    }
+    if (bRanged)
+    {
+        // The stock AI switches to melee when ammo runs out, but only if a melee weapon is in
+        // the inventory. Always buy one (5% of the allowance, at least 15 gp if any is left).
+        int nBackup = CL_GearLeft(oCreature, 5);
+        int nLeft = CL_GearLeft(oCreature, 0);
+        if (nBackup < 15) nBackup = nLeft < 15 ? nLeft : 15;
+        object oBackup = CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 5, nBackup, 0);
+        if (GetIsObjectValid(oBackup))
+        {
+            SetLocalString(oCreature, "MCP_GEAR_BACKUP", GetResRef(oBackup));
+            CL_GearSpend(oCreature, CL_Buy(oCreature, oBackup, -1, 0));
+        }
+        else SetLocalString(oCreature, "MCP_GEAR_BACKUP", "none");
     }
     else if (nWeaponBase >= 0 && !bRanged
         && CL_Cell("baseitems", "WeaponSize", nWeaponBase) <= GetCreatureSize(oCreature)
@@ -427,6 +457,8 @@ json CL_SpellEntries(object oCreature)
         json jPool = JsonObjectGet(jPools, IntToString(nClass));
         if (JsonGetType(jPool) != JSON_TYPE_OBJECT) continue;
         string sKnown = Get2DAString("classes", "SpellKnownTable", nClass);
+        string sColumn = Get2DAString("classes", "SpellTableColumn", nClass);
+        string sPinned = GetLocalString(oCreature, "MCP_SA_PINNED");
         int nSpellLevel;
         for (nSpellLevel = 0; nSpellLevel <= 9; nSpellLevel++)
         {
@@ -442,11 +474,29 @@ json CL_SpellEntries(object oCreature)
                 if (nKnown > 0 && nKnown < nDistinct) nDistinct = nKnown;
             }
             if (nDistinct > nPoolSize) nDistinct = nPoolSize;
+            // Pinned spells first (those on this class's list at this spell level), then the
+            // pool from a random start, skipping duplicates, until nDistinct spells are chosen.
+            json jChosen = JsonArray();
+            int p = 0;
+            string sPin = CL_Token(sPinned, 0);
+            while (sPin != "" && JsonGetLength(jChosen) < nDistinct)
+            {
+                int nPin = StringToInt(sPin);
+                if (CL_Cell("spells", sColumn, nPin) == nSpellLevel) jChosen = JsonArrayInsert(jChosen, JsonInt(nPin));
+                p++;
+                sPin = CL_Token(sPinned, p);
+            }
             int nOffset = Random(nPoolSize);
             int k;
+            for (k = 0; k < nPoolSize && JsonGetLength(jChosen) < nDistinct; k++)
+            {
+                json jId = JsonArrayGet(jIds, (nOffset + k) % nPoolSize);
+                if (JsonGetType(JsonFind(jChosen, jId)) == JSON_TYPE_NULL) jChosen = JsonArrayInsert(jChosen, jId);
+            }
+            int nChosen = JsonGetLength(jChosen);
             for (k = 0; k < nSlots; k++)
             {
-                int nSpell = JsonGetInt(JsonArrayGet(jIds, (nOffset + (k % nDistinct)) % nPoolSize));
+                int nSpell = JsonGetInt(JsonArrayGet(jChosen, k % nChosen));
                 json jEntry = JsonObject();
                 jEntry = JsonObjectSet(jEntry, "__struct_id", JsonInt(0));
                 jEntry = JsonObjectSet(jEntry, "Spell", JsonParse("{\\"type\\":\\"word\\",\\"value\\":" + IntToString(nSpell) + "}"));
@@ -534,6 +584,18 @@ void CL_Verify(object oCreature)
             if (!bOnList) nBad++;
         }
         CL_Spec(oCreature, sActual == sExpect, "cl_spell_slots", sExpect, sActual);
+        string sPinned = GetLocalString(oCreature, "MCP_SA_PINNED");
+        int p = 0;
+        string sPin = CL_Token(sPinned, 0);
+        while (sPin != "")
+        {
+            int bFound = FALSE;
+            int i;
+            for (i = 0; i < nCount; i++) if (GetSpellAbilitySpell(oCreature, i) == StringToInt(sPin)) bFound = TRUE;
+            CL_Spec(oCreature, bFound, "cl_spell_pinned_" + sPin, "present", bFound ? "present" : "missing");
+            p++;
+            sPin = CL_Token(sPinned, p);
+        }
         CL_Spec(oCreature, nBad == 0, "cl_spell_validity", "0", IntToString(nBad));
     }
 
@@ -544,6 +606,18 @@ void CL_Verify(object oCreature)
         object oHand = GetItemInSlot(INVENTORY_SLOT_RIGHTHAND, oCreature);
         CL_Spec(oCreature, GetIsObjectValid(oChest), "cl_gear_chest", "equipped", GetResRef(oChest));
         if (CL_WantsWeapon(oCreature)) CL_Spec(oCreature, GetIsObjectValid(oHand), "cl_gear_weapon", "equipped", GetResRef(oHand));
+        string sBackup = GetLocalString(oCreature, "MCP_GEAR_BACKUP");
+        if (sBackup != "")
+        {
+            int bHas = FALSE;
+            object oInv = GetFirstItemInInventory(oCreature);
+            while (GetIsObjectValid(oInv))
+            {
+                if (GetResRef(oInv) == sBackup) bHas = TRUE;
+                oInv = GetNextItemInInventory(oCreature);
+            }
+            CL_Spec(oCreature, bHas, "cl_gear_melee_backup", "melee_weapon_in_inventory", sBackup);
+        }
         CL_Spec(oCreature, GetLocalInt(oCreature, "MCP_GOLD_AFTER_GEAR") == GetLocalInt(oCreature, "MCP_GOLD_BEFORE"),
             "cl_gear_no_gold", IntToString(GetLocalInt(oCreature, "MCP_GOLD_BEFORE")),
             IntToString(GetLocalInt(oCreature, "MCP_GOLD_AFTER_GEAR")));

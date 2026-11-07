@@ -121,6 +121,12 @@ on disk unless the project's source **is** the module (check whether the
 repo has separate `.nss` files under version control before assuming
 nwn-mcp's copy is the authoritative one).
 
+## NPC feat packages (packages.2da FeatPref2DA tables)
+
+- `generate_weapon_packages(meleeTemplate, rangedTemplate?, classId, outDir, prefix?, weapons?, skillPref?, startRow?, labelPrefix?, descriptionStrref?)` — one package per weapon from a template (e.g. `NPCpackages/gackftfighta.2da` melee, `gackftfightg.2da` ranged). Swaps the seven `baseitems.2da` weapon feats; ranged weapons get Focus/Specialization/Improved Critical and, for crossbows, Rapid Reload; a weapon the class isn't automatically proficient with gets that proficiency first (Exotic Weapon Proficiency for bastard sword, katana, double weapons…); feats the class can never take are dropped. Writes `<prefix><weapon>.2da` plus a `packages_class<N>_weapons.2da` row file to append to `packages.2da`.
+- `sanitize_feat_package(file, classId, outFile?)` — drops feats a class can never take (not on its feat list, tied to another class, or behind an unavailable prerequisite) and adds the package weapon's missing proficiency.
+- 2DAs only load from a HAK or the override folder, not from inside a module. Pass the package row to `LevelUpHenchman`'s `nPackage` argument, or set it as the creature's `StartingPackage`.
+
 ## Scope
 
 Base tools operate on **instanced content placed in areas** (GIT contents),

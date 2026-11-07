@@ -19,9 +19,10 @@ Use this instead of hand-building stat blocks, gear and spell wiring. You supply
 
 1. Once per module: `create_creature_level_system` (optional `stores`: JSON array of store tags/resrefs NPCs may buy from; default four base-game stores).
 2. For each class-based creature, call `forge_creature` on the blueprint (`resref`) AND on each placed copy (`area` + `tag`), with: `race`, `classId`, `level` (absolute target; use this for anything placed in an area, since placed creatures spawn at module load before PCs exist), `gearRole` (`pc` for companions, `elite` for bosses and named leaders, `standard` for rank and file, `mook` for fodder), optional `gearWealth` (multiplier on the role share, default 0.5), `powerLevel` (`tougher`/`epic` only for bosses), `complexity: "simple"` for commoner-tier NPCs, `plan` (class id per level) for multiclass, and `originalSpawn` (`x0_ch_hen_spawn` for companions, `nw_c2_default9` otherwise).
-3. What happens at spawn: the creature is a legal level-1 build; `LevelUpHenchman` levels it to the target (live-verified to add every automatic feat and no illegal ones); it buys proficient gear from the stores within a level-scaled allowance (unspent allowance is discarded, never given as gold); casters get spell abilities with the right spells, caster level and slots per day; then it logs `[SPEC_OK]`/`[SPEC_FAIL]` lines that `run_live_verification` reports.
-4. Don't add your own spell wrappers (`a_hen_spawn`, `a_ra_spawn`, `SA_OnSpawn`) or `bake_spec_ability_pool` for a forged creature, and don't add `ITEM_PROPERTY_AC_BONUS` to give armor AC: mundane armor already has base AC from its torso part.
-5. Animals, outsiders and other monster-class creatures are not forged yet; build those as before.
+3. Optional: `pinnedSpells` (JSON array of `spells.2da` rows a caster always gets first, e.g. a boss's signature spell).
+4. What happens at spawn: the creature is a legal level-1 build; `LevelUpHenchman` levels it to the target (live-verified to add every automatic feat and no illegal ones); it buys proficient gear from the stores within a level-scaled allowance (unspent allowance is discarded, never given as gold); archers also buy a melee backup weapon; casters get spell abilities with the right spells, caster level and slots per day; every purchase is logged as a `[CL_LOOT]` line for `/adventure-rewards`; then it logs `[SPEC_OK]`/`[SPEC_FAIL]` lines that `run_live_verification` reports.
+5. Don't add your own spell wrappers (`a_hen_spawn`, `a_ra_spawn`, `SA_OnSpawn`) or `bake_spec_ability_pool` for a forged creature, and don't add `ITEM_PROPERTY_AC_BONUS` to give armor AC: mundane armor already has base AC from its torso part.
+6. Animals, outsiders and other monster-class creatures are not forged. Choosing a ready-made monster from the default or custom palette (`list_blueprints`, `resman_search`, `place_creature`) is the right approach for them; don't build them from scratch.
 
 ## Workflow
 
@@ -86,25 +87,11 @@ For each NPC described in the plot's `### Key NPCs` section:
    - `faction` — **always `2`** (Commoner)
    - `conversation` — dialog resref, e.g., `dlg_elara`
 
-3. **Do NOT modify stats, feats, or equipment** unless the plot specifically describes combat capability. The source blueprint's stats are fine for ambient NPCs. `/adventure-quests` or `/adventure-challenges` can upgrade stats later if needed.
-
-   **When the plot does describe combat capability** (a guard captain, a rival duelist, a
-   hostile cult leader who talks before it fights, etc.), this Key NPC needs the same
-   static bake Phase 3b uses for companions — it is not companion-exclusive, only the
-   henchman dialog/script/`HENCH_LEVEL` wiring in Phase 3b is. Specifically follow
-   Phase 3b's **Ability scores**, **`FeatList` must be populated at build time** (all
-   four sources), **Skill points**, and **Equipment** subsections below. Confirmed real
-   bug this exact gap causes: every non-companion Key NPC bug report this project has
-   seen (a wizard with no spells or racial feats, a fighter given armor she has no
-   proficiency for, a boss with no spells at all) came from a Key NPC skipping straight
-   past Phase 3b because it read "Skip this phase entirely if the plot has no companion
-   characters" and — correctly, for the henchman-specific parts — didn't realize the
-   stat/feat/equipment recipe underneath still applied to them. **Unlike a companion,
-   a Key NPC is never recruited and so never gets a live `LevelUpHenchman()` pass** —
-   it has no HP/BAB/saves/skill-points/spells source at all besides what's baked
-   statically at build time. A caster Key NPC additionally needs a `spells` param
-   (`SpecAbilityList`) selection sized to its level — see "Casters with no recruit
-   event need spells baked statically" under Phase 3b's Equipment section.
+3. **Do NOT hand-edit stats, feats, or equipment.** A non-combat Key NPC keeps its source
+   blueprint's stats. **A combat-capable Key NPC** (a guard captain, a rival duelist, a cult
+   leader who talks before it fights) is built with `forge_creature` (see "Creature forge" at
+   the top of this skill) on its blueprint and its placed copy: `gearRole: "elite"` for a boss
+   or named leader, `"standard"` otherwise, and `originalSpawn: "nw_c2_default9"`.
 
 ---
 
@@ -118,83 +105,29 @@ away. This is the single most-reported defect in generated modules.
 leaving one slot spare). Use fewer unless the plot calls for a full party — every companion
 is another actor to keep alive, pathed, and balanced against.
 
-**Skip this phase entirely if the plot has no companion characters.** But if you landed
-here from Phase 3's "combat-capable Key NPC" cross-reference instead, do NOT skip —
-the henchman-only parts (Steps 1-3's dialog/script/`HENCH_LEVEL` wiring) don't apply to
-a non-companion Key NPC, but the **Ability scores**, **`FeatList`**, **Skill points**,
-and **Equipment** subsections below apply to any combat-capable creature regardless of
-whether it's recruitable.
-
-#### Step 0: Check which caster spell system this adventure uses
-
-Read `adventure.md`'s `## Module` section's `Caster System` field (set once, during
-`/create-adventure`'s own pre-flight — this sub-skill never asks the user). Default to
-**Special Abilities** if the field is missing (an older `adventure.md` written before
-this field existed).
-
-- **Special Abilities (default)** — use the recipe in "Special Abilities recipe
-  (default)" immediately below, for Step 1's shared scripts and Step 3's
-  `create_creature_blueprint` call. **Simpler than the Random Abilities path**: there's
-  no leveling-timing dance to get right, because `bake_spec_ability_pool` computes the
-  pool from the blueprint's own ability scores/`ClassList`/`HENCH_LEVEL` directly — it
-  doesn't depend on a live `LevelUpHenchman()` pass having run yet, unlike
-  `RA_OnSpawn`'s `SetMemorizedSpell()`.
-- **Random Abilities** (the user explicitly chose the previous method) — skip to Step 1
-  below and follow it exactly as written; that section (and everything under "Casters
-  get randomized spells by default, computed at runtime" later in this file) documents
-  that path unchanged.
-
-**Special Abilities recipe (default):**
-
-Shared scripts (once per module, same idempotency check as Step 1: `list_resources
-(pattern: "a_hen_*")` — if `a_hen_join` already exists, skip):
-
-| Resref | Purpose |
-|--------|---------|
-| `c_hen_free`, `c_hen_mine`, `a_hen_stay`, `a_hen_follow` | Identical to Step 1 below — not caster-system-specific. |
-| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark, call `SPEC_VerifyCreature`. **No `RA_OnSpawn`/`SA_OnSpawn` call here** — unlike the Random Abilities path, spells are already resolved by the time this runs (see below). |
-| `a_hen_leave` | Identical to Step 1 below. |
-| `a_hen_spawn` | `#include "inc_spec_check"` + `#include "inc_spec_ability"`, then `ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF)`, `DelayCommand(0.5, SA_OnSpawn(OBJECT_SELF))`, then `SPEC_SelfTestOnSpawn(OBJECT_SELF)`. Calling `SA_OnSpawn` here (raw spawn, not recruit) is safe and correct — see above for why, unlike `RA_OnSpawn`. |
-| `a_hen_endround` | Not needed for this system — leave `ScriptEndRound` at its henchman default (don't override it in Step 3's `scripts` param). |
-
-Also at module-load time (Step 2 below, same `a_mod_load`/`SetMaxHenchmen` logic): call
-`create_spec_ability_system()` once per module instead of `create_random_abilities_system()`,
-if `inc_spec_ability` doesn't already exist.
-
-Per companion, after Step 3's `create_creature_blueprint` call (ability scores/`FeatList`/
-equipment already set per the rest of this phase): call `bake_spec_ability_pool(resref:
-"<name>")` once, before placement. It reads the blueprint's own `HENCH_LEVEL` automatically
-(no extra param needed) and bakes a dormant, sorted-by-level pool — `SA_OnSpawn` activates
-a real-slot-sized random subset on every spawn. Step 3's `scripts` override becomes
-`'{"ScriptSpawn": "a_hen_spawn"}'` only (no `ScriptEndRound` override — leave it at the
-henchman default). As with the Random Abilities path: **omit `bake_spec_ability_pool` and
-the `scripts` override entirely only when this specific companion needs a fixed,
-story-specific ability instead of a random one** — fall back to plain `henchman: true`
-default scripts and set `spells` (`SpecAbilityList`) by hand via `create_creature_blueprint`.
-
----
-
-**Random Abilities variant (only when `adventure.md`'s `Caster System` field says so) —
-Step 1 onward documents this path in full:**
+**Skip this phase entirely if the plot has no companion characters.**
 
 #### Step 1: Shared scripts (once per module)
 
 **Idempotency check:** `list_resources(pattern: "a_hen_*")`. If `a_hen_join` already
 exists, skip to Step 3.
 
-Write these seven with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
+Write these six with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
 reports `compiled: true`.
 
 | Resref | Purpose |
 |--------|---------|
 | `c_hen_free` | `StartingConditional` — TRUE when the companion has no master |
 | `c_hen_mine` | `StartingConditional` — TRUE when the PC speaking is its master |
-| `a_hen_join` | Recruit: level up, then `#include "inc_random_abil"`'s `DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))` (random spellbook — see below), `SetAssociateListenPatterns`, `AddHenchman`, bark, call `SPEC_VerifyCreature` (see below) |
+| `a_hen_join` | Recruit: raise `SetMaxHenchmen` defensively, `SetAssociateListenPatterns`, `AddHenchman`, send the `HENCHMAN_CMD_FOLLOW` silent shout so it starts in follow mode, bark |
 | `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
 | `a_hen_stay` | Stand ground, via `bkRespondToHenchmenShout` |
 | `a_hen_follow` | Follow master, via `bkRespondToHenchmenShout` |
-| `a_hen_spawn` | `#include "inc_spec_check"`, then `ExecuteScript("x0_ch_hen_spawn", OBJECT_SELF)` followed by `SPEC_SelfTestOnSpawn(OBJECT_SELF)`. Does **not** call `RA_OnSpawn` — see below for why that moved to `a_hen_join` |
-| `a_hen_endround` | `#include "inc_random_abil"`, then `ExecuteScript("x0_ch_hen_combat", OBJECT_SELF)` followed by `DelayCommand(0.5, RA_OnEndRound(OBJECT_SELF))` |
+
+`a_hen_join` does **not** level the companion or touch its spells: `forge_creature` has
+already levelled, equipped and given spell abilities to the companion at spawn. Don't
+write `a_hen_spawn` or `a_hen_endround`; a forged companion's `ScriptSpawn` is `cf_spawn`,
+which chains the stock `x0_ch_hen_spawn` first.
 
 Two rules that make or break this — both are silent failures:
 - **`SetMaxHenchmen()` must be raised before `AddHenchman()`.** `AddHenchman` is a
@@ -203,84 +136,16 @@ Two rules that make or break this — both are silent failures:
   radial follow/stand-ground orders as a silent command shout the companion matches in
   its OnConversation handler. Without this it ignores every order.
 
-**`a_hen_spawn` chains, it never replaces.** The stock henchman `ScriptSpawn`
-(`x0_ch_hen_spawn`) does real work — `SetAssociateListenPatterns`, respawn location,
-identifying starting gear — that must still happen. `a_hen_spawn` calls it first via
-`ExecuteScript`, then calls `SPEC_SelfTestOnSpawn(OBJECT_SELF)`, which is a no-op unless
-`MCP_VERIFY_MODE` is set: during generation it levels the companion straight to its
-`SPEC_LEVEL` and runs `SPEC_VerifyCreature()` with no PC needing to connect and recruit it
-through dialog first, so a stat/appearance mismatch shows up in the log from a plain
-headless module load. This is a safe, precedented pattern — BioWare's own stock
-`x0_ch_hen_spawn.nss` calls `LevelUpHenchman()` straight from `OnSpawn` on an unrecruited
-companion in shipped Undermountain content. In the delivered module (`MCP_VERIFY_MODE=0`)
-this costs nothing beyond one no-op function call. `a_hen_spawn` does **not** call
-`RA_OnSpawn` — see the next paragraph for why the random-spellbook roll belongs at
-recruit, not at spawn.
-
-**`a_hen_join` calls `RA_OnSpawn` after the leveling loop, not `a_hen_spawn` before it
-— this is load-bearing, not a style choice (fixed 2026-09-11).** `SetMemorizedSpell()`
-(the engine call `RA_OnSpawn` uses for Tier 1 classes) silently respects
-`GetMemorizedSpellCountByLevel()`, which reports 0 for a never-leveled, freshly-spawned
-companion — confirmed directly: wiring `RA_OnSpawn` at raw `ScriptSpawn` time only ever
-rolls cantrips, since the companion isn't leveled until `LevelUpHenchman()` runs here at
-recruit. `a_hen_join` must `#include "inc_random_abil"` (alongside `inc_spec_check`)
-and call `DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))` immediately after the level-up
-loop completes, before `SetAssociateListenPatterns`/`AddHenchman`/the bark — so a
-caster companion gets a real, populated, freshly-randomized spellbook the moment it
-joins the party rather than a cantrip-only one. It costs nothing for a non-caster
-companion (every class-position check inside `RA_OnSpawn` no-ops immediately) so it
-belongs here unconditionally, not gated per companion. **Still wrapped in
-`DelayCommand`, not called inline** — the level-up loop above it can itself be
-instruction-heavy for a high target level, and `DelayCommand` genuinely hands the
-delayed call a fresh instruction budget rather than sharing whatever the loop already
-spent (the same real, general NWScript fact this project confirmed via a separate,
-real, shipped integration of the same tfndev-derived system — UniverseOfArlandia, see
-`docs/tfndev-random-npc-system-findings.md`). Because it's deferred, it actually runs
-*after* `SPEC_VerifyCreature()` (still the genuine last synchronous line of
-`a_hen_join`) — expected and harmless, the same ordering `a_hen_spawn` already used
-between `SPEC_SelfTestOnSpawn` and the old `RA_OnSpawn` call before this fix.
-
-**Confirmed real and narrowed (2026-09-11): this fix gives Cleric/Druid/Paladin/Ranger
-companions a complete, real, multi-level spellbook with no known limitation.** A
-dedicated headless-server test (`docs/random-abilities-runtime-findings.md`, "Round
-2") leveled a Cleric via the identical `LevelUpHenchman()` loop and found every spell
-level 0-3 populated with real, engine-recognized spells — unlike Wizard, which stays
-capped at cantrips (level 0 only) even after leveling, a closed, NWNX-confirmed-
-structural limitation with no known fix (see
-`docs/tfndev-random-npc-system-findings.md`). **Prefer the static `spells` param over
-this system only for a Wizard companion** whose spells matter above cantrip level —
-Cleric/Druid/Paladin/Ranger companions need no such override anymore.
-
-**`a_hen_endround` is the same chain-never-replace pattern, for the one part of the
-random-spellbook system that needs a combat-round hook** (Bard/Sorcerer — spontaneous
-casters the engine gives no runtime "known spells" setter, so their random abilities
-are cast via a `ScriptEndRound` check rather than a real spellbook). Like `a_hen_join`'s
-`RA_OnSpawn` call, it's safe and cheap to wire on every companion, and wrapped in
-`DelayCommand` for the same reason: `RA_OnEndRound` no-ops instantly for a
-Cleric/Druid/Paladin/Ranger/Wizard (real spellbook, no `ScriptEndRound` involvement
-needed), for any non-caster, and for a Bard/Sorcerer companion that hasn't been
-recruited yet (its `RA_TIER2` flag is only set once `RA_OnSpawn` has run at
-`a_hen_join`, so an unrecruited companion drawn into combat simply doesn't cast random
-abilities yet — expected, now that the whole system is scoped to "after recruit").
-
 #### Step 2: Raise the henchman cap at module load
 
 `get_module_info` → read `onModLoad`. If it is not already `a_mod_load`:
-- `create_spec_verification()` once per module, if `inc_spec_check` doesn't already
-  exist — generates the runtime spec-check include `a_hen_join` and `OnSpawn` call into
-  (see "Verify the recruit actually worked, live" below).
-- `create_random_abilities_system()` once per module, if `inc_random_abil` doesn't
-  already exist — generates the runtime random-spellbook include `a_hen_spawn`/
-  `a_hen_endround` call into (see "Casters get randomized spells by default,
-  computed at runtime" below).
 - `write_script("a_mod_load")` calling `SetMaxHenchmen(4)`, then
-  `SetLocalInt(GetModule(), "MCP_VERIFY_MODE", 1)`, then
   `ExecuteScript("<the previous onModLoad value>")` — **chain, do not replace**. Omit
-  the `ExecuteScript` line only if the previous value was empty. The `MCP_VERIFY_MODE`
-  literal is `1` during generation/testing and must be flipped to `0` (recompile, repack)
-  as the very last build step before delivering the module — see
-  `docs/runtime-verification-spec.md` §7.
+  the `ExecuteScript` line only if the previous value was empty.
 - `set_module_scripts(Mod_OnModLoad: "a_mod_load")`
+
+Also call `create_creature_level_system` once per module if `cf_spawn` doesn't exist yet
+(it is shared with `/adventure-challenges`).
 
 #### Step 3: Per companion — dialog first, then blueprint
 
@@ -297,7 +162,7 @@ state-based branching without needing link-backs:
 3. *No condition* — a short fallback line. Without this, if both conditions are false
    the conversation opens empty.
 
-Then `create_creature_blueprint`:
+Then create and forge the companion:
 
 ```
 create_creature_blueprint(
@@ -308,39 +173,21 @@ create_creature_blueprint(
   race: <racialtypes.2da row for the NPC's described race>,
   appearance: <same numeric value as race, for the 7 standard PC races — see note below>,
   gender: <0=male, 1=female>,
-  classes: '[{"class": <class ID for the companion's role — 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger 8=Rogue 9=Sorcerer 10=Wizard>, "level": 1}]',
-  startingPackage: <same value as the class ID above>,
   conversation: "dlg_hen_<resref>",
-  soundset: <TYPE 0 row matching gender — see table>,
-  scripts: '{"ScriptSpawn": "a_hen_spawn", "ScriptEndRound": "a_hen_endround"}',
-  varTable: '[
-    {"name": "HENCH_LEVEL", "type": "int", "value": <module target level>},
-    {"name": "SPEC_ENABLED", "type": "int", "value": 1},
-    {"name": "SPEC_RACE", "type": "int", "value": <same value as race>},
-    {"name": "SPEC_APPEARANCE", "type": "int", "value": <same value as appearance>},
-    {"name": "SPEC_CLASS", "type": "int", "value": <same value as the classes[0].class above>},
-    {"name": "SPEC_LEVEL", "type": "int", "value": <same value as HENCH_LEVEL>},
-    {"name": "SPEC_PACKAGE", "type": "int", "value": <same value as startingPackage>}
-  ]'
+  soundset: <TYPE 0 row matching gender — see table>
 )
+place_creature(area: "<area>", blueprint: "<name>", x: ..., y: ...)
+forge_creature(resref: "<name>", race: "<race>", classId: "<class>", level: "<module target level>",
+               gearRole: "pc", originalSpawn: "x0_ch_hen_spawn")
+forge_creature(area: "<area>", tag: "<name>", race: "<race>", classId: "<class>", level: "<module target level>",
+               gearRole: "pc", originalSpawn: "x0_ch_hen_spawn")
 ```
 
-The `SPEC_*` vars are the input to `SPEC_VerifyCreature()` (from `inc_spec_check`, see Step 2)
-— cheap, inert local data that costs nothing to carry and lets `a_hen_join`/`OnSpawn` confirm
-at runtime that `LevelUpHenchman()` actually produced what this template asked for. They are
-redundant with the fields already on this call by design — read them off the same values,
-don't compute anything new.
-
-`scripts: '{"ScriptSpawn": "a_hen_spawn", "ScriptEndRound": "a_hen_endround"}'` overrides
-just those two fields on top of the `henchman: true` preset — the other 11 script fields
-(`ScriptDialogue`, `ScriptHeartbeat`, ...) stay wired to the stock `x0_ch_hen_*`
-associate AI. This is what lets the headless self-test (`SPEC_SelfTestOnSpawn`, see
-"Verify the recruit actually worked, live" below) run at all, and is the default
-wiring for the random-spellbook system too — **omit both overrides only when this
-specific companion needs a fixed, story-specific ability instead of a random one**
-(see "Casters get randomized spells by default, computed at runtime" below), in which
-case fall back to the plain `henchman: true` default scripts and set `spells`
-(`SpecAbilityList`) by hand as before.
+Class IDs: 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger
+8=Rogue 9=Sorcerer 10=Wizard. The forge writes the legal level-1 build, package, alignment
+fit and spawn wiring; at spawn the companion levels to `level`, buys proficient gear and,
+for a caster, gets spell abilities. Don't set `classes`, `feats`, `spells`, `equipment`,
+`scripts` or `varTable` on the blueprint yourself.
 
 **Appearance rule — no chassis needed.** `appearance.2da` rows 0–6 (Dwarf, Elf, Gnome,
 Halfling, Half-Elf, Half-Orc, Human) map 1:1 by label to the same numeric values as the
@@ -353,300 +200,37 @@ fallback path, and its caveats). `buildMinimalUtc()` now writes the full composi
 body-part field set (`BodyPart_*`, `ArmorPart_RFoot`, `Appearance_Head`, `Color_*`)
 this rendering path needs — nothing further to set by hand here.
 
-**Give every companion clothing, even with no mechanical property.** An empty chest slot
-isn't a valid default. `nw_cloth001` is a real base-game mundane item (1gp) that works for
-anyone not already in armor.
+#### Equipment and spells
 
-**Faster path: `build_npc_stat_block`.** Everything from here through "Skill points"
-below (ability scores, the 4-source `FeatList` bake, `SkillList`) can be computed and
-written in one call: `build_npc_stat_block(resref, race, classId, level, powerLevel?)`,
-run right after `create_creature_blueprint` and before `place_creature`. It reads the
-same 2DA tables this section describes by hand (live from the loaded module, not
-hardcoded) and applies the same rules — the manual recipe below is still the reference
-for *why* each field ends up the way it does, and is what to fall back on for anything
-the tool doesn't cover (HP is also set by the tool; spells are not — see "Casters with
-no recruit event" below). `powerLevel` defaults to `elite` (the Elite Array `15/14/13/
-12/10/8`, ~25-point-buy equivalent) and is the right choice for essentially every NPC,
-including a flavorfully-named mook ("Thug," "Bandit") — `elite` already reads as a
-competent, above-average individual. **`tougher`/`epic` are reserved for a genuine
-boss-tier creature** — they're built to deliberately exceed the Elite Array's ceiling,
-and using one for an ordinary NPC produces an implausibly strong character for no
-narrative reason (a confirmed real bug: a background Thug built this way with 18
-Strength). `low` is the one band safe to use for a deliberately weaker NPC at any tier.
+`forge_creature` buys every forged creature's gear at spawn: armor and weapons it is
+proficient with (the engine silently refuses to equip anything else), within its level's
+allowance. A few cases still need a hand:
 
-**Ability scores.** Apply real racial adjustments (Dwarf +2Con/-2Cha, Elf +2Dex/-2Con,
-Gnome +2Con/-2Str, Halfling +2Dex/-2Str, Half-Orc +2Str/-2Int/-2Cha, Half-Elf/Human none),
-pick a primary stat from `classes.2da`'s `PrimaryAbil` column, and — for a companion built
-above level 1 — add +1 to it at levels 4 and 8 (the real ability-increase rule). **Floor
-rule:** a racial penalty should never push a mental stat below what the character needs to
-function narratively — Cha ≥ 6 and Int ≥ 8 are reasonable minimums even for a race with a
--2 to that stat, unless the plot specifically calls for a dim/inarticulate character.
-
-**`startingPackage` must be set — this is not optional.** `LevelUpHenchman()` reads the
-companion's `StartingPackage` (a `packages.2da` row) to decide which feats, skills, and
-spells to grant at each level. Left unset it defaults to GFF row `0`, which is Barbarian's
-package — silently *correct* only if the companion actually is a Barbarian, and silently
-*wrong* for every other class. **Verified rule: for every base class's iconic package,
-`packages.2da` row index equals class ID** (Bard=1, Cleric=2, Druid=3, Fighter=4, Monk=5,
-Paladin=6, Ranger=7, Rogue=8, Sorcerer=9, Wizard=10, Barbarian=0) — so `startingPackage`
-should always be set to the same number as the `classes` entry's `class` value.
-
-**Always pass `classes` explicitly, starting at level 1** — the companion levels up live to
-`HENCH_LEVEL` via `LevelUpHenchman()` when `a_hen_join` fires on recruit. This live call
-correctly grants HP, BAB, saves, skill points, and spells (`bReadyAllSpells = TRUE`
-matters — without it the companion joins with an empty memorized list). **It does NOT
-grant feats of any kind** — see the corrected `FeatList` guidance below; bake those
-statically at build time regardless of this live-leveling path. Do not pre-set a higher
-static `ClassLevel` here — a companion built at level 1 and leveled live (for
-everything except feats) is the difference between this working correctly and the
-"cleric henchman has no spells" bug.
-
-**CORRECTED — an empty `FeatList` is a real defect, not expected behavior.** This section
-previously claimed racial and class feats come from the engine/`LevelUpHenchman()`
-automatically. **Confirmed false by direct probe on a live headless server**:
-`LevelUpHenchman()` grants ZERO automatic feats — not racial, not class proficiencies,
-not bonus feats — at any level, for any class. A level-5 Fighter leveled live through a
-real recruit still lacked basic Simple/Martial Weapon Proficiency. Automatic feats are
-apparently a character-creation-time concept (the toolset's own character-creation UI),
-not something a runtime `LevelUpHenchman()` call ever performs. **`FeatList` must be
-populated at build time, before `place_creature`**, from four sources — do this for
-every companion and every combat-capable Key NPC, regardless of whether they'll also be
-live-leveled for HP/BAB/saves/skills/spells (those four ARE engine-computed or
-live-granted correctly; only feats need this static workaround):
-
-1. **Racial** — every row in `race_feat_<race>.2da` is unconditionally granted (no level
-   gate; that table has no `List`/`GrantedOnLevel` columns at all).
-2. **Automatic class feats** — `cls_feat_<class>.2da` rows with `List=3`, filtered to
-   `GrantedOnLevel <=` the target level (weapon/armor proficiencies, Turn Undead, Sneak
-   Attack progression, Bardic Knowledge, etc.).
-3. **Generic feat slots** — every class gets a freely-chosen feat at levels 1, 3, 6, 9,
-   12... (hardcoded D&D 3.5 rule, not table-driven). Pick something sensible for the
-   role (Toughness, Iron Will, a relevant Skill Focus) — there's no known eligibility
-   table for this slot in the 2DA stack, so this is a judgment call, not a lookup.
-4. **Class-specific bonus feat slots** — `cls_bfeat_<class>.2da`'s single `Bonus` column
-   (row index = level−1, `1` = a slot opens that level) tells you WHEN a slot opens:
-   Fighter fires at 1,2,4,6,8,10 (6 slots by level 10); Ranger at 1,5,10; Wizard at 5,10;
-   Rogue at 10 only; Barbarian/Bard/Cleric never. No eligibility-list column exists here
-   either — the legal-feats-per-slot restriction is presumably hardcoded in the engine.
-   Pick a real, class-appropriate feat for each slot (Weapon Focus/Specialization for
-   Fighter, a metamagic/item-creation feat for Wizard, etc.) — see the weapon-feat-match
-   rule below before picking a Focus/Specialization/Improved-Critical feat.
-
-Verify the count is right, but treat the *specific* picks for slots 3 and 4 as a
-reasonable build, not something RAW-audited against every prerequisite — there is no
-live server in this pipeline to confirm legality, and getting the slot *count* right
-from real 2DA data is the load-bearing part.
-
-**Skill points.** Like feats, live `LevelUpHenchman()` has not been confirmed to grant
-these correctly and there's no reason to assume it's exempt from the same gap — bake
-`SkillList` at build time too. Points per level = `classes.2da`'s `SkillPointBase` + Int
-modifier, **×4 at level 1**, ×1 per level after (floor of 1/level if the total would go
-non-positive — recompute this whenever Int changes, a wrong-cached total from an earlier
-Int value is a real mistake this project has made). Human gets its own +1/level bonus by
-the same ×4/×1 rule. Spend only on skills where `cls_skill_<class>.2da` has
-`ClassSkill=1`; cap per skill at `level + 3` ranks. `SkillList` is a fixed 28-entry list
-(`__struct_id: 0`, `Rank` byte per entry) indexed by `skills.2da` row order — a
-from-scratch blueprint's `SkillList` defaults to empty/all-zero, which is a real defect
-for anyone above level 1, not a placeholder to leave alone.
-
-#### Equipment
-
-Every companion (and any Key NPC given non-default gear) needs a weapon and something in
-the chest slot at minimum — bare skin/empty-handed is not a valid default, only ever skip
-gear for an explicit story reason.
-
-**After sourcing real items (below), equip with `equip_npc_by_role`** rather than
-`set_creature_equipment` directly — same slot check, plus it rejects (or with
-`force:true`, equips and warns about) an item the creature's `FeatList` isn't
-proficient with, reports a `get_wealth_budget` reference figure, recommends a weapon
-type from a curated per-class table when no `righthand` item is supplied yet, and
-runs `verify_creature` as its own last step. It does not search for items itself —
-still find real resrefs via `list_blueprints`/`resman_search` first, exactly as
-below. If the story or the user later wants a different weapon type for this
-creature (a General Fighter reassigned from Longsword to Battleaxe, say),
-`respec_weapon_feats` moves the existing Focus/Specialization/Improved Critical
-feats onto the new weapon in one call instead of hand-editing `FeatList`.
-
-**Source real, existing blueprints — do not build from scratch by default.** Two tools,
-used together, not one:
-- `list_blueprints(type: "uti", pattern: "...")` — matches resref/tag/TLK-resolved
-  display name. Good for named magic items ("Cloak of Elvenkind", "Half Plate +3").
-- `resman_search(pattern: "...")` — raw resref substring match across the **entire**
-  resman stack, base BIFs included. **Required before concluding "no real item exists"
-  for anything mundane** — the base game's "Standard palette" vanilla weapons use terse,
-  non-obvious resref codes with no display-name overlap to an intuitive search term
-  (a plain Battleaxe is `nw_waxbt001`, a Rapier is `nw_wswrp001`, a Dagger is
-  `nw_wswdg001` — none contain "battleaxe"/"rapier"/"dagger"). `list_blueprints` alone
-  missed all three of these in one real session; `resman_search` with a short prefix
-  guess (`wax`=axe family, `wsw`=sword family) found them immediately. Try both before
-  building anything from scratch.
-
-**What to build vs. source:**
-- No bonus needed → a plain mundane blueprint (found via the two tools above), or a
-  from-scratch weapon (`create_item_blueprint`) only if genuinely nothing real matches —
-  safe for weapons (`ModelType` 2 in `baseitems.2da`), since `create_item_blueprint`
-  correctly defaults `ModelPart1-3`.
-- Needs a bonus → an existing, appropriately-valued magic item, costed with
-  `resolve_blueprint` and budgeted against `get_wealth_budget(level, role)`'s per-slot
-  split.
-- Armor (`ModelType` 3) — **always source from a real existing blueprint, never build
-  from scratch.** Armor needs 18 `ArmorPart_<slot>` fields + 6 `Cloth/Leather/MetalColor`
-  fields that `create_item_blueprint` does not set at all, and unlike creature body
-  parts there's no safe universal default number — a from-scratch armor item renders
-  with no visible model change. A real blueprint already carries correct data.
-- Pure narrative/flavor item (a keepsake, a holy symbol, a personal effect) with no
-  mechanical property → fine to build from scratch, but it needs a `description`
-  establishing why it matters. Don't generate a bare, unexplained accessory (a ring,
-  boots, gloves) with neither a property nor a backstory.
-
-**A weapon-specific feat means the matching weapon, exactly — not just the matching
-proficiency category.** Weapon Focus/Weapon Specialization/Improved Critical are all
-per-weapon-type feats (`feat.2da` labels like `WeapFocBAxe` are Battle-Axe-specific — a
-different weapon in the same broad category, e.g. a Dwarven Waraxe, gets no benefit from
-them at all). Check `feat.2da`'s `OrReqFeat0-4` columns on the matching
-`ImpCrit<Weapon>` row to see which specific weapons a proficiency feat actually covers
-before equipping — this is also how to catch a class/weapon proficiency mismatch (e.g. a
-Rogue or Bard equipped with a Longsword neither is proficient with in this ruleset).
-
-**Base proficiency, not just Focus-feat matching — verified via a live `baseitems.2da`.**
-The weapon-specific-feat check above answers "does this Focus/Specialization feat apply
-to this exact weapon" — it does not answer the more basic "is this creature proficient
-with this weapon/armor/shield at all." That's a separate, simpler, fully-checkable
-lookup: `baseitems.2da`'s `ReqFeat0`-`ReqFeat4` columns on the equipped item's `BaseItem`
-row list every feat that individually grants proficiency with it (an OR-set — e.g. a
-Shortbow's `ReqFeat0-2` are Martial Weapon Proficiency, Rogue's bonus weapon
-proficiency, and Elf's bonus weapon proficiency; any one suffices). Before equipping a
-weapon or shield, confirm the creature's baked `FeatList` contains at least one of that
-item's `ReqFeat` values — this is the actual mechanism behind "Rogues cannot use medium
-armor"-class bugs. **Armor weight class works differently but is fully checkable**:
-`baseitems.2da` has a single generic armor row (16) shared by every body-armor item
-regardless of weight class, with no `ReqFeat` data of its own — but weight class isn't
-stored on the base item at all. It's derived from the item's own AC Bonus property
-(`PropertiesList` entry with `PropertyName=1`, `CostValue` = the AC bonus amount 0-8):
-AC bonus 0 needs no proficiency, 1-3 is Light armor, 4-5 is Medium, 6-8 is Heavy
-(verified against `armor.2da`'s 9-row ACBONUS table and a real community equipment
-script's tier boundaries). Before equipping armor, check its AC Bonus property against
-the creature's baked `FeatList` for the matching tier feat (Light=3, Medium=4, Heavy=2)
-— `verify_creature`'s `armor_proficiency_mismatch` check enforces this precisely, the
-literal Corin Vale bug (a Rogue in Medium armor with only Light Armor Proficiency).
-When picking armor for a class, prefer what its automatic-class-feat proficiency
-actually covers (Rogue/Bard/Sorcerer/Wizard → light only; most others per their
-`cls_feat_<class>.2da` bake) rather than relying on the check to catch a mismatch after
-the fact. **Buy the weapon first, armor second, with whatever budget remains** — then,
-within the proficiency-determined tier, pick the highest AC Bonus (and correspondingly
-highest-price) item the remaining gold affords, not just the cheapest one that clears
-the proficiency bar. See `adventure-challenges/SKILL.md`'s "Purchase order and armor
-selection" for the full rule and a worked example — it applies here identically.
-
-**Give every ranged-weapon creature a melee weapon too.** NWN's base combat AI
-auto-switches a ranged attacker to melee when it runs out of ammo
-(`ActionEquipMostDamagingMelee`, called from the stock `nw_c2_default9`) — but only if a
-melee-capable weapon exists somewhere in its inventory. An archer/thrower with nothing
-melee-capable anywhere just stops fighting once ammo runs out. Give it a plain melee
-weapon appropriate to the creature (a d6 weapon + a small shield, or a single d8
-weapon) as an unequipped inventory item via `add_items_to_container`-style inventory —
-it does not need to be equipped for the base AI to find and switch to it.
-`verify_creature`'s `ranged_weapon_no_melee_backup` check flags the gap.
-
-**Casters get randomized spells by default, computed at runtime.** A companion's
-spells come from the live `LevelUpHenchman()` call at recruit (`bReadyAllSpells =
-TRUE`, per the note above) — but a non-companion Key NPC is never recruited and never
-gets that call, so a caster Key NPC with nothing else set is permanently spell-less.
-The default fix for both cases (and the project-wide default for every caster this
-pipeline generates, companion or Key NPC, unless the plot needs a fixed ability — see
-below) is `create_random_abilities_system`: it generates `inc_random_abil`, whose
-`RA_OnSpawn`/`RA_OnEndRound` compute a **fresh, random** spell/ability selection
-**entirely in NWScript, every time the module loads** — no build-time baking, so the
-same NPC hands the player something different on a repeat playthrough. For
-Cleric/Druid/Paladin/Ranger/Wizard it writes a real memorized spellbook via the
-engine's own `SetMemorizedSpell()`; for Bard/Sorcerer (no runtime "known spells"
-setter exists) it casts a stored virtual ability list via `ActionCastSpellAtObject`'s
-`bCheat` param from `RA_OnEndRound`. See `src/util/random-abilities-script.ts` for the
-full design and the verified 2DA columns/engine functions it relies on.
-
-**Companions: fixed 2026-09-11 — `RA_OnSpawn` runs from `a_hen_join`, after the
-leveling loop, not from `a_hen_spawn` before it.** See Phase 3b Step 1 above for the
-full wiring. This gives Cleric/Druid/Paladin/Ranger companions a complete, real,
-multi-level spellbook with no known limitation, confirmed via a real headless-server
-test (`docs/random-abilities-runtime-findings.md`, "Round 2"). **Wizard is the one
-confirmed, closed exception** — it stays capped at cantrips (level 0 only) even fully
-leveled, a structural engine limitation with no known fix: three independent NWNX
-approaches (`NWNX_Creature_LevelUp`, `NWNX_Creature_AddKnownSpell`, and
-`NWNX_Creature_SetRemainingSpellSlots` — a direct setter for the exact stuck value)
-were all tested against a real, working NWNX deployment and all hit the identical
-ceiling — see `docs/tfndev-random-npc-system-findings.md` for the full investigation.
-**Prefer the static `spells` param over this system only for a Wizard companion**
-whose spells matter above cantrip level. Tier 2 (Bard, Sorcerer) has no such
-limitation and is confirmed fully working, for companions and Key NPCs alike.
-
-**Key NPCs: no recruit event exists, so `RA_OnSpawn` has nowhere to defer to —
-it must be wired at raw spawn, and for Tier 1 classes this means cantrip-only,
-regardless of class.** A non-companion Key NPC never gets a `LevelUpHenchman()` call
-at all, so `GetMemorizedSpellCountByLevel()` stays 0 above level 0 for every one of
-the five Tier 1 classes on a Key NPC — not just Wizard. The companion fix above
-doesn't help here; there's no leveling event to place the call after. Write a small
-`a_ra_spawn`/`a_ra_endround` pair chaining the plain default scripts instead of the
-henchman ones (`ExecuteScript("nw_c2_default9", OBJECT_SELF)` /
-`ExecuteScript("nw_c2_default3", OBJECT_SELF)`), then
-`DelayCommand(0.5, RA_OnSpawn(OBJECT_SELF))` / `DelayCommand(0.5,
-RA_OnEndRound(OBJECT_SELF))`, and
-pass `scripts: '{"ScriptSpawn": "a_ra_spawn", "ScriptEndRound": "a_ra_endround"}'` to
-`create_creature_blueprint`. **Always prefer the static `spells` param over this
-system for a Tier 1 Key NPC whose spells matter above cantrip level** — this is the
-settled recommendation for Key NPCs specifically, not a stopgap (Tier 2 Key NPCs —
-Bard/Sorcerer — have no such limitation).
-
-**Opt-out for a story-specific fixed ability**: skip writing/wiring the wrapper for
-that one NPC and use `create_creature_blueprint`'s `spells` param instead (writes
-`SpecAbilityList`, NWN's "Special Abilities" system: spell-like castings independent
-of class levels, where each `{spell, level}` entry is one use and repeating an entry
-grants multiple uses per day) — e.g. a boss whose signature spell must always be the
-same one, or a plot beat that depends on a specific spell being available. Size the
-selection to the class's spells-per-day at the target level (e.g. `cls_spgn_<class>.2da`),
-picking 1-3 thematically-appropriate spells per level rather than one spell repeated
-many times. `verify_creature`'s `caster_no_spells` check only sees static state
-(`MemorizedList`/`SpecAbilityList` at build time) — it can't see what `RA_OnSpawn`
-rolls at runtime, so a caster wired to the random system is expected to show as
-"no spells" under static verification; that is not a bug for a creature using this
-system.
-
-**Casters who suffer arcane spell failure (Wizard/Sorcerer/Bard) should be in light or no
-armor** — this is the mechanically correct default, not an oversight to fix later.
+- **A specific plot item** (a named heirloom sword): forge with `gearWealth: "0"` so the
+  creature keeps its current gear, then equip the item with `set_creature_equipment`.
+- **Never build armor from scratch.** `create_item_blueprint` doesn't set the 18
+  `ArmorPart_*` fields or the colors, so from-scratch armor renders as nothing. Use a real
+  blueprint.
+- **A flavor item with no mechanical property** (a keepsake, a holy symbol) needs a
+  `description` saying why it matters. Don't add bare, unexplained rings, boots or gloves.
+- **Archers get a melee backup automatically**: a forged creature with a ranged weapon
+  also buys a melee weapon it can use, kept unequipped in its inventory, so the stock AI
+  can switch to it when ammo runs out. Only add one by hand for a creature forged with
+  `gearWealth: "0"`.
+- **A fixed signature spell** (a boss whose plot depends on one spell): pass
+  `pinnedSpells: '[<spells.2da row>]'` to `forge_creature`. A pinned spell is always picked
+  first at its spell level and is checked in game (`cl_spell_pinned_<id>`); the forge
+  warns and ignores a spell that isn't on the creature's class list.
 
 `henchman: true` wires all 13 script fields to the stock `x0_ch_hen_*` associate AI.
 These are base-game resources resolved at runtime — **never write them into the module**,
 and expect `validate_module` to report them as missing (a false positive).
 
-**Verify the recruit actually worked, live.** `verify_creature`/`verify_dialog` (Step 4
-below) only check static GFF preconditions — they cannot confirm `LevelUpHenchman()`
-behaved correctly at runtime. `a_hen_join` must `#include "inc_spec_check"` (generated by
-`create_spec_verification`, Step 2) and call `SPEC_VerifyCreature(oHenchman)` as its last
-line, after the level-up loop and `AddHenchman()` succeed. This is a no-op unless
-`MCP_VERIFY_MODE` is set (it is, during generation — see Step 2), so it costs nothing in
-the delivered module. Read `[SPEC_OK]`/`[SPEC_FAIL]` lines from the server log after a real
-in-game recruit test: `[SPEC_FAIL] ... field=level` points at a package/recruit-script
-problem, `field=spell_count` points at a missing `bReadyAllSpells = TRUE`, and
-`field=race`/`field=appearance` points at `race`/`appearance` not both having been set on
-the blueprint. See `docs/runtime-verification-spec.md` for the full field list and the
-build→run→check→repair loop this is meant to close.
-
-**`field=spell_count` will still false-positive for a Sorcerer/Wizard/Bard companion
-wired to the random-abilities system, even after the `a_hen_join` timing fix above —
-this is not a regression to chase.** `SPEC_VerifyCreature`'s spell_count check reads
-`GetKnownSpellCount()`, which is structurally blind to both of `RA_OnSpawn`'s write
-paths: Tier 1 writes via `SetMemorizedSpell()` (a *memorized*, not *known*, spell),
-and Tier 2 stores a local JSON array, neither of which populates the known-spell list
-`GetKnownSpellCount()` reads. (Cleric/Druid/Paladin/Ranger are unaffected either way —
-`SpecIsCasterAtLevel` only checks Sorcerer/Wizard/Bard, since those four "prepared"
-casters have no known-spell list for `GetKnownSpellCount` to structurally see at all.)
-Treat this specific field as a known, permanent blind spot for any RA-wired caster,
-same as `verify_creature`'s static `caster_no_spells` check above.
-
-`a_hen_spawn` gets the same check for free, headlessly: `SPEC_SelfTestOnSpawn(OBJECT_SELF)`
-levels the companion straight to `SPEC_LEVEL` and runs the same `SPEC_VerifyCreature()`
-check the moment the area loads — no real PC needs to connect and click through the recruit
-dialog first. This means `[SPEC_OK]`/`[SPEC_FAIL]` lines are already in the log from a plain
-headless module load, before anyone ever plays it.
+**Verify the spawn worked, live.** At spawn every forged creature logs `[SPEC_OK]`/
+`[SPEC_FAIL]` lines for its level, classes, spell slots and spell validity, pinned spells,
+equipped chest and weapon, an archer's melee backup, and that no gold was added, plus one
+`[CL_LOOT]` line listing what it bought. `run_live_verification` returns them; fix
+any `[SPEC_FAIL]` before reporting success.
 
 #### Step 4: Verify before moving on
 
@@ -671,14 +255,11 @@ the exact cause of the "Cleric NPC has no spells" bug.
 three entries in this table used to be wrong (`nw_humanmerc002` labeled Fighter is
 really Cleric; `nw_elfmerc001` labeled Ranger is really Wizard; `nw_halfcel001`
 labeled Cleric is really Fighter), which would silently build a companion with the
-wrong spellbook/proficiencies if you trusted the source chassis's native class. Always
-cross-check with `resolve_blueprint(resource: "<resref>.utc")` → `classes` before using
-any *new* source not in this table, and **pass `classes` (and `startingPackage`)
-explicitly on the `create_creature_blueprint` call regardless** — appearance and combat
-class are independent, so never rely on a chassis's native `ClassList` by omission. Note
-that cloning also carries over whatever legacy/current field set (`Phenotype`, existing
-`FeatList`/`SkillList`) the source NPC happens to have — another reason to prefer the
-chassis-free default path unless you specifically need one of these looks.
+wrong spellbook/proficiencies if you trusted the source chassis's native class. `forge_creature`
+overwrites class, package, feats, skills and ability scores regardless of what the chassis
+carries, so its native `ClassList` doesn't matter once the creature is forged. Cloning still
+carries over whatever other legacy fields (`Phenotype`) the source NPC has — another reason
+to prefer the chassis-free default path unless you specifically need one of these looks.
 
 **CORRECTION (superseded twice — read the final state, not the history): the invisible
 companion bug was NOT the `Tail`/`Wings` field pair.** A from-scratch companion (built
@@ -922,7 +503,7 @@ Append an `## Actors` section to `adventure.md` with this structure:
 **Companions:**
 - **[Name]** (`resref`, tag: `tag`) — [class] targeting level [N], recruitable in [area].
   Dialog: `dlg_hen_[resref]`. Chassis: `[source_blueprint]`. Soundset: [row].
-  `HENCH_LEVEL` = [N]. Scripts: `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`;
+  Forged at level [N] (`gearRole: pc`). Scripts: `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`;
   conditions `c_hen_free` / `c_hen_mine`.
 
 **Henchman cap:** `a_mod_load` sets `SetMaxHenchmen(4)`, chained from `[previous Mod_OnModLoad]`.

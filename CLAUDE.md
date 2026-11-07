@@ -135,6 +135,39 @@ The rest are open.
     (`git push -u origin area-avenue-rotation`) so it won't recur. Left as its own
     pushed branch, explicitly undecided: develop it further or delete it later.
 
+14. **TODO (user-raised, 2026-11-07) — creature forge gaps.** `forge_creature`/`create_creature_level_system`
+    (`src/tools/creature-forge-tools.ts`, generated NWScript in `src/util/creature-level-script.ts`) cover
+    class-based creatures. Five gaps were left; three are now closed in the tools.
+    - ~~**Fixed signature spell.**~~ **DONE 2026-11-07:** `forge_creature` `pinnedSpells` (stored as
+      `MCP_SA_PINNED`; `inc_cre_level` picks them first at their spell level; checked in game as
+      `cl_spell_pinned_<id>`; a spell not on the creature's class list is warned about and ignored). Skills
+      updated: `adventure-actors` (Equipment and spells), `adventure-challenges` (Phase 5).
+    - ~~**Melee backup weapon for archers.**~~ **DONE 2026-11-07:** `inc_cre_level` `CL_GearOffhand` buys a usable
+      melee weapon into the inventory (unequipped) for any creature with a ranged weapon; checked in game as
+      `cl_gear_melee_backup`. Skills updated: `adventure-actors`, `adventure-challenges`.
+    - ~~**List of spawn-bought loot for `/adventure-rewards`.**~~ **DONE 2026-11-07:** every purchase is kept in
+      `MCP_GEAR_LOG` and logged as one `[CL_LOOT] tag= resref= area= droppable= items=resref@slot[xstack]:gp,…`
+      line per creature, returned by `run_live_verification` in `otherTaggedLines`. Skill updated:
+      `adventure-rewards` (From `## Challenges`). Still open: nothing writes these lines into `adventure.md`
+      automatically — the rewards phase has to run `run_live_verification` itself.
+    - **Monster-class creatures** (Animal, Beast, Outsider, Undead, Construct, …). Not forged. **Choosing a
+      ready-made monster from the default or custom palette and placing it as-is is acceptable for non-player-class
+      creatures** — they don't need to be built. What would still need work, only if wanted: forge support that
+      takes a palette creature's own CR/levels and advances it (spec §5.5) — `src/tools/creature-forge-tools.ts`
+      (`forgeCreature`: skip the level-1 rebuild, keep creature weapons/hide, use the monster class's own feat
+      table), `src/util/creature-level-script.ts` (`LevelUpHenchman` with the monster class; no shopping), and the
+      skills `adventure-challenges` (Phase 5 "Monsters", Monster template, Creature Source Blueprints) and
+      `adventure-actors` (Ambient Creature Blueprints). Until then both skills already say to use palette monsters.
+    - **`compose_encounter` still builds bosses its own way.** `src/tools/encounter-composer-tools.ts` calls
+      `buildNpcStatBlock`/`buildCreatureBlueprint` directly and wires `RA_OnSpawn`/`SA_OnSpawn` via its
+      `casterSystem` param (default `special_abilities`). To resolve: replace that path with `forgeCreature`
+      (boss: `gearRole: "elite"`, `powerLevel: "tougher"`; support creatures: `standard`/`mook`), call
+      `writeCreatureLevelSystem` when `cf_spawn` is missing, drop the `casterSystem` param and its spell-wiring
+      warnings, and update `encounter-composer-placement.integration.test.ts`. No skill calls `compose_encounter` today (checked
+      2026-11-07), so no skill text has to change for the fix itself; once it forges, add it to
+      `adventure-challenges` Phase 3 as the way to build a balanced boss group. Docs to update with it:
+      `docs/encounter-composer-spec.md` and `docs/special-abilities-system.md` (both describe the old caster wiring).
+
 ## Design Intent
 
 This MCP serves two purposes:

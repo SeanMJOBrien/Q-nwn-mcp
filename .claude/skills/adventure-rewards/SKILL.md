@@ -62,6 +62,11 @@ Read `adventure.md`. Extract from all sections:
 - **Creature CR values** — used to estimate total monster XP
 - **Creature count per area** — total kills expected
 - **Magic Items on Creatures** — items players will loot from defeated enemies. **Do not duplicate these as placed rewards.**
+  Forged creatures (`forge_creature`) buy their gear at spawn, so `## Challenges` lists only plot items for them. To see
+  everything they will drop, call `run_live_verification` and read its `[CL_LOOT]` lines (in `otherTaggedLines`): one
+  per creature, `tag=… resref=… area=… droppable=… items=resref@slot[xstack]:gp,…` (`slot` is the `INVENTORY_SLOT_*`
+  number, `inv` for an unequipped item). Treat items worth more than a few hundred gp, and any `nw_it_m*`/`nw_ma*`
+  magic item, as loot the party will collect. Gear is chosen the same way every run, so one run is enough.
 - **Boss creature** — highest CR enemy; boss reward should match or slightly exceed boss equipment
 
 **From `## Affordances`:**

@@ -64,3 +64,21 @@ describe("classSpellPools", () => {
     expect(classSpellPools(index, 4, "seed")).toBeUndefined();
   });
 });
+
+describe("pinned spells, melee backup and loot log", () => {
+  const src = generateCreatureLevelInclude();
+  it("picks pinned spells before the random pool", () => {
+    expect(src).toContain('GetLocalString(oCreature, "MCP_SA_PINNED")');
+    expect(src.indexOf("MCP_SA_PINNED")).toBeLessThan(src.indexOf("int nOffset = Random(nPoolSize);"));
+    expect(src).toContain('"cl_spell_pinned_" + sPin');
+  });
+  it("buys an unequipped melee backup for ranged weapons", () => {
+    expect(src).toContain("CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 5, nBackup, 0)");
+    expect(src).toContain("CL_Buy(oCreature, oBackup, -1, 0)");
+    expect(src).toContain('"cl_gear_melee_backup"');
+  });
+  it("logs one [CL_LOOT] line per creature", () => {
+    expect(src).toContain('"[CL_LOOT] tag="');
+    expect(src).toContain('"MCP_GEAR_LOG"');
+  });
+});
