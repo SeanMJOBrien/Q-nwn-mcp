@@ -23,6 +23,7 @@ import type { GffObj } from "../types/gff.js";
 import { snapshotGitForUndo } from "../util/undo.js";
 import { compileScript, jsonToGff } from "../nim-tools.js";
 import { checkPlacementWalkable, checkPositionWalkable } from "../util/walkmesh.js";
+import { MIN_TRANSITION_DEPTH, MIN_TRANSITION_WIDTH, rectTriggerGeometry, rectTriggerPoints } from "../util/trigger-geometry.js";
 
 /** List names excluded from walkability validation (doors sit on walls, sounds are ambient) */
 const WALK_CHECK_SKIP_LISTS = new Set(["Door List", "SoundList"]);
@@ -99,7 +100,7 @@ export function registerObjectMgmtTools(server: McpServer): void {
 
   server.tool(
     "create_area_transition",
-    "Create a one-way area transition: trigger in source area → waypoint in target area. For two-way transitions, call twice with swapped source/target. Writes and compiles a transition script, places the waypoint, places the trigger, and sets LinkedTo metadata for connectivity checks.",
+    "Create a one-way area transition: trigger in source area → waypoint in target area. For two-way transitions, call twice with swapped source/target. Writes and compiles a transition script, places the waypoint, places the trigger, and sets LinkedTo metadata for connectivity checks. The trigger is a width x depth rectangle (default 4 x 4 m) turned to `rotation`; size it so players can walk into it and see it on mouse-over (about 4-6 m across, 2-3 m deep for a path).",
     {
       sourceArea: z.string().describe("Area resref where the trigger is placed"),
       sourceX: numParam("Trigger X position in source area"),
@@ -111,11 +112,34 @@ export function registerObjectMgmtTools(server: McpServer): void {
       targetZ: optNumParam("Waypoint Z position (default 0.0)"),
       tag: z.string().describe("Base tag for naming. Max 11 chars to avoid script resref truncation collisions. Trigger tag = 'tr_<tag>' (32-char limit), waypoint tag = 'wp_<tag>' (32-char limit), script resref = 'a_tr_<tag>' (16-char resref limit — this is the constraint). Use short abbreviated tags like 'vil_inn', 'cave_vil'."),
       triggerBlueprint: z.string().optional().describe("UTT blueprint resref for the trigger (default: 'nw_yourfeet' or generic trigger)"),
+      width: optNumParam(
+        "Trigger size across the route, in metres (default 4). Real transitions: median 4.7; use 4-6 for a path, doorway or cave mouth, the road's own width (10-20) for an open road edge. Under 2 is hard to find.",
+      ),
+      depth: optNumParam("Trigger size along the route, in metres (default 4). Real transitions: median 2.0; use 2-3. Under 1 is easy to walk past."),
+      rotation: optNumParam(
+        "Compass direction the route runs through the trigger, in degrees (0 = north, 90 = east, clockwise; default 0). The width is laid perpendicular to it, so 0 gives a trigger wide in X across a north-south path.",
+      ),
     },
     { destructiveHint: true },
-    async ({ sourceArea, sourceX, sourceY, sourceZ, targetArea, targetX, targetY, targetZ, tag, triggerBlueprint }) => {
+    async ({ sourceArea, sourceX, sourceY, sourceZ, targetArea, targetX, targetY, targetZ, tag, triggerBlueprint, width, depth, rotation }) => {
       const sxN = toF(sourceX), syN = toF(sourceY), szN = toF(sourceZ);
       const txN = toF(targetX), tyN = toF(targetY), tzN = toF(targetZ);
+      const sizeGiven = width !== undefined || depth !== undefined || rotation !== undefined;
+      const widthN = width !== undefined ? toF(width) : 4;
+      const depthN = depth !== undefined ? toF(depth) : 4;
+      const rotationN = rotation !== undefined ? toF(rotation) : 0;
+      if (!(widthN > 0) || !(depthN > 0) || !Number.isFinite(rotationN)) {
+        return {
+          content: [{ type: "text", text: `width and depth must be positive numbers and rotation a number of degrees (got width=${width}, depth=${depth}, rotation=${rotation})` }],
+          isError: true,
+        };
+      }
+      const warnings: string[] = [];
+      if (widthN < MIN_TRANSITION_WIDTH || depthN < MIN_TRANSITION_DEPTH) {
+        warnings.push(
+          `Trigger is ${widthN} x ${depthN} m; below about ${MIN_TRANSITION_WIDTH} x ${MIN_TRANSITION_DEPTH} m players struggle to find it on mouse-over or walk past it.`,
+        );
+      }
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
@@ -286,18 +310,9 @@ export function registerObjectMgmtTools(server: McpServer): void {
       // Ensure trigger has geometry — blueprints don't include it, but placed
       // instances require it for the engine to detect entry and the toolset to render.
       // Z=0.025 raises geometry slightly above walk plane so it's clickable.
-      if (!triggerObj.Geometry) {
-        const s = 2.0; // half-size of default 4m square
-        const gz = 0.025;
-        triggerObj.Geometry = {
-          type: "list",
-          value: [
-            { __struct_id: 0, PointX: { type: "float", value: -s }, PointY: { type: "float", value: -s }, PointZ: { type: "float", value: gz } },
-            { __struct_id: 0, PointX: { type: "float", value:  s }, PointY: { type: "float", value: -s }, PointZ: { type: "float", value: gz } },
-            { __struct_id: 0, PointX: { type: "float", value:  s }, PointY: { type: "float", value:  s }, PointZ: { type: "float", value: gz } },
-            { __struct_id: 0, PointX: { type: "float", value: -s }, PointY: { type: "float", value:  s }, PointZ: { type: "float", value: gz } },
-          ],
-        };
+      // An explicit width/depth/rotation always wins over a blueprint's own geometry.
+      if (sizeGiven || !triggerObj.Geometry) {
+        triggerObj.Geometry = rectTriggerGeometry(widthN, depthN, rotationN);
       }
 
       // Area Transition type — engine handles the jump natively via LinkedTo.
@@ -320,12 +335,20 @@ export function registerObjectMgmtTools(server: McpServer): void {
           text: JSON.stringify({
             success: true,
             transition: {
-              source: { area: sourceArea, triggerTag: trigTag, position: { x: sxN, y: syN, z: szN } },
+              source: {
+                area: sourceArea,
+                triggerTag: trigTag,
+                position: { x: sxN, y: syN, z: srcWalk.z ?? szN },
+                ...(sizeGiven || !utt
+                  ? { size: { width: widthN, depth: depthN, rotation: rotationN }, corners: rectTriggerPoints(widthN, depthN, rotationN) }
+                  : { size: "blueprint geometry" }),
+              },
               target: { area: targetArea, waypointTag: wpTag, position: { x: txN, y: tyN, z: tzN } },
               script: scriptResref,
               compiled: compResult.success,
               ...(compResult.success ? {} : { compilerOutput: compResult.output }),
             },
+            ...(warnings.length ? { warnings } : {}),
           }, null, 2),
         }],
       };

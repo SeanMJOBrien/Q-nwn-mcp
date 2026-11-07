@@ -174,14 +174,14 @@ The rest are open.
       `docs/encounter-composer-spec.md` and `docs/special-abilities-system.md` (both describe the old caster wiring).
 
 15. **TODO (standing, user rule 2026-11-07) — branches and commits not yet merged into `master`.**
-    Checked 2026-11-07 after `git fetch --prune`. Update after every commit or merge.
+    Checked 2026-11-07 after `git fetch --prune`; only `master`, the working branch and `area-avenue-rotation` remain. Update after every commit or merge.
     - **Merged 2026-11-07:** `systest-live-run-and-generalized-spec` was fast-forwarded into `master` (the SPEC_* assertions,
       encounter composer, Hollow Communion playtest fixes, Special-Abilities caster system, creature forge, weapon feat
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **`moonglow-run-plugin`** (pushed) — still shows 2 commits ahead by hash (`417da53` and F6 `9537345`), but both are in
-      `master` (as the cherry-pick `7aa2c5f` and an equivalent patch). Safe to delete.
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **1 commit** ahead of `master`:
+      `create_area_transition` `width`/`depth`/`rotation` options (`src/util/trigger-geometry.ts`, area-connections skill).
     - **`area-avenue-rotation`** (pushed) — 9 commits, `2558742`..`9f568dc`: rotation support for stamped tile groups,
       protected avenues between feature groups, the rotation-handedness fix and its revert, orphaned-tile notes, a
       per-tileset test TODO, and the `nwscript-docs/` reference (`9f568dc`). Undecided since #13: review and merge, or delete.
@@ -189,10 +189,11 @@ The rest are open.
       `src/util/tileset.test.ts`, and its rotation work predates the 2026-10-02 counter-clockwise correction (it also holds a
       handedness fix and its revert), so it needs a real review against the live oracle first. `nwscript-docs/` is already in
       `master` by another route.
-    - **Fully merged (0 commits ahead of `master`), safe to delete:** `area-design-survey-and-verification`,
+    - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
-      `spatial-conventions-and-variable-tools`, `weapon-preference-variety` (local and, where present, `origin/`).
+      `spatial-conventions-and-variable-tools`, `weapon-preference-variety`, `moonglow-run-plugin` (its unique commit had
+      been cherry-picked; every moonglow file in `master` was checked identical before deleting).
     - **Uncommitted work in the working tree** (not commits, listed so it isn't lost): `analyze_walkmesh`
       (`src/util/walkmesh-analysis.ts` + test, `analysis-tools.ts`, `nwn-object-placement` skill, `CHANGELOG.md`; untested on real
       areas), the `create_area` default-tile fix (`tile-solver.ts`/`.test.ts`, `paint-tools.ts`, its `CLAUDE.md` entry), and

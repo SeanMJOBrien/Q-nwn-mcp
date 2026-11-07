@@ -77,8 +77,12 @@ Use for open terrain: the edge of a forest, a road leaving a rural area, a deser
   cave mouth, and as wide as the road itself (10-20 m) for an open road leaving the area (the
   largest real ones are 19-60 m long). Don't go below about 2 × 1 m — the handful of real triggers
   smaller than that (0.4 × 0.4 m) are hard to find and easy to walk past. Vertices: 4-5.
-  `create_area_transition` builds a 4 × 4 m square (16 m²) when the blueprint has no geometry,
-  which is inside this range for paths and doorways but too narrow for a wide road edge.
+  Pass the size to `create_area_transition`: `width` (across the route), `depth` (along it) and
+  `rotation` (the compass direction the route runs, 0 = north, 90 = east). For example, a road
+  leaving east: `width: "12", depth: "3", rotation: "90"`. Without them it builds a 4 × 4 m square
+  (or keeps the blueprint's own geometry), which suits a path but is too narrow for a road edge.
+  It warns below 2 × 1 m. Only the trigger's centre has to be walkable; its ends may run into
+  the walls or trees either side of the route.
 
 ### 3. Light-shaft portals — last resort
 

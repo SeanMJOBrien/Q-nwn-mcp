@@ -405,6 +405,40 @@ describe("create_area_transition", () => {
       // Verify script was written
       // "a_tr_forest_to_cave" truncated to 16 chars = "a_tr_forest_to_c"
       expect(mockIndex.resources.has("a_tr_forest_to_c.nss")).toBe(true);
+
+      // Default geometry: a 4 x 4 m square
+      const pts = (g: GffObj) =>
+        (g.Geometry as { value: GffObj[] }).value.map((v) => [(v.PointX as { value: number }).value, (v.PointY as { value: number }).value]);
+      expect(pts(triggers[0])).toEqual([[-2, -2], [2, -2], [2, 2], [-2, 2]]);
+
+      // Sized and rotated: 6 m across, 2 m deep, route running east
+      const sized = parseResult(
+        await client.callTool({
+          name: "create_area_transition",
+          arguments: {
+            sourceArea: "forest", sourceX: "35.0", sourceY: "25.0", targetArea: "cave", targetX: "15.0", targetY: "15.0",
+            tag: "road_e", width: "6", depth: "2", rotation: "90",
+          },
+        }),
+      ) as { transition: { source: { size: unknown } }; warnings?: string[] };
+      expect(sized.transition.source.size).toEqual({ width: 6, depth: 2, rotation: 90 });
+      expect(sized.warnings).toBeUndefined();
+      // Route east: depth (2) spans X, width (6) spans Y
+      expect(pts(triggers[1])).toEqual([[-1, 3], [-1, -3], [1, -3], [1, 3]]);
+
+      // Tiny triggers warn; non-positive sizes are refused
+      const tiny = parseResult(
+        await client.callTool({
+          name: "create_area_transition",
+          arguments: { sourceArea: "forest", sourceX: "35.0", sourceY: "25.0", targetArea: "cave", targetX: "15.0", targetY: "15.0", tag: "tiny", width: "0.5", depth: "0.5" },
+        }),
+      ) as { warnings?: string[] };
+      expect(tiny.warnings?.[0]).toContain("0.5 x 0.5");
+      const bad = await client.callTool({
+        name: "create_area_transition",
+        arguments: { sourceArea: "forest", sourceX: "35.0", sourceY: "25.0", targetArea: "cave", targetX: "15.0", targetY: "15.0", tag: "bad", width: "0" },
+      });
+      expect(bad.isError).toBe(true);
     } finally {
       await cleanup();
     }
