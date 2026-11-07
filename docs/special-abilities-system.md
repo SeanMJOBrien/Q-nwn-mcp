@@ -272,7 +272,9 @@ was reverted after this run — it was never meant to ship.
   dependency, since the pool only needs the blueprint's final `ClassList`/`HENCH_LEVEL`,
   not a live `LevelUpHenchman()` pass). The full original Random Abilities recipe is kept,
   unmodified, as the explicit fallback when `adventure.md` says so.
-- **`compose_encounter`** (bosses) takes a `casterSystem` param, default
+- **`compose_encounter`** (bosses) — *superseded 2026-11-07: bosses are now forged
+  (`forgeCreature`, spell abilities written by `inc_cre_level` at spawn) and the `casterSystem`
+  param is gone; the rest of this bullet is history.* It took a `casterSystem` param, default
   `"special_abilities"`. This is a strict improvement over the old default for a boss
   specifically: a boss's `ClassList` is set directly (no recruit event to level through),
   which is exactly the shape that caps Random Abilities' Tier 1 path at cantrips — Special

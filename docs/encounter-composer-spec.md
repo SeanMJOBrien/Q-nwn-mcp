@@ -4,6 +4,12 @@ Status: **F1, F2, F3, F4, F5 and F6 are built** — `compose_encounter` now
 builds and places a real roster, reports when the fight is too hard for the
 stated party, and names the fix. F7 (v2) and F8 remain planning only.
 
+**Update 2026-11-07:** placement mode now forges the boss (`forgeCreature`, gearRole `elite`,
+powerLevel `tougher`, faction Hostile): it levels, buys gear and gets spell abilities at spawn through
+`cf_spawn`, like every other class-based creature, and writes the level system if the module lacks it.
+The `casterSystem` param, the hand-built stat block, the clothing-only gear and the separate spell
+wrappers described in F6 below are gone. Earlier composed bosses also had no faction set (0 = player).
+
 ## Why this exists
 
 The user's stated goal: an LLM should be able to say something like *"I need a

@@ -163,15 +163,11 @@ The rest are open.
       table), `src/util/creature-level-script.ts` (`LevelUpHenchman` with the monster class; no shopping), and the
       skills `adventure-challenges` (Phase 5 "Monsters", Monster template, Creature Source Blueprints) and
       `adventure-actors` (Ambient Creature Blueprints). Until then both skills already say to use palette monsters.
-    - **`compose_encounter` still builds bosses its own way.** `src/tools/encounter-composer-tools.ts` calls
-      `buildNpcStatBlock`/`buildCreatureBlueprint` directly and wires `RA_OnSpawn`/`SA_OnSpawn` via its
-      `casterSystem` param (default `special_abilities`). To resolve: replace that path with `forgeCreature`
-      (boss: `gearRole: "elite"`, `powerLevel: "tougher"`; support creatures: `standard`/`mook`), call
-      `writeCreatureLevelSystem` when `cf_spawn` is missing, drop the `casterSystem` param and its spell-wiring
-      warnings, and update `encounter-composer-placement.integration.test.ts`. No skill calls `compose_encounter` today (checked
-      2026-11-07), so no skill text has to change for the fix itself; once it forges, add it to
-      `adventure-challenges` Phase 3 as the way to build a balanced boss group. Docs to update with it:
-      `docs/encounter-composer-spec.md` and `docs/special-abilities-system.md` (both describe the old caster wiring).
+    - ~~**`compose_encounter` still builds bosses its own way.**~~ **DONE 2026-11-07:** placement mode forges the boss
+      (`forgeCreature`, gearRole `elite`, powerLevel `tougher`, faction Hostile — it had no faction before, so composed bosses
+      were in the player faction), writes the level system when `cf_spawn` is missing, and the `casterSystem` param and its
+      spell wrappers are gone. Support creatures stay palette monsters. `adventure-challenges` Phase 3 now names it for boss
+      groups; `docs/encounter-composer-spec.md` and `docs/special-abilities-system.md` carry the update.
 
 15. **TODO (standing, user rule 2026-11-07) — branches and commits not yet merged into `master`.**
     Checked 2026-11-07 after `git fetch --prune`; only `master`, the working branch and `area-avenue-rotation` remain. Update after every commit or merge.
@@ -180,9 +176,10 @@ The rest are open.
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **3 commits** ahead of `master`:
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **4 commits** ahead of `master`:
       `create_area_transition` `width`/`depth`/`rotation` options (`4d441e8`), `create_companion_system` /
-      `create_companion_dialog` (`64059a1`), and the same size options on `place_trigger`.
+      `create_companion_dialog` (`64059a1`), the same size options on `place_trigger` (`13f44ec`), and
+      `compose_encounter` forging its boss (TODO #14).
     - **`area-avenue-rotation`** (pushed) — 9 commits, `2558742`..`9f568dc`: rotation support for stamped tile groups,
       protected avenues between feature groups, the rotation-handedness fix and its revert, orphaned-tile notes, a
       per-tileset test TODO, and the `nwscript-docs/` reference (`9f568dc`). Undecided since #13: review and merge, or delete.

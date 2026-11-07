@@ -166,7 +166,11 @@ For each dangerous area, design enemy encounters with tactical diversity.
 - **Patrol** (2-3 creatures): 2 melee + 1 ranged OR 2 melee + 1 caster
 - **Guard post** (2-4 creatures): 2-3 melee + 0-1 caster, positioned near a door or objective
 - **Ambush** (3-4 creatures): Mix of melee + ranged, hidden around corners
-- **Boss fight** (3-5 creatures): 1 boss + 2-4 adds of mixed roles
+- **Boss fight** (3-5 creatures): 1 boss + 2-4 adds of mixed roles. For a themed boss (necromancer,
+  cultist leader...), `compose_encounter(role, bossCR, targetEL, partyLevel, area)` builds the whole
+  group: a forged Hostile boss plus enough palette minions to reach `targetEL`, placed on open ground.
+  Call it without `area` first to see the plan; move the creatures afterwards if the spots don't suit
+  the story.
 - **Lone sentry** (1 creature): Single tough melee creature at a chokepoint
 
 **Creature count by area role:**

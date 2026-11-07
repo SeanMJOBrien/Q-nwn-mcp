@@ -272,26 +272,6 @@ describe("compose_encounter — placement mode", () => {
     }
   });
 
-  it("reports a real wealth budget and weapon-type recommendation, but never equips a specific item", async () => {
-    await setupArea();
-    const { client, cleanup } = await createTestClient();
-    try {
-      const result = await client.callTool({
-        name: "compose_encounter",
-        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea" },
-      });
-      const parsed = json(result) as {
-        gearing: { wealthBudgetGp: number; recommendedWeapon: { label: string } | null };
-        nextSteps: string;
-      };
-      expect(parsed.gearing.wealthBudgetGp).toBeGreaterThan(0);
-      expect(parsed.nextSteps).toContain("equip_npc_by_role");
-      expect(parsed.nextSteps.toLowerCase()).not.toContain("equipped: righthand");
-    } finally {
-      await cleanup();
-    }
-  });
-
   it("runs verify_creature on the newly built boss and includes the result", async () => {
     await setupArea();
     const { client, cleanup } = await createTestClient();
@@ -308,61 +288,52 @@ describe("compose_encounter — placement mode", () => {
     }
   });
 
-  it("gives the boss a real stat block, baseline clothing, and wires the special-abilities spawn script by default (regression: 'Thug caster had no clothes/spells')", async () => {
+  it("forges the boss: hostile, levelled and geared at spawn through cf_spawn, with the level system written", async () => {
     await setupArea();
     addItemBlueprint("nw_cloth001");
     const { client, cleanup } = await createTestClient();
     try {
-      const result = await client.callTool({
-        name: "compose_encounter",
-        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea" },
-      });
-      const parsed = json(result) as {
-        placed?: { boss: { resref: string; spellsWired: boolean; spellWiringWarnings?: string[] } };
+      const parsed = json(
+        await client.callTool({ name: "compose_encounter", arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea" } }),
+      ) as {
+        boss: { level: number };
+        placed?: { boss: { resref: string; forged: { level: number } }; levelSystemWritten?: string };
+        nextSteps: string;
       };
-      expect(parsed.placed?.boss.spellsWired).toBe(true);
-      expect(parsed.placed?.boss.spellWiringWarnings).toBeUndefined();
+      expect(parsed.placed?.levelSystemWritten).toBe("inc_cre_level + cf_spawn");
+      expect(mockIndex.resources.has("cf_spawn.ncs")).toBe(true);
+      expect(parsed.placed?.boss.forged.level).toBe(parsed.boss.level);
 
       const bossDoc = mockIndex.parsedGff.get(`${parsed.placed!.boss.resref}.utc`) as GffObj;
-      const feats = (bossDoc.FeatList as { value: GffObj[] } | undefined)?.value ?? [];
-      expect(feats.length).toBeGreaterThan(0);
+      expect((bossDoc.FactionID as { value: number }).value).toBe(1);
+      expect((bossDoc.ScriptSpawn as { value: string }).value).toBe("cf_spawn");
+      const vars = Object.fromEntries(
+        ((bossDoc.VarTable as { value: GffObj[] }).value ?? []).map((v) => [(v.Name as { value: string }).value, (v.Value as { value: unknown }).value]),
+      );
+      expect(vars.MCP_LEVEL).toBe(parsed.boss.level);
+      expect(vars.MCP_GEAR_ROLE).toBe("elite");
+      expect(vars.MCP_ORIG_SPAWN).toBe("nw_c2_default9");
 
-      // SpecAbilityList is baked (dormant, sorted by level) — SA_OnSpawn
-      // activates a real-slot-sized subset at actual runtime, which this
-      // mocked build-time test never executes, so every entry is SpellFlags=0
-      // here by design (see buildSpecAbilityListEntries's doc comment).
-      const specAbilities = (bossDoc.SpecAbilityList as { value: GffObj[] } | undefined)?.value ?? [];
-      expect(specAbilities.length).toBeGreaterThan(0);
-      const levels = specAbilities.map((e) => (e.Spell as { value: number }).value);
-      expect(levels).toEqual([10, 11]); // sorted: Wiz_Sorc level-0 spell (id 10) before level-1 (id 11)
-
-      const equip = (bossDoc.Equip_ItemList as { value: GffObj[] } | undefined)?.value ?? [];
-      const chest = equip.find((e) => e.__struct_id === 2); // EQUIP_SLOT_MAP.chest
-      expect((chest?.TemplateResRef as { value: string } | undefined)?.value).toBe("nw_cloth001");
-
-      // The spawn wrapper script exists and includes the special-abilities system.
-      expect(mockIndex.resources.has("inc_spec_ability.nss")).toBe(true);
-      expect([...mockIndex.resources.keys()].some((k) => k.startsWith("ce_nec_spn"))).toBe(true);
+      // The placed copy carries the same wiring.
+      const placed = ((mockIndex.parsedGff.get("testarea.git") as GffObj)["Creature List"] as { value: GffObj[] }).value[0];
+      expect((placed.ScriptSpawn as { value: string }).value).toBe("cf_spawn");
+      expect(parsed.nextSteps).toContain("run_live_verification");
     } finally {
       await cleanup();
     }
   });
 
-  it("falls back to the random-abilities system when casterSystem:'random_abilities' is explicitly requested", async () => {
+  it("reuses an existing level system instead of rewriting it", async () => {
     await setupArea();
-    addItemBlueprint("nw_cloth001");
+    mockIndex.resources.set("cf_spawn.ncs", { resref: "cf_spawn", extension: "ncs", filePath: path.join(tempDir, "cf_spawn.ncs"), sizeBytes: 1 });
     const { client, cleanup } = await createTestClient();
     try {
-      const result = await client.callTool({
-        name: "compose_encounter",
-        arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea", casterSystem: "random_abilities" },
-      });
-      const parsed = json(result) as {
-        placed?: { boss: { spellsWired: boolean; spellWiringWarnings?: string[] } };
-      };
-      expect(parsed.placed?.boss.spellsWired).toBe(true);
-      expect(parsed.placed?.boss.spellWiringWarnings?.join(" ")).toContain("LevelUpHenchman");
-      expect(mockIndex.resources.has("inc_random_abil.nss")).toBe(true);
+      const parsed = json(
+        await client.callTool({ name: "compose_encounter", arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea" } }),
+      ) as { placed?: { levelSystemWritten?: string } };
+      expect(parsed.placed).toBeDefined();
+      expect(parsed.placed?.levelSystemWritten).toBeUndefined();
+      expect(mockIndex.resources.has("inc_cre_level.nss")).toBe(false);
     } finally {
       await cleanup();
     }
