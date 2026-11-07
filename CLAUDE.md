@@ -180,8 +180,8 @@ The rest are open.
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **`moonglow-run-plugin`** (pushed) — still shows 11 commits ahead by hash, but all of its content is now in `master`
-      (`417da53` as a cherry-pick, the rest as equivalent patches). Safe to delete.
+    - **`moonglow-run-plugin`** (pushed) — still shows 2 commits ahead by hash (`417da53` and F6 `9537345`), but both are in
+      `master` (as the cherry-pick `7aa2c5f` and an equivalent patch). Safe to delete.
     - **`area-avenue-rotation`** (pushed) — 9 commits, `2558742`..`9f568dc`: rotation support for stamped tile groups,
       protected avenues between feature groups, the rotation-handedness fix and its revert, orphaned-tile notes, a
       per-tileset test TODO, and the `nwscript-docs/` reference (`9f568dc`). Undecided since #13: review and merge, or delete.
