@@ -63,6 +63,22 @@ Use for open terrain: the edge of a forest, a road leaving a rural area, a deser
   own output (`Type=1`, `LinkedToFlags=2`).
 - Place it *across* the route, not on it, and make it wide enough that a running player cannot
   clip past a corner.
+- **Size it so players can walk into it and see it on mouse-over.** Measured across all 313
+  area-transition (`Type 1`) triggers in `the-frozen-north` (511 areas), as a rectangle laid across
+  the route:
+
+  | | 10th pct | 25th | **median** | 75th | 90th |
+  |---|---|---|---|---|---|
+  | Long side (across the route), m | 1.9 | 2.7 | **4.7** | 6.4 | 10.0 |
+  | Short side (along the route), m | 1.0 | 1.3 | **2.0** | 3.2 | 4.5 |
+  | Area, m² | 2.1 | 4.1 | **6.9** | 16.7 | 39.5 |
+
+  Aim for the middle of that range: **about 4-6 m across and 2-3 m deep** for a path, doorway or
+  cave mouth, and as wide as the road itself (10-20 m) for an open road leaving the area (the
+  largest real ones are 19-60 m long). Don't go below about 2 × 1 m — the handful of real triggers
+  smaller than that (0.4 × 0.4 m) are hard to find and easy to walk past. Vertices: 4-5.
+  `create_area_transition` builds a 4 × 4 m square (16 m²) when the blueprint has no geometry,
+  which is inside this range for paths and doorways but too narrow for a wide road edge.
 
 ### 3. Light-shaft portals — last resort
 
