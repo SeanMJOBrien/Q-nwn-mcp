@@ -180,8 +180,9 @@ The rest are open.
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **1 commit** ahead of `master`:
-      `create_area_transition` `width`/`depth`/`rotation` options (`src/util/trigger-geometry.ts`, area-connections skill).
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **2 commits** ahead of `master`:
+      `create_area_transition` `width`/`depth`/`rotation` options (`4d441e8`) and `create_companion_system` /
+      `create_companion_dialog`.
     - **`area-avenue-rotation`** (pushed) — 9 commits, `2558742`..`9f568dc`: rotation support for stamped tile groups,
       protected avenues between feature groups, the rotation-handedness fix and its revert, orphaned-tile notes, a
       per-tileset test TODO, and the `nwscript-docs/` reference (`9f568dc`). Undecided since #13: review and merge, or delete.
@@ -2592,6 +2593,14 @@ member; they divide nothing. Only **combat** XP is divided by the engine.
   no checker can see it — hand shared signature rewards out from a script instead.
 
 ## Henchmen / Companions
+
+**Standard path (2026-11-07): `create_companion_system` (once per module) + `create_companion_dialog`
+(per companion), source in `src/util/companion-script.ts`.** The party cap is counted from the engine at
+join time (living henchmen of PC masters in the recruiting PC's party), never kept in a module counter —
+the hand-written Hollow Communion scripts kept `HC_HENCH_COUNT`, missed the decrement on dismiss and then
+on death (each permanently blocked recruiting), and decremented on the death of a companion never
+recruited. Join raises `SetMaxHenchmen` before `AddHenchman`, so no `a_mod_load` is needed. Compiled
+against the real compiler; not live-tested (the headless verify server has no PC to recruit with).
 
 `create_creature_blueprint`'s `henchman: true` wires all 13 script fields to the stock
 BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at runtime —

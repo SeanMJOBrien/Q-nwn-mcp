@@ -101,68 +101,27 @@ Any NPC the plot describes as joining, following, accompanying, or being rescued
 must be built as a **real NWN henchman**, or they will stand still while the player walks
 away. This is the single most-reported defect in generated modules.
 
-**Cap at 3 companions per adventure** (the generated `a_mod_load` sets `SetMaxHenchmen(4)`,
-leaving one slot spare). Use fewer unless the plot calls for a full party — every companion
-is another actor to keep alive, pathed, and balanced against.
+**Cap at 3 companions per adventure.** Use fewer unless the plot calls for a full party: every
+companion is another actor to keep alive, pathed, and balanced against.
 
 **Skip this phase entirely if the plot has no companion characters.**
 
 #### Step 1: Shared scripts (once per module)
 
-**Idempotency check:** `list_resources(pattern: "a_hen_*")`. If `a_hen_join` already
-exists, skip to Step 3.
+`create_companion_system()` (pass `maxCompanions` only if the plot needs fewer than 3). It writes
+and compiles `inc_companion`, the conditions `c_hen_mine` / `c_hen_full` / `c_hen_free` and the
+actions `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`. Confirm `success: true`.
+Don't write any of these by hand, and don't write `a_hen_death` or a recruit counter: the party
+cap is counted from the engine at join time, so dismissal and death free a slot by themselves.
+Join raises the henchman cap before `AddHenchman`, sets listen patterns and starts the companion
+in follow mode, so no `a_mod_load` change is needed for companions.
 
-Write these six with `write_script`. All are vanilla NWScript — no NWNX. Confirm each
-reports `compiled: true`.
+Also call `create_creature_level_system` once per module if `cf_spawn` doesn't exist yet (it is
+shared with `/adventure-challenges`).
 
-| Resref | Purpose |
-|--------|---------|
-| `c_hen_free` | `StartingConditional` — TRUE when the companion has no master |
-| `c_hen_mine` | `StartingConditional` — TRUE when the PC speaking is its master |
-| `a_hen_join` | Recruit: raise `SetMaxHenchmen` defensively, `SetAssociateListenPatterns`, `AddHenchman`, send the `HENCHMAN_CMD_FOLLOW` silent shout so it starts in follow mode, bark |
-| `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
-| `a_hen_stay` | Stand ground, via `bkRespondToHenchmenShout` |
-| `a_hen_follow` | Follow master, via `bkRespondToHenchmenShout` |
+#### Step 2: Per companion — blueprint, dialog, forge
 
-`a_hen_join` does **not** level the companion or touch its spells: `forge_creature` has
-already levelled, equipped and given spell abilities to the companion at spawn. Don't
-write `a_hen_spawn` or `a_hen_endround`; a forged companion's `ScriptSpawn` is `cf_spawn`,
-which chains the stock `x0_ch_hen_spawn` first.
-
-Two rules that make or break this — both are silent failures:
-- **`SetMaxHenchmen()` must be raised before `AddHenchman()`.** `AddHenchman` is a
-  no-op when the cap is too low, and reports no error. `a_hen_join` raises it defensively.
-- **`SetAssociateListenPatterns()` must be called on recruit.** The engine delivers
-  radial follow/stand-ground orders as a silent command shout the companion matches in
-  its OnConversation handler. Without this it ignores every order.
-
-#### Step 2: Raise the henchman cap at module load
-
-`get_module_info` → read `onModLoad`. If it is not already `a_mod_load`:
-- `write_script("a_mod_load")` calling `SetMaxHenchmen(4)`, then
-  `ExecuteScript("<the previous onModLoad value>")` — **chain, do not replace**. Omit
-  the `ExecuteScript` line only if the previous value was empty.
-- `set_module_scripts(Mod_OnModLoad: "a_mod_load")`
-
-Also call `create_creature_level_system` once per module if `cf_spawn` doesn't exist yet
-(it is shared with `/adventure-challenges`).
-
-#### Step 3: Per companion — dialog first, then blueprint
-
-`create_dialog("dlg_hen_<resref>")` with **three roots in this order**. The engine
-evaluates `StartingList` in order and the first TRUE condition wins, which gives
-state-based branching without needing link-backs:
-
-1. `condition: "c_hen_mine"` — in-party hub. PC replies: "Hold this position"
-   (`script: a_hen_stay`), "Stay close to me" (`script: a_hen_follow`), "We should part
-   ways" (the NPC farewell entry beneath carries `script: a_hen_leave`), "Never mind".
-2. `condition: "c_hen_free"` — story exposition, who they are and why they are here.
-   PC replies: "Tell me about yourself" (backstory), "Will you travel with me?" (the NPC
-   accept entry beneath carries `script: a_hen_join`), "Another time".
-3. *No condition* — a short fallback line. Without this, if both conditions are false
-   the conversation opens empty.
-
-Then create and forge the companion:
+Create, place and forge the companion, then give it its dialog:
 
 ```
 create_creature_blueprint(
@@ -173,7 +132,6 @@ create_creature_blueprint(
   race: <racialtypes.2da row for the NPC's described race>,
   appearance: <same numeric value as race, for the 7 standard PC races — see note below>,
   gender: <0=male, 1=female>,
-  conversation: "dlg_hen_<resref>",
   soundset: <TYPE 0 row matching gender — see table>
 )
 place_creature(area: "<area>", blueprint: "<name>", x: ..., y: ...)
@@ -181,6 +139,11 @@ forge_creature(resref: "<name>", race: "<race>", classId: "<class>", level: "<mo
                gearRole: "pc", originalSpawn: "x0_ch_hen_spawn")
 forge_creature(area: "<area>", tag: "<name>", race: "<race>", classId: "<class>", level: "<module target level>",
                gearRole: "pc", originalSpawn: "x0_ch_hen_spawn")
+create_companion_dialog(creature: "<name>",
+               introduction: "<first meeting: who they are, why they are here>",
+               backstory: "<answer to 'Tell me about yourself'>",
+               accept: "<agreeing to join, in their voice>", farewell: "<when dismissed>",
+               partyFull: "<when the party already has enough help>")
 ```
 
 Class IDs: 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger
@@ -232,7 +195,7 @@ equipped chest and weapon, an archer's melee backup, and that no gold was added,
 `[CL_LOOT]` line listing what it bought. `run_live_verification` returns them; fix
 any `[SPEC_FAIL]` before reporting success.
 
-#### Step 4: Verify before moving on
+#### Step 3: Verify before moving on
 
 For each companion: `verify_creature(resref: "<resref>", henchman: true)` and
 `verify_dialog(resref: "dlg_hen_<resref>")`. **Both must return zero errors.** Fix and
@@ -503,10 +466,11 @@ Append an `## Actors` section to `adventure.md` with this structure:
 **Companions:**
 - **[Name]** (`resref`, tag: `tag`) — [class] targeting level [N], recruitable in [area].
   Dialog: `dlg_hen_[resref]`. Chassis: `[source_blueprint]`. Soundset: [row].
-  Forged at level [N] (`gearRole: pc`). Scripts: `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`;
-  conditions `c_hen_free` / `c_hen_mine`.
+  Forged at level [N] (`gearRole: pc`).
 
-**Henchman cap:** `a_mod_load` sets `SetMaxHenchmen(4)`, chained from `[previous Mod_OnModLoad]`.
+**Companion system:** `create_companion_system`, party cap [N] (counted from the engine at join).
+Scripts `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`; conditions `c_hen_mine` /
+`c_hen_full` / `c_hen_free`.
 
 **Faction:** All actors set to Commoner (ID 2).
 ```
@@ -514,7 +478,7 @@ Append an `## Actors` section to `adventure.md` with this structure:
 **Downstream skills must respect the companion entries:**
 - `/adventure-quests` must **not** overwrite a companion's `Conversation`, and must **not**
   add quest roots with `parentIndex: 0` to a companion dialog — that unshifts the quest root
-  ahead of the two conditional roots and breaks recruitment. Prefer not making companions
+  ahead of the three conditional roots and breaks recruitment. Prefer not making companions
   quest-givers at all.
 - `/adventure-challenges` must **not** make a companion hostile.
 - `/adventure-polish` must whitelist the base-game `x0_ch_hen_*` scripts when checking

@@ -15,11 +15,12 @@ import { buildDialogSummary, requireIndex } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, setField } from "../types/gff.js";
+import type { ModuleIndex } from "../types/module.js";
 import { numParam, toI } from "../util/params.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-interface InputNode {
+export interface InputNode {
   speaker: "npc" | "pc";
   text: string;
   script?: string;
@@ -76,7 +77,7 @@ function makeReply(text: string, script?: string): GffObj {
  * Validate that the tree alternates NPC↔PC correctly.
  * Returns an error message string, or null if valid.
  */
-function validateTree(nodes: InputNode[], expectedSpeaker: "npc" | "pc"): string | null {
+export function validateTree(nodes: InputNode[], expectedSpeaker: "npc" | "pc"): string | null {
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     if (node.speaker !== expectedSpeaker) {
@@ -141,6 +142,36 @@ function flattenTree(roots: InputNode[]): {
   return { entryList, replyList, startingList };
 }
 
+/** A complete DLG document (every field the engine requires) from a validated node tree. */
+export function buildDialogDocument(roots: InputNode[]): GffDocument {
+  const { entryList, replyList, startingList } = flattenTree(roots);
+  return {
+    __data_type: "DLG ",
+    DelayEntry: { type: "dword", value: 0 },
+    DelayReply: { type: "dword", value: 0 },
+    NumWords: { type: "dword", value: 0 },
+    EndConverAbort: { type: "resref", value: "" },
+    EndConversation: { type: "resref", value: "" },
+    PreventZoomIn: { type: "byte", value: 0 },
+    StartingList: { type: "list", value: startingList },
+    EntryList: { type: "list", value: entryList },
+    ReplyList: { type: "list", value: replyList },
+  };
+}
+
+/** Write a DLG document into the module and register it in the index. Returns its size in bytes. */
+export async function writeDialogDocument(index: ModuleIndex, resref: string, doc: GffDocument): Promise<number> {
+  const resrefLower = resref.toLowerCase();
+  const key = `${resrefLower}.dlg`;
+  const filePath = path.join(index.tempDir, key);
+  await jsonToGff(doc, filePath);
+  const stat = await fs.stat(filePath);
+  index.resources.set(key, { resref: resrefLower, extension: "dlg", filePath, sizeBytes: stat.size });
+  index.parsedGff.set(key, doc);
+  index.dialogs.set(resrefLower, buildDialogSummary(resrefLower, doc, index.creatures));
+  return stat.size;
+}
+
 // ─── Tool Registration ──────────────────────────────────────────────────────
 
 export function registerDialogWriteTools(server: McpServer): void {
@@ -195,35 +226,11 @@ export function registerDialogWriteTools(server: McpServer): void {
         };
       }
 
-      const { entryList, replyList, startingList } = flattenTree(parsed);
-
-      const doc: GffDocument = {
-        __data_type: "DLG ",
-        DelayEntry: { type: "dword", value: 0 },
-        DelayReply: { type: "dword", value: 0 },
-        NumWords: { type: "dword", value: 0 },
-        EndConverAbort: { type: "resref", value: "" },
-        EndConversation: { type: "resref", value: "" },
-        PreventZoomIn: { type: "byte", value: 0 },
-        StartingList: { type: "list", value: startingList },
-        EntryList: { type: "list", value: entryList },
-        ReplyList: { type: "list", value: replyList },
-      };
-
-      const filePath = path.join(index.tempDir, key);
-      await jsonToGff(doc, filePath);
-
-      const stat = await fs.stat(filePath);
-      index.resources.set(key, {
-        resref: resrefLower,
-        extension: "dlg",
-        filePath,
-        sizeBytes: stat.size,
-      });
-      index.parsedGff.set(key, doc);
-
-      const summary = buildDialogSummary(resrefLower, doc, index.creatures);
-      index.dialogs.set(resrefLower, summary);
+      const doc = buildDialogDocument(parsed);
+      const sizeBytes = await writeDialogDocument(index, resrefLower, doc);
+      const entryList = getFieldList(doc, "EntryList");
+      const replyList = getFieldList(doc, "ReplyList");
+      const startingList = getFieldList(doc, "StartingList");
 
       return {
         content: [
@@ -236,7 +243,7 @@ export function registerDialogWriteTools(server: McpServer): void {
                 entries: entryList.length,
                 replies: replyList.length,
                 startingNodes: startingList.length,
-                sizeBytes: stat.size,
+                sizeBytes,
               },
               null,
               2,
@@ -254,8 +261,14 @@ export function registerDialogWriteTools(server: McpServer): void {
     "Add a node to an existing dialog. If parentType is 'entry', adds a PC reply linked from that entry. If parentType is 'reply', adds an NPC entry linked from that reply. If parentType is 'dialog', adds a new NPC root entry to the StartingList (use for quest-stage branching with condition scripts). For 'dialog' mode, parentIndex controls insertion position: 0 inserts at the beginning (evaluated first), -1 or omit appends at the end (evaluated last).",
     {
       dialog: z.string().describe("Dialog resref"),
-      parentIndex: numParam("Index of parent node in its list (EntryList or ReplyList). For parentType 'dialog': 0=insert at start, -1=append at end"),
-      parentType: z.enum(["entry", "reply", "dialog"]).describe("Type of parent: 'entry' adds PC reply, 'reply' adds NPC entry, 'dialog' adds NPC root entry to StartingList"),
+      parentIndex: numParam(
+        "Index of parent node in its list (EntryList or ReplyList). For parentType 'dialog': 0=insert at start, -1=append at end",
+      ),
+      parentType: z
+        .enum(["entry", "reply", "dialog"])
+        .describe(
+          "Type of parent: 'entry' adds PC reply, 'reply' adds NPC entry, 'dialog' adds NPC root entry to StartingList",
+        ),
       text: z.string().describe("Dialog text for the new node"),
       script: z.string().optional().describe("Action script resref (runs when node plays)"),
       condition: z.string().optional().describe("Condition script on the link from parent"),
@@ -324,7 +337,7 @@ export function registerDialogWriteTools(server: McpServer): void {
                   addedType: "entry",
                   addedIndex: newIndex,
                   parentType: "dialog",
-                  startingListPosition: parentIdx === -1 ? startingList.length - 1 : (parentIdx <= 0 ? 0 : parentIdx),
+                  startingListPosition: parentIdx === -1 ? startingList.length - 1 : parentIdx <= 0 ? 0 : parentIdx,
                   totalEntries: entries.length,
                   totalReplies: replies.length,
                   totalStartingNodes: startingList.length,
@@ -424,7 +437,12 @@ export function registerDialogWriteTools(server: McpServer): void {
     { idempotentHint: true },
     async ({ dialog, nodeType, nodeIndex, text, script, sound, comment }) => {
       if (text === undefined && script === undefined && sound === undefined && comment === undefined) {
-        return { content: [{ type: "text", text: "Must provide at least one field to edit (text, script, sound, or comment)" }], isError: true };
+        return {
+          content: [
+            { type: "text", text: "Must provide at least one field to edit (text, script, sound, or comment)" },
+          ],
+          isError: true,
+        };
       }
 
       const index = requireIndex();
@@ -441,7 +459,10 @@ export function registerDialogWriteTools(server: McpServer): void {
       const list = nodeType === "entry" ? getFieldList(dlg, "EntryList") : getFieldList(dlg, "ReplyList");
 
       if (idx < 0 || idx >= list.length) {
-        return { content: [{ type: "text", text: `${nodeType} index ${idx} out of range (0-${list.length - 1})` }], isError: true };
+        return {
+          content: [{ type: "text", text: `${nodeType} index ${idx} out of range (0-${list.length - 1})` }],
+          isError: true,
+        };
       }
 
       const node = list[idx];
@@ -477,17 +498,23 @@ export function registerDialogWriteTools(server: McpServer): void {
       index.dialogs.set(resrefLower, summary);
 
       return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            success: true,
-            dialog: resrefLower,
-            nodeType,
-            nodeIndex: idx,
-            oldText,
-            changes,
-          }, null, 2),
-        }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                dialog: resrefLower,
+                nodeType,
+                nodeIndex: idx,
+                oldText,
+                changes,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
     },
   );
