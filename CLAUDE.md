@@ -176,17 +176,16 @@ The rest are open.
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **4 commits** ahead of `master`:
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **14 commits** ahead of `master`:
       `create_area_transition` `width`/`depth`/`rotation` options (`4d441e8`), `create_companion_system` /
-      `create_companion_dialog` (`64059a1`), the same size options on `place_trigger` (`13f44ec`), and
-      `compose_encounter` forging its boss (TODO #14).
-    - **`area-avenue-rotation`** (pushed) — 9 commits, `2558742`..`9f568dc`: rotation support for stamped tile groups,
-      protected avenues between feature groups, the rotation-handedness fix and its revert, orphaned-tile notes, a
-      per-tileset test TODO, and the `nwscript-docs/` reference (`9f568dc`). Undecided since #13: review and merge, or delete.
-      **Not merged 2026-11-07:** a trial merge conflicts in `CLAUDE.md`, `src/tools/adventure-tools.ts` and
-      `src/util/tileset.test.ts`, and its rotation work predates the 2026-10-02 counter-clockwise correction (it also holds a
-      handedness fix and its revert), so it needs a real review against the live oracle first. `nwscript-docs/` is already in
-      `master` by another route.
+      `create_companion_dialog` (`64059a1`), the same size options on `place_trigger` (`13f44ec`), `compose_encounter`
+      forging its boss (`138e5a9`), and the merge of `area-avenue-rotation` (its 9 commits plus the merge commit).
+    - **`area-avenue-rotation`** (pushed) — **merged into the working branch 2026-11-07** after review: a new oracle test
+      ("rotated tile groups placed by hand match rotateGroupTileIndex") confirms its final group-rotation mapping against
+      633 hand-placed rotated groups (98.6 % of 1,886 tiles), entrance facing matches the verified door convention, and
+      the stale "may look scrambled" warnings were removed; skills now document `paint_group` `rotation` and the layout's
+      `avenue` option. Conflicts (`CLAUDE.md`, `adventure-tools.ts` imports, `tileset.test.ts`) kept both sides. Delete the
+      branch once the working branch reaches `master`.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
@@ -250,6 +249,15 @@ signature, parameters, remarks, or example usage, read `nwscript-docs/<FunctionN
 directly (exact-name match — don't grep/scan the whole directory). Not every engine
 function has a page; absence isn't authoritative.
 
+## NWScript Function Reference
+
+`nwscript-docs/` holds one cleaned markdown file per NWScript engine function,
+named exactly by function name (e.g. `AngleToVector.md`, `GetSpellUsesLeft.md`),
+sourced from nwnlexicon.com and stripped of wiki chrome. To look up a function's
+signature, parameters, remarks, or example usage, read `nwscript-docs/<FunctionName>.md`
+directly (exact-name match — don't grep/scan the whole directory). Not every engine
+function has a page; absence isn't authoritative.
+
 ## Architecture
 
 ```
@@ -290,7 +298,7 @@ All 10 styles use a single BSP pipeline, differentiated by `StyleConfig` presets
 
 #### Layout Rules
 
-- **BSP rooms**: minimum 3x3, margin >= 2 (enforced, never collapses to 1). `minLeaf = 6` ensures each leaf can fit a 3-tile room + 2-tile margin. Interior styles use `splitThreshold: 10` — minimum area for 4 rooms is 14x14 (12x12 playable). Exterior styles use `splitThreshold: 12` and `marginRange: [2, 2]` to guarantee rooms large enough for 2x3 building features — minimum area for 4 exterior rooms is 18x18 (16x16 playable). Room size is a random fraction of available leaf space, randomly offset within the leaf.
+- **BSP rooms**: minimum 3x3, margin >= 2 (enforced, never collapses to 1). `minLeaf = 6` ensures each leaf can fit a 3-tile room + 2-tile margin — **this one hardcoded `6` is shared by every style, interior AND exterior.** `StyleConfig.splitThreshold` (10 for most interior styles, 12 for exterior) is assigned in every preset but **confirmed dead — never read anywhere in `bspPartition`** (found 2026-09-19 while designing the avenue-reservation feature below). Wiring it in looks like an obvious fix — DON'T, without also auditing every place that cites it: at a real `splitThreshold=10` minLeaf, a 4-room split needs 20 playable tiles per axis (22x22 total); at 12, exterior styles would need 24 playable (26x26 total) — both far above what's documented and actually relied on today. **The real minimum area for 4 rooms, any style, is 14x14 total (12x12 playable)** — `2 * minLeaf` per axis, off the one true shared constant. `adventure-areas/SKILL.md`'s "Interior minimum 12x12" line is correct (if for the wrong stated reason — its "(splitThreshold 10)" parenthetical describes config that isn't actually consulted); its "Exterior minimum 18x18" line is also correct in practice, but for a *different* reason than splitThreshold: BSP itself would happily hand back four 3x3 leaves at 14x14 for exterior too, but a 3x3 room can't fit any real 2x3+ building feature group — 18x18 is a feature-fit headroom guideline, not a value the code enforces or splitThreshold produces. Room size is a random fraction of available leaf space, randomly offset within the leaf.
 - **L-shaped rooms**: Adjacent BSP siblings may merge into a single zone with probability `nonRectChance`. The zone solver handles arbitrary shapes.
 - **Corridor routing**: axis-overlap detection (straight connection at shared Y/X), L-bend fallback when rooms don't overlap on either axis.
 - **S-curves**: Probability controlled by `sCurveChance`. Offsets middle third by 1 tile perpendicular. Bends only on interior wall tiles (never first/last).
@@ -303,6 +311,174 @@ All 10 styles use a single BSP pipeline, differentiated by `StyleConfig` presets
 - **Solver scan-order**: solves bottom-to-top, left-to-right. Fallback chain: (1) exact corners+crossers, (1.5) adjust free corners+keep crossers, (2) exact corners+drop crossers, (3) adjust free corners+drop crossers, (4) all-default fallback. Step 1.5 finds "corridor mouth" tiles by adjusting room-edge corners. Adjustments are written back to the corner grid so downstream tiles see them.
 - **Feature group filters**: groups with crosser edges or mismatched terrain corners are excluded from feature packing and `adventure_apply_layout`. Door-containing groups are allowed **only if** every door tile has all corners matching the floor terrain and no crosser edges — this lets freestanding buildings (houses, lodges) pass while rejecting corridor doors and transition doors. Terrain mismatch means a feature tile's corners don't all match the room's floor terrain — placing such a feature locks foreign corners into the grid, creating visual seams and forcing solver fallbacks on neighboring tiles.
 - **Feature suggestions**: `suggestedFeatures` array in LayoutResult — packed into rooms targeting 50%+ tile coverage. `adventure_apply_layout` applies zones + crossers + features atomically. Pass `preferredFeatures` (array of group names from `get_tileset_details`) in `LayoutStyle` to prioritize plot-appropriate features over random selection.
+
+#### Stamped-group rotation, entrance detection, and road/avenue preservation (2026-09-19)
+
+User-raised: stamped feature groups (`paint_group`, `adventure_apply_layout`) were placed
+at a single fixed orientation with no concept of facing a road, and roads were purely
+cosmetic (a crosser-tile texture choice, not a protected, reserved corridor). Three
+connected pieces, all in `src/util/tileset.ts` unless noted:
+
+- **`rotateGroupTileIndex(ngc, ngr, columns, rows, rotation)` / `rotatedGroupDimensions()`**
+  — the real grid-slot remap a rotated group needs. Rotating a group isn't just a
+  per-tile orientation flag: it's rotating which native `(col, row)` maps to which
+  `tileId` in the group's own row-major array, plus swapping footprint width/height at
+  90°/270°. Derived by transforming the group footprint's own corners through this
+  codebase's existing `forwardRotateDoor` point-rotation convention, cross-checked three
+  independent ways (direct per-rotation corner-transform, and composing the 90° step
+  two/three times to re-derive 180°/270° algebraically — all three agreed) plus a
+  bijection test (every native cell visited exactly once) and a "four 90° steps returns
+  to identity" algebraic check, both parametrized across multiple group shapes. Wired
+  into `paint_group` (new `rotation` param, 0-3), `adventure_apply_layout`'s real
+  feature-tile write path, and `findFeatureDoorPosition` (previously hardcoded its
+  orientation argument to `0` always). **Handedness verified (2026-11-07):** the oracle test "rotated tile
+  groups placed by hand match rotateGroupTileIndex" (`tile-oracle.live.test.ts`, needs `TFN_SRC`) finds 633
+  hand-placed rotated groups in 504 real areas; 98.6 % of their 1,886 tiles sit at `Tile_Orientation` = the
+  rotation this remap implies (the mirror mapping: 32.9 %, all of it from 180° turns). The "may look scrambled"
+  warnings on rotated multi-tile groups were removed: the toolset rotates groups exactly this way.
+- **Fixed a real correctness gap the rotation work surfaced**: `adventure_apply_layout`'s
+  terrain-corner match check read a tile's *native* corners even for a rotated
+  placement — a rotated tile presents different corners outward. Now uses
+  `getRotatedCorners`. Curated collar tiles (`feature-collars.ts`) are hand-authored for
+  native placement only, so a feature with one clamps `rotation` to 0 with a warning
+  rather than silently misplacing its collar.
+- **`getGroupEntrances(group, tileset, rotation)`** — generalizes the door-classification
+  logic that already existed privately inside `findFeatureDoorPosition` (used only to
+  aim transition portals at a building's front door). Returns every EXTERIOR door a
+  group has (not just the first), each with a cardinal `side` (N/S/E/W). Deliberately
+  computes door geometry at native orientation always and only rotates the reported
+  `side` by simple compass arithmetic (N→E→S→W→N per quarter-turn) rather than
+  re-deriving positions against a rotated grid — a smaller, independently-checkable
+  piece of logic than duplicating the full grid remap. Exposed to callers via
+  `get_tileset_details`'s full-mode `entrances` field per group — this data was
+  previously unreachable outside `layout-generator.ts`'s private scan.
+- **`LayoutStyle.avenue?: boolean`** (`src/util/layout-generator.ts`, default false —
+  every existing caller's output is byte-identical without it). When true,
+  `packFeatures` is deferred from its normal step-6 position to run *after* step 7 (room
+  connections) instead of before — corridors aren't computed until step 7, and
+  `packFeatures` previously had zero visibility into them (confirmed: it only receives
+  `rooms`, never `crossers`/corridor geometry, so a feature could legally land on tiles
+  a corridor also crossed through a room interior). Deferring the *call site* (not
+  moving the intricate, exterior/interior-branching corridor-computation code itself)
+  keeps this a small, safe reorder — the non-avenue path's call site, arguments, and
+  ordering are completely unchanged. The avenue tile set is computed after corridors
+  exist: for exterior styles, whatever `floorTiles` gained since a pre-corridor
+  snapshot (corridors are carved as floor-terrain zones); for interior styles, every
+  crosser path's tiles directly (crossers cover wall tiles specifically, never touching
+  `floorTiles` at all). That set seeds `packFeatures`'s `occupied` exclusion, so a
+  feature never lands on the avenue, and — for a room adjacent to an avenue tile —
+  biases placement toward a position/rotation whose `getGroupEntrances(...).side` faces
+  it, trying all 4 rotations before falling back to the ordinary uniform-random
+  placement if no facing match fits (scored, not forced). No new "protected crosser"
+  solver concept was needed for this: since main connectors, shortcuts, and the
+  secondary stream are still computed in their existing relative order (only
+  `packFeatures`'s position moved around all of them), nothing about their own mutual
+  overlap risk changed — narrower and safer than the original plan's idea of separately
+  flagging just the "primary spine" as protected.
+- **Verified end-to-end against real tileset data**, not just synthetic unit fixtures:
+  `tno01`'s real `Thatch_House_1` group (1x1, one door, native side `N`) run through
+  `adventure_generate_layout({avenue:true, preferredFeatures:["Thatch_House_1"]})` at
+  4 rooms produced 4 placements, 2 of them with a non-zero `rotation` (the facing bias
+  actually engaging), and `adventure_apply_layout` applied all 4 with zero
+  `featureWarnings`. 3 new unit tests confirm the avenue-exclusion property holds across
+  15 real-generation trials (never a false pass — both "a feature was placed" and "a
+  corridor existed" are asserted, not just "no overlap found").
+- **Spacing rule (user-raised, from a real hand-built village pair): buildings should
+  sit within 1-2 tiles of the avenue, not just somewhere in the adjacent room.** Confirmed
+  a real gap in the current design while hand-building "The Twin Villages Waystop": the
+  avenue-adjacency bias (above) only checks whether a room touches the avenue at all and
+  whether a candidate rotation's entrance faces it — it has **no distance preference**,
+  so a feature placed correctly-facing but deep in a large room (e.g. a 3-tile gap to the
+  avenue, found in one hand-authored village's west row) still passes today's check. Two
+  places this needs to land:
+  - **Hand-authoring convention (apply now, no code change needed):** when placing
+    buildings via `paint_group`/`adventure_apply_layout` alongside a hand-built avenue
+    crosser, keep the gap between a building's road-facing edge and the avenue itself to
+    1-2 tiles — enough for a small dooryard, not an open field. Mirror the gap on both
+    sides of the avenue for a consistent street frontage.
+  - **`packFeatures`'s automatic avenue bias (not yet built):** the position search
+    (`layout-generator.ts`) should prefer candidates *closer* to the avenue-adjacent room
+    edge, not just any position with a facing match — e.g. bias the random `fx0`/`fy0`
+    roll toward that edge, or explicitly rank candidates by distance-to-avenue before
+    facing. Not yet implemented; today's automatic placement can legally put a
+    correctly-rotated building far from the road it's supposedly fronting.
+
+- **Rotation-handedness saga, "The Twin Villages Waystop" (2026-09-19) — two separate
+  bugs, found across two rounds of real user checks, plus a fundamental limitation
+  the fix has to work around rather than solve.** Full sequence, since each round's
+  wrong diagnosis is as instructive as the eventual fix:
+  1. **Round 1 — `bearingToSide`/`rotateSide` calibration, CONFIRMED and fixed.** User
+     report: "The buildings should have their doorways facing the road... Almost none
+     of them did." Had the user visually check 4 real placed buildings in the toolset
+     against their intended facing (one per rotation value 0/1/2/3) — the same
+     corpus-cross-check discipline the "Tile rotation" pitfall above prescribes,
+     applied via direct human observation since no pre-existing corpus uses these
+     specific groups. Two real, independent calibration bugs, both in `tileset.ts`:
+     `bearingToSide()` was a full quadrant (90°) out of phase (wrong even at rotation
+     0, no rotation involved at all), and `rotateSide()` composed the rotation in the
+     wrong direction (added steps; the real direction subtracts). Confirmed by fitting
+     all 4 reports to one formula (`actual = (expected + 1 - 2*rotation) mod 4`) —
+     both fixed, and this fix is correct and still in place.
+  2. **Round 2 — `rotateGroupTileIndex()`, WRONGLY "fixed" by the same commit, then
+     reverted.** Round 1's fix also swapped cases 1/3 in `rotateGroupTileIndex()` (the
+     multi-tile grid-slot remap), on the assumption it shared the same handedness bug.
+     It didn't — a second real user report ("any tile feature larger than one tile is
+     broken") showed actual structural corruption (tiles duplicated into two slots,
+     buildings broken into disordered pieces), which a real handedness/direction bug
+     cannot produce (a bijective remap can flip which way something faces, but can
+     never duplicate a tile). Root cause found by cross-checking the formula against
+     `~/git/settileLibrary`, a separate, independently-tested NWScript library for
+     this exact operation (`TileBlockRotate`/`_TileRotatedOffsetX/Y`): its verified
+     90° point-rotation `(ox,oy) -> (-oy,ox)` is algebraically identical to this
+     function's ORIGINAL (pre-swap) case 1/3 — confirmed by deriving the general W x H
+     inverse from that same point-rotation and checking it cell-by-cell against a 2x2
+     example. **The swap was reverted; `rotateGroupTileIndex` is back to its original,
+     now cross-verified formula**, and Round 1's compass-calibration fix stayed
+     unchanged — the two functions solve genuinely independent problems (which tile ID
+     lands in which grid slot, vs. which rotation value to request for a target
+     facing) and don't share a bug just because they're both "rotation code".
+  3. **The real limitation underneath both rounds, confirmed by the same reference
+     library: most multi-tile groups (named houses/inns/towers) cannot be safely
+     rotated via grid-remap + per-tile-orientation-bump AT ALL, regardless of how
+     correct the index math is.** Quoting settileLibrary's own docs: "The four tiles
+     of a tileset tower are four *different* models, one per quadrant... Rotating a
+     tile only spins that quadrant's own model, so rearranging the four and bumping
+     their orientations scrambles the tower instead of turning it. Rotation is correct
+     for tiles whose orientation is meaningful on its own: terrain crossers, roads,
+     **single-tile features**. To reface an authored structure you need a
+     differently-authored group." A 1x1 feature is exactly a single ordinary tile —
+     rotating it via `Tile_Orientation` is the same operation the engine already does
+     for every terrain tile, and is safe. A 2x2+ named building is an assembly of
+     unique, position-specific meshes; relocating and re-spinning them is a
+     structurally valid *tile* rotation that still produces the wrong *building*.
+     **`paint_group` and `adventure_apply_layout` now emit an advisory warning
+     (not a hard block, since there's no way to tell a genuinely rotation-safe
+     multi-tile group from an unsafe one purely from tile data) whenever a rotation
+     other than 0 is requested for a group larger than 1x1.**
+  **Actual fix applied to the shipped content**, once both of the above were
+  understood: rather than rotating multi-tile buildings at all, both villages'
+  10-building layouts were rebuilt using ONLY each group's *native* (rotation 0)
+  facing — surveyed the full `tno01`/`ttf01` group catalogs for real door bearings
+  per group (direct `.set` file reads), and picked whichever named building already
+  faces the needed direction unrotated for each side of the road, swapping any
+  grass-terrain group that mismatched its dirt-zone surroundings for a dirt-terrain
+  equivalent facing the same way. `tno01` had enough variety for a fully-distinct
+  10-building set this way; `ttf01`'s much smaller building palette forced real
+  repetition (most of one village's houses ended up sharing 1-2 models) — a real,
+  visible trade-off of "correct and safe" over "no rotation-scramble risk," not
+  something to silently improve later without noting the cause. **None of this
+  touches the separately-verified, pre-existing `getRotatedCorners`/
+  `getRotatedCrossers`/`forwardRotate` convention** ("Tile rotation" pitfall above) —
+  that solves a different problem (which corner terrain a *terrain* tile presents at
+  a given orientation) and was never in question. **Lesson reinforced twice in one
+  session:** a rotation-handedness or rotation-safety assumption is not verified by
+  the code agreeing with itself (bijection tests, algebraic identities, "zero
+  warnings" from the solver) — none of those catch a systematically-wrong-but-still-
+  structurally-valid rotation, or a mathematically-correct rotation applied to
+  content that can't survive it. It takes a real render, a real human observer, or a
+  real independently-tested reference implementation to check against — and even
+  after finding one bug this way, don't assume every other "rotation-shaped" function
+  nearby shares its root cause without checking each one on its own terms.
 
 ### Resource Loading
 
@@ -455,6 +631,10 @@ place it — closing the gap between "the collar is correct" and "there's
 actually room for the collar." Related to, but distinct from, the area-prefabs
 work above (prefabs solve *authoring* a known-good multi-tile piece once;
 this solves *making room* for one, prefab or procedural, before packing it).
+Still open. A related but separate gap — *reserving a road/avenue* between
+stamped groups (not a flat buffer around one feature) — is now built; see
+"Stamped-group rotation, entrance detection, and road/avenue preservation"
+under Layout Rules above.
 
 **TODO — rebuild a single area in place from an existing/completed module
 (user-raised).** No current tool lets you regenerate just one area of an
@@ -492,6 +672,46 @@ a commit (every `repack_module`? every mutating tool call, git-embedded
 resources included?), and whether the binary form is committed alongside the
 JSON form (probably yes, since the JSON is derived and the binary is what
 actually ships) or regenerated from JSON on demand.
+
+**TODO — a systematic test/analysis pass across every native (base-game) tileset,
+one throwaway single-area module per tileset (user-raised).** Everything this
+project currently knows about a specific tileset's real quirks — `ttf01`'s building
+palette being far smaller than `tno01`'s (surfaced only by trying to avoid rotation
+in "The Twin Villages Waystop"), most named building groups' doors failing the
+`getGroupEntrances` 3m-offset exterior/interior heuristic (found empirically,
+group by group, only when a real build needed it), which groups' corner terrain is
+Grass vs Dirt vs Forest and so seams against a given zone, which multi-tile groups
+are genuinely rotation-safe (single, symmetric-enough models) vs. structurally
+unsafe (a unique mesh per tile — see the rotation-handedness saga above) — has come
+from hand debugging one real build's specific groups, one tileset at a time, after
+something already broke. Doing this proactively, once, for every native tileset
+would turn "discover the gap live, at content-build time" into "already known and
+documented before it can bite a build."
+
+**What such an area/analysis should capture per tileset**, informed directly by the
+gaps this session found the hard way: every named group placed at least once (native
+rotation 0, since that's the only rotation always safe to test) with its full
+`get_tileset_details` `entrances` result recorded next to its REAL door bearing data
+(so the entrance-detection heuristic's actual hit rate per tileset is measured, not
+assumed); each group's own corner-terrain pattern tabulated against the tileset's
+declared floor/wall/border terrains (which ones will seam against which zone types);
+a rough census of building-type variety (how many distinct named groups exist,
+usable as a sanity check before promising a build "N distinct buildings" the way
+`ttf01`'s sparse palette couldn't actually deliver); and, longer-term, some way to
+flag which multi-tile groups are plausibly rotation-safe — there's no automated way
+to tell a symmetric/repeatable piece from a unique-mesh-per-tile one from `.set` data
+alone (per the settileLibrary finding above), so this might start as a manually
+curated allow-list seeded by this pass rather than something fully automatic.
+
+**Not yet scoped — real open questions before building this**: one area per tileset
+vs. several (a tileset with hundreds of groups may not fit every one, unrotated,
+into a single reasonably-sized area); whether this becomes a new MCP tool (a
+`survey_tileset`-style capability that builds the throwaway module itself) or a
+one-off script/skill run manually per tileset and its findings folded into this
+doc; and how the output should be stored so it stays a living reference rather than
+a one-time report — most likely a per-tileset findings doc under `docs/`, in the
+same spirit as `docs/encounter-difficulty-findings.md` and the other verified-finding
+docs this project already keeps, rather than something baked into `tileset.ts` itself.
 
 **Tooling to prevent the classes of mistakes found late in one session's own
 work (user-raised: "how do we avoid these in the future, can we add script
@@ -759,6 +979,56 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
   completely different, correct, common pattern — don't conflate the two
   when auditing for this. Only `start_web_editor` had the broken shape;
   confirmed by checking every other bare `{}` occurrence's actual position.
+- **`paint_group` only ever writes its OWN footprint — repainting the same origin with
+  a different-shaped group (or one with different `-1` holes) leaves the previous
+  group's tiles behind as orphaned fragments, outside the new group's bounds or
+  underneath its holes.** Confirmed real, twice, in "The Twin Villages Waystop": after
+  several rounds of replacing buildings at the same 10-15 origins (different group,
+  different rotation, different footprint each round — the rotation-bug repair saga
+  above), a user report of buildings "still broken into pieces" traced to genuine
+  leftover tiles from 2-3 rounds earlier, not a new bug. Two concrete shapes this
+  takes: (1) a **hole** — a new group's `-1` slot (e.g. `city_house_2x2`'s tileIds
+  `[283,-1,284,285]`) is explicitly skipped by `paint_group`'s write loop
+  (`if (tileId < 0) continue`), so whatever tile occupied that grid cell from an
+  earlier, differently-shaped placement is never overwritten; (2) a **smaller/
+  differently-rotated footprint** — replacing a 2x3 group with a 2x2 one, or a
+  2-row-tall placement with a 1-row one, leaves every cell in the old footprint that
+  isn't in the new one untouched. **Diagnosis method (reusable for any future report
+  like this):** convert the area's `.are` to JSON directly (`nwn_gff -i area.are -o
+  area.json -k json -p` — the temp dir's `.are`/`.git` files are raw binary GFF, not
+  pre-converted), build a `tileID -> owning group name` map from the tileset's full
+  group catalog, and scan the suspect region for any tile ID that belongs to a
+  building group but isn't the one that's *supposed* to be there. **This has a real
+  blind spot**: a tile ID belonging to a group that's ALSO used correctly elsewhere in
+  the same area won't be flagged as foreign by a simple "is this ID in my expected
+  set" check — confirmed in this same session (a stray `Shack 1 2x2` tile sat in a
+  slot that was supposed to become `Shack 2 1x2`, invisible to the scan because
+  `Shack 1 2x2`'s own tiles are legitimately expected elsewhere in the same area).
+  Closing that gap needs reconstructing each origin's *actual* placement history
+  (every group/rotation/footprint ever placed there, and its real bounding box
+  including any rotation-driven width/height swap) and diffing the union against the
+  final group's own footprint — slower, but the only way to catch same-group,
+  wrong-slot leftovers. **A second real user report found two more orphans this same
+  check missed** — the manual historical reconstruction used to find the first batch
+  had its own error (misremembered the *original* build's rotation for two specific
+  buildings as 0 when it was actually 1, understating their true historical footprint
+  by one row). **The reliable fix is to stop reconstructing history by hand entirely**:
+  build a full per-cell expected-tile map from the FINAL intended footprint of every
+  building (not just a set of "valid" tile IDs), then scan the whole region for two
+  conditions at once — every footprint cell holds exactly its expected tile, AND no
+  cell outside any footprint (including a hole) holds a tile belonging to ANY known
+  building group. This catches both failure shapes in one pass (a wrong tile inside a
+  footprint, and a stray tile outside one) without needing to know or trust the
+  placement history at all — only the final plan and the tileset's real group catalog.
+  **No code fix applied** — this is a workflow/diagnosis pitfall
+  for hand-driven, multi-round `paint_group` repainting of the same origin, not a bug
+  in `paint_group` itself (it correctly does exactly what it's asked; nothing asks it
+  to clear a *different* group's old footprint first, since it has no way to know what
+  was there before). If this recurs, consider a `clear_footprint`-style tool that
+  overwrites a rectangular region to a caller-supplied background tile before
+  painting a group, so hand-driven multi-round repainting doesn't need this manual
+  archaeology every time.
+
 - **FIXED — the equipped-item resref field was read as `EquippedRes` everywhere in
   this codebase; no real equipped item struct carries that field name, so every
   check depending on it was silent dead code.** The real field is `TemplateResRef`
@@ -2633,6 +2903,26 @@ BioWare associate AI (`x0_ch_hen_*`). These are base-game resources resolved at 
   the box, not just an unset field. `verify_creature` now flags
   `appearance_race_mismatch` for any creature (not just henchmen) where these disagree
   within the standard-race range.
+- **TODO — randomize head/hair-color/skin-color for standard PC-race NPC appearances
+  (user-raised).** `buildMinimalUtc()`'s `Appearance_Head`/`Color_Hair`/`Color_Skin`/
+  `Color_Tattoo1`/`Color_Tattoo2` defaults are fixed values matched from two real sample
+  henchmen (`hen_dorna.utc`/`hen_linu.utc`, see the "invisible henchmen" pitfall above) —
+  every generated NPC on a standard PC-race appearance (rows 0-6, the bullet above)
+  currently looks identical unless hand-varied per creature. User wants this randomized,
+  following the same approach an existing sibling project, **GvE3** (`~/git/gve3`,
+  per this project's shared-tooling convention — see the global CLAUDE.md), already uses
+  for its own NPC/PC appearance randomization. **Not yet scoped — GvE3's actual
+  implementation (script/table/value ranges) hasn't been read yet, and nothing here
+  should be guessed at ahead of that** (matches this project's "never guess, verify
+  against real data" discipline — see the 2DA-research-technique memory). Before
+  building: find and read GvE3's real randomization script/include, confirm its real
+  head-count-per-race/gender source (likely `appearance.2da` or a head-count table) and
+  its real `Color_Hair`/`Color_Skin` value ranges (skin-tone ranges plausibly differ by
+  race, so don't assume one universal range), then port the verified mechanism rather
+  than inventing new ranges. Likely landing spot: a `complexity`-style opt-in on
+  `build_npc_stat_block` or a new dedicated appearance-randomization tool, seeded
+  deterministically the same way `pickWeaponPreference` is (by the creature's own
+  tag/resref) to keep generated content reproducible rather than dice-rolled.
 - **An empty `FeatList` on a fresh level-1 blueprint is expected, not a defect** — but
   **verified via a live headless server run: `GetHasFeat()` does NOT reflect any
   engine-computed racial feat set when `FeatList` is empty; it strictly reads the actual

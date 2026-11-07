@@ -30,7 +30,7 @@ import { snapshotGitForUndo } from "../util/undo.js";
 import { compileScript, jsonToGff, erfPack } from "../nim-tools.js";
 import { checkPlacementWalkable } from "../util/walkmesh.js";
 import { findOpenGround, loadAreaWalkGrid } from "../util/walkgrid.js";
-import { getTilesetInfo } from "../util/tileset.js";
+import { getTilesetInfo, getRotatedCorners, rotatedGroupDimensions, rotateGroupTileIndex } from "../util/tileset.js";
 import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatchesTerrain, resolveFloorTerrain, MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import type { LayoutStyle, SuggestedFeature } from "../util/layout-generator.js";
 import { solveArea } from "../util/zone-solver.js";
@@ -544,7 +544,7 @@ export function registerAdventureTools(server: McpServer): void {
       tileset: z.string().describe("Tileset resref (e.g., 'tdc01' for crypt, 'ttf01' for forest)"),
       width: z.string().describe("Area width in tiles (8-32)"),
       height: z.string().describe("Area height in tiles (8-32)"),
-      style: z.string().describe("JSON style object: {type: 'dungeon'|'cave'|'dwelling'|'forest'|'rural'|'city'|'plains'|'desert'|'castle'|'tundra', rooms?: number, clearings?: number, corridorStyle?: 'straight'|'zigzag', roadStyle?: 'spine'|'grid'|'winding', preferredFeatures?: string[], safeMode?: boolean} — preferredFeatures is an array of tileset group names (from get_tileset_details) to prioritize when placing features (ignored when safeMode is true — safeMode always returns an empty suggestedFeatures array). Preferred groups are tried first before falling back to random selection."),
+      style: z.string().describe("JSON style object: {type: 'dungeon'|'cave'|'dwelling'|'forest'|'rural'|'city'|'plains'|'desert'|'castle'|'tundra', rooms?: number, clearings?: number, corridorStyle?: 'straight'|'zigzag', roadStyle?: 'spine'|'grid'|'winding', preferredFeatures?: string[], safeMode?: boolean, avenue?: boolean} — preferredFeatures is an array of tileset group names (from get_tileset_details) to prioritize when placing features (ignored when safeMode is true — safeMode always returns an empty suggestedFeatures array). Preferred groups are tried first before falling back to random selection. avenue:true (default false, zero effect on existing callers) reserves the primary room-to-room corridor as a protected avenue BEFORE packing features — a feature never overlaps it, and a feature in an avenue-adjacent room is preferentially placed/rotated so its entrance (see get_tileset_details's per-group entrances field) faces the avenue, falling back to ordinary placement if no facing match fits. Placed features may then carry a rotation field (0-3 quarter-turns) — pass it straight through to adventure_apply_layout."),
       transitionCount: z.string().optional().describe("Number of transition points to generate (default 1)"),
       transitionDirections: z.string().optional().describe("JSON array of directions: ['south', 'north', 'east', 'west']"),
     },
@@ -704,8 +704,24 @@ export function registerAdventureTools(server: McpServer): void {
           featureWarnings.push(`${sf.feature}: skipped (height-transition tile — needs hand-terraced elevated terrain, not auto-placeable)`);
           continue;
         }
-        // Reject groups whose tile corners don't match the surrounding zone terrain.
-        // Look up what terrain the zone solver will paint at this position.
+        // Collar tiles (relX/relY/tileId/orientation below) are hand-authored
+        // for a NATIVE (rotation=0) placement of the main feature — rotating
+        // the feature without also re-deriving its collar would place the
+        // collar tiles in the wrong spot relative to the now-rotated
+        // building. Clamp to 0 rather than silently placing a mismatched
+        // collar; the feature itself is still worth placing.
+        let rotation: 0 | 1 | 2 | 3 = sf.rotation ?? 0;
+        if (collar && rotation !== 0) {
+          featureWarnings.push(`${sf.feature}: rotation ${rotation} requested but this feature has a curated collar (native placement only) — placed at rotation 0`);
+          rotation = 0;
+        }
+        // Rotation matches how the toolset rotates a group (tile-oracle.live.test.ts: 633 hand-placed rotated
+        // groups, 98.6% of tiles agree), so no warning is needed for rotated multi-tile groups.
+        const { columns: placedColumns, rows: placedRows } = rotatedGroupDimensions(group.columns, group.rows, rotation);
+        // Reject groups whose tile corners (AS ROTATED — a feature placed at
+        // rotation 1/2/3 presents different corners outward than its native
+        // tile data lists) don't match the surrounding zone terrain. Look up
+        // what terrain the zone solver will paint at this position.
         const featureZoneTerrain = (() => {
           // Last zone covering this position wins (zones apply in order)
           let terrain = "";
@@ -721,32 +737,35 @@ export function registerAdventureTools(server: McpServer): void {
             if (id < 0) return false;
             const t = tileset.tiles[id];
             if (!t) return false;
-            return t.corners.topLeft.toLowerCase() !== featureZoneTerrain ||
-                   t.corners.topRight.toLowerCase() !== featureZoneTerrain ||
-                   t.corners.bottomLeft.toLowerCase() !== featureZoneTerrain ||
-                   t.corners.bottomRight.toLowerCase() !== featureZoneTerrain;
+            const rc = getRotatedCorners(t, rotation);
+            return rc.topLeft.toLowerCase() !== featureZoneTerrain ||
+                   rc.topRight.toLowerCase() !== featureZoneTerrain ||
+                   rc.bottomLeft.toLowerCase() !== featureZoneTerrain ||
+                   rc.bottomRight.toLowerCase() !== featureZoneTerrain;
           });
           if (terrainMismatch) {
             featureWarnings.push(`${sf.feature}: skipped (tile corners don't match zone terrain '${featureZoneTerrain}')`);
             continue;
           }
         }
-        // Validate dimensions match
-        if (sf.columns !== group.columns || sf.rows !== group.rows) {
-          featureWarnings.push(`${sf.feature}: layout says ${sf.columns}x${sf.rows} but tileset group is ${group.columns}x${group.rows}`);
+        // Validate dimensions match (against the PLACED, post-rotation footprint)
+        if (sf.columns !== placedColumns || sf.rows !== placedRows) {
+          featureWarnings.push(`${sf.feature}: layout says ${sf.columns}x${sf.rows} but tileset group at rotation ${rotation} is ${placedColumns}x${placedRows}`);
           continue;
         }
         // Validate bounds
-        if (sf.x < 0 || sf.x + group.columns > areaWidth || sf.y < 0 || sf.y + group.rows > areaHeight) {
+        if (sf.x < 0 || sf.x + placedColumns > areaWidth || sf.y < 0 || sf.y + placedRows > areaHeight) {
           featureWarnings.push(`${sf.feature} at (${sf.x},${sf.y}) out of bounds for ${areaWidth}x${areaHeight} area`);
           continue;
         }
-        // Resolve group tiles (row-major, bottom-to-top, orientation 0)
-        for (let gr = 0; gr < group.rows; gr++) {
-          for (let gc = 0; gc < group.columns; gc++) {
+        // Resolve group tiles: iterate the PLACED (post-rotation) footprint,
+        // and for each slot look up which native group cell's tileId belongs there.
+        for (let ngr = 0; ngr < placedRows; ngr++) {
+          for (let ngc = 0; ngc < placedColumns; ngc++) {
+            const { gc, gr } = rotateGroupTileIndex(ngc, ngr, group.columns, group.rows, rotation);
             const tileId = group.tileIds[gr * group.columns + gc];
             if (tileId < 0) continue; // empty slot
-            featureTiles.push({ x: sf.x + gc, y: sf.y + gr, tileId, orientation: 0 });
+            featureTiles.push({ x: sf.x + ngc, y: sf.y + ngr, tileId, orientation: rotation });
           }
         }
         // Resolve the feature's collar, if it has a curated one (feature-collars.ts).

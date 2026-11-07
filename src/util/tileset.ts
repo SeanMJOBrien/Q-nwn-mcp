@@ -363,6 +363,75 @@ function forwardRotateDoor(x: number, y: number, orientation: number): [number, 
   }
 }
 
+/**
+ * New-footprint dimensions after rotating a `columns`x`rows` group by
+ * `rotation` quarter-turns. 90°/270° swap columns and rows; 0°/180° don't.
+ */
+export function rotatedGroupDimensions(
+  columns: number,
+  rows: number,
+  rotation: 0 | 1 | 2 | 3,
+): { columns: number; rows: number } {
+  return rotation % 2 === 0 ? { columns, rows } : { columns: rows, rows: columns };
+}
+
+/**
+ * Given a target slot (ngc, ngr) within a group's FOOTPRINT AFTER rotating it
+ * by `rotation` quarter-turns, return which NATIVE (pre-rotation) grid slot's
+ * tileId belongs there — i.e. this is the inverse map a caller writing a
+ * rotated group's tiles needs: iterate the rotated footprint's cells, call
+ * this once per cell, read `group.tileIds[gr * columns + gc]` from the
+ * result.
+ *
+ * Derived by transforming the group footprint's own corners through the same
+ * point-rotation this codebase already uses for doors/corners
+ * (`forwardRotateDoor`'s case 0-3), then inverting. Cross-checked three
+ * independent ways before trusting it (direct per-rotation corner-transform,
+ * and composing the 90° step two/three times to re-derive 180°/270°
+ * algebraically) — all three agreed on internal self-consistency (bijection,
+ * 4-steps-is-identity), which only proves this is *a* valid 90° rotation,
+ * not *which way* it turns.
+ *
+ * CORRECTION (2026-09-19, second round): an earlier fix this same day swapped
+ * cases 1 and 3 here, based on a wrong assumption that this function shared
+ * the same handedness bug as `bearingToSide`/`rotateSide` below. It does not.
+ * A real user report ("any tile feature larger than one tile is broken")
+ * after that swap shipped — buildings scrambled into wrong pieces, a tile
+ * duplicated into two slots — led to checking this function's formula
+ * directly against `~/git/settileLibrary`'s independently-verified
+ * `TileBlockRotate`/`_TileRotatedOffsetX/Y` (a separate, real, tested NWScript
+ * library for exactly this operation). That reference's forward rotation of
+ * offset `(ox,oy)` by 90° is `(-oy, ox)` — algebraically identical to this
+ * function's ORIGINAL (pre-swap) case 1/3, confirmed by deriving the general
+ * W x H inverse from that same verified point-rotation and checking it cell
+ * by cell against a 2x2 example. The swap was reverted; this is back to the
+ * original, now cross-verified formula. The compass-facing calibration fix in
+ * `bearingToSide`/`rotateSide` below is a SEPARATE, independent piece of
+ * logic (used only for choosing which `rotation` value to request, never for
+ * the actual tile-position write path) and remains correct — see its own
+ * note for why the two are unrelated despite looking like "the same kind of
+ * handedness bug" at a glance. This still does NOT touch the separately-
+ * verified, pre-existing `getRotatedCorners`/`forwardRotate` convention.
+ *
+ * VERIFIED (2026-11-07) against real, hand-built areas: tile-oracle.live.test.ts finds 633 rotated groups
+ * placed by hand in 504 areas, and 98.6 % of their 1,886 tiles sit at Tile_Orientation = this rotation.
+ */
+export function rotateGroupTileIndex(
+  ngc: number,
+  ngr: number,
+  columns: number,
+  rows: number,
+  rotation: 0 | 1 | 2 | 3,
+): { gc: number; gr: number } {
+  switch (rotation) {
+    case 0: return { gc: ngc, gr: ngr };
+    case 1: return { gc: ngr, gr: rows - ngc - 1 };
+    case 2: return { gc: columns - ngc - 1, gr: rows - ngr - 1 };
+    case 3: return { gc: columns - ngr - 1, gr: ngc };
+    default: return { gc: ngc, gr: ngr };
+  }
+}
+
 /** Compute world-space door positions for a tile placed at (col, row) with given orientation. */
 export function getTileDoorWorldPositions(
   tile: TileDefinition,
@@ -379,6 +448,130 @@ export function getTileDoorWorldPositions(
       bearing: (dp.orientation + tileOrientation * 90) % 360,
     };
   });
+}
+
+/**
+ * Quantize a bearing (degrees) to the nearest cardinal side.
+ *
+ * CALIBRATION FIX (2026-09-19): the original bucket assignment here was a
+ * full quadrant (90°) off from real in-game facing, confirmed by a user
+ * visually checking 4 real placed buildings in the toolset against their
+ * intended facing — see the `rotateSide` fix below for the second,
+ * independent bug found in the same report. This mapping was derived by
+ * assumption ("0=east/+X, counterclockwise") and never checked against a
+ * real placement before that report; the corrected buckets below are the
+ * ones that reproduce all 4 real, human-observed results exactly.
+ */
+function bearingToSide(bearing: number): "N" | "S" | "E" | "W" {
+  const normalized = ((bearing % 360) + 360) % 360;
+  if (normalized >= 45 && normalized < 135) return "E";
+  if (normalized >= 135 && normalized < 225) return "N";
+  if (normalized >= 225 && normalized < 315) return "W";
+  return "S";
+}
+
+export interface GroupEntrance {
+  /** Native (rotation=0), pre-rotation tile-slot column/row within the group's own grid. */
+  localCol: number;
+  localRow: number;
+  /** Native-space (rotation=0) group-local coordinates — NOT remapped for `rotation`. */
+  x: number;
+  y: number;
+  /** Native-space bearing (rotation=0). */
+  bearing: number;
+  /** Which side of the group's footprint this door opens onto, AFTER applying `rotation`. */
+  side: "N" | "S" | "E" | "W";
+}
+
+const SIDE_ORDER: Array<"N" | "S" | "E" | "W"> = ["N", "E", "S", "W"];
+
+/**
+ * Rotate a cardinal side by `steps` quarter-turns.
+ *
+ * DIRECTION FIX (2026-09-19): this used to ADD steps (N->E->S->W as
+ * `rotation` increases). A user's real in-toolset check of 4 placed
+ * buildings across all 4 rotation values found the real direction is the
+ * opposite — confirmed together with the `bearingToSide` calibration fix
+ * above, since the two errors combined to fit all 4 reports exactly:
+ * `actual = (expected + 1 - 2*rotation) mod 4`. This does not affect or
+ * contradict the separately-verified, PRE-EXISTING tile-corner rotation
+ * convention (`getRotatedCorners`/`forwardRotate`, "case 1 = 90° CW") —
+ * that logic solves a different problem (which corner terrain ends up
+ * where) and was independently corpus-verified; this function's "which
+ * compass direction" calibration was a fresh, never-verified assumption.
+ */
+function rotateSide(side: "N" | "S" | "E" | "W", steps: number): "N" | "S" | "E" | "W" {
+  const idx = SIDE_ORDER.indexOf(side);
+  return SIDE_ORDER[(((idx - steps) % 4) + 4) % 4];
+}
+
+/**
+ * Every EXTERIOR door a tile group has — generalizes findFeatureDoorPosition's
+ * (layout-generator.ts) door scan, which only ever returned the first exterior
+ * door for transition-portal placement. Same classification logic (a door is
+ * "exterior" if its outward offset point lands off the group's own footprint),
+ * reused rather than re-derived, now returning all of them plus a cardinal
+ * `side` so a caller can reason about which face of the group to point at a
+ * road/avenue.
+ *
+ * Deliberately does NOT re-derive door world-positions at a rotated tile
+ * placement — that would require the same grid-slot remap
+ * (`rotateGroupTileIndex` in layout-generator.ts) this function would then
+ * have to duplicate, doubling the surface area for a rotation-handedness
+ * mistake. Instead: door geometry (x/y/bearing/localCol/localRow) is always
+ * computed at native orientation (rotation=0, the same math
+ * findFeatureDoorPosition already used and this project already trusts), and
+ * `rotation` only rotates the returned `side` label by simple compass
+ * arithmetic (N->E->S->W->N per quarter-turn) — a much smaller, independently
+ * checkable piece of logic than re-deriving positions.
+ *
+ * HANDEDNESS: fixed 2026-09-19 after a real in-toolset user report found the
+ * original direction/calibration wrong on 4 real placed buildings — see the
+ * fix notes on `bearingToSide`/`rotateSide` for the confirming data. `side`
+ * now matches real in-game facing for both rotation=0 and every nonzero
+ * rotation.
+ */
+export function getGroupEntrances(group: TileGroup, tileset: TilesetInfo, rotation: 0 | 1 | 2 | 3 = 0): GroupEntrance[] {
+  const OFFSET = 3.0;
+  const featureTileSet = new Set<string>();
+  for (let gc = 0; gc < group.columns; gc++) {
+    for (let gr = 0; gr < group.rows; gr++) {
+      featureTileSet.add(`${gc},${gr}`);
+    }
+  }
+
+  const entrances: GroupEntrance[] = [];
+  for (let gr = 0; gr < group.rows; gr++) {
+    for (let gc = 0; gc < group.columns; gc++) {
+      const tileId = group.tileIds[gr * group.columns + gc];
+      if (tileId < 0) continue;
+      const tile = tileset.tiles[tileId];
+      if (!tile || tile.doors === 0) continue;
+
+      // Group-local coordinates (origin at (0,0), not world space) — reuse
+      // getTileDoorWorldPositions at native orientation (0) with the group's
+      // own (gc, gr) as the "col/row" args, matching findFeatureDoorPosition.
+      const doorPositions = getTileDoorWorldPositions(tile, gc, gr, 0);
+      for (const door of doorPositions) {
+        const rad = (door.bearing * Math.PI) / 180;
+        const offsetX = door.x + Math.cos(rad) * OFFSET;
+        const offsetY = door.y + Math.sin(rad) * OFFSET;
+        const offsetTileCol = Math.floor(offsetX / 10);
+        const offsetTileRow = Math.floor(offsetY / 10);
+        const isExterior = !featureTileSet.has(`${offsetTileCol},${offsetTileRow}`);
+        if (!isExterior) continue;
+        entrances.push({
+          localCol: gc,
+          localRow: gr,
+          x: Math.round(door.x * 10) / 10,
+          y: Math.round(door.y * 10) / 10,
+          bearing: door.bearing,
+          side: rotateSide(bearingToSide(door.bearing), rotation),
+        });
+      }
+    }
+  }
+  return entrances;
 }
 
 // ─── Tileset Cache ──────────────────────────────────────────────────────────

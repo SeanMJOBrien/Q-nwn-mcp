@@ -35,6 +35,8 @@ import {
   getRotatedCrossers,
   listAllTilesets,
   parseTilesetFile,
+  rotatedGroupDimensions,
+  rotateGroupTileIndex,
 } from "./tileset.js";
 import type { TilesetInfo } from "./tileset.js";
 import { extractSalvaging } from "./batch-extract.js";
@@ -396,6 +398,60 @@ describe.skipIf(!haveAreas)("conventions against real, human-built areas (LIVE, 
     expect(onRaised.total).toBeGreaterThan(100);
     expect(pct(onRaised.right, onRaised.total)).toBeGreaterThanOrEqual(85);
     expect(pct(onRaised.flat5, onRaised.total)).toBeLessThanOrEqual(15);
+  }, 600_000);
+
+  it("rotated tile groups placed by hand match rotateGroupTileIndex: layout turned n x 90 degrees counter-clockwise, every tile at orientation n", () => {
+    // A layout found by remapping with rotation n must hold tiles placed at Tile_Orientation n. The mirror (clockwise)
+    // pairing finds the same layouts under the opposite rotation number, so the orientation agreement is the test.
+    const mirror = (rot: 1 | 2 | 3): 1 | 2 | 3 => (rot === 1 ? 3 : rot === 3 ? 1 : 2);
+    const groups = [0, 0, 0, 0];
+    const orient = { ccw: 0, mirror: 0, total: 0 };
+    for (const { are, tileset } of areas) {
+      const info = game.tilesets.get(tileset);
+      if (!info) continue;
+      const grid = readAreaTileGrid(are);
+      for (const g of info.groups) {
+        const filled = g.tileIds.filter((id) => id >= 0);
+        // Only groups whose layout is unambiguous: 2+ tiles, all distinct ids.
+        if (filled.length < 2 || new Set(filled).size !== filled.length) continue;
+        for (const rot of [1, 2, 3] as const) {
+          const { columns: nc, rows: nr } = rotatedGroupDimensions(g.columns, g.rows, rot);
+          for (let oy = 0; oy + nr <= grid.height; oy++) {
+            for (let ox = 0; ox + nc <= grid.width; ox++) {
+              let ok = true;
+              const placed: number[] = [];
+              for (let ngr = 0; ngr < nr && ok; ngr++) {
+                for (let ngc = 0; ngc < nc && ok; ngc++) {
+                  const { gc, gr } = rotateGroupTileIndex(ngc, ngr, g.columns, g.rows, rot);
+                  const id = g.tileIds[gr * g.columns + gc];
+                  if (id < 0) continue;
+                  const t = grid.tiles[(oy + ngr) * grid.width + ox + ngc];
+                  if (!t || t.id !== id) ok = false;
+                  else placed.push(t.orientation % 4);
+                }
+              }
+              if (!ok) continue;
+              groups[rot]++;
+              orient.total += placed.length;
+              orient.ccw += placed.filter((o) => o === rot).length;
+              orient.mirror += placed.filter((o) => o === mirror(rot)).length;
+            }
+          }
+        }
+      }
+    }
+    report("rotated groups", {
+      rot1: groups[1],
+      rot2: groups[2],
+      rot3: groups[3],
+      tiles: orient.total,
+      ccwOrientationPct: pct(orient.ccw, orient.total),
+      mirrorOrientationPct: pct(orient.mirror, orient.total),
+    });
+    expect(groups[1] + groups[3]).toBeGreaterThan(50);
+    expect(pct(orient.ccw, orient.total)).toBeGreaterThanOrEqual(95);
+    // Rotation-2 tiles agree under both pairings, so the mirror's share is bounded by them.
+    expect(pct(orient.mirror, orient.total)).toBeLessThan(60);
   }, 600_000);
 });
 

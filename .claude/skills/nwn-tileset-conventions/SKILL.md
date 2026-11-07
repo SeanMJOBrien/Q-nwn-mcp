@@ -12,7 +12,10 @@ env-gated oracle `src/util/tile-oracle.live.test.ts`. If you change rotation/hei
 
 - World metres: **+X east, +Y north**, origin at the **south-west** corner; a tile is **10 × 10 m**.
 - `Tile_List` is **row-major from the south-west**: `index = tileY × Width + tileX`; tile centre `(tileX×10+5, tileY×10+5)`.
-- `paint_group` x,y is the **bottom-left** tile of the group.
+- `paint_group` x,y is the **bottom-left** tile of the group. `rotation` (0-3) turns the whole group n × 90°
+  counter-clockwise, exactly as the toolset does: the footprint swaps width and height at 1 and 3, each tile moves to
+  its turned cell and gets `Tile_Orientation` n (checked against 633 hand-placed rotated groups, 98.6 % agreement).
+  `get_tileset_details` (full) lists each group's exterior `entrances` with the side they open onto.
 
 ## Rotation: counter-clockwise, and the `.set` is already in orientation-0 terms
 
