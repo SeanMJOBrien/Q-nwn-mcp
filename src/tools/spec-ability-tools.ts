@@ -25,7 +25,7 @@ import type { ModuleIndex } from "../types/module.js";
 import { writeAndCompileScript } from "../util/script-writer.js";
 import { bakeSpecAbilityPoolForCreature } from "../util/spec-ability-pool.js";
 import { generateSpecAbilityInclude } from "../util/spec-ability-script.js";
-import { resolveCreatureTarget, targetErrorResult } from "./npc-tools.js";
+import { creatureSeed, resolveCreatureTarget, targetErrorResult } from "./npc-tools.js";
 
 /** Probe resref used to prove the include compiles. Removed before returning. */
 const PROBE_RESREF = "_sa_probe";
@@ -139,7 +139,7 @@ export function registerSpecAbilityTools(server: McpServer): void {
         breakdown,
         warnings: allWarnings,
         henchLevelApplied,
-      } = bakeSpecAbilityPoolForCreature(index, creature, markReady ?? false, target.label);
+      } = bakeSpecAbilityPoolForCreature(index, creature, markReady ?? false, creatureSeed(creature));
 
       creature.SpecAbilityList = {
         type: "list",

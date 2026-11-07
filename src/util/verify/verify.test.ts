@@ -1001,116 +1001,87 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).not.toContain("ranged_feat_no_reload_support");
   });
 
-  // AC Bonus item property (PropertyName=1, ITEM_PROPERTY_AC_BONUS) with
-  // CostValue=4 is Medium armor (tier 4-5) per armorTierFeat() — the literal
-  // Corin Vale bug: a Rogue with only Light Armor Proficiency (feat 3) from
-  // its automatic class feats, equipped with Medium armor (needs feat 4).
-  function chestArmor(acBonus: number) {
+  // Base AC comes from the torso part (parts_chest.2da ACBONUS), verified live
+  // 2026-11-07; an AC Bonus property is enhancement only. Here torso row N has
+  // base AC N. The Corin Vale bug: a Rogue with only Light Armor Proficiency
+  // (feat 3) in base-AC-4 (Medium) armor, which the engine refuses to equip.
+  const armorIndex = () =>
+    makeIndex({
+      twodaTables: new Map([
+        [
+          "parts_chest",
+          twoDA(
+            ["ACBONUS"],
+            Array.from({ length: 9 }, (_, i) => [i, { ACBONUS: `${i}.00` }] as [number, Record<string, string>]),
+          ),
+        ],
+      ]),
+    });
+  function chestArmor(baseAC: number, enhancement = 0) {
     return {
       __struct_id: 2,
       TemplateResRef: { type: "resref", value: "some_armor" },
       BaseItem: { type: "int", value: 16 },
+      ArmorPart_Torso: { type: "byte", value: baseAC },
       PropertiesList: {
         type: "list",
-        value: [
-          {
-            __struct_id: 0,
-            PropertyName: { type: "word", value: 1 },
-            CostValue: { type: "word", value: acBonus },
-          },
-        ],
+        value:
+          enhancement > 0
+            ? [{ __struct_id: 0, PropertyName: { type: "word", value: 1 }, CostValue: { type: "word", value: enhancement } }]
+            : [],
       },
     };
   }
 
-  it("flags Chest-slot armor whose weight tier has no matching Armor Proficiency feat", async () => {
+  it("flags Chest-slot armor whose base AC needs a proficiency the creature lacks", async () => {
     const obj = makeCreature("nw_c2_default", {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 3 } }] }, // ArmProfLgt only
-      Equip_ItemList: { type: "list", value: [chestArmor(4)] }, // Medium armor — needs ArmProfMed (4)
+      Equip_ItemList: { type: "list", value: [chestArmor(4)] }, // plain chainmail-class armor, no properties
     });
     const report = new Report("t", "utc");
-    await verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, armorIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("armor_proficiency_mismatch");
   });
 
   it("does not flag Chest-slot armor when the matching weight-tier feat is present", async () => {
     const obj = makeCreature("nw_c2_default", {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 4 } }] }, // ArmProfMed
-      Equip_ItemList: { type: "list", value: [chestArmor(4)] }, // Medium armor
+      Equip_ItemList: { type: "list", value: [chestArmor(4)] },
     });
     const report = new Report("t", "utc");
-    await verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, armorIndex(), obj);
     expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
   });
 
-  it("does not flag Chest-slot armor with no AC Bonus property at all (unknown tier, degrades to skip)", async () => {
-    const obj = makeCreature("nw_c2_default", {
-      Equip_ItemList: {
-        type: "list",
-        value: [
-          {
-            __struct_id: 2,
-            TemplateResRef: { type: "resref", value: "some_armor" },
-            BaseItem: { type: "int", value: 16 },
-          },
-        ],
-      },
-    });
-    const report = new Report("t", "utc");
-    await verifyCreature(report, makeIndex(), obj);
-    expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
-  });
-
-  // Real, confirmed finding: some base-game NPC "costume" armor (the
-  // nw_aarcl0XX family) has a genuinely empty PropertiesList despite looking
-  // like, and being costed like, real protective gear — AC bonus 0 isn't a
-  // proficiency problem for armorTierFeat() (correctly needs no feat), but it
-  // IS a "this armor does nothing" problem worth its own warning.
-  it("flags Chest-slot armor costed like real gear but with no AC Bonus property at all", async () => {
-    const obj = makeCreature("nw_c2_default", {
-      Equip_ItemList: {
-        type: "list",
-        value: [
-          {
-            __struct_id: 2,
-            TemplateResRef: { type: "resref", value: "nw_aarcl004" },
-            BaseItem: { type: "int", value: 16 },
-            Cost: { type: "dword", value: 150 },
-          },
-        ],
-      },
-    });
-    const report = new Report("t", "utc");
-    await verifyCreature(report, makeIndex(), obj);
-    expect(report.warnings.map((w) => w.code)).toContain("equipped_armor_no_ac_bonus");
-  });
-
-  it("does not flag cheap baseline clothing (Cost <= 10) with no AC Bonus property", async () => {
-    const obj = makeCreature("nw_c2_default", {
-      Equip_ItemList: {
-        type: "list",
-        value: [
-          {
-            __struct_id: 2,
-            TemplateResRef: { type: "resref", value: "nw_cloth001" },
-            BaseItem: { type: "int", value: 16 },
-            Cost: { type: "dword", value: 1 },
-          },
-        ],
-      },
-    });
-    const report = new Report("t", "utc");
-    await verifyCreature(report, makeIndex(), obj);
-    expect(report.warnings.map((w) => w.code)).not.toContain("equipped_armor_no_ac_bonus");
-  });
-
-  it("does not flag Chest-slot armor that already has a real AC Bonus property, even a low one", async () => {
+  it("an AC Bonus enhancement does not change the weight class (+4 leather is still Light)", async () => {
     const obj = makeCreature("nw_c2_default", {
       FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 3 } }] }, // ArmProfLgt
-      Equip_ItemList: { type: "list", value: [{ ...chestArmor(1), Cost: { type: "dword", value: 150 } }] },
+      Equip_ItemList: { type: "list", value: [chestArmor(2, 4)] },
     });
     const report = new Report("t", "utc");
-    await verifyCreature(report, makeIndex(), obj);
+    await verifyCreature(report, armorIndex(), obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
+  });
+
+  it("skips armor whose torso part can't be resolved (blueprint entry with only EquippedRes)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      Equip_ItemList: {
+        type: "list",
+        value: [{ __struct_id: 2, EquippedRes: { type: "resref", value: "nw_aarcl004" } }],
+      },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, armorIndex(), obj);
+    expect(report.errors.map((e) => e.code)).not.toContain("armor_proficiency_mismatch");
+  });
+
+  it("no longer reports equipped_armor_no_ac_bonus for mundane armor (it has base AC from its torso)", async () => {
+    const obj = makeCreature("nw_c2_default", {
+      FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 4 } }] },
+      Equip_ItemList: { type: "list", value: [{ ...chestArmor(5), Cost: { type: "dword", value: 150 } }] },
+    });
+    const report = new Report("t", "utc");
+    await verifyCreature(report, armorIndex(), obj);
     expect(report.warnings.map((w) => w.code)).not.toContain("equipped_armor_no_ac_bonus");
   });
 

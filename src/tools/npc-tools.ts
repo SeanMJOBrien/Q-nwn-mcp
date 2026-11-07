@@ -50,6 +50,7 @@ import { snapshotGitForUndo } from "../util/undo.js";
 import { checkEquipProficiency, verifyCreature } from "../util/verify/blueprints.js";
 import { hasCell, listOf, Report, twoDARow } from "../util/verify/common.js";
 import { budgetBreakdown, type GearRole } from "../util/wealth.js";
+import { estimateCRFromLevel } from "../util/encounter-difficulty.js";
 
 /** classes.2da rows that cast spells at all (MemorizesSpells=1 or a spontaneous caster) — see random-abilities-script.ts's own header for the same 7-class split. */
 const CASTER_CLASS_IDS = new Set([1, 2, 3, 6, 7, 9, 10]); // Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Wizard
@@ -60,6 +61,17 @@ export interface CreatureTarget {
   obj: GffObj;
   label: string;
   save: () => Promise<void>;
+}
+
+/**
+ * Deterministic seed for a creature's seeded choices (weapon preference, ready
+ * spell subset). Uses the creature's own TemplateResRef, then Tag — fields a
+ * blueprint and its placed copy share — so both always make the same picks. The
+ * old seed was the target label (resref for one, "area:tag" for the other), so a
+ * blueprint and its placed copy could get different weapons.
+ */
+export function creatureSeed(obj: GffObj): string {
+  return getFieldStr(obj, "TemplateResRef") || getFieldStr(obj, "Tag") || "creature";
 }
 
 /** Shared by spec-ability-tools.ts's bake_spec_ability_pool — same blueprint-or-placed-instance resolution. */
@@ -233,6 +245,12 @@ export function applyNpcStatBlock(
     })),
   };
 
+  // Challenge rating — previously never written, so get_balance_report read a stale
+  // CR after any re-level. CR ~ total level (verified against 505 real creatures, see
+  // encounter-difficulty.ts estimateCRFromLevel). With deferLeveling the creature is
+  // levelled at runtime, so CR tracks the real target level.
+  setField(obj, "ChallengeRating", "float", estimateCRFromLevel(params.level));
+
   // HP
   setField(obj, "MaxHitPoints", "short", result.hp);
   setField(obj, "CurrentHitPoints", "short", result.hp);
@@ -336,7 +354,7 @@ export function registerNpcTools(server: McpServer): void {
         powerLevel: powerLevel as PowerLevel | undefined,
         complexity: complexity as "full" | "simple" | undefined,
         deferLeveling,
-        seed: target.label,
+        seed: creatureSeed(target.obj),
       });
 
       await target.save();
@@ -448,13 +466,13 @@ export function registerNpcTools(server: McpServer): void {
         level: newLevel,
         powerLevel: powerLevel as PowerLevel | undefined,
         complexity: complexity as "full" | "simple" | undefined,
-        seed: target.label,
+        seed: creatureSeed(obj),
       });
 
       const hadSpecAbilities = listOf(obj, "SpecAbilityList").length > 0;
       let specAbility: { totalPoolSize: number; readyCount: number } | undefined;
       if (hadSpecAbilities) {
-        const { entries } = bakeSpecAbilityPoolForCreature(index, obj, markReady ?? false, target.label);
+        const { entries } = bakeSpecAbilityPoolForCreature(index, obj, markReady ?? false, creatureSeed(obj));
         obj.SpecAbilityList = {
           type: "list",
           value: entries.map((e) => ({
@@ -773,7 +791,7 @@ export function registerNpcTools(server: McpServer): void {
 
         // Proficiency check — weapons/shields via ReqFeat0-4, Chest armor via its AC Bonus tier.
         // Shared with set_creature_equipment so there's one place this logic can get wrong.
-        const profReason = checkEquipProficiency(slotId, itemObj, baseRow, featIds);
+        const profReason = checkEquipProficiency(slotId, itemObj, baseRow, featIds, index);
         if (profReason && !force) {
           skipped.push({ slot: slotName, resref: itemResref, reason: profReason });
           continue;
@@ -792,7 +810,7 @@ export function registerNpcTools(server: McpServer): void {
 
       const recommendedWeapon =
         !equipMap.righthand && resolvedClassId !== undefined
-          ? pickWeaponPreference(resolvedClassId, target.label)
+          ? pickWeaponPreference(resolvedClassId, creatureSeed(creature))
           : undefined;
       const budget =
         resolvedLevel !== undefined ? budgetBreakdown(resolvedLevel, (role as GearRole) ?? "pc") : undefined;
@@ -1039,23 +1057,16 @@ export function registerNpcTools(server: McpServer): void {
   );
 
   // ─── add_equipped_item_property ─────────────────────────────────────────
-  // Gap found while investigating a real armor-mechanics bug: several base-
-  // game NPC "costume" armor items (the `nw_aarcl0XX` family, at minimum)
-  // have a genuinely empty PropertiesList — confirmed directly against the
-  // real base-game .uti, not a copying bug — so they provide zero real AC
-  // bonus despite looking like Chain/Banded/whatever armor. add_item_property
-  // only ever targets a standalone item blueprint resource; there was no way
-  // to add a property to an item already embedded in a creature's
-  // Equip_ItemList (a different struct entirely, per the documented
-  // "placed instance is a separate copy" pattern this project already
-  // knows about for ClassList/FeatList).
+  // Adds a property to an item embedded in a creature's Equip_ItemList (a
+  // separate copy from any item blueprint). CORRECTED 2026-11-07: mundane armor
+  // is NOT AC-less — base AC comes from the torso part (armorBaseAC). An AC
+  // property is enhancement on top, so adding one to fix "missing AC" stacks.
 
   server.tool(
     "add_equipped_item_property",
     "Add an item property (itempropdef.2da row) to an item already equipped on a creature's Equip_ItemList, by slot. " +
-      "Use this to give a cosmetic-only armor piece (empty PropertiesList — common on some base-game NPC costume items) a real " +
-      "ITEM_PROPERTY_AC_BONUS (propertyName 1, costTable 2, costValue = the AC bonus 0-8) so its mechanical AC matches its " +
-      "visual tier, and verify_creature's armor_proficiency_mismatch check has something real to compare against. " +
+      "Use it for enchantments (e.g. ITEM_PROPERTY_AC_BONUS as a +N enhancement). Do NOT use it to 'give armor AC': " +
+      "mundane armor already has its base AC from its torso part (parts_chest.2da ACBONUS), and an AC property stacks on top. " +
       "For a standalone item blueprint (not yet equipped on anyone), use add_item_property instead.",
     {
       resref: z.string().optional().describe("Blueprint resref to edit"),

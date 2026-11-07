@@ -238,8 +238,9 @@ describe("buildNpcStatBlock", () => {
     for (const f of [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]) {
       expect(featIds).toContain(f);
     }
-    // Bonus slots (levels 1,2,4 = 3 slots) filled with the universal filler set.
-    for (const f of [40, 6, 10]) expect(featIds).toContain(f);
+    // Bonus slots (levels 1,2,4 = 3 slots) filled with the universal fallback set
+    // (this fixture has no packages/feat tables, so no package order and no gate).
+    for (const f of [40, 10, 28]) expect(featIds).toContain(f);
     expect(result.warnings.filter((w) => w.includes("unfilled"))).toHaveLength(0);
     expect(new Set(featIds).size).toBe(featIds.length); // no duplicates
 
@@ -269,7 +270,38 @@ describe("buildNpcStatBlock", () => {
     // The 2 generic slots (1 baseline + Human's ExtraFeatsAtFirstLevel) fall through to
     // the universal filler instead — confirms the slots were filled, not just skipped.
     expect(featIds).toContain(40); // Toughness
-    expect(featIds).toContain(6); // Cleave
+    expect(featIds).toContain(10); // Dodge
+  });
+
+  it("only picks feats whose feat.2da requirements are met (regression: Cleave without Power Attack, Improved Critical at BAB 1)", () => {
+    const index = makeIndex();
+    const featRow = (extra: Record<string, string>) => ({ FEAT: "1", ALLCLASSESCANUSE: "1", ...extra });
+    const weaponPref = pickWeaponPreference(4, "legal_seed")!;
+    index.twodaTables.set(
+      "feat",
+      twoDA(
+        ["FEAT", "ALLCLASSESCANUSE", "PREREQFEAT1", "MINSTR", "MINDEX", "MINATTACKBONUS"],
+        [
+          [40, featRow({})],
+          [10, featRow({ MINDEX: "13" })],
+          [28, featRow({ MINSTR: "13" })],
+          [6, featRow({ PREREQFEAT1: "28" })],
+          [weaponPref.weaponFocusFeat, featRow({ MINATTACKBONUS: "1" })],
+          [weaponPref.weaponSpecializationFeat, featRow({ MINATTACKBONUS: "4" })],
+          [weaponPref.weaponImprovedCriticalFeat, featRow({ MINATTACKBONUS: "8" })],
+        ],
+      ),
+    );
+    index.twodaTables.set("cls_atk_1", twoDA(["BAB"], [[0, { BAB: "1" }]]));
+    const fighter = index.twodaTables.get("classes")!.rows.get(4)!;
+    fighter.AttackBonusTable = "CLS_ATK_1";
+
+    const result = buildNpcStatBlock(index, { race: 6, classId: 4, level: 1, powerLevel: "elite", seed: "legal_seed" });
+    const featIds = result.feats.map((f) => f.feat);
+    expect(featIds).toContain(weaponPref.weaponFocusFeat); // BAB 1 meets 1
+    expect(featIds).not.toContain(weaponPref.weaponSpecializationFeat); // BAB 1 < 4
+    expect(featIds).not.toContain(weaponPref.weaponImprovedCriticalFeat); // BAB 1 < 8
+    if (featIds.includes(6)) expect(featIds).toContain(28); // Cleave only with Power Attack
   });
 
   it("grants Weapon Focus/Specialization/Improved Critical to Barbarian, Paladin, and Ranger too (user-specified melee set)", () => {

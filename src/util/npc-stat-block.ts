@@ -26,7 +26,23 @@ import {
   TOUGHNESS_FEAT,
   WEAPON_INVESTMENT_CLASS_IDS,
 } from "./npc-weapon-preferences.js";
+import {
+  classBab,
+  classFeatAccess,
+  classFortSave,
+  classMaxSpellLevel,
+  type FeatCheckState,
+  type FeatSlot,
+  featLegality,
+  packageFeatOrder,
+  weaponInvestmentFeats,
+} from "./feat-legality.js";
 import { twoDARow } from "./verify/common.js";
+
+/** feat.2da rows used as the universal fallback after the package order. */
+const POWER_ATTACK_FEAT = 28;
+const ALERTNESS_FEAT = 0;
+const GREAT_FORTITUDE_FEAT = 14;
 
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
@@ -278,123 +294,6 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
   const increaseLevels = multiplesUpTo(4, level).length;
   abilityScores = { ...abilityScores, [primaryKey]: abilityScores[primaryKey] + increaseLevels };
 
-  // ─── Feats ────────────────────────────────────────────────────────────
-  const feats: FeatPick[] = [];
-  const featIds = new Set<number>();
-  function addFeat(feat: number, source: FeatPick["source"]): void {
-    if (featIds.has(feat)) return;
-    featIds.add(feat);
-    feats.push({ feat, source });
-  }
-
-  // 1. Racial — every row in race_feat_<race>.2da, unconditional.
-  const raceFeatTable = tableFromConstantColumn(index, raceRow, "FeatsTable");
-  if (raceRow && !raceFeatTable) warnings.push(`racialtypes.2da row ${params.race} has no resolvable FeatsTable`);
-  for (const row of raceFeatTable?.rows.values() ?? []) {
-    const featIndex = numCell(row, "FeatIndex", -1);
-    if (featIndex >= 0) addFeat(featIndex, "racial");
-  }
-
-  // 2. Automatic class feats — cls_feat_<class>.2da, List=3, GrantedOnLevel <= level.
-  const classFeatTable = tableFromConstantColumn(index, classRow, "FeatsTable");
-  if (classRow && !classFeatTable) warnings.push(`classes.2da row ${params.classId} has no resolvable FeatsTable`);
-  for (const row of classFeatTable?.rows.values() ?? []) {
-    if (row.List !== "3") continue;
-    const grantedOnLevel = numCell(row, "GrantedOnLevel", -1);
-    if (grantedOnLevel >= 1 && grantedOnLevel <= level) {
-      const featIndex = numCell(row, "FeatIndex", -1);
-      if (featIndex >= 0) addFeat(featIndex, "class_automatic");
-    }
-  }
-
-  // Shared candidate queue for generic + bonus feat slots: the class's
-  // preferred weapon's Focus/Specialization/Improved Critical, then a small
-  // universal filler set. Slots beyond this queue are left unfilled with a
-  // warning rather than guessing — this project's "encode unverified data as
-  // a skip, never a guess" convention.
-  const weaponPref = pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed");
-  const grantWeaponInvestment = WEAPON_INVESTMENT_CLASS_IDS.has(params.classId);
-  const candidateQueue: number[] = [
-    ...(weaponPref && grantWeaponInvestment
-      ? [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]
-      : []),
-    TOUGHNESS_FEAT,
-    CLEAVE_FEAT,
-    DODGE_FEAT,
-  ];
-  function nextCandidate(): number | undefined {
-    while (candidateQueue.length > 0) {
-      const c = candidateQueue.shift()!;
-      if (!featIds.has(c)) return c;
-    }
-    return undefined;
-  }
-
-  // 3. Generic feat slots — every character gets one at 1st level (hardcoded
-  // baseline D&D 3.5 rule, not in any 2DA), plus racialtypes.2da's own
-  // ExtraFeatsAtFirstLevel (Human=1, verified; every other standard race is
-  // unset), plus NumberNormalFeatsEveryNthLevel feats at each multiple of
-  // NormalFeatEveryNthLevel up to `level` — both columns read live.
-  //
-  // Skipped entirely for complexity: "simple", same as the bonus slots below —
-  // user-specified rule: a low-level/minion/commoner-tier NPC's feats should
-  // be constrained to what's actually REQUIRED (racial + automatic class
-  // feats), not filled out with this project's curated stand-in for a
-  // tabletop player's free choice. The real D&D rule ("every character gets a
-  // feat at 1st level") describes a player's choice to make, not a feat this
-  // kind of NPC is missing without one.
-  const complexity = params.complexity ?? "full";
-  if (complexity === "full") {
-    let genericSlots = level >= 1 ? 1 : 0;
-    const extraAtFirst = numCell(raceRow, "ExtraFeatsAtFirstLevel", 0);
-    genericSlots += extraAtFirst;
-    const nth = numCell(raceRow, "NormalFeatEveryNthLevel", 0);
-    const perNth = numCell(raceRow, "NumberNormalFeatsEveryNthLevel", 0);
-    genericSlots += multiplesUpTo(nth, level).length * perNth;
-
-    let unfilledGeneric = 0;
-    for (let i = 0; i < genericSlots; i++) {
-      const c = nextCandidate();
-      if (c === undefined) {
-        unfilledGeneric++;
-      } else {
-        addFeat(c, "generic_slot");
-      }
-    }
-    if (unfilledGeneric > 0) {
-      warnings.push(`${unfilledGeneric} generic feat slot(s) left unfilled — no more curated candidates, pick manually`);
-    }
-  }
-
-  // 4. Class-specific bonus feat slots — cls_bfeat_<class>.2da's single
-  // "Bonus" column, row index = level-1, 1 = a slot opens that level.
-  // Skipped entirely for complexity: "simple" — this is exactly the PC-style
-  // advancement chain a background NPC doesn't need (see StatBlockParams'
-  // complexity doc comment).
-  if (complexity === "full") {
-    const bonusFeatTable = tableFromConstantColumn(index, classRow, "BonusFeatsTable");
-    let bonusSlots = 0;
-    if (bonusFeatTable) {
-      for (let lvl = 1; lvl <= level; lvl++) {
-        if (bonusFeatTable.rows.get(lvl - 1)?.Bonus === "1") bonusSlots++;
-      }
-    }
-    let unfilledBonus = 0;
-    for (let i = 0; i < bonusSlots; i++) {
-      const c = nextCandidate();
-      if (c === undefined) {
-        unfilledBonus++;
-      } else {
-        addFeat(c, "bonus_slot");
-      }
-    }
-    if (unfilledBonus > 0) {
-      warnings.push(
-        `${unfilledBonus} class bonus feat slot(s) left unfilled — no more curated candidates, pick manually`,
-      );
-    }
-  }
-
   // ─── Skill points ─────────────────────────────────────────────────────
   const skillPointBase = numCell(classRow, "SkillPointBase", 0);
   const intMod = abilityMod(abilityScores.int);
@@ -432,6 +331,129 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
     warnings.push("No class skills resolved (SkillsTable missing) — skill points computed but not spent");
   }
   const skillRanks = [...ranks.entries()].filter(([, r]) => r > 0).map(([skillIndex, rank]) => ({ skillIndex, rank }));
+
+  // ─── Feats ────────────────────────────────────────────────────────────
+  const feats: FeatPick[] = [];
+  const featIds = new Set<number>();
+  function addFeat(feat: number, source: FeatPick["source"]): void {
+    if (featIds.has(feat)) return;
+    featIds.add(feat);
+    feats.push({ feat, source });
+  }
+
+  // 1. Racial — every row in race_feat_<race>.2da, unconditional.
+  const raceFeatTable = tableFromConstantColumn(index, raceRow, "FeatsTable");
+  if (raceRow && !raceFeatTable) warnings.push(`racialtypes.2da row ${params.race} has no resolvable FeatsTable`);
+  for (const row of raceFeatTable?.rows.values() ?? []) {
+    const featIndex = numCell(row, "FeatIndex", -1);
+    if (featIndex >= 0) addFeat(featIndex, "racial");
+  }
+
+  // 2. Automatic class feats — cls_feat_<class>.2da, List=3, GrantedOnLevel <= level.
+  const classFeatTable = tableFromConstantColumn(index, classRow, "FeatsTable");
+  if (classRow && !classFeatTable) warnings.push(`classes.2da row ${params.classId} has no resolvable FeatsTable`);
+  for (const row of classFeatTable?.rows.values() ?? []) {
+    if (row.List !== "3") continue;
+    const grantedOnLevel = numCell(row, "GrantedOnLevel", -1);
+    if (grantedOnLevel >= 1 && grantedOnLevel <= level) {
+      const featIndex = numCell(row, "FeatIndex", -1);
+      if (featIndex >= 0) addFeat(featIndex, "class_automatic");
+    }
+  }
+
+  // Generic and class-bonus slots are filled in this order, each pick gated by
+  // feat-legality.ts (every feat.2da requirement plus class access for the slot):
+  //   1. the class's preferred weapon's Focus/Specialization/Improved Critical
+  //      (only for WEAPON_INVESTMENT_CLASS_IDS — project rule),
+  //   2. the class package's FeatPref2DA order (BioWare's own pick order, which
+  //      LevelUpHenchman also follows on later levels),
+  //   3. a small universal fallback.
+  // Feats that are some weapon's Focus/Spec/ImpCrit are skipped for classes
+  // outside WEAPON_INVESTMENT_CLASS_IDS. A slot with no legal candidate is
+  // left empty with a warning, never filled with an illegal feat.
+  const weaponPref = pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed");
+  const grantWeaponInvestment = WEAPON_INVESTMENT_CLASS_IDS.has(params.classId);
+  const investmentFeats = weaponInvestmentFeats(index);
+  const candidateOrder: number[] = [
+    ...(weaponPref && grantWeaponInvestment
+      ? [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]
+      : []),
+    ...packageFeatOrder(index, params.classId),
+    TOUGHNESS_FEAT,
+    DODGE_FEAT,
+    POWER_ATTACK_FEAT,
+    CLEAVE_FEAT,
+    ALERTNESS_FEAT,
+    GREAT_FORTITUDE_FEAT,
+  ].filter((f) => grantWeaponInvestment || !investmentFeats.has(f));
+  const access = classFeatAccess(index, params.classId);
+  const legalityState = (): FeatCheckState => ({
+    level,
+    classId: params.classId,
+    classLevel: level,
+    bab: classBab(index, params.classId, level),
+    abilities: abilityScores,
+    featIds,
+    skillRanks: ranks,
+    fortSave: classFortSave(index, params.classId, level) + abilityMod(abilityScores.con),
+    maxSpellLevel: classMaxSpellLevel(index, params.classId, level),
+  });
+  const featTableLoaded = index.twodaTables.has("feat");
+  function nextLegal(slot: FeatSlot): number | undefined {
+    const state = legalityState();
+    for (const c of candidateOrder) {
+      if (featIds.has(c)) continue;
+      if (!featTableLoaded || featLegality(index, c, state, slot, access).length === 0) return c;
+    }
+    return undefined;
+  }
+
+  // 3. Generic feat slots — every character gets one at 1st level (hardcoded
+  // baseline D&D 3.5 rule, not in any 2DA), plus racialtypes.2da's own
+  // ExtraFeatsAtFirstLevel (Human=1, verified; every other standard race is
+  // unset), plus NumberNormalFeatsEveryNthLevel feats at each multiple of
+  // NormalFeatEveryNthLevel up to `level` — both columns read live.
+  // Skipped entirely for complexity: "simple" (required feats only).
+  const complexity = params.complexity ?? "full";
+  if (complexity === "full") {
+    let genericSlots = level >= 1 ? 1 : 0;
+    genericSlots += numCell(raceRow, "ExtraFeatsAtFirstLevel", 0);
+    const nth = numCell(raceRow, "NormalFeatEveryNthLevel", 0);
+    const perNth = numCell(raceRow, "NumberNormalFeatsEveryNthLevel", 0);
+    genericSlots += multiplesUpTo(nth, level).length * perNth;
+
+    let unfilledGeneric = 0;
+    for (let i = 0; i < genericSlots; i++) {
+      const c = nextLegal("generic");
+      if (c === undefined) unfilledGeneric++;
+      else addFeat(c, "generic_slot");
+    }
+    if (unfilledGeneric > 0) {
+      warnings.push(`${unfilledGeneric} generic feat slot(s) left unfilled — no legal candidate in the package order`);
+    }
+  }
+
+  // 4. Class-specific bonus feat slots — cls_bfeat_<class>.2da's single
+  // "Bonus" column, row index = level-1, 1 = a slot opens that level.
+  // Only feats on the class's bonus list (cls_feat List 1/2) qualify.
+  if (complexity === "full") {
+    const bonusFeatTable = tableFromConstantColumn(index, classRow, "BonusFeatsTable");
+    let bonusSlots = 0;
+    if (bonusFeatTable) {
+      for (let lvl = 1; lvl <= level; lvl++) {
+        if (bonusFeatTable.rows.get(lvl - 1)?.Bonus === "1") bonusSlots++;
+      }
+    }
+    let unfilledBonus = 0;
+    for (let i = 0; i < bonusSlots; i++) {
+      const c = nextLegal("bonus");
+      if (c === undefined) unfilledBonus++;
+      else addFeat(c, "bonus_slot");
+    }
+    if (unfilledBonus > 0) {
+      warnings.push(`${unfilledBonus} class bonus feat slot(s) left unfilled — no legal candidate in the package order`);
+    }
+  }
 
   // ─── HP ───────────────────────────────────────────────────────────────
   // Max at level 1, "average rounded up" ((die/2)+1) per level after, deterministic.

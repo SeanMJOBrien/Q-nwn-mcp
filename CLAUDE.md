@@ -638,6 +638,22 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
 
 ## Known Pitfalls
 
+- **CORRECTIONS (2026-11-07, live-engine verified; details in `docs/creature-forge-spec.md` §11) — several older entries below are wrong:**
+  (1) Armor base AC comes from the torso part (`parts_chest.2da` `ACBONUS` for `ArmorPart_Torso`), not from `ITEM_PROPERTY_AC_BONUS`
+  (enhancement only). The `nw_aarcl*` items are real armor, not cosmetic; `equipped_armor_no_ac_bonus` was removed and
+  `armorBaseAC()` (`verify/blueprints.ts`) now drives both proficiency checks. The Hollow Communion "AC fix" stacked AC and was undone.
+  (2) **The engine silently refuses to equip items a creature isn't proficient with** (placed or spawned, any blueprint format). This is
+  the "no clothes" bug: e.g. Rogues wearing base-AC-5 armor. `armor_proficiency_mismatch` now means "unarmored in play".
+  (3) `LevelUpHenchman` DOES add every automatic class feat from level 2 up, and no illegal feat (11 classes to level 12), when level 1
+  is valid; the "zero automatic feats" result came from creatures with an empty level-1 FeatList.
+  (4) `.utc` equipment entries written as full item structs work; toolset files use `EquippedRes`-only entries, and both equip.
+  (5) Feats and spell abilities CAN change at runtime: `ObjectToJson(o, TRUE)` → edit → `JsonToObject(..., TRUE)` keeps tag, locals, HP,
+  effects; the new object's OnSpawn fires again. Each ready SpecAbilityList entry is one cast; its `SpellCasterLevel` is the cast level.
+  (6) `build_npc_stat_block` used to write illegal level-1 feats (Cleave without Power Attack, Weapon Specialization at level 1);
+  every pick now goes through `feat-legality.ts` in package (`packft_*`) order.
+  **New standard path:** `create_creature_level_system` + `forge_creature` (spawn-time levelling, store shopping, spell abilities, in-game
+  verification). The Hollow Communion's 13 class-based creatures were rebuilt this way (58/58 live checks).
+
 - **FIXED — the local compile toolchain's `nwscript.nss` can silently predate real NWN:EE engine functions, with a
   cryptic error that looks like a syntax bug in the generated script.** Found building the Special-Abilities
   random-caster system (`spec-ability-script.ts`): `create_spec_ability_system`'s generated include failed to

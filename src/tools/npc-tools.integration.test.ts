@@ -787,11 +787,13 @@ describe("equip_npc_by_role", () => {
       Tag: { type: "cexostring", value: resref },
       TemplateResRef: { type: "resref", value: resref },
       BaseItem: { type: "int", value: 16 },
-      PropertiesList: { type: "list", value: [{ __struct_id: 0, PropertyName: { type: "word", value: 1 }, CostValue: { type: "word", value: 4 } }] },
+      ArmorPart_Torso: { type: "byte", value: 4 }, // parts_chest row 4 = base AC 4 (Medium)
+      PropertiesList: { type: "list", value: [] },
     } as unknown as GffDocument;
   }
 
   beforeEach(() => {
+    mockIndex.twodaTables.set("parts_chest", twoDA(["ACBONUS"], [[4, { ACBONUS: "4.00" }]]));
     mockIndex.twodaTables.set(
       "baseitems",
       twoDA(
@@ -874,7 +876,7 @@ describe("equip_npc_by_role", () => {
         arguments: { resref: "light_only_npc", equipment: JSON.stringify({ chest: "med_armor" }) },
       });
       const parsed = parseResult(result) as { skipped: Array<{ reason: string }> };
-      expect(parsed.skipped[0].reason).toContain("weight tier");
+      expect(parsed.skipped[0].reason).toContain("not proficient with this armor");
     } finally {
       await cleanup();
     }
@@ -886,6 +888,7 @@ describe("equip_npc_by_role", () => {
       key,
       makeBlueprintUtc({
         Tag: { type: "cexostring", value: "fighter_npc" },
+        TemplateResRef: { type: "resref", value: "fighter_npc" },
         ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 5 } }] },
       }) as unknown as GffDocument,
     );

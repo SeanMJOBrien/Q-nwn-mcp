@@ -750,13 +750,10 @@ describe("creature equipment tools", () => {
     mockIndex.resources.set("testarea.git", { resref: "testarea", extension: "git", filePath: path.join(tempDir, "testarea.git"), sizeBytes: 100 });
     mockIndex.areas.set("testarea", { resref: "testarea", name: "Test", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 });
 
-    // Medium armor: AC Bonus property (PropertyName 1) with CostValue 4 -> armorTierFeat(4) = 4 (ArmProfMed).
+    // Medium armor: torso part 4 -> parts_chest ACBONUS 4 -> armorTierFeat(4) = 4 (ArmProfMed).
     const chainmailDoc = makeItemDoc("medium_armor", "MEDIUM_ARMOR");
-    (chainmailDoc.PropertiesList as { value: GffObj[] }).value.push({
-      __struct_id: 0,
-      PropertyName: { type: "word", value: 1 },
-      CostValue: { type: "word", value: 4 },
-    });
+    (chainmailDoc as GffObj).ArmorPart_Torso = { type: "byte", value: 4 };
+    mockIndex.twodaTables.set("parts_chest", { columns: ["ACBONUS"], rows: new Map([[4, { ACBONUS: "4.00" }]]) } as TwoDATable);
     mockIndex.parsedGff.set("medium_armor.uti", chainmailDoc);
 
     try {
@@ -766,7 +763,7 @@ describe("creature equipment tools", () => {
       });
       const rejectedParsed = parseResult(rejected) as Record<string, unknown>;
       expect(rejectedParsed.success).toBe(true);
-      expect((rejectedParsed.failed as string[])[0]).toMatch(/not proficient with this armor's weight tier/);
+      expect((rejectedParsed.failed as string[])[0]).toMatch(/not proficient with this armor/);
       expect(rejectedParsed.totalEquipped).toBe(0);
 
       // force:true equips it anyway, with a warning attached.
@@ -1376,6 +1373,7 @@ describe("verify_all placed-instance coverage", () => {
                 __struct_id: 2, // Chest
                 TemplateResRef: { type: "resref", value: "nw_aarcl004" },
                 BaseItem: { type: "int", value: 16 },
+                ArmorPart_Torso: { type: "byte", value: 32 }, // nw_aarcl004's torso: base AC 5 (Medium)
                 PropertiesList: {
                   type: "list",
                   value: [{ __struct_id: 0, PropertyName: { type: "word", value: 1 }, CostValue: { type: "word", value: 4 } }], // AC Bonus 4 = Medium
@@ -1392,6 +1390,7 @@ describe("verify_all placed-instance coverage", () => {
       parsedGff: new Map([["testarea.git", gitDoc]]),
       areas: new Map([["testarea", { resref: "testarea", name: "Test", width: 4, height: 4, tileset: "ttf01", isInterior: false, creatureCount: 1, placeableCount: 0, doorCount: 0, encounterCount: 0, triggerCount: 0, waypointCount: 0 }]]),
     });
+    mockIndex.twodaTables.set("parts_chest", { columns: ["ACBONUS"], rows: new Map([[32, { ACBONUS: "5.00" }]]) } as TwoDATable);
 
     const { registerVerifyTools } = await import("./verify-tools.js");
     const { client, cleanup } = await createTestClient(registerVerifyTools);

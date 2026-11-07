@@ -269,7 +269,7 @@ export function registerCreatureTools(server: McpServer): void {
 
         // Proficiency check — shared with equip_npc_by_role (see checkEquipProficiency's own
         // comment for the real Rogue-in-heavy-armor bug this closes).
-        const profReason = checkEquipProficiency(slotId, itemObj, baseRow, featIds);
+        const profReason = checkEquipProficiency(slotId, itemObj, baseRow, featIds, index);
         if (profReason && !force) {
           failed.push(`${itemResref} in slot "${slotName}": ${profReason}`);
           continue;

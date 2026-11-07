@@ -102,9 +102,8 @@ const STANDARD_PC_RACE_MAX = 6;
 const HENCHMAN_SCRIPT_PREFIX = "x0_ch_hen_";
 
 /**
- * Maps an equipped armor item's AC Bonus (ITEM_PROPERTY_AC_BONUS = 1 in
- * nwscript.nss; PropertiesList entry with PropertyName=1, CostValue = the
- * AC bonus amount 0-8) to the single feat.2da row (2=ArmProfHvy,
+ * Maps an armor's BASE AC (armorBaseAC — from the torso part, NOT from
+ * ITEM_PROPERTY_AC_BONUS, which is enhancement only) to the single feat.2da row (2=ArmProfHvy,
  * 3=ArmProfLgt, 4=ArmProfMed — verified against a live feat.2da) that grants
  * proficiency with that weight tier.
  *
@@ -124,6 +123,26 @@ const HENCHMAN_SCRIPT_PREFIX = "x0_ch_hen_";
  * property at all — treated as requiring no proficiency rather than
  * guessed, per this project's "encode unverified data as a skip" rule).
  */
+/**
+ * An armor item's BASE AC, which decides its weight class (Light 1-3, Medium 4-5,
+ * Heavy 6-8). It comes from the torso part: parts_chest.2da row ArmorPart_Torso,
+ * column ACBONUS. Verified 2026-11-07: all 12 mundane nw_aarcl* armors match
+ * armor.2da prices through this lookup, and the live engine's GetItemACValue
+ * returns exactly this plus any enhancement (nw_aarcl004 5, nw_aarcl007 8,
+ * nw_maarcl046 torso 36 = 4, +1 property = 5). ITEM_PROPERTY_AC_BONUS is
+ * enhancement only and never changes the weight class.
+ *
+ * Returns undefined when the item carries no ArmorPart_Torso (a blueprint entry
+ * holding only EquippedRes) or parts_chest.2da isn't loaded — never a guess.
+ */
+export function armorBaseAC(index: ModuleIndex, itemObj: GffObj): number | undefined {
+  if (itemObj.ArmorPart_Torso === undefined) return undefined;
+  const row = twoDARow(index, "parts_chest", getFieldNum(itemObj, "ArmorPart_Torso"));
+  if (!hasCell(row, "ACBONUS")) return undefined;
+  const ac = Number.parseFloat(row!.ACBONUS);
+  return Number.isFinite(ac) ? Math.round(ac) : undefined;
+}
+
 export function armorTierFeat(acBonus: number): number | undefined {
   if (acBonus <= 0) return undefined;
   if (acBonus <= 3) return 3; // ArmProfLgt
@@ -164,6 +183,7 @@ export function checkEquipProficiency(
   itemObj: GffObj,
   baseRow: Record<string, string> | undefined,
   featIds: Set<number>,
+  index?: ModuleIndex,
 ): string | undefined {
   if ((slotId === EQUIP_SLOT_MAP.righthand || slotId === EQUIP_SLOT_MAP.lefthand) && baseRow) {
     const reqFeats = REQ_FEAT_COLUMNS.map((col) => baseRow[col])
@@ -172,12 +192,11 @@ export function checkEquipProficiency(
     if (reqFeats.length > 0 && !reqFeats.some((f) => featIds.has(f))) {
       return `not proficient — needs one of feat.2da rows ${reqFeats.join(", ")}`;
     }
-  } else if (slotId === EQUIP_SLOT_MAP.chest) {
-    const acBonusProp = listOf(itemObj, "PropertiesList").find((p) => getFieldNum(p, "PropertyName") === 1);
-    const acBonus = acBonusProp ? getFieldNum(acBonusProp, "CostValue") : 0;
-    const requiredFeat = armorTierFeat(acBonus);
+  } else if (slotId === EQUIP_SLOT_MAP.chest && index) {
+    const baseAC = armorBaseAC(index, itemObj);
+    const requiredFeat = baseAC === undefined ? undefined : armorTierFeat(baseAC);
     if (requiredFeat !== undefined && !featIds.has(requiredFeat)) {
-      return `not proficient with this armor's weight tier — needs feat.2da row ${requiredFeat}`;
+      return `not proficient with this armor (base AC ${baseAC}) — needs feat.2da row ${requiredFeat}; the engine will refuse to equip it`;
     }
   }
   return undefined;
@@ -554,7 +573,11 @@ export async function verifyCreature(
     // dormant pool is exactly as mute as having no spells at all, and a
     // length-only check would have missed that.
     const hasSpecAbilities = listOf(obj, "SpecAbilityList").some((entry) => getFieldNum(entry, "SpellFlags") === 1);
-    if (!hasMemorized && !hasSpecAbilities) {
+    // forge_creature casters get their spell abilities at spawn from inc_cre_level (MCP_SA_POOL).
+    const spawnSpells = listOf(obj, "VarTable").some(
+      (v) => getFieldStr(v, "Name").toUpperCase() === "MCP_SA_POOL" && getFieldStr(v, "Value") !== "",
+    );
+    if (!hasMemorized && !hasSpecAbilities && !spawnSpells) {
       report.warn(
         "caster_no_spells",
         "Creature has a spellcasting class at or past its casting level but no spells in either ClassList's MemorizedList or SpecAbilityList — it cannot cast anything",
@@ -690,48 +713,22 @@ export async function verifyCreature(
     }
   }
 
-  // Precise weight-class check (see armorTierFeat() above for the derivation):
-  // reads the equipped Chest item's own AC Bonus item property to determine
-  // whether it's Light/Medium/Heavy armor, then checks for the one matching
-  // proficiency feat — this is the literal Corin Vale bug (a Rogue in medium
-  // armor with only Light Armor Proficiency from its automatic class feats).
+  // Weight-class check: base AC from the armor's torso part (armorBaseAC), then
+  // the one matching proficiency feat. This is the Corin Vale bug (a Rogue in
+  // medium armor with only Light Armor Proficiency). Live engine finding
+  // (2026-11-07, spike S0): the engine refuses to equip items the creature isn't
+  // proficient with, so a mismatch here means the creature is unarmored in play.
   {
     const chestEntry = equipList.find((e) => e.__struct_id === EQUIP_SLOT_MAP.chest);
-    const acBonusProp = chestEntry
-      ? listOf(chestEntry, "PropertiesList").find((p) => getFieldNum(p, "PropertyName") === 1)
-      : undefined;
-    const acBonus = acBonusProp ? getFieldNum(acBonusProp, "CostValue") : 0;
-    const requiredFeat = armorTierFeat(acBonus);
+    const baseAC = chestEntry ? armorBaseAC(index, chestEntry) : undefined;
+    const requiredFeat = baseAC === undefined ? undefined : armorTierFeat(baseAC);
     if (chestEntry && requiredFeat !== undefined && !featIds.has(requiredFeat)) {
       const tierName = requiredFeat === 3 ? "Light" : requiredFeat === 4 ? "Medium" : "Heavy";
       report.error(
         "armor_proficiency_mismatch",
-        `Chest-slot armor grants an AC Bonus of ${acBonus} (${tierName} armor) but FeatList lacks the matching Armor Proficiency feat (feat.2da row ${requiredFeat}) — it will be worn at a real mechanical penalty`,
+        `Chest-slot armor has base AC ${baseAC} (${tierName} armor, from its torso part) but FeatList lacks the matching Armor Proficiency feat (feat.2da row ${requiredFeat}) — the engine silently refuses to equip it, so the creature appears without armor in play`,
         "Equip_ItemList",
-        "bake the matching Armor Proficiency feat via create_creature_blueprint's `feats` param, or equip armor this creature is already proficient with",
-      );
-    }
-
-    // A real, confirmed gap this check's own AC-bonus lookup can't see on its
-    // own: some real base-game NPC "costume" armor items (the nw_aarcl0XX
-    // family, confirmed directly against the authentic base-game .uti — not
-    // a cloning bug) are purely cosmetic, with a genuinely EMPTY
-    // PropertiesList despite looking like real Chain/Banded/whatever armor
-    // and being costed like it. armorTierFeat() correctly treats AC bonus 0
-    // as "needs no proficiency" (the right call for a deliberately-bare
-    // clothing item like nw_cloth001, Cost ~1gp) — but a Chest item costed
-    // like real protective gear that STILL has zero AC bonus is its own
-    // distinct problem: it isn't a proficiency mismatch, it's armor that
-    // does nothing mechanically. Gated on Cost > 10 specifically so the
-    // intentional AC-0 baseline clothing convention this project already
-    // uses for companions never false-positives here.
-    if (chestEntry && acBonus === 0 && getFieldNum(chestEntry, "BaseItem") === 16 && getFieldNum(chestEntry, "Cost") > 10) {
-      report.warn(
-        "equipped_armor_no_ac_bonus",
-        `Chest-slot armor is costed at ${getFieldNum(chestEntry, "Cost")}gp like real protective gear, but carries no ITEM_PROPERTY_AC_BONUS at all — ` +
-          "it provides zero mechanical AC regardless of what it looks like or what proficiency this creature has",
-        "Equip_ItemList",
-        "use add_equipped_item_property to add a real AC_BONUS property (propertyName 1, costTable 2, costValue = the intended AC bonus), or equip a different real armor item",
+        "bake the matching Armor Proficiency feat, or equip armor this creature is proficient with",
       );
     }
   }
@@ -939,7 +936,7 @@ export async function verifyCreature(
     }
 
     const vars = listOf(obj, "VarTable");
-    const hasLevel = vars.some((v) => getFieldStr(v, "Name").toUpperCase() === "HENCH_LEVEL");
+    const hasLevel = vars.some((v) => ["HENCH_LEVEL", "MCP_LEVEL", "MCP_LEVEL_REL"].includes(getFieldStr(v, "Name").toUpperCase()));
     if (!hasLevel) {
       report.warn(
         "henchman_no_level_var",
