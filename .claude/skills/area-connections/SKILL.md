@@ -16,8 +16,8 @@ Measured across 12,507 hand-built areas in `~/git`:
 | Triggers only | 984 | 13% |
 | Both | 688 | 9% |
 
-38,281 doors against 10,629 triggers — and of those triggers only **475 are `Type 2`** (area
-transition). The rest are traps (7,080) and generic script volumes (3,074).
+38,281 doors against 10,629 triggers — and of those triggers only **475 are `Type 1`** (area
+transition). The rest are traps (7,080, `Type 2`) and generic script volumes (3,074, `Type 0`).
 
 **Doors are how areas connect.** Trigger volumes are a distant second, used where there is no wall
 to hang a door on. Free-standing light-shaft portals are a fallback, not a default.
@@ -57,7 +57,10 @@ Use for open terrain: the edge of a forest, a road leaving a rural area, a deser
 
 - **Geometry: median 5 vertices, minimum 3.** A trigger with fewer than 3 verts is invisible to
   both the engine and the toolset — it silently never fires.
-- Set `Type` to 2 for an area transition. (Type 1 is a trap, type 0 a script volume.)
+- Set `Type` to 1 for an area transition. (Type 2 is a trap, type 0 a script volume — verified
+  against `the-frozen-north`: of 313 Type-1 triggers, 309 carry `LinkedTo`; all 113 Type-2 triggers
+  carry `TrapFlag=1`; all 91 Type-0 triggers carry neither.) This matches `create_area_transition`'s
+  own output (`Type=1`, `LinkedToFlags=2`).
 - Place it *across* the route, not on it, and make it wide enough that a running player cannot
   clip past a corner.
 
