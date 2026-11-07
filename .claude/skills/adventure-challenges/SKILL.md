@@ -307,6 +307,8 @@ create_trap_blueprint(
 ```
 place_trigger(area: "dungeon", blueprint: "trap_fire_01", x: "55.0", y: "45.0")
 ```
+To cover a corridor wall to wall, pass the corridor's `width`, a `depth` of 1-2 m and the
+`rotation` it runs (compass degrees, 0 = north, 90 = east); this replaces the blueprint's square.
 
 **Trap types:**
 

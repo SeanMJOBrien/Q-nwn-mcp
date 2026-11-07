@@ -20,6 +20,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { GIT_STRUCT_ID } from "../config.js";
 import { checkPositionWalkable, checkPlacementWalkable } from "../util/walkmesh.js";
+import { MIN_TRANSITION_DEPTH, MIN_TRANSITION_WIDTH, rectTriggerGeometry } from "../util/trigger-geometry.js";
 import { resolveBlueprint, getGitDoc, writeBackGit, updateAreaCounts, degToRad } from "../util/git-helpers.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
@@ -474,17 +475,31 @@ export function registerPlacementTools(server: McpServer): void {
 
   server.tool(
     "place_trigger",
-    "Place a trigger in an area from a UTT blueprint (module or base game). The blueprint's geometry defines the trigger shape.",
+    "Place a trigger in an area from a UTT blueprint (module or base game). The trigger is a width x depth rectangle " +
+      "turned to `rotation`; without those it keeps the blueprint's geometry, or a 4 x 4 m square when the blueprint has none.",
     {
       area: z.string().describe("Area resref"),
       blueprint: z.string().describe("UTT blueprint resref (module or base game)"),
       x: numParam("World X position (trigger center)"),
       y: numParam("World Y position (trigger center)"),
       z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
+      width: optNumParam("Trigger size across, in metres (east-west at rotation 0; default 4). For a trigger across a path, the path's width."),
+      depth: optNumParam("Trigger size along, in metres (north-south at rotation 0; default 4)."),
+      rotation: optNumParam("Compass direction the depth runs, in degrees (0 = north, 90 = east, clockwise; default 0). For a trigger across a path, the direction the path runs."),
     },
     { idempotentHint: true },
-    async ({ area, blueprint, x, y, z: zPos }) => {
+    async ({ area, blueprint, x, y, z: zPos, width, depth, rotation }) => {
       const xN = toF(x), yN = toF(y), zN = toF(zPos);
+      const sizeGiven = width !== undefined || depth !== undefined || rotation !== undefined;
+      const widthN = width !== undefined ? toF(width) : 4;
+      const depthN = depth !== undefined ? toF(depth) : 4;
+      const rotationN = rotation !== undefined ? toF(rotation) : 0;
+      if (!(widthN > 0) || !(depthN > 0) || !Number.isFinite(rotationN)) {
+        return {
+          content: [{ type: "text", text: `width and depth must be positive numbers and rotation a number of degrees (got width=${width}, depth=${depth}, rotation=${rotation})` }],
+          isError: true,
+        };
+      }
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
@@ -519,17 +534,14 @@ export function registerPlacementTools(server: McpServer): void {
 
       // Ensure trigger has geometry — blueprints don't include it, but placed
       // instances require it for the engine to detect entry and the toolset to render.
-      if (!obj.Geometry) {
-        const s = 2.0; // half-size of default 4m square
-        obj.Geometry = {
-          type: "list",
-          value: [
-            { __struct_id: 0, PointX: { type: "float", value: -s }, PointY: { type: "float", value: -s }, PointZ: { type: "float", value: 0.025 } },
-            { __struct_id: 0, PointX: { type: "float", value:  s }, PointY: { type: "float", value: -s }, PointZ: { type: "float", value: 0.025 } },
-            { __struct_id: 0, PointX: { type: "float", value:  s }, PointY: { type: "float", value:  s }, PointZ: { type: "float", value: 0.025 } },
-            { __struct_id: 0, PointX: { type: "float", value: -s }, PointY: { type: "float", value:  s }, PointZ: { type: "float", value: 0.025 } },
-          ],
-        };
+      // An explicit width/depth/rotation always wins over a blueprint's own geometry.
+      const blueprintGeometry = !sizeGiven && !!obj.Geometry;
+      if (sizeGiven || !obj.Geometry) obj.Geometry = rectTriggerGeometry(widthN, depthN, rotationN);
+      const warnings: string[] = [];
+      if (sizeGiven && getFieldNum(obj, "Type") === 1 && (widthN < MIN_TRANSITION_WIDTH || depthN < MIN_TRANSITION_DEPTH)) {
+        warnings.push(
+          `Transition trigger is ${widthN} x ${depthN} m; below about ${MIN_TRANSITION_WIDTH} x ${MIN_TRANSITION_DEPTH} m players struggle to find it on mouse-over or walk past it.`,
+        );
       }
 
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
@@ -551,6 +563,8 @@ export function registerPlacementTools(server: McpServer): void {
             trigger: name,
             blueprint,
             position: { x: xN, y: yN, z: placeZ },
+            size: blueprintGeometry ? "blueprint geometry" : { width: widthN, depth: depthN, rotation: rotationN },
+            ...(warnings.length ? { warnings } : {}),
           }, null, 2),
         }],
       };

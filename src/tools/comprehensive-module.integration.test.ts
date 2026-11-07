@@ -525,6 +525,8 @@ describe("comprehensive module — every mockable nwn-mcp system, one shared mod
 
     const t = await call("place_trigger", { area: "testarea", blueprint: "test_trap", x: "13", y: "13" });
     expect(t).toBeTypeOf("object");
+    const sized = await call("place_trigger", { area: "testarea", blueprint: "test_trap", x: "13", y: "18", width: "6", depth: "2", rotation: "90" });
+    expect(sized.size).toEqual({ width: 6, depth: 2, rotation: 90 });
 
     const e = await call("place_encounter", { area: "testarea", blueprint: "test_enc", x: "14", y: "14" });
     expect(e.success).toBe(true);
