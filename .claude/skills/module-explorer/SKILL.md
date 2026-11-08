@@ -84,6 +84,10 @@ Reach for these instead of manually cross-referencing GFF fields:
      `.ute` encounter (creature spawn list, difficulty, respawn behavior)
      ready for `place_encounter`. `sourceResref` clones an existing
      blueprint as a starting point instead of building from scratch.
+   - Dialog nodes (`create_dialog`, `add_dialog_node`, `edit_dialog_node`) take EE script parameters:
+     `params` (the node script's ActionParams) and `conditionParams` (the condition on the link to the node),
+     each a JSON object of key → value read with `GetScriptParam`, so one generic script can serve many
+     nodes. `quest` + `questEntry` make the node advance that journal stage itself, with no script.
    - `export_resource(resref, type, outputPath)` pulls one resource out of
      the loaded module to a real file on disk — for handing a single
      `.uti`/`.dlg`/`.nss`/etc. to the user, or round-tripping it through an

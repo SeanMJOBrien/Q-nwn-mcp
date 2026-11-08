@@ -14,41 +14,89 @@ import { z } from "zod";
 import { buildDialogSummary, requireIndex } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
-import { getFieldList, getFieldLocStr, setField } from "../types/gff.js";
+import { getFieldList, getFieldLocStr, getFieldStr, setField } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
-import { numParam, toI } from "../util/params.js";
+import { numParam, optNumParam, toI } from "../util/params.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+/** EE script parameters (GetScriptParam): key -> value, both strings. */
+export type ScriptParams = Record<string, string>;
 
 export interface InputNode {
   speaker: "npc" | "pc";
   text: string;
   script?: string;
+  /** ActionParams for this node's script. */
+  params?: ScriptParams;
   condition?: string;
+  /** ConditionParams for the condition on the link leading to this node. */
+  conditionParams?: ScriptParams;
+  /** Native journal advance: the node sets this journal tag to `questEntry` when it plays (no script needed). */
+  quest?: string;
+  questEntry?: number;
   children?: InputNode[];
+}
+
+/** The `{Key, Value}` cexostring struct list ActionParams/ConditionParams use (verified against 417 TFN dialogs). */
+export function paramList(params?: ScriptParams): { type: "list"; value: GffObj[] } {
+  return {
+    type: "list",
+    value: Object.entries(params ?? {}).map(
+      ([k, v], i) =>
+        ({ __struct_id: i, Key: { type: "cexostring", value: k }, Value: { type: "cexostring", value: String(v) } }) as unknown as GffObj,
+    ),
+  };
+}
+
+/** Parse a tool's JSON params argument ('{"target":"2"}') into string values; throws on anything but a flat object. */
+export function parseParamsArg(raw: string | undefined, name: string): ScriptParams | undefined {
+  if (raw === undefined || raw === "") return undefined;
+  const parsed = JSON.parse(raw) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${name} must be a JSON object of key -> value`);
+  const out: ScriptParams = {};
+  for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!k) throw new Error(`${name} has an empty key`);
+    if (v !== null && typeof v === "object") throw new Error(`${name}.${k} must be a string, number or boolean`);
+    out[k] = String(v);
+  }
+  return out;
+}
+
+interface NodeExtras {
+  params?: ScriptParams;
+  quest?: string;
+  questEntry?: number;
+}
+
+function questFields(extras?: NodeExtras): Record<string, unknown> {
+  if (!extras?.quest) return { Quest: { type: "cexostring", value: "" } };
+  return { Quest: { type: "cexostring", value: extras.quest }, QuestEntry: { type: "dword", value: extras.questEntry ?? 0 } };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Build a link struct for StartingList, RepliesList, or EntriesList. */
-function makeLink(index: number, condition?: string): GffObj {
+function makeLink(index: number, condition?: string, conditionParams?: ScriptParams): GffObj {
   return {
     __struct_id: 0,
     Index: { type: "dword", value: index },
     Active: { type: "resref", value: condition || "" },
+    ConditionParams: paramList(conditionParams),
     IsChild: { type: "byte", value: 0 },
   } as unknown as GffObj;
 }
 
 /** Build an NPC entry struct with all standard NWN DLG fields. */
-function makeEntry(text: string, script?: string): GffObj {
+function makeEntry(text: string, script?: string, extras?: NodeExtras): GffObj {
   return {
     __struct_id: 0,
+    ActionParams: paramList(extras?.params),
     Animation: { type: "dword", value: 0 },
     AnimLoop: { type: "byte", value: 1 },
     Comment: { type: "cexostring", value: "" },
     Delay: { type: "dword", value: 4294967295 },
-    Quest: { type: "cexostring", value: "" },
+    ...questFields(extras),
     RepliesList: { type: "list", value: [] },
     Script: { type: "resref", value: script || "" },
     Sound: { type: "resref", value: "" },
@@ -58,15 +106,16 @@ function makeEntry(text: string, script?: string): GffObj {
 }
 
 /** Build a PC reply struct with all standard NWN DLG fields. */
-function makeReply(text: string, script?: string): GffObj {
+function makeReply(text: string, script?: string, extras?: NodeExtras): GffObj {
   return {
     __struct_id: 0,
+    ActionParams: paramList(extras?.params),
     Animation: { type: "dword", value: 0 },
     AnimLoop: { type: "byte", value: 1 },
     Comment: { type: "cexostring", value: "" },
     Delay: { type: "dword", value: 4294967295 },
     EntriesList: { type: "list", value: [] },
-    Quest: { type: "cexostring", value: "" },
+    ...questFields(extras),
     Script: { type: "resref", value: script || "" },
     Sound: { type: "resref", value: "" },
     Text: { type: "cexolocstring", value: { "0": text } },
@@ -105,7 +154,7 @@ function flattenTree(roots: InputNode[]): {
   const startingList: GffObj[] = [];
 
   function processEntry(node: InputNode): number {
-    const entry = makeEntry(node.text, node.script);
+    const entry = makeEntry(node.text, node.script, node);
     const idx = entryList.length;
     entryList.push(entry);
 
@@ -113,14 +162,14 @@ function flattenTree(roots: InputNode[]): {
       const replies = getFieldList(entry, "RepliesList");
       for (const child of node.children) {
         const replyIdx = processReply(child);
-        replies.push(makeLink(replyIdx, child.condition));
+        replies.push(makeLink(replyIdx, child.condition, child.conditionParams));
       }
     }
     return idx;
   }
 
   function processReply(node: InputNode): number {
-    const reply = makeReply(node.text, node.script);
+    const reply = makeReply(node.text, node.script, node);
     const idx = replyList.length;
     replyList.push(reply);
 
@@ -128,7 +177,7 @@ function flattenTree(roots: InputNode[]): {
       const entries = getFieldList(reply, "EntriesList");
       for (const child of node.children) {
         const entryIdx = processEntry(child);
-        entries.push(makeLink(entryIdx, child.condition));
+        entries.push(makeLink(entryIdx, child.condition, child.conditionParams));
       }
     }
     return idx;
@@ -136,7 +185,7 @@ function flattenTree(roots: InputNode[]): {
 
   for (const root of roots) {
     const entryIdx = processEntry(root);
-    startingList.push(makeLink(entryIdx, root.condition));
+    startingList.push(makeLink(entryIdx, root.condition, root.conditionParams));
   }
 
   return { entryList, replyList, startingList };
@@ -185,7 +234,7 @@ export function registerDialogWriteTools(server: McpServer): void {
       nodes: z
         .string()
         .describe(
-          "JSON array of dialog tree nodes: [{ speaker: 'npc'|'pc', text: string, script?: string, condition?: string, children?: [...] }]",
+          "JSON array of dialog tree nodes: [{ speaker: 'npc'|'pc', text: string, script?: string, params?: {key: value}, condition?: string, conditionParams?: {key: value}, quest?: string, questEntry?: number, children?: [...] }]. params are the script's ActionParams and conditionParams the condition's ConditionParams (read with GetScriptParam); quest + questEntry advance that journal stage natively when the node plays.",
         ),
     },
     { destructiveHint: true },
@@ -272,9 +321,24 @@ export function registerDialogWriteTools(server: McpServer): void {
       text: z.string().describe("Dialog text for the new node"),
       script: z.string().optional().describe("Action script resref (runs when node plays)"),
       condition: z.string().optional().describe("Condition script on the link from parent"),
+      params: z.string().optional().describe('JSON object of ActionParams for the node\'s script, e.g. {"target":"2"}'),
+      conditionParams: z.string().optional().describe('JSON object of ConditionParams for the condition, e.g. {"quest":"q_wolf","op":"at","stage":"1"}'),
+      quest: z.string().optional().describe("Journal tag this node advances natively when it plays"),
+      questEntry: optNumParam("Journal entry ID (stage) the node sets; needs quest"),
     },
     { destructiveHint: true },
-    async ({ dialog, parentIndex, parentType, text, script, condition }) => {
+    async ({ dialog, parentIndex, parentType, text, script, condition, params, conditionParams, quest, questEntry }) => {
+      let extras: NodeExtras;
+      let condParams: ScriptParams | undefined;
+      try {
+        extras = { params: parseParamsArg(params, "params"), quest, questEntry: questEntry !== undefined ? toI(questEntry) : undefined };
+        condParams = parseParamsArg(conditionParams, "conditionParams");
+      } catch (e) {
+        return { content: [{ type: "text", text: (e as Error).message }], isError: true };
+      }
+      if (questEntry !== undefined && !quest) {
+        return { content: [{ type: "text", text: "questEntry needs quest (the journal tag)" }], isError: true };
+      }
       const index = requireIndex();
       const parentIdx = toI(parentIndex);
       const resrefLower = dialog.toLowerCase();
@@ -294,12 +358,12 @@ export function registerDialogWriteTools(server: McpServer): void {
 
       // ─── parentType: "dialog" — add a new NPC root entry to StartingList ─
       if (parentType === "dialog") {
-        const newEntry = makeEntry(text, script);
+        const newEntry = makeEntry(text, script, extras);
         const newIndex = entries.length;
         entries.push(newEntry);
 
         const startingList = getFieldList(dlg, "StartingList");
-        const link = makeLink(newIndex, condition);
+        const link = makeLink(newIndex, condition, condParams);
 
         if (parentIdx <= 0 || parentIdx >= startingList.length) {
           // -1 or 0: insert at the beginning (highest priority, evaluated first)
@@ -367,7 +431,7 @@ export function registerDialogWriteTools(server: McpServer): void {
       const newNodeType = parentType === "entry" ? "reply" : "entry";
 
       // Build the new node
-      const newNode = newNodeType === "entry" ? makeEntry(text, script) : makeReply(text, script);
+      const newNode = newNodeType === "entry" ? makeEntry(text, script, extras) : makeReply(text, script, extras);
 
       const newIndex = targetList.length;
       targetList.push(newNode);
@@ -380,7 +444,7 @@ export function registerDialogWriteTools(server: McpServer): void {
         setField(parentNode, linkListName, "list", []);
         links = getFieldList(parentNode, linkListName);
       }
-      links.push(makeLink(newIndex, condition));
+      links.push(makeLink(newIndex, condition, condParams));
 
       // Write back to disk
       const entry = index.resources.get(key);
@@ -433,13 +497,30 @@ export function registerDialogWriteTools(server: McpServer): void {
       script: z.string().optional().describe("New action script resref (runs when node plays)"),
       sound: z.string().optional().describe("New sound resref"),
       comment: z.string().optional().describe("New builder comment"),
+      params: z.string().optional().describe("JSON object replacing the node's ActionParams ('{}' clears them)"),
+      quest: z.string().optional().describe("Journal tag the node advances natively ('' clears it)"),
+      questEntry: optNumParam("Journal entry ID the node sets (with quest)"),
     },
     { idempotentHint: true },
-    async ({ dialog, nodeType, nodeIndex, text, script, sound, comment }) => {
-      if (text === undefined && script === undefined && sound === undefined && comment === undefined) {
+    async ({ dialog, nodeType, nodeIndex, text, script, sound, comment, params, quest, questEntry }) => {
+      let newParams: ScriptParams | undefined;
+      try {
+        newParams = parseParamsArg(params, "params");
+      } catch (e) {
+        return { content: [{ type: "text", text: (e as Error).message }], isError: true };
+      }
+      if (
+        text === undefined &&
+        script === undefined &&
+        sound === undefined &&
+        comment === undefined &&
+        newParams === undefined &&
+        quest === undefined &&
+        questEntry === undefined
+      ) {
         return {
           content: [
-            { type: "text", text: "Must provide at least one field to edit (text, script, sound, or comment)" },
+            { type: "text", text: "Must provide at least one field to edit (text, script, sound, comment, params, quest or questEntry)" },
           ],
           isError: true,
         };
@@ -484,6 +565,19 @@ export function registerDialogWriteTools(server: McpServer): void {
       if (comment !== undefined) {
         setField(node, "Comment", "cexostring", comment);
         changes.comment = comment;
+      }
+      if (newParams !== undefined) {
+        node.ActionParams = paramList(newParams);
+        changes.params = newParams;
+      }
+      if (quest !== undefined) {
+        setField(node, "Quest", "cexostring", quest);
+        if (quest === "") delete node.QuestEntry;
+        changes.quest = quest;
+      }
+      if (questEntry !== undefined && (quest ?? getFieldStr(node, "Quest"))) {
+        setField(node, "QuestEntry", "dword", toI(questEntry));
+        changes.questEntry = toI(questEntry);
       }
 
       // Write back to disk
