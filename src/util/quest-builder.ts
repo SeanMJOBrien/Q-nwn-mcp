@@ -289,33 +289,32 @@ export class QuestBuilder {
 
   /** The quest item: a module blueprint (existing, or a clone of a base-game item, or a new misc item). */
   private async item(s: Stage): Promise<Participant> {
-    const wantRes = (s.item ?? `${this.spec.tag}_i${s.n}`).toLowerCase().slice(0, 16);
+    const wantRes = (s.item ?? `${this.spec.tag.slice(0, 11)}_i${s.n}`).toLowerCase().slice(0, 16);
     const key = `item:${wantRes}`;
     const known = this.participants.get(key);
     if (known) return known;
-    let resref = wantRes;
-    const inModule = this.doc(`${resref}.uti`);
-    let doc = inModule ?? this.newItems.get(resref);
+    const inModule = this.doc(`${wantRes}.uti`);
     if (inModule) {
-      s.item = resref;
+      s.item = wantRes;
       const p: Participant = {
-        label: resref,
+        label: wantRes,
         kind: "item",
-        copies: [{ obj: inModule as GffObj, where: `bp:${resref}.uti` }],
+        copies: [{ obj: inModule as GffObj, where: `bp:${wantRes}.uti` }],
         slots: new Map(),
       };
       this.participants.set(key, p);
       return p;
     }
+    let resref = wantRes;
+    let doc = this.newItems.get(resref);
     if (!doc) {
-      if (s.item) {
-        const base = await resolveBlueprint(this.index, s.item, "uti", this.resman);
-        if (!base) throw new QuestBuildError(`stage ${s.n}: item ${s.item} not found`);
+      const base = s.itemName ? undefined : await resolveBlueprint(this.index, wantRes, "uti", this.resman);
+      if (base) {
         // Never write quest variables onto a shared base-game item: copy it under its own resref.
-        resref = `${this.spec.tag}_i${s.n}`.slice(0, 16);
+        resref = `${this.spec.tag.slice(0, 11)}_i${s.n}`;
         doc = structuredClone(base) as GffDocument;
-        this.report.notes.push(`item ${s.item} copied as ${resref} so quest variables don't touch every ${s.item}`);
-      } else {
+        this.report.notes.push(`item ${wantRes} copied as ${resref} so quest variables don't touch every ${wantRes}`);
+      } else if (s.itemName) {
         doc = {
           __data_type: "UTI ",
           AddCost: { type: "dword", value: 0 },
@@ -326,7 +325,7 @@ export class QuestBuilder {
           Description: { type: "cexolocstring", value: {} },
           DescIdentified: { type: "cexolocstring", value: {} },
           Identified: { type: "byte", value: 1 },
-          LocalizedName: { type: "cexolocstring", value: { "0": s.itemName ?? resref } },
+          LocalizedName: { type: "cexolocstring", value: { "0": s.itemName } },
           ModelPart1: { type: "byte", value: 1 },
           Plot: { type: "byte", value: 1 },
           PropertiesList: { type: "list", value: [] },
@@ -336,6 +335,8 @@ export class QuestBuilder {
           TemplateResRef: { type: "resref", value: resref },
         } as unknown as GffDocument;
         applyDefaultItemModels(doc as GffObj, this.index);
+      } else {
+        throw new QuestBuildError(`stage ${s.n}: item ${wantRes} not found (give itemName to create a new quest item)`);
       }
       const o = doc as GffObj;
       setField(o, "TemplateResRef", "resref", resref);
@@ -351,6 +352,7 @@ export class QuestBuilder {
       slots: new Map(),
     };
     this.participants.set(key, p);
+    this.participants.set(`item:${resref}`, p);
     return p;
   }
 
@@ -405,6 +407,7 @@ export class QuestBuilder {
     if (r?.gold) vars.push({ name: `${base}_reward_gold`, type: "int", value: r.gold });
     if (r?.item) vars.push({ name: `${base}_reward_item`, type: "string", value: r.item });
     if (this.spec.bounty && s.end === true) vars.push({ name: `${base}_bounty_end`, type: "int", value: 1 });
+    if (s.script) vars.push({ name: `${base}_self_script`, type: "string", value: s.script });
     this.setVars(p, vars);
   }
 
@@ -644,7 +647,9 @@ export class QuestBuilder {
     if (s.do === "deliver") {
       const item = s.item ?? "";
       const count = String(s.count ?? 1);
-      const adv = this.entry(d, thanks, `${c}advance`, "q_act", { target, take_item: item, take_count: count });
+      const advParams: ScriptParams = s.keep ? { target } : { target, take_item: item, take_count: count };
+      const adv = this.entry(d, thanks, `${c}advance`, "q_act", advParams);
+      if (s.reply) this.linkER(d, adv, this.reply(d, s.reply, `${c}reply`));
       this.leave(d, adv, `${c}leave`);
       this.root(d, adv, 1, { target, item, count });
       const lack = this.entry(d, s.missing ?? "You were to bring me something. Have you lost it?", `${c}missing`);
@@ -823,6 +828,45 @@ export class QuestBuilder {
         by = trig.label;
         break;
       }
+      case "search": {
+        const plc = this.placed(s.target as string, "Placeable List", "placeable");
+        if (!plc) throw new QuestBuildError(`stage ${s.n}: no placed placeable tagged ${s.target}`);
+        slot = this.assignSlot(plc, s);
+        this.writeStageVars(plc, s, slot);
+        this.setEvent(plc, slot, "OnUsed", "q_search", "MCP_Q_ORIG_USED");
+        const chk = s.check as NonNullable<Stage["check"]>;
+        const vars: Array<{ name: string; type: "int" | "string" | "float"; value: number | string }> = [
+          { name: "quest_search_skill", type: "string", value: chk.skill },
+          { name: "quest_search_dc", type: "int", value: chk.dc },
+          { name: "quest_search_tries", type: "int", value: chk.tries ?? 2 },
+          { name: "quest_search_assured", type: "int", value: chk.assured === false ? 0 : 1 },
+          { name: "quest_search_pass", type: "string", value: chk.pass ?? s.text ?? "You find something." },
+          { name: "quest_search_fail", type: "string", value: chk.fail ?? "You find nothing." },
+        ];
+        if (s.none) vars.push({ name: "quest_search_none", type: "string", value: s.none });
+        if (s.item || s.itemName) {
+          const item = await this.item(s);
+          vars.push({ name: "quest_search_item", type: "string", value: item.label });
+        }
+        if (s.examine) {
+          vars.push({ name: "quest_search_bonus_skill", type: "string", value: s.examine.skill });
+          vars.push({ name: "quest_search_bonus_dc", type: "int", value: s.examine.dc });
+          if (s.examine.var) vars.push({ name: "quest_search_bonus_var", type: "string", value: s.examine.var });
+          if (s.examine.pass) vars.push({ name: "quest_search_bonus_pass", type: "string", value: s.examine.pass });
+          if (s.examine.fail) vars.push({ name: "quest_search_bonus_fail", type: "string", value: s.examine.fail });
+        }
+        this.setVars(plc, vars);
+        for (const c of plc.copies) setField(c.obj, "Useable", "byte", 1);
+        by = s.target as string;
+        break;
+      }
+      case "custom": {
+        this.report.notes.push(
+          `stage ${s.n} is advanced by your own script: call AddJournalQuestEntry("${this.spec.tag}", ${s.n}, oPC) (whole party by default) where it happens`,
+        );
+        by = "custom script";
+        break;
+      }
       case "use": {
         const plc = this.placed(s.target as string, "Placeable List", "placeable");
         if (!plc) throw new QuestBuildError(`stage ${s.n}: no placed placeable tagged ${s.target}`);
@@ -847,8 +891,9 @@ export class QuestBuilder {
   }
 
   private async ensureItemExists(s: Stage): Promise<void> {
-    if (!s.item && s.itemName) await this.item(s);
-    else if (s.item && !this.doc(`${s.item}.uti`) && !this.newItems.has(s.item)) {
+    if (s.item && this.newItems.has(s.item)) return;
+    if (s.itemName) await this.item(s);
+    else if (s.item && !this.doc(`${s.item}.uti`)) {
       const base = await resolveBlueprint(this.index, s.item, "uti", this.resman);
       if (!base) this.report.warnings.push(`stage ${s.n}: item ${s.item} doesn't exist; nothing can be handed over`);
     }

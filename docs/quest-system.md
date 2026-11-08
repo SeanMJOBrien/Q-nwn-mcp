@@ -66,14 +66,22 @@ What is derived:
 | `explore` | A party member enters the area | `area` |
 | `trigger` | A party member walks into a spot | `area`, `x`, `y`, optional `radius` (default 3 m) |
 | `use` | A party member uses a placeable | `target` (placed placeable tag) |
+| `search` | A party member searches a placeable and the best-skilled party member (player or companion) passes `check` | `target` (placed placeable tag), `check: {skill, dc, tries, assured, pass, fail}`; optional `item`/`itemName` handed to the player, `examine`, `none` |
 | `deliver` | The NPC takes the item (`count`, default 1) | `item`, or an earlier stage that gives or picks one up; `to` (default the giver) |
 | `rescue` | Freeing the captive in dialog (it leaves unless `leave: false`) | `target` |
 | `escort` | The NPC reaches the destination following a party member | `target`; `area` and optional `x`, `y`, `radius` |
+| `custom` | Your own script calls `AddJournalQuestEntry(tag, n, oPC)` | nothing: build_quest writes the journal entry only (use for a stage like "every enemy in the tower is dead") |
 
 Any stage may add:
 
 - `check: {skill, dc, else, prompt, pass, fail}` on talk-style stages: the PC line rolls the check once (the best rank among the
   speaker and its companions); a pass advances, a fail does nothing (`else: "end"`) or turns the NPC hostile (`else: "fight"`).
+- `search` options: `check.tries` (attempts per player, default 2), `check.assured` (default true: once a player's tries are
+  spent the search succeeds anyway, so a required clue can never block the quest), `examine: {skill, dc, var, pass, fail}` (a
+  second check rolled on success by whoever is best at it, such as Lore on a found letter's seal; a pass sets module local
+  string `var` to "1" and shows `pass` with that companion's name), `none` (text before the quest reaches this stage).
+- `keep: true` on `deliver`: the NPC examines the item and the party keeps it (a later stage can hand it on).
+- `script`: a script run on the advancing NPC when the stage advances (e.g. opening a gate).
 - `reward: {xp, xp_tier, xp_level, gold, item}`. An item reward on stage 1 is how a courier parcel is handed out.
 - `n`, `from`, `end`: branches. Two stages with the same `from` fork; two with the same `n` converge (a persuade path and a
   kill path both reaching stage 2). `end: "fail"` marks a failure ending.
@@ -122,6 +130,7 @@ Any stage may add:
 | `q_act` | Dialog action. With `target`, nothing else runs unless the advance happened, so nothing repeats. |
 | `q_roll` | A skill check rolled once, as an action; `q_chk roll=` reads the result. |
 | `q_ondeath`, `q_onenter`, `q_trigger`, `q_onused` | Event stages; run the stored original handler first. |
+| `q_search` | Search stage on a placeable: the best-skilled party member rolls, limited tries per player, optional assured find, item, and an `examine` check. |
 | `q_mod_acquire`, `q_mod_tick` | Per-module wrappers for OnAcquireItem and OnHeartbeat, with the old handler built in. |
 
 ### `q_chk` parameters

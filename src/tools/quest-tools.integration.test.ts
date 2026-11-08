@@ -227,6 +227,73 @@ describe("build_quest", () => {
     }
   });
 
+  it("wires a search stage with a companion examine check, a kept item and a stage script", async () => {
+    const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+    (git["Placeable List"] as { value: GffObj[] }).value.push({
+      __struct_id: 9,
+      Tag: v("cexostring", "old_chest"),
+      OnUsed: v("resref", "old_used"),
+      Useable: v("byte", 0),
+    } as unknown as GffObj);
+    (git["Creature List"] as { value: GffObj[] }).value.push(creature("capt_holt"));
+    const spec = JSON.stringify({
+      name: "Letter",
+      giver: "farmer_ned",
+      stages: [
+        { do: "talk", journal: "a" },
+        {
+          do: "search",
+          target: "old_chest",
+          itemName: "Torn letter",
+          journal: "b",
+          check: { skill: "search", dc: 13, pass: "A letter!" },
+          examine: { skill: "lore", dc: 14, var: "HC_SEAL", pass: "The seal is forged." },
+        },
+        { do: "deliver", keep: true, journal: "c", text: "Show me... forged." },
+        { do: "deliver", to: "capt_holt", journal: "d", script: "a_gate_pass" },
+      ],
+    });
+    const { c, done } = await client();
+    try {
+      const r = json(await c.callTool({ name: "build_quest", arguments: { spec } }));
+      expect(r.success).toBe(true);
+      const chest = (git["Placeable List"] as { value: GffObj[] }).value[0];
+      expect(getFieldStr(chest, "OnUsed")).toBe("q_search");
+      expect(vars(chest)).toMatchObject({
+        quest1: "2_q_letter",
+        quest_event: 1,
+        MCP_Q_ORIG_USED: "old_used",
+        quest_search_skill: "search",
+        quest_search_dc: 13,
+        quest_search_assured: 1,
+        quest_search_item: "q_letter_i2",
+        quest_search_bonus_skill: "lore",
+        quest_search_bonus_var: "HC_SEAL",
+      });
+      expect(mockIndex.parsedGff.has("q_letter_i2.uti")).toBe(true);
+      expect(mockIndex.parsedGff.has("q_letter_i3.uti")).toBe(false); // deliver reuses the found letter
+      const holt = (git["Creature List"] as { value: GffObj[] }).value[2];
+      expect(vars(holt)).toMatchObject({ quest1: "4_q_letter", quest1_self_script: "a_gate_pass" });
+      // The giver looks at the letter without taking it; Holt takes it.
+      const ned = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
+      const keepNode = getFieldList(ned, "EntryList").find((e) =>
+        getFieldStr(e, "Comment").endsWith("s3:advance"),
+      ) as GffObj;
+      expect(getScriptParams(keepNode, "ActionParams")).toEqual({ target: "2" });
+      const holtDlg = mockIndex.parsedGff.get("dq_capt_holt.dlg") as unknown as GffObj;
+      const takeNode = getFieldList(holtDlg, "EntryList").find((e) =>
+        getFieldStr(e, "Comment").endsWith("s4:advance"),
+      ) as GffObj;
+      expect(getScriptParams(takeNode, "ActionParams")).toEqual({
+        target: "1",
+        take_item: "q_letter_i2",
+        take_count: "1",
+      });
+    } finally {
+      await done();
+    }
+  });
+
   it("explains a spec it can't build", async () => {
     const { c, done } = await client();
     try {

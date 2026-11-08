@@ -90,9 +90,18 @@ nodes by hand.** The full field reference is `docs/quest-system.md`; this phase 
   quest from the giver.
 - **Stage kinds:** `talk` (with `to`, default the giver), `return`, `kill` (`target`), `pickup` (`item` or `itemName`, plus
   `from_creature` or `in` for who holds it), `explore` (`area`), `trigger` (`area`, `x`, `y`), `use` (`target` placeable
-  tag), `deliver` (`item`, `to`), `rescue` (`target`), `escort` (`target`, destination `area`).
+  tag), `search` (placeable + `check`), `deliver` (`item`, `to`), `rescue` (`target`), `escort` (`target`, destination
+  `area`), `custom` (your own script advances it).
 - **A template** replaces the stage list for common shapes: `fetch`, `kill`, `bounty`, `deliver`, `rescue`, `escort`,
   `investigate` (`clues`), `persuade-or-fight`. Give the journal lines in order with `journal: [...]`.
+- **Searches and clues:** `search` on a placeable (`target`) with `check: {skill, dc}`: the party member best at the skill
+  (often a companion) rolls, each player gets 2 tries, and a required clue is found anyway once tries run out. Add `item` /
+  `itemName` to hand over what is found, and `examine: {skill, dc, var, pass}` for a second check by whoever knows most
+  (Lore on a letter's seal); the message names that companion.
+- **Look but keep:** `deliver` with `keep: true` lets an NPC examine an item the party carries on to someone else.
+- **Stage effects:** `script` runs a script on the NPC when the stage advances (opening a gate). A stage only your own script
+  can detect (every enemy in a room dead) is `do: "custom"`: build_quest writes the journal entry and your script calls
+  `AddJournalQuestEntry(tag, n, oPC)`.
 - **Skill gates:** `check: {skill, dc, else: "fight"}` on a talk stage. The PC line rolls once (the best of the speaker and
   its companions), so retrying the conversation can't reroll.
 - **Branches:** two stages with the same `n` are alternative ways to reach that stage (persuade *or* kill); `from` forks;

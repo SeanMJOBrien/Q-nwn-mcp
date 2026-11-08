@@ -12,9 +12,11 @@ export const STAGE_KINDS = [
   "explore",
   "trigger",
   "use",
+  "search",
   "deliver",
   "rescue",
   "escort",
+  "custom",
 ] as const;
 export type StageKind = (typeof STAGE_KINDS)[number];
 
@@ -37,6 +39,20 @@ export interface StageCheck {
   else?: "fight" | "end";
   /** PC line offering the check. */
   prompt?: string;
+  pass?: string;
+  fail?: string;
+  /** search: attempts per player (default 2). */
+  tries?: number;
+  /** search: succeed anyway once a player's tries are spent, so a required clue can't block the quest (default true). */
+  assured?: boolean;
+}
+
+/** search: a second check rolled on success by whoever in the party is best at it (e.g. Lore on a found letter's seal). */
+export interface StageExamine {
+  skill: string;
+  dc: number;
+  /** Module local string set to "1" on a pass (readable with q_chk var=). */
+  var?: string;
   pass?: string;
   fail?: string;
 }
@@ -74,8 +90,15 @@ export interface StageInput {
   y?: number;
   radius?: number;
   check?: StageCheck;
+  examine?: StageExamine;
   reward?: StageReward;
   leave?: boolean;
+  /** deliver: the NPC looks at the item but the party keeps it. */
+  keep?: boolean;
+  /** Script run on the advancing object (the NPC) when the stage advances (questK_self_script). */
+  script?: string;
+  /** search: text when the placeable is used before the quest reaches this stage. */
+  none?: string;
   /** Dialog lines (all optional; defaults are used). */
   offer?: string;
   accept?: string;
@@ -285,12 +308,17 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     stages.push({ ...s, do: kind, n, from: s.from ?? n - 1, journal, end: s.end ?? false });
   }
 
+  // A new quest item (itemName, no item) gets its resref now, so later stages (deliver) refer to the same item.
+  for (const s of stages) if (s.itemName && !s.item) s.item = `${tag.slice(0, 11)}_i${s.n}`;
+
   // Requirements per kind.
   for (const s of stages) {
     const need = (field: keyof StageInput, what: string) => {
       if (s[field] === undefined || s[field] === "") throw new QuestSpecError(`stage ${s.n} (${s.do}) needs ${what}`);
     };
-    if (s.do === "kill" || s.do === "rescue" || s.do === "escort" || s.do === "use") need("target", "a target");
+    if (s.do === "kill" || s.do === "rescue" || s.do === "escort" || s.do === "use" || s.do === "search")
+      need("target", "a target");
+    if (s.do === "search" && !s.check) throw new QuestSpecError(`stage ${s.n} (search) needs a check {skill, dc}`);
     if (s.do === "pickup" && !s.item && !s.itemName)
       throw new QuestSpecError(`stage ${s.n} (pickup) needs an item or itemName`);
     if (s.do === "explore" || s.do === "trigger") need("area", "an area");
