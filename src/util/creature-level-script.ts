@@ -57,6 +57,8 @@ export function generateCreatureLevelInclude(options: CreatureLevelOptions = {})
 //   MCP_GEAR_ROLE (string)   pc | elite | standard | mook
 //   MCP_GEAR_WEAPONS (string) comma list of preferred baseitems.2da rows
 //   MCP_SA_PINNED (string)   comma list of spells.2da rows always picked first at their level
+//   MCP_SA_DOMAIN (string)   JSON {"<class>": {"<spell level>": [domain spell ids]}}; one fills a slot per level
+//   MCP_DOMAINS (string)     JSON {"<class>": [domain1, domain2]} (domains.2da rows), checked in game
 // At spawn it: levels up with LevelUpHenchman, buys gear from the module's stores,
 // rebuilds once (ObjectToJson/JsonToObject, state kept) to write spell abilities at
 // the right caster level and slot count, then verifies and logs [SPEC_OK]/[SPEC_FAIL].
@@ -442,9 +444,27 @@ int CL_Slots(object oCreature, int nClass, int nClassLevel, int nSpellLevel)
     return nBase + CL_BonusSpells(nMod, nSpellLevel);
 }
 
+// Spell level of nSpell for one class: its domain level when it is one of that class's domain spells
+// (jDom = the class's MCP_SA_DOMAIN object), else the class's spells.2da column; -1 when neither.
+int CL_SpellLevel(json jDom, string sColumn, int nSpell)
+{
+    if (JsonGetType(jDom) == JSON_TYPE_OBJECT)
+    {
+        int nLevel;
+        for (nLevel = 1; nLevel <= 9; nLevel++)
+        {
+            json jIds = JsonObjectGet(jDom, IntToString(nLevel));
+            if (JsonGetType(jIds) == JSON_TYPE_ARRAY && JsonGetType(JsonFind(jIds, JsonInt(nSpell))) != JSON_TYPE_NULL) return nLevel;
+        }
+    }
+    if (sColumn == "" || sColumn == "****") return -1;
+    return CL_Cell("spells", sColumn, nSpell);
+}
+
 // Builds the SpecAbilityList JSON value and records the expected ready counts.
 json CL_SpellEntries(object oCreature)
 {
+    json jDomains = JsonParse(GetLocalString(oCreature, "MCP_SA_DOMAIN"));
     json jEntries = JsonArray();
     json jPools = JsonParse(GetLocalString(oCreature, "MCP_SA_POOL"));
     string sExpect = "";
@@ -459,6 +479,7 @@ json CL_SpellEntries(object oCreature)
         string sKnown = Get2DAString("classes", "SpellKnownTable", nClass);
         string sColumn = Get2DAString("classes", "SpellTableColumn", nClass);
         string sPinned = GetLocalString(oCreature, "MCP_SA_PINNED");
+        json jDom = JsonObjectGet(jDomains, IntToString(nClass));
         int nSpellLevel;
         for (nSpellLevel = 0; nSpellLevel <= 9; nSpellLevel++)
         {
@@ -477,12 +498,17 @@ json CL_SpellEntries(object oCreature)
             // Pinned spells first (those on this class's list at this spell level), then the
             // pool from a random start, skipping duplicates, until nDistinct spells are chosen.
             json jChosen = JsonArray();
+            // The domain slot: one of this level's domain spells, before anything else.
+            json jDomIds = JsonObjectGet(jDom, IntToString(nSpellLevel));
+            if (JsonGetType(jDomIds) == JSON_TYPE_ARRAY && JsonGetLength(jDomIds) > 0)
+                jChosen = JsonArrayInsert(jChosen, JsonArrayGet(jDomIds, Random(JsonGetLength(jDomIds))));
             int p = 0;
             string sPin = CL_Token(sPinned, 0);
             while (sPin != "" && JsonGetLength(jChosen) < nDistinct)
             {
                 int nPin = StringToInt(sPin);
-                if (CL_Cell("spells", sColumn, nPin) == nSpellLevel) jChosen = JsonArrayInsert(jChosen, JsonInt(nPin));
+                if (CL_SpellLevel(jDom, sColumn, nPin) == nSpellLevel && JsonGetType(JsonFind(jChosen, JsonInt(nPin))) == JSON_TYPE_NULL)
+                    jChosen = JsonArrayInsert(jChosen, JsonInt(nPin));
                 p++;
                 sPin = CL_Token(sPinned, p);
             }
@@ -513,6 +539,64 @@ json CL_SpellEntries(object oCreature)
 
 // ---- verification (runs on the final object) ----
 
+// Domains: the class entry carries the planned domains, and the creature has each domain's power feat.
+void CL_VerifyDomains(object oCreature)
+{
+    json jPlan = JsonParse(GetLocalString(oCreature, "MCP_DOMAINS"));
+    if (JsonGetType(jPlan) != JSON_TYPE_OBJECT) return;
+    int nPos;
+    for (nPos = 1; nPos <= 3; nPos++)
+    {
+        int nClass = GetClassByPosition(nPos, oCreature);
+        if (nClass == CLASS_TYPE_INVALID) continue;
+        json jPair = JsonObjectGet(jPlan, IntToString(nClass));
+        if (JsonGetType(jPair) != JSON_TYPE_ARRAY) continue;
+        int nD1 = JsonGetInt(JsonArrayGet(jPair, 0));
+        int nD2 = JsonGetInt(JsonArrayGet(jPair, 1));
+        string sExpected = IntToString(nD1) + "," + IntToString(nD2);
+        string sActual = IntToString(GetDomain(oCreature, 1, nClass)) + "," + IntToString(GetDomain(oCreature, 2, nClass));
+        CL_Spec(oCreature, sActual == sExpected, "cl_domain_" + IntToString(nClass), sExpected, sActual);
+        int nF1 = CL_Cell("domains", "GrantedFeat", nD1);
+        int nF2 = CL_Cell("domains", "GrantedFeat", nD2);
+        int bFeats = (nF1 < 0 || GetHasFeat(nF1, oCreature)) && (nF2 < 0 || GetHasFeat(nF2, oCreature));
+        CL_Spec(oCreature, bFeats, "cl_domain_feats_" + IntToString(nClass),
+            IntToString(nF1) + "," + IntToString(nF2), bFeats ? "present" : "missing");
+    }
+}
+
+// Domain spells: at every spell level with domain spells and slots, at least one ready ability is one of them.
+void CL_VerifyDomainSpells(object oCreature, json jDomains, int nCount)
+{
+    if (JsonGetType(jDomains) != JSON_TYPE_OBJECT) return;
+    int nPos;
+    for (nPos = 1; nPos <= 3; nPos++)
+    {
+        int nClass = GetClassByPosition(nPos, oCreature);
+        if (nClass == CLASS_TYPE_INVALID) continue;
+        json jDom = JsonObjectGet(jDomains, IntToString(nClass));
+        if (JsonGetType(jDom) != JSON_TYPE_OBJECT) continue;
+        string sExpected = "";
+        string sActual = "";
+        int nLevel;
+        for (nLevel = 1; nLevel <= 9; nLevel++)
+        {
+            json jIds = JsonObjectGet(jDom, IntToString(nLevel));
+            if (JsonGetType(jIds) != JSON_TYPE_ARRAY || JsonGetLength(jIds) == 0) continue;
+            if (CL_Slots(oCreature, nClass, GetLevelByPosition(nPos, oCreature), nLevel) <= 0) continue;
+            sExpected += IntToString(nLevel) + ";";
+            int i;
+            for (i = 0; i < nCount; i++)
+            {
+                if (!GetSpellAbilityReady(oCreature, i)) continue;
+                if (JsonGetType(JsonFind(jIds, JsonInt(GetSpellAbilitySpell(oCreature, i)))) == JSON_TYPE_NULL) continue;
+                sActual += IntToString(nLevel) + ";";
+                break;
+            }
+        }
+        if (sExpected != "") CL_Spec(oCreature, sActual == sExpected, "cl_spell_domain_" + IntToString(nClass), sExpected, sActual);
+    }
+}
+
 void CL_Verify(object oCreature)
 {
     if (!GetIsObjectValid(oCreature)) return;
@@ -539,6 +623,7 @@ void CL_Verify(object oCreature)
 
     // Spell abilities: each on a class list at an accessible level, right caster level, right count.
     string sExpect = GetLocalString(oCreature, "MCP_SA_EXPECT");
+    json jDomains = JsonParse(GetLocalString(oCreature, "MCP_SA_DOMAIN"));
     if (sExpect != "")
     {
         int nCount = GetSpellAbilityCount(oCreature);
@@ -552,6 +637,7 @@ void CL_Verify(object oCreature)
             int nClassLevel = GetLevelByPosition(nPos, oCreature);
             string sColumn = Get2DAString("classes", "SpellTableColumn", nClass);
             if (sColumn == "" || sColumn == "****") continue;
+            json jDom = JsonObjectGet(jDomains, IntToString(nClass));
             int nSpellLevel;
             for (nSpellLevel = 0; nSpellLevel <= 9; nSpellLevel++)
             {
@@ -560,7 +646,7 @@ void CL_Verify(object oCreature)
                 for (i = 0; i < nCount; i++)
                 {
                     int nSpell = GetSpellAbilitySpell(oCreature, i);
-                    if (CL_Cell("spells", sColumn, nSpell) != nSpellLevel) continue;
+                    if (CL_SpellLevel(jDom, sColumn, nSpell) != nSpellLevel) continue;
                     if (!GetSpellAbilityReady(oCreature, i)) continue;
                     if (GetSpellAbilityCasterLevel(oCreature, i) != nClassLevel) nBad++;
                     nReady++;
@@ -578,7 +664,7 @@ void CL_Verify(object oCreature)
                 int nClass = GetClassByPosition(c, oCreature);
                 if (nClass == CLASS_TYPE_INVALID) continue;
                 string sColumn = Get2DAString("classes", "SpellTableColumn", nClass);
-                int nLevel = (sColumn == "" || sColumn == "****") ? -1 : CL_Cell("spells", sColumn, nSpell);
+                int nLevel = CL_SpellLevel(JsonObjectGet(jDomains, IntToString(nClass)), sColumn, nSpell);
                 if (nLevel >= 0 && CL_Slots(oCreature, nClass, GetLevelByPosition(c, oCreature), nLevel) > 0) bOnList = TRUE;
             }
             if (!bOnList) nBad++;
@@ -597,7 +683,9 @@ void CL_Verify(object oCreature)
             sPin = CL_Token(sPinned, p);
         }
         CL_Spec(oCreature, nBad == 0, "cl_spell_validity", "0", IntToString(nBad));
+        CL_VerifyDomainSpells(oCreature, jDomains, nCount);
     }
+    CL_VerifyDomains(oCreature);
 
     // Gear: everything the creature holds equipped is usable (the engine drops what isn't).
     if (GetLocalFloat(oCreature, "MCP_GEAR_WEALTH") > 0.0)

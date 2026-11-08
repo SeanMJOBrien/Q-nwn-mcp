@@ -27,19 +27,38 @@ import {
 import { estimateCRFromLevel } from "../util/encounter-difficulty.js";
 import { EQUIP_SLOT_MAP } from "../util/equip-slots.js";
 import { mergeVarTable, resolveBlueprint } from "../util/git-helpers.js";
-import { pickWeaponPreference, seedHash } from "../util/npc-weapon-preferences.js";
 import type { PowerLevel } from "../util/npc-stat-block.js";
+import { pickWeaponPreference, seedHash } from "../util/npc-weapon-preferences.js";
 import { toF, toI } from "../util/params.js";
 import { writeAndCompileScript } from "../util/script-writer.js";
 import { hasCell, isRetired2DARow, listOf, twoDARow } from "../util/verify/common.js";
 import type { GearRole } from "../util/wealth.js";
-import { applyNpcStatBlock, type CreatureTarget, creatureSeed, resolveCreatureTarget, targetErrorResult } from "./npc-tools.js";
+import {
+  applyNpcStatBlock,
+  type CreatureTarget,
+  creatureSeed,
+  resolveCreatureTarget,
+  targetErrorResult,
+} from "./npc-tools.js";
 
 /** Locals from older systems that the forge supersedes (stale once a creature levels at spawn). */
-const SUPERSEDED_VARS = ["HENCH_LEVEL", "SPEC_ENABLED", "SPEC_RACE", "SPEC_APPEARANCE", "SPEC_CLASS", "SPEC_LEVEL", "SPEC_PACKAGE"];
+const SUPERSEDED_VARS = [
+  "HENCH_LEVEL",
+  "SPEC_ENABLED",
+  "SPEC_RACE",
+  "SPEC_APPEARANCE",
+  "SPEC_CLASS",
+  "SPEC_LEVEL",
+  "SPEC_PACKAGE",
+];
 
 /** Creature-only slots kept when gear is replaced (claws, bite, hide). */
-const CREATURE_SLOTS = new Set([EQUIP_SLOT_MAP.cweapon_l, EQUIP_SLOT_MAP.cweapon_r, EQUIP_SLOT_MAP.cweapon_b, EQUIP_SLOT_MAP.hide]);
+const CREATURE_SLOTS = new Set([
+  EQUIP_SLOT_MAP.cweapon_l,
+  EQUIP_SLOT_MAP.cweapon_r,
+  EQUIP_SLOT_MAP.cweapon_b,
+  EQUIP_SLOT_MAP.hide,
+]);
 
 const BASELINE_CLOTHING = "nw_cloth001";
 
@@ -71,6 +90,8 @@ export interface ForgeParams {
   originalSpawn?: string;
   /** spells.2da rows always picked first at their spell level (a boss's signature spell). */
   pinnedSpells?: number[];
+  /** domains.2da rows for a class that picks domains (Cleric); default: the creature's package domains. */
+  domains?: number[];
 }
 
 export interface ForgeResult {
@@ -80,6 +101,8 @@ export interface ForgeResult {
   spellPoolSizes: Record<string, Record<string, number>>;
   gear: string;
   originalSpawn: string;
+  /** Domains written per domain-picking class, with their power feats. */
+  domains?: Record<string, Array<{ id: number; label: string; feat?: number }>>;
   warnings: string[];
 }
 
@@ -100,7 +123,11 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
  * Reads the spell's own class column (never resolving through Master — the bug that
  * leaked Extract Brain into a Cleric's book) and keeps only real spells (UserType 1).
  */
-export function classSpellPools(index: ModuleIndex, classId: number, seed: string): Record<string, number[]> | undefined {
+export function classSpellPools(
+  index: ModuleIndex,
+  classId: number,
+  seed: string,
+): Record<string, number[]> | undefined {
   const classRow = twoDARow(index, "classes", classId);
   if (!classRow || classRow.SpellCaster !== "1" || !hasCell(classRow, "SpellTableColumn")) return undefined;
   const column = classRow.SpellTableColumn;
@@ -115,8 +142,68 @@ export function classSpellPools(index: ModuleIndex, classId: number, seed: strin
     (byLevel[String(level)] ??= []).push(spellId);
   }
   const pools: Record<string, number[]> = {};
-  for (const [level, ids] of Object.entries(byLevel)) pools[level] = seededShuffle(ids.sort((a, b) => a - b), `${seed}:${classId}:${level}`);
+  for (const [level, ids] of Object.entries(byLevel))
+    pools[level] = seededShuffle(
+      ids.sort((a, b) => a - b),
+      `${seed}:${classId}:${level}`,
+    );
   return Object.keys(pools).length > 0 ? pools : undefined;
+}
+
+/** A usable domains.2da row: has a label and a granted power feat. */
+function isDomainRow(index: ModuleIndex, id: number): boolean {
+  const row = twoDARow(index, "domains", id);
+  return !!row && hasCell(row, "Label") && hasCell(row, "GrantedFeat");
+}
+
+/**
+ * The two domains for a class that picks them (classes.2da PickDomains = 1), or undefined for any other class.
+ * Requested domains win; otherwise the package's Domain1/Domain2 (what LevelUpHenchman uses for a class gained
+ * later), falling back to the class's own package row.
+ */
+export function chooseDomains(
+  index: ModuleIndex,
+  classId: number,
+  packageId: number | undefined,
+  requested: number[] | undefined,
+  warnings: string[],
+): [number, number] | undefined {
+  if (twoDARow(index, "classes", classId)?.PickDomains !== "1") return undefined;
+  if (requested && requested.length > 0) {
+    const valid = [...new Set(requested)].filter((d) => isDomainRow(index, d));
+    if (valid.length === 2) return [valid[0], valid[1]];
+    warnings.push(
+      `domains ${JSON.stringify(requested)} must be two different domains.2da rows; using the package domains instead`,
+    );
+  }
+  for (const pkg of [packageId, Number(twoDARow(index, "classes", classId)?.Package)]) {
+    if (pkg === undefined || !Number.isInteger(pkg)) continue;
+    const row = twoDARow(index, "packages", pkg);
+    if (!row || Number(row.ClassID) !== classId) continue;
+    const d1 = Number(row.Domain1);
+    const d2 = Number(row.Domain2);
+    if (isDomainRow(index, d1) && isDomainRow(index, d2) && d1 !== d2) return [d1, d2];
+  }
+  warnings.push(`no usable domains found for class ${classId}; it will have none`);
+  return undefined;
+}
+
+/** Domain spells by spell level for the given domains: { "1": [13], "3": [42, 171] }. */
+export function domainSpells(index: ModuleIndex, domains: number[]): Record<string, number[]> {
+  const out: Record<string, number[]> = {};
+  for (const d of domains) {
+    const row = twoDARow(index, "domains", d);
+    if (!row) continue;
+    for (let level = 1; level <= 9; level++) {
+      const cell = row[`Level_${level}`];
+      if (!cell || cell === "****") continue;
+      const spell = Number(cell);
+      if (!Number.isInteger(spell)) continue;
+      const list = (out[String(level)] ??= []);
+      if (!list.includes(spell)) list.push(spell);
+    }
+  }
+  return out;
 }
 
 /** Moves alignment inside a class's restriction (Monk lawful; Paladin lawful good; Barbarian/Bard not lawful). */
@@ -170,9 +257,46 @@ export async function forgeCreature(
   const classIds = [...new Set(plan ?? [params.classId])];
   fitAlignment(obj, classIds, warnings);
 
+  // Domains (Cleric): written on the class entry, their power feats added to the level-1 feats, and their
+  // spells added to that class's spell pool (inc_cre_level fills one slot per spell level with one).
+  const domainsByClass: Record<string, [number, number]> = {};
+  const packageId = getFieldNum(obj, "StartingPackage");
+  for (const classId of classIds) {
+    const chosen = chooseDomains(
+      index,
+      classId,
+      classId === firstClass ? packageId : undefined,
+      params.domains,
+      warnings,
+    );
+    if (!chosen) continue;
+    domainsByClass[String(classId)] = chosen;
+    const entry = listOf(obj, "ClassList").find((c) => getFieldNum(c, "Class") === classId);
+    if (entry) {
+      setField(entry, "Domain1", "byte", chosen[0]);
+      setField(entry, "Domain2", "byte", chosen[1]);
+      const feats = listOf(obj, "FeatList");
+      for (const d of chosen) {
+        const feat = Number(twoDARow(index, "domains", d)?.GrantedFeat);
+        if (Number.isInteger(feat) && !feats.some((f) => getFieldNum(f, "Feat") === feat)) {
+          feats.push({ __struct_id: 1, Feat: { type: "word", value: feat } } as unknown as GffObj);
+        }
+      }
+    } else {
+      warnings.push(
+        `class ${classId} is gained after level 1; LevelUpHenchman gives it the package's domains, not ${chosen.join("/")}`,
+      );
+    }
+  }
+
   // 2. Levelling plan and target.
   const targetLevel = params.level > 0 ? params.level : 0;
-  setField(obj, "ChallengeRating", "float", estimateCRFromLevel(targetLevel > 0 ? targetLevel : Math.max(1, params.levelMin ?? 1)));
+  setField(
+    obj,
+    "ChallengeRating",
+    "float",
+    estimateCRFromLevel(targetLevel > 0 ? targetLevel : Math.max(1, params.levelMin ?? 1)),
+  );
   removeVars(obj, SUPERSEDED_VARS);
   const vars: Array<{ name: string; type: "int" | "float" | "string"; value: number | string }> = [
     { name: "MCP_LEVEL", type: "int", value: targetLevel },
@@ -184,11 +308,35 @@ export async function forgeCreature(
 
   // 3. Spell pools per caster class (inc_cre_level picks the right count at the reached level).
   const pools: Record<string, Record<string, number[]>> = {};
+  const domainPools: Record<string, Record<string, number[]>> = {};
   for (const classId of classIds) {
     const p = classSpellPools(index, classId, seed);
-    if (p) pools[String(classId)] = p;
+    if (!p) continue;
+    const doms = domainsByClass[String(classId)];
+    if (doms) {
+      // A domain spell is cast at its domain level; drop it from any other level of the class pool so each
+      // spell ability has one unambiguous spell level.
+      const ds = domainSpells(index, doms);
+      const all = new Set(Object.values(ds).flat());
+      for (const level of Object.keys(p)) p[level] = p[level].filter((id) => !all.has(id));
+      for (const [level, ids] of Object.entries(ds)) p[level] = [...(p[level] ?? []), ...ids];
+      domainPools[String(classId)] = ds;
+    }
+    pools[String(classId)] = p;
   }
-  vars.push({ name: "MCP_SA_POOL", type: "string", value: Object.keys(pools).length > 0 ? JSON.stringify(pools) : "" });
+  vars.push(
+    { name: "MCP_SA_POOL", type: "string", value: Object.keys(pools).length > 0 ? JSON.stringify(pools) : "" },
+    {
+      name: "MCP_SA_DOMAIN",
+      type: "string",
+      value: Object.keys(domainPools).length > 0 ? JSON.stringify(domainPools) : "",
+    },
+    {
+      name: "MCP_DOMAINS",
+      type: "string",
+      value: Object.keys(domainsByClass).length > 0 ? JSON.stringify(domainsByClass) : "",
+    },
+  );
 
   // Pinned spells must be on one of the creature's class lists, or they can never be picked.
   const pinned = (params.pinnedSpells ?? []).filter((spell) => {
@@ -202,7 +350,8 @@ export async function forgeCreature(
   // 4. Gear settings. With an allowance, start from baseline clothing and creature-only slots.
   const wealth = params.gearWealth ?? DEFAULT_GEAR_WEALTH;
   const weapons =
-    params.weapons ?? (() => {
+    params.weapons ??
+    (() => {
       const pref = pickWeaponPreference(firstClass, seed);
       return pref ? [pref.baseItem] : [];
     })();
@@ -229,19 +378,38 @@ export async function forgeCreature(
 
   // 5. Wire the spawn wrapper, remembering the original handler.
   const current = getFieldStr(obj, "ScriptSpawn");
-  const originalSpawn = params.originalSpawn ?? (current === CREATURE_LEVEL_WRAPPER ? "nw_c2_default9" : current || "nw_c2_default9");
+  const originalSpawn =
+    params.originalSpawn ?? (current === CREATURE_LEVEL_WRAPPER ? "nw_c2_default9" : current || "nw_c2_default9");
   mergeVarTable(obj, [{ name: "MCP_ORIG_SPAWN", type: "string", value: originalSpawn }]);
   setField(obj, "ScriptSpawn", "resref", CREATURE_LEVEL_WRAPPER);
 
   return {
     target: target.label,
-    targetLevel: targetLevel > 0 ? targetLevel : `party average ${(params.levelRel ?? 0) >= 0 ? "+" : ""}${params.levelRel ?? 0}`,
+    targetLevel:
+      targetLevel > 0 ? targetLevel : `party average ${(params.levelRel ?? 0) >= 0 ? "+" : ""}${params.levelRel ?? 0}`,
     levelOneFeats: result.feats.map((f) => f.feat),
     spellPoolSizes: Object.fromEntries(
-      Object.entries(pools).map(([c, p]) => [c, Object.fromEntries(Object.entries(p).map(([l, ids]) => [l, ids.length]))]),
+      Object.entries(pools).map(([c, p]) => [
+        c,
+        Object.fromEntries(Object.entries(p).map(([l, ids]) => [l, ids.length])),
+      ]),
     ),
     gear,
     originalSpawn,
+    ...(Object.keys(domainsByClass).length > 0
+      ? {
+          domains: Object.fromEntries(
+            Object.entries(domainsByClass).map(([c, ds]) => [
+              c,
+              ds.map((d) => {
+                const row = twoDARow(index, "domains", d);
+                const feat = Number(row?.GrantedFeat);
+                return { id: d, label: row?.Label ?? String(d), ...(Number.isInteger(feat) ? { feat } : {}) };
+              }),
+            ]),
+          ),
+        }
+      : {}),
     warnings,
   };
 }
@@ -252,7 +420,12 @@ export async function writeCreatureLevelSystem(
   stores?: string[],
   droppable?: boolean,
 ): Promise<{ include: string; wrapper: string; compiled: boolean; compilerOutput?: string; stores: string[] }> {
-  await writeAndCompileScript(index, CREATURE_LEVEL_INCLUDE, generateCreatureLevelInclude({ stores, droppable }), false);
+  await writeAndCompileScript(
+    index,
+    CREATURE_LEVEL_INCLUDE,
+    generateCreatureLevelInclude({ stores, droppable }),
+    false,
+  );
   const wrapper = await writeAndCompileScript(index, CREATURE_LEVEL_WRAPPER, generateCreatureLevelWrapper(), true);
   return {
     include: `${CREATURE_LEVEL_INCLUDE}.nss`,
@@ -272,7 +445,10 @@ export function registerCreatureForgeTools(server: McpServer): void {
       "before forge_creature. `stores` names the store tags/resrefs NPCs buy from (default: four base-game stores). " +
       "Unspent allowance is discarded, never given as gold.",
     {
-      stores: z.string().optional().describe('JSON array of store tags or resrefs, e.g. ["nw_storeweap001","my_smith"]'),
+      stores: z
+        .string()
+        .optional()
+        .describe('JSON array of store tags or resrefs, e.g. ["nw_storeweap001","my_smith"]'),
       droppable: z.boolean().optional().describe("Whether bought gear can drop as loot (default true)"),
     },
     { destructiveHint: true },
@@ -302,7 +478,7 @@ export function registerCreatureForgeTools(server: McpServer): void {
       "stores within a gold allowance that grows with level (role share x `gearWealth`, default 0.5; proficiency-checked, since the " +
       "engine refuses to equip items a creature isn't proficient with; ranged creatures also get a melee backup weapon in " +
       "their inventory; every purchase is logged as a [CL_LOOT] line that run_live_verification returns), and casters get " +
-      "spell abilities with the correct spells, caster level and slots per day (`pinnedSpells` are always picked first). Target a blueprint (`resref`) or a placed instance (`area`+`tag`); call it " +
+      "spell abilities with the correct spells, caster level and slots per day (`pinnedSpells` are always picked first). A Cleric gets two `domains` (default: its package's): their power feats now and one domain spell per spell level at spawn. Target a blueprint (`resref`) or a placed instance (`area`+`tag`); call it " +
       "for both copies. Needs create_creature_level_system once per module. Placed creatures spawn at module load, before " +
       "any PC exists, so use an absolute `level` for them; `levelRel` suits creatures spawned later by script or encounter.",
     {
@@ -316,32 +492,64 @@ export function registerCreatureForgeTools(server: McpServer): void {
       levelMin: z.string().optional().describe("Minimum level"),
       levelMax: z.string().optional().describe("Maximum level"),
       plan: z.string().optional().describe("JSON array of class ids, one per level, for multiclass order"),
-      powerLevel: z.enum(["elite", "low", "standard", "tougher", "epic"]).optional().describe("Ability-score band (default elite)"),
+      powerLevel: z
+        .enum(["elite", "low", "standard", "tougher", "epic"])
+        .optional()
+        .describe("Ability-score band (default elite)"),
       complexity: z.enum(["full", "simple"]).optional().describe("'simple' = required feats only (minions, commoners)"),
-      gearRole: z.enum(["pc", "elite", "standard", "mook"]).optional().describe("Wealth share: pc/elite 100%, standard 50%, mook 25% (default standard)"),
-      gearWealth: z.string().optional().describe("Allowance multiplier on the role share (default 0.5; 0 keeps current gear)"),
+      gearRole: z
+        .enum(["pc", "elite", "standard", "mook"])
+        .optional()
+        .describe("Wealth share: pc/elite 100%, standard 50%, mook 25% (default standard)"),
+      gearWealth: z
+        .string()
+        .optional()
+        .describe("Allowance multiplier on the role share (default 0.5; 0 keeps current gear)"),
       weapons: z.string().optional().describe("JSON array of preferred baseitems.2da rows"),
-      originalSpawn: z.string().optional().describe("Spawn script to run before levelling (default: the creature's current ScriptSpawn)"),
+      originalSpawn: z
+        .string()
+        .optional()
+        .describe("Spawn script to run before levelling (default: the creature's current ScriptSpawn)"),
       pinnedSpells: z
         .string()
         .optional()
-        .describe("JSON array of spells.2da rows a caster always gets first at their spell level (e.g. a boss's signature spell)"),
+        .describe(
+          "JSON array of spells.2da rows a caster always gets first at their spell level (e.g. a boss's signature spell)",
+        ),
+      domains: z
+        .string()
+        .optional()
+        .describe(
+          "Cleric only: JSON array of two domains.2da rows chosen for the character (0 Air, 1 Animal, 3 Death, 4 Destruction, 5 Earth, 6 Evil, 7 Fire, 8 Good, 9 Healing, 10 Knowledge, 13 Magic, 14 Plant, 15 Protection, 16 Strength, 17 Sun, 18 Travel, 19 Trickery, 20 War, 21 Water). Default: the package's (Healing and Sun for the Cleric package).",
+        ),
     },
     { destructiveHint: true },
     async (args) => {
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
-      const target = await resolveCreatureTarget(index, args.resref, args.area, args.tag, "forge_creature", `Forge ${args.tag ?? args.resref}`);
+      const target = await resolveCreatureTarget(
+        index,
+        args.resref,
+        args.area,
+        args.tag,
+        "forge_creature",
+        `Forge ${args.tag ?? args.resref}`,
+      );
       if ("error" in target) return targetErrorResult(target);
       let plan: number[] | undefined;
       let weapons: number[] | undefined;
       let pinnedSpells: number[] | undefined;
+      let domains: number[] | undefined;
       try {
+        domains = args.domains ? (JSON.parse(args.domains) as number[]) : undefined;
         plan = args.plan ? (JSON.parse(args.plan) as number[]) : undefined;
         weapons = args.weapons ? (JSON.parse(args.weapons) as number[]) : undefined;
         pinnedSpells = args.pinnedSpells ? (JSON.parse(args.pinnedSpells) as number[]) : undefined;
       } catch {
-        return { content: [{ type: "text", text: "plan, weapons and pinnedSpells must be JSON arrays of numbers" }], isError: true };
+        return {
+          content: [{ type: "text", text: "plan, weapons, pinnedSpells and domains must be JSON arrays of numbers" }],
+          isError: true,
+        };
       }
       const result = await forgeCreature(index, resmanOpts, target, {
         race: toI(args.race),
@@ -358,6 +566,7 @@ export function registerCreatureForgeTools(server: McpServer): void {
         weapons,
         originalSpawn: args.originalSpawn,
         pinnedSpells,
+        domains,
       });
       await target.save();
       const hasSystem = index.resources.has(`${CREATURE_LEVEL_WRAPPER}.ncs`);

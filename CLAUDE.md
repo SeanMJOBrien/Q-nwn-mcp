@@ -176,10 +176,11 @@ The rest are open.
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **14 commits** ahead of `master`:
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **15 commits** ahead of `master`:
       `create_area_transition` `width`/`depth`/`rotation` options (`4d441e8`), `create_companion_system` /
       `create_companion_dialog` (`64059a1`), the same size options on `place_trigger` (`13f44ec`), `compose_encounter`
-      forging its boss (`138e5a9`), and the merge of `area-avenue-rotation` (its 9 commits plus the merge commit).
+      forging its boss (`138e5a9`), the merge of `area-avenue-rotation` (`df26991`: its 9 commits plus the merge commit),
+      and Cleric domains in the forge.
     - **`area-avenue-rotation`** (pushed) — **merged into the working branch 2026-11-07** after review: a new oracle test
       ("rotated tile groups placed by hand match rotateGroupTileIndex") confirms its final group-rotation mapping against
       633 hand-placed rotated groups (98.6 % of 1,886 tiles), entrance facing matches the verified door convention, and
@@ -933,6 +934,12 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
   effects; the new object's OnSpawn fires again. Each ready SpecAbilityList entry is one cast; its `SpellCasterLevel` is the cast level.
   (6) `build_npc_stat_block` used to write illegal level-1 feats (Cleave without Power Attack, Weapon Specialization at level 1);
   every pick now goes through `feat-legality.ts` in package (`packft_*`) order.
+  (7) **Clerics had no domains (fixed 2026-11-07):** the forge wrote no `Domain1`/`Domain2` and no domain power feat, and
+  spell abilities came only from the Cleric column, so no Cleric ever had domain powers or domain spells (`LevelUpHenchman`
+  adds feats from level 2 only). The forge now picks two domains (`domains` param, default the package's — Healing/Sun for
+  the Cleric package; any class with `classes.2da PickDomains=1`), adds both `GrantedFeat`s, and `inc_cre_level` fills one
+  slot per spell level with a domain spell (checked in game: `cl_domain_<class>`, `cl_domain_feats_<class>`,
+  `cl_spell_domain_<class>`). Wizards' school specialization (`PickSchool`) has the same gap and is not handled yet.
   **New standard path:** `create_creature_level_system` + `forge_creature` (spawn-time levelling, store shopping, spell abilities, in-game
   verification). The Hollow Communion's 13 class-based creatures were rebuilt this way (58/58 live checks).
 
