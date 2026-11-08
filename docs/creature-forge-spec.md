@@ -1,6 +1,7 @@
 # Creature forge: one declarative spec → a correct creature, at any level, in any form
 
-Status: **design only, nothing built.** Measurements below were taken on
+Status (2026-11-07): **spawn-time levelling is built** — how to use it and its logic flow are in
+[`creature-forge-manual.md`](creature-forge-manual.md). The original status line follows: **design only, nothing built.** Measurements below were taken on
 2026-11-07 against commit `e517065`, the real 8193.35 2DA set, 13 base-game
 `nw_aarcl*` items, and The Frozen North's source (501 `.utc`, 1,321 `.uti`,
 40 sampled `.git`). The audit scripts were throwaway; §9 turns each of them into

@@ -170,23 +170,24 @@ The rest are open.
       groups; `docs/encounter-composer-spec.md` and `docs/special-abilities-system.md` carry the update.
 
 15. **TODO (standing, user rule 2026-11-07) — branches and commits not yet merged into `master`.**
-    Checked 2026-11-07 after `git fetch --prune`; only `master`, the working branch and `area-avenue-rotation` remain, none with unmerged commits. Update after every commit or merge.
+    Checked 2026-11-07 after `git fetch --prune`; only `master` and the working branch remain. Update after every commit or merge.
     - **Merged 2026-11-07:** `systest-live-run-and-generalized-spec` was fast-forwarded into `master` (the SPEC_* assertions,
       encounter composer, Hollow Communion playtest fixes, Special-Abilities caster system, creature forge, weapon feat
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **Merged 2026-11-07 (second time):** the working branch fast-forwarded into `master` again with 16 more commits:
+    - **Merged 2026-11-07 (second time):** the working branch fast-forwarded into `master` again with 17 more commits (`master` = `4cc663a`):
       `create_area_transition` / `place_trigger` size options, `create_companion_system` / `create_companion_dialog`,
       `compose_encounter` forging its boss, the `area-avenue-rotation` merge (`df26991`), Cleric domains (`a2ff791`), and
       Wizard schools plus the `run_live_verification` stop-timing fix. The working branch is 0 ahead of `master`.
-    - **`area-avenue-rotation`** (pushed) — **fully merged** (reviewed and merged via the working branch: a new oracle test confirms
-      its group rotation against 633 hand-placed rotated groups, 98.6 % of 1,886 tiles). 0 commits ahead of `master`; safe to delete.
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **1 commit** ahead of `master`: the creature forge
+      manual (`docs/creature-forge-manual.md`, linked from `docs/README.md` and the spec).
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
       `spatial-conventions-and-variable-tools`, `weapon-preference-variety`, `moonglow-run-plugin` (its unique commit had
-      been cherry-picked; every moonglow file in `master` was checked identical before deleting).
+      been cherry-picked; every moonglow file in `master` was checked identical before deleting), and `area-avenue-rotation`
+      (fully merged via the working branch).
     - **Uncommitted work in the working tree** (not commits, listed so it isn't lost): `analyze_walkmesh`
       (`src/util/walkmesh-analysis.ts` + test, `analysis-tools.ts`, `nwn-object-placement` skill, `CHANGELOG.md`; untested on real
       areas), the `create_area` default-tile fix (`tile-solver.ts`/`.test.ts`, `paint-tools.ts`, its `CLAUDE.md` entry), and

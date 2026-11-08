@@ -10,6 +10,7 @@
 | How does the encounter-difficulty checker combine creatures, and what happens with an unset CR? | [encounter-difficulty-findings.md](encounter-difficulty-findings.md) |
 | How would an LLM ask for "a necromancer for a CR 6 battle" and get a built, balanced roster back? *(design only, not implemented)* | [encounter-composer-spec.md](encounter-composer-spec.md) |
 | How should any creature be built, levelled up or down, and changed in appearance from one declarative spec? *(spawn-time levelling built: `forge_creature`, `create_creature_level_system`; rest is design)* | [creature-forge-spec.md](creature-forge-spec.md) |
+| How do I build creatures and companions with the forge, and what does it do step by step (logic flow, in-game checks, locals)? | [creature-forge-manual.md](creature-forge-manual.md) |
 | How does the parametrized PQJ quest system work? | [pqj-quest-system.md](pqj-quest-system.md) |
 | What happened when random caster abilities ran on a real headless server? | [random-abilities-runtime-findings.md](random-abilities-runtime-findings.md) |
 | How does the Special-Abilities caster system (the project-wide default) work, and how does a DM actually see/use the abilities in-game? | [special-abilities-system.md](special-abilities-system.md) |
