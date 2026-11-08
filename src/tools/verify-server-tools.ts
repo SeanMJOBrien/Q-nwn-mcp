@@ -15,18 +15,23 @@
  * in-process static checks.
  */
 
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { execFile } from "child_process";
 import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { MCP_FOLDER_VERIFYSERVER } from "../config.js";
 import { requireIndex } from "../module-loader.js";
 import { erfPack } from "../nim-tools.js";
 import { clearDirtyUnder } from "../util/dirty-state.js";
 import { optNumParam, toI } from "../util/params.js";
-import { bracketTagCount, DEFAULT_ERROR_PATTERNS, parseLiveLogs } from "../util/verify-server/result.js";
+import {
+  bracketTagCount,
+  DEFAULT_ERROR_PATTERNS,
+  parseLiveLogs,
+  pendingLevelSystemTags,
+} from "../util/verify-server/result.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -46,15 +51,21 @@ const UP_TIMEOUT_MS = 60_000;
  * larger `timeoutSeconds` explicitly.
  */
 const DEFAULT_TIMEOUT_SECONDS = 45;
-const STABILITY_WINDOW_SECONDS = 5;
+// Quiet seconds after which a loaded module counts as finished. inc_cre_level's DelayCommand steps leave gaps of
+// 3-5 s between a creature's gear lines and its check lines, and the server log is written in bursts, so 5 s cut
+// runs short (casters' checks were lost). Pending-creature detection below covers the common case; this is the backstop.
+const STABILITY_WINDOW_SECONDS = 8;
 const POLL_INTERVAL_MS = 1_000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function readTextOrEmpty(filePath: string): Promise<string> {
+async function readTextOrEmpty(filePath: string, notBeforeMs = 0): Promise<string> {
   try {
+    // docker-compose down leaves the previous run's log behind; until the new server rewrites it, reading it would
+    // report the old run (it already says "Loading Module:" and never grows, so the poll returned it at once).
+    if (notBeforeMs > 0 && (await fs.stat(filePath)).mtimeMs < notBeforeMs) return "";
     return await fs.readFile(filePath, "utf-8");
   } catch {
     return "";
@@ -116,7 +127,7 @@ interface PollResult {
 async function pollLogs(
   serverLogPath: string,
   engineLogPath: string,
-  opts: { expectedCheckLines?: number; timeoutSeconds: number },
+  opts: { expectedCheckLines?: number; timeoutSeconds: number; notBeforeMs?: number },
 ): Promise<PollResult> {
   const deadline = Date.now() + opts.timeoutSeconds * 1000;
   let lastGrowthAt = Date.now();
@@ -126,7 +137,10 @@ async function pollLogs(
   let engineLogTail = "";
 
   while (Date.now() < deadline) {
-    const [newServer, newEngine] = await Promise.all([readTextOrEmpty(serverLogPath), readTextOrEmpty(engineLogPath)]);
+    const [newServer, newEngine] = await Promise.all([
+      readTextOrEmpty(serverLogPath, opts.notBeforeMs),
+      readTextOrEmpty(engineLogPath, opts.notBeforeMs),
+    ]);
     serverLogTail = newServer;
     engineLogTail = newEngine;
 
@@ -145,7 +159,8 @@ async function pollLogs(
       }
     }
 
-    if (sawLoadingModule && Date.now() - lastGrowthAt >= STABILITY_WINDOW_SECONDS * 1000) {
+    const pending = pendingLevelSystemTags(newServer).length + pendingLevelSystemTags(newEngine).length;
+    if (sawLoadingModule && pending === 0 && Date.now() - lastGrowthAt >= STABILITY_WINDOW_SECONDS * 1000) {
       return { timedOut: false, sawLoadingModule, serverLogTail, engineLogTail };
     }
 
@@ -184,7 +199,7 @@ export function registerVerifyServerTools(server: McpServer): void {
       "instrumentation, or any other [TAG_*] bracket-tagged log line from other instrumentation). Repacks the " +
       "module, copies it into the verify-server's modules dir, points NWN_MODULE at it, brings the container up, " +
       "polls the logs for up to timeoutSeconds (default 45) — stopping early once expectedCheckLines bracket-tagged " +
-      "lines appear, or once log growth stalls for a few seconds after the module starts loading — then ALWAYS " +
+      "lines appear, or once log growth stalls for 8 seconds after the module starts loading with no forged creature still mid-spawn — then ALWAYS " +
       "tears the container down, even on error or timeout (this server is throwaway and never player-facing). " +
       "Needs Docker (docker-compose v1) and a configured verify-server checkout; can take up to timeoutSeconds, " +
       "unlike the fast in-process verify_* family. The 45s default is deliberately under the MCP SDK's own 60s " +
@@ -192,9 +207,10 @@ export function registerVerifyServerTools(server: McpServer): void {
       "own request timeout, otherwise the call appears to fail even though the server finishes and tears down " +
       "correctly regardless. See docs/runtime-verification-spec.md for the full design.",
     {
-      modulePath: z.string().optional().describe(
-        "Explicit .mod path to test. Default: repack the currently-loaded module and use it.",
-      ),
+      modulePath: z
+        .string()
+        .optional()
+        .describe("Explicit .mod path to test. Default: repack the currently-loaded module and use it."),
       expectedCheckLines: optNumParam(
         "Short-circuit polling once this many bracket-tagged log lines ([SPEC_OK]/[SPEC_FAIL]/[TAG_*]) appear, " +
           "without waiting out the stability window. Omit if the module carries no such instrumentation.",
@@ -248,11 +264,15 @@ export function registerVerifyServerTools(server: McpServer): void {
       let poll: PollResult;
       try {
         await execDockerCompose(["down"], verifyServerDir, DOWN_TIMEOUT_MS).catch(() => {});
+        // Anything older than this is the previous run's log (file mtime has 1 s granularity on some filesystems).
+        const notBeforeMs = Date.now() - 1000;
         await execDockerCompose(["up", "-d"], verifyServerDir, UP_TIMEOUT_MS);
 
         poll = await pollLogs(serverLogPath, engineLogPath, {
           expectedCheckLines: expectedCheckLines !== undefined ? toI(expectedCheckLines) : undefined,
-          timeoutSeconds: timeoutSeconds !== undefined ? toI(timeoutSeconds, DEFAULT_TIMEOUT_SECONDS) : DEFAULT_TIMEOUT_SECONDS,
+          timeoutSeconds:
+            timeoutSeconds !== undefined ? toI(timeoutSeconds, DEFAULT_TIMEOUT_SECONDS) : DEFAULT_TIMEOUT_SECONDS,
+          notBeforeMs,
         });
       } finally {
         try {
@@ -265,9 +285,7 @@ export function registerVerifyServerTools(server: McpServer): void {
       const parsed = parseLiveLogs(poll.serverLogTail, poll.engineLogTail, errorPatterns ?? DEFAULT_ERROR_PATTERNS);
       const combinedTail = `${poll.serverLogTail}\n${poll.engineLogTail}`;
       const rawLogExcerpt =
-        combinedTail.length > RAW_EXCERPT_MAX_CHARS
-          ? combinedTail.slice(-RAW_EXCERPT_MAX_CHARS)
-          : combinedTail;
+        combinedTail.length > RAW_EXCERPT_MAX_CHARS ? combinedTail.slice(-RAW_EXCERPT_MAX_CHARS) : combinedTail;
 
       return {
         content: [
@@ -283,7 +301,9 @@ export function registerVerifyServerTools(server: McpServer): void {
                 otherTaggedLines: parsed.otherTaggedLines,
                 rawLogExcerpt,
                 ...(poll.timedOut && !poll.sawLoadingModule
-                  ? { note: "Timed out before the server logged Loading Module: — the container may have failed to start." }
+                  ? {
+                      note: "Timed out before the server logged Loading Module: — the container may have failed to start.",
+                    }
                   : {}),
               },
               null,

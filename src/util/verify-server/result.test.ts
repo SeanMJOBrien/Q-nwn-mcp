@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { bracketTagCount, parseLiveLogs } from "./result.js";
+import { bracketTagCount, parseLiveLogs, pendingLevelSystemTags } from "./result.js";
 
 describe("bracketTagCount", () => {
   it("counts bracket-tagged lines", () => {
-    const text = "[SPEC_OK] tag=a\nsome other line\n[SPEC_FAIL] tag=b field=x expected=1 actual=2\n[SYSTEST_DEATH] tag=c killer=d";
+    const text =
+      "[SPEC_OK] tag=a\nsome other line\n[SPEC_FAIL] tag=b field=x expected=1 actual=2\n[SYSTEST_DEATH] tag=c killer=d";
     expect(bracketTagCount(text)).toBe(3);
   });
 
@@ -35,10 +36,7 @@ describe("parseLiveLogs", () => {
   });
 
   it("parses [SPEC_FAIL] lines into specResults.fail with all four fields", () => {
-    const result = parseLiveLogs(
-      "[SPEC_FAIL] tag=hos_cbenf field=racial_feat expected=228 actual=-1",
-      "",
-    );
+    const result = parseLiveLogs("[SPEC_FAIL] tag=hos_cbenf field=racial_feat expected=228 actual=-1", "");
     expect(result.specResults.fail).toEqual([
       { tag: "hos_cbenf", field: "racial_feat", expected: "228", actual: "-1" },
     ]);
@@ -53,7 +51,9 @@ describe("parseLiveLogs", () => {
   });
 
   it("flags EXOWARNING lines when a caller opts in via a custom errorPatterns list", () => {
-    const result = parseLiveLogs("", "I [07:00:06] SomeSubsystem::DoThing() EXOWARNING: unexpected state", ["exowarning"]);
+    const result = parseLiveLogs("", "I [07:00:06] SomeSubsystem::DoThing() EXOWARNING: unexpected state", [
+      "exowarning",
+    ]);
     expect(result.engineErrors).toHaveLength(1);
     expect(result.engineErrors[0].matchedPattern.toLowerCase()).toContain("exowarning");
   });
@@ -125,5 +125,18 @@ describe("parseLiveLogs", () => {
     expect(result.specResults.ok).toEqual(["rurik"]);
     expect(result.specResults.fail).toHaveLength(1);
     expect(result.engineErrors.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("pendingLevelSystemTags", () => {
+  it("lists creatures that finished shopping but have not logged their final level line", () => {
+    const log = [
+      "[Sun Nov  8 01:35:51] [CL] hos_thug1 gear spent=673/675",
+      "[Sun Nov  8 01:35:51] [CL] boss_venn gear spent=6485/6500",
+      "[Sun Nov  8 01:35:53] [CL] hos_thug1 lvl=3 chest=nw_aarcl011 ac=19",
+    ].join("\n");
+    expect(pendingLevelSystemTags(log)).toEqual(["boss_venn"]);
+    expect(pendingLevelSystemTags(`${log}\n[Sun Nov  8 01:35:54] [CL] boss_venn lvl=6 chest=x`)).toEqual([]);
+    expect(pendingLevelSystemTags("no level system here")).toEqual([]);
   });
 });

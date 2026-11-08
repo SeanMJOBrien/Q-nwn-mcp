@@ -67,6 +67,19 @@ const SPEC_OK_RE = /\[SPEC_OK\]\s+tag=(\S+)/;
 const SPEC_FAIL_RE = /\[SPEC_FAIL\]\s+tag=(\S+)\s+field=(\S+)\s+expected=(\S+)\s+actual=(\S+)/;
 
 /** Count of lines containing a `[SOME_TAG]`-shaped bracket, across all instrumentation. */
+/**
+ * Creatures still mid-spawn in inc_cre_level: each logs "[CL] <tag> gear spent=..." when its shopping ends and
+ * "[CL] <tag> lvl=..." once its rebuild and checks are done (a few seconds later, after DelayCommand steps). The
+ * poll keeps waiting while any tag has the first line and not the second, so a quiet gap is not taken as "finished".
+ */
+export function pendingLevelSystemTags(text: string): string[] {
+  const started = new Map<string, number>();
+  const finished = new Map<string, number>();
+  for (const m of text.matchAll(/\[CL\] (\S+) gear spent=/g)) started.set(m[1], (started.get(m[1]) ?? 0) + 1);
+  for (const m of text.matchAll(/\[CL\] (\S+) lvl=/g)) finished.set(m[1], (finished.get(m[1]) ?? 0) + 1);
+  return [...started].filter(([tag, n]) => (finished.get(tag) ?? 0) < n).map(([tag]) => tag);
+}
+
 export function bracketTagCount(text: string): number {
   return (text.match(new RegExp(BRACKET_TAG_RE.source, "gm")) ?? []).length;
 }
