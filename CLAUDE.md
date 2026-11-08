@@ -180,8 +180,8 @@ The rest are open.
       `create_area_transition` / `place_trigger` size options, `create_companion_system` / `create_companion_dialog`,
       `compose_encounter` forging its boss, the `area-avenue-rotation` merge (`df26991`), Cleric domains (`a2ff791`), and
       Wizard schools plus the `run_live_verification` stop-timing fix. The working branch is 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **1 commit** ahead of `master`: the creature forge
-      manual (`docs/creature-forge-manual.md`, linked from `docs/README.md` and the spec).
+    - **Merged 2026-11-07 (third time):** the creature forge manual (`c9c1280`, `docs/creature-forge-manual.md`) and this TODO
+      update were fast-forwarded into `master`. The working branch is 0 ahead of `master`.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
