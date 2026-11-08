@@ -7,6 +7,7 @@ import type { GffObj } from "../../types/gff.js";
 import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
 import { flattenDialog } from "../dialog-walker.js";
+import { collectQuestVarAwards } from "../quest-vars.js";
 import { checkScriptRef, listOf, loadScriptSources, type Report } from "./common.js";
 
 export async function verifyJournal(report: Report, index: ModuleIndex, doc: GffObj): Promise<void> {
@@ -25,6 +26,11 @@ export async function verifyJournal(report: Report, index: ModuleIndex, doc: Gff
   // same false-positive class already documented for PQJ-wrapped quests.
   const scriptedAwards = collectScriptedJournalAwards(await loadScriptSources(index));
   mergeNativeFieldAwards(scriptedAwards, index);
+  // The parameter-driven quest system advances through questK = "<stage>_<tag>" variables (build_quest), not script text.
+  for (const [tag, byStage] of collectQuestVarAwards(index)) {
+    if (!scriptedAwards.has(tag)) scriptedAwards.set(tag, new Set());
+    for (const stage of byStage.keys()) scriptedAwards.get(tag)!.add(stage);
+  }
 
   for (const [i, category] of categories.entries()) {
     const tag = getFieldStr(category, "Tag");

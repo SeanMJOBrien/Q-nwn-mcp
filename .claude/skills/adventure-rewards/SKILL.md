@@ -215,6 +215,12 @@ reward moment and give it an entry for each class the party plausibly contains, 
 
 ### Phase 3: Assign Quest XP
 
+**Quests built with `build_quest`** (their `## Quests` block has a **Spec** line): copy the spec, set
+`"reward": {"xp": <calculated XP>, "gold": <gold>}` (and `"item"` for a signature reward) at the top level, and run
+`build_quest(spec)` again (dry run first). The rebuild replaces only that quest's own wiring, and the runtime pays every
+player in the party the full amount, so don't divide by party size. Use `edit_journal_quest` below only for quests not built
+with `build_quest`.
+
 For each quest with a completion journal entry (`end=true`), call `edit_journal_quest`:
 
 ```

@@ -182,8 +182,9 @@ The rest are open.
       Wizard schools plus the `run_live_verification` stop-timing fix. The working branch is 0 ahead of `master`.
     - **Merged 2026-11-07 (third time):** the creature forge manual (`c9c1280`, `docs/creature-forge-manual.md`) and this TODO
       update were fast-forwarded into `master`. The working branch is 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **1 commit** ahead of `master`: dialog tools write
-      script parameters and native quest fields (step 1 of the quest-system port).
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **2 commits** ahead of `master`: dialog tools write
+      script parameters and native quest fields (`f1747e0`), and the quest system (`create_quest_system`, `build_quest`,
+      `remove_quest`, `docs/quest-system.md`, `adventure-quests` rewrite).
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
@@ -2776,6 +2777,19 @@ user's explicit "add todo notes" request.**
    assuming this explanation is complete, and whether Elowen's remaining
    gap is specifically at level 2 (matching the documented ceiling) or
    somewhere the fix should have reached.
+
+## Quest system (2026-11-07)
+
+**Standard path for quests: `build_quest(spec, dryRun)`** (+ `create_quest_system`, `remove_quest`); reference
+`docs/quest-system.md`, source `src/util/quest-{spec,builder,script,vars}.ts`, `src/tools/quest-tools.ts`. Ported from TFN's
+`inc_quest.nss`/`dlg_q_*` and the TFN content studio's courier/rescue/escort runtime: **vanilla** (quest state = the engine's
+`NW_JOURNAL_ENTRY<tag>`; no SQLite/NWNX), **whole party** (user decision: any member's advance moves every journal and pays every
+player 100 %), TFN's `questK = "<stage>_<tag>"` variable contract and eligibility rules. Every dialog line uses `q_chk`/`q_act`
+with script parameters; skill checks roll once in `q_roll` (an action — TFN rolled inside a condition). Fixed TFN bugs: AoE
+advances always used `quest1`, slots stopped at 19, Bluff check had condition side effects and skipped stages, unchecked reward
+items, two-digit stages, pickups only slot 1. `verify_journal` / `verify_quest_completability` read the quest variables
+(`quest-vars.ts`); before that they read only script text and native dialog fields. **Not live-tested:** the headless server has
+no player, so no stage can advance there; all scripts compile with `nwn_script_comp`.
 
 ## Co-op / Multiplayer Rules
 

@@ -8,6 +8,7 @@ import type { CreatureRecord } from "../types/module.js";
 import { flattenDialog } from "../util/dialog-walker.js";
 import { bandDifficulty, clusterHostiles } from "../util/encounter-difficulty.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
+import { collectQuestVarAwards } from "../util/quest-vars.js";
 import { isBaseGameResource, isBaseGameScript, loadScriptSources } from "../util/verify/common.js";
 import { buildAreaTransitions, buildTagToAreaMap } from "./tileset-tools.js";
 
@@ -956,6 +957,8 @@ export function registerAnalysisTools(server: McpServer): void {
         }
       }
 
+      const questVarAwards = collectQuestVarAwards(index);
+
       // Find which scripts reference which quest tags
       function findScriptsForQuest(questTag: string): {
         startScripts: string[];
@@ -998,6 +1001,14 @@ export function registerAnalysisTools(server: McpServer): void {
           for (const root of tree) scanForNativeField(root);
         }
 
+        // The parameter-driven quest system (build_quest) advances through questK = "<stage>_<tag>" variables on the
+        // objects involved; a creature with a conversation is recorded as "dlg:<resref>".
+        for (const [stage, sources] of questVarAwards.get(questTag.toLowerCase()) ?? []) {
+          const existing = stageScripts.get(stage) || [];
+          existing.push(...sources);
+          stageScripts.set(stage, existing);
+        }
+
         return { startScripts, endScripts, stageScripts };
       }
 
@@ -1005,6 +1016,7 @@ export function registerAnalysisTools(server: McpServer): void {
       // the dialog findScriptsForQuest's sentinel already names directly.
       function findDialogWithScript(scriptResref: string): string | null {
         if (scriptResref.startsWith("native:")) return scriptResref.slice("native:".length);
+        if (scriptResref.startsWith("dlg:")) return scriptResref.slice("dlg:".length);
         for (const [dlgResref, tree] of dialogTrees) {
           function searchNode(node: FlatDialogNode): boolean {
             if (node.script === scriptResref) return true;

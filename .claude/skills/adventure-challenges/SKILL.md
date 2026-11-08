@@ -672,6 +672,9 @@ Differentiate similar creatures with a numeric suffix: `hos_gobwar`, `hos_gobmag
 - **Verify item resrefs resolve.** If `resman_search` doesn't find an expected item, try alternate resref patterns or substitute a similar item.
 - **Repack after all changes.** Call `repack_module` at the end so the user can see changes in the toolset.
 - **No quest logic.** Don't modify dialogs, journal entries, or quest state. That's `/adventure-quests`'s job (already done).
+- **Quest targets stay.** A creature or captive a quest stage names (`## Quests` → stage `kill`/`rescue`/`escort` targets)
+  was placed by `build_quest` with quest variables on it: don't move, replace, re-forge or delete it, and don't place a second
+  copy of its blueprint (each copy would advance the quest). Guards around it are fine.
 - **No loot or XP.** Don't place items on the ground or assign XP values. That's `/adventure-affordances` and `/adventure-rewards`.
 - **Scale damage to level.** Trap damage and creature stats should match the adventure's target level.
 - **Magic items are loot.** Equipped magic items on defeated creatures become player loot. Note all magic items in adventure.md for `/adventure-rewards` analysis. Don't make magic items more powerful than the creature that carries them.

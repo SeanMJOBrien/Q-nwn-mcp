@@ -44,7 +44,11 @@ export function paramList(params?: ScriptParams): { type: "list"; value: GffObj[
     type: "list",
     value: Object.entries(params ?? {}).map(
       ([k, v], i) =>
-        ({ __struct_id: i, Key: { type: "cexostring", value: k }, Value: { type: "cexostring", value: String(v) } }) as unknown as GffObj,
+        ({
+          __struct_id: i,
+          Key: { type: "cexostring", value: k },
+          Value: { type: "cexostring", value: String(v) },
+        }) as unknown as GffObj,
     ),
   };
 }
@@ -53,7 +57,8 @@ export function paramList(params?: ScriptParams): { type: "list"; value: GffObj[
 export function parseParamsArg(raw: string | undefined, name: string): ScriptParams | undefined {
   if (raw === undefined || raw === "") return undefined;
   const parsed = JSON.parse(raw) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`${name} must be a JSON object of key -> value`);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+    throw new Error(`${name} must be a JSON object of key -> value`);
   const out: ScriptParams = {};
   for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
     if (!k) throw new Error(`${name} has an empty key`);
@@ -63,7 +68,7 @@ export function parseParamsArg(raw: string | undefined, name: string): ScriptPar
   return out;
 }
 
-interface NodeExtras {
+export interface NodeExtras {
   params?: ScriptParams;
   quest?: string;
   questEntry?: number;
@@ -71,13 +76,16 @@ interface NodeExtras {
 
 function questFields(extras?: NodeExtras): Record<string, unknown> {
   if (!extras?.quest) return { Quest: { type: "cexostring", value: "" } };
-  return { Quest: { type: "cexostring", value: extras.quest }, QuestEntry: { type: "dword", value: extras.questEntry ?? 0 } };
+  return {
+    Quest: { type: "cexostring", value: extras.quest },
+    QuestEntry: { type: "dword", value: extras.questEntry ?? 0 },
+  };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /** Build a link struct for StartingList, RepliesList, or EntriesList. */
-function makeLink(index: number, condition?: string, conditionParams?: ScriptParams): GffObj {
+export function makeLink(index: number, condition?: string, conditionParams?: ScriptParams): GffObj {
   return {
     __struct_id: 0,
     Index: { type: "dword", value: index },
@@ -88,7 +96,7 @@ function makeLink(index: number, condition?: string, conditionParams?: ScriptPar
 }
 
 /** Build an NPC entry struct with all standard NWN DLG fields. */
-function makeEntry(text: string, script?: string, extras?: NodeExtras): GffObj {
+export function makeEntry(text: string, script?: string, extras?: NodeExtras): GffObj {
   return {
     __struct_id: 0,
     ActionParams: paramList(extras?.params),
@@ -106,7 +114,7 @@ function makeEntry(text: string, script?: string, extras?: NodeExtras): GffObj {
 }
 
 /** Build a PC reply struct with all standard NWN DLG fields. */
-function makeReply(text: string, script?: string, extras?: NodeExtras): GffObj {
+export function makeReply(text: string, script?: string, extras?: NodeExtras): GffObj {
   return {
     __struct_id: 0,
     ActionParams: paramList(extras?.params),
@@ -322,16 +330,34 @@ export function registerDialogWriteTools(server: McpServer): void {
       script: z.string().optional().describe("Action script resref (runs when node plays)"),
       condition: z.string().optional().describe("Condition script on the link from parent"),
       params: z.string().optional().describe('JSON object of ActionParams for the node\'s script, e.g. {"target":"2"}'),
-      conditionParams: z.string().optional().describe('JSON object of ConditionParams for the condition, e.g. {"quest":"q_wolf","op":"at","stage":"1"}'),
+      conditionParams: z
+        .string()
+        .optional()
+        .describe('JSON object of ConditionParams for the condition, e.g. {"quest":"q_wolf","op":"at","stage":"1"}'),
       quest: z.string().optional().describe("Journal tag this node advances natively when it plays"),
       questEntry: optNumParam("Journal entry ID (stage) the node sets; needs quest"),
     },
     { destructiveHint: true },
-    async ({ dialog, parentIndex, parentType, text, script, condition, params, conditionParams, quest, questEntry }) => {
+    async ({
+      dialog,
+      parentIndex,
+      parentType,
+      text,
+      script,
+      condition,
+      params,
+      conditionParams,
+      quest,
+      questEntry,
+    }) => {
       let extras: NodeExtras;
       let condParams: ScriptParams | undefined;
       try {
-        extras = { params: parseParamsArg(params, "params"), quest, questEntry: questEntry !== undefined ? toI(questEntry) : undefined };
+        extras = {
+          params: parseParamsArg(params, "params"),
+          quest,
+          questEntry: questEntry !== undefined ? toI(questEntry) : undefined,
+        };
         condParams = parseParamsArg(conditionParams, "conditionParams");
       } catch (e) {
         return { content: [{ type: "text", text: (e as Error).message }], isError: true };
@@ -520,7 +546,10 @@ export function registerDialogWriteTools(server: McpServer): void {
       ) {
         return {
           content: [
-            { type: "text", text: "Must provide at least one field to edit (text, script, sound, comment, params, quest or questEntry)" },
+            {
+              type: "text",
+              text: "Must provide at least one field to edit (text, script, sound, comment, params, quest or questEntry)",
+            },
           ],
           isError: true,
         };
