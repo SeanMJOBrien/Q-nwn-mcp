@@ -182,9 +182,9 @@ The rest are open.
       Wizard schools plus the `run_live_verification` stop-timing fix. The working branch is 0 ahead of `master`.
     - **Merged 2026-11-07 (third time):** the creature forge manual (`c9c1280`, `docs/creature-forge-manual.md`) and this TODO
       update were fast-forwarded into `master`. The working branch is 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **3 commits** ahead of `master`: dialog tools write
+    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **4 commits** ahead of `master`: dialog tools write
       script parameters and native quest fields (`f1747e0`), the quest system (`39b39ec`: `create_quest_system`, `build_quest`,
-      `remove_quest`, `docs/quest-system.md`, `adventure-quests` rewrite), and search/custom stages (`q_search`).
+      `remove_quest`, `docs/quest-system.md`, `adventure-quests` rewrite), search/custom stages (`db5948d`, `q_search`), and optional clues, approaching NPCs, join/companion/dismiss (`q_approach`).
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,

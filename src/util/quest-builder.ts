@@ -512,7 +512,7 @@ export class QuestBuilder {
     if (!jrl) return;
     const cats = getFieldList(jrl.doc as GffObj, "Categories");
     const byN = new Map<number, Stage>();
-    for (const s of this.spec.stages) if (!byN.has(s.n) || s.end) byN.set(s.n, s);
+    for (const s of this.spec.stages) if (!s.optional && (!byN.has(s.n) || s.end)) byN.set(s.n, s);
     const entries = [...byN.values()]
       .sort((a, b) => a.n - b.n)
       .map((s, i) => ({
@@ -635,7 +635,9 @@ export class QuestBuilder {
       const offer = this.entry(d, s.offer ?? "I could use some help.", `${c}offer`);
       const yes = this.reply(d, s.acceptReply ?? "I'll help.", `${c}yes`);
       const no = this.reply(d, s.declineReply ?? "Not now.", `${c}no`);
-      const acc = this.entry(d, s.accept ?? "Thank you. Be careful.", `${c}accept`, "q_act", { target });
+      const accParams: ScriptParams = s.join ? { target, join: "1" } : { target };
+      const acc = this.entry(d, s.accept ?? "Thank you. Be careful.", `${c}accept`, "q_act", accParams);
+      if (s.approach) this.wireApproach(npc, typeof s.approach === "string" ? s.approach : "");
       const dec = this.entry(d, s.decline ?? "Perhaps another time.", `${c}decline`);
       this.linkER(d, offer, yes);
       this.linkER(d, offer, no);
@@ -701,9 +703,25 @@ export class QuestBuilder {
       this.root(d, intro, 1, { target, roll: key, roll_result: "none" });
       return;
     }
-    const adv = this.entry(d, thanks, `${c}advance`, "q_act", { target });
+    const actParams: ScriptParams = { target };
+    if (s.dismiss) actParams.dismiss = s.dismiss;
+    if (s.join) actParams.join = "1";
+    const adv = this.entry(d, thanks, `${c}advance`, "q_act", actParams);
     if (s.reply) this.linkER(d, adv, this.reply(d, s.reply, `${c}reply`));
-    this.root(d, adv, 1, { target });
+    this.root(d, adv, 1, s.companion ? { target, companion: s.companion } : { target });
+  }
+
+  /** The NPC walks up to the first player it sees and starts its conversation (q_approach on its OnPerception). */
+  private wireApproach(npc: Participant, bark: string): void {
+    for (const c of npc.copies) {
+      const orig = getFieldStr(c.obj, "ScriptOnNotice");
+      if (orig !== "q_approach") {
+        if (orig) mergeVarTable(c.obj, [{ name: "MCP_Q_ORIG_NOTICE", type: "string", value: orig }]);
+        setField(c.obj, "ScriptOnNotice", "resref", "q_approach");
+      }
+      if (bark) mergeVarTable(c.obj, [{ name: "quest_approach_bark", type: "string", value: bark }]);
+      this.touch(c);
+    }
   }
 
   /** "Still working on it" lines on the giver while the party is between its stages, and a done line at the end. */
@@ -714,12 +732,12 @@ export class QuestBuilder {
     const giverStages = new Set(
       this.spec.stages.filter((s) => (s.to ?? this.spec.giver) === this.spec.giver && isTalkLike(s)).map((s) => s.n),
     );
-    const numbers = [...new Set(this.spec.stages.map((s) => s.n))].sort((a, b) => a - b);
+    const numbers = [...new Set(this.spec.stages.filter((s) => !s.optional).map((s) => s.n))].sort((a, b) => a - b);
     for (const n of numbers) {
-      const stage = this.spec.stages.find((s) => s.n === n) as Stage;
+      const stage = this.spec.stages.find((s) => s.n === n && !s.optional) as Stage;
       const c = `${COMMENT(this.spec.tag)}s${n}:`;
       if (stage.end) {
-        const done = this.entry(d, "Thank you again for your help.", `${c}done`);
+        const done = this.entry(d, stage.reminder ?? "Thank you again for your help.", `${c}done`);
         this.root(d, done, 2, { quest: this.spec.tag, stage: String(n), op: "at" });
       } else if (!giverStages.has(n + 1)) {
         const rem = this.entry(d, stage.reminder ?? "Have you done what I asked?", `${c}reminder`);
@@ -839,7 +857,8 @@ export class QuestBuilder {
           { name: "quest_search_skill", type: "string", value: chk.skill },
           { name: "quest_search_dc", type: "int", value: chk.dc },
           { name: "quest_search_tries", type: "int", value: chk.tries ?? 2 },
-          { name: "quest_search_assured", type: "int", value: chk.assured === false ? 0 : 1 },
+          { name: "quest_search_assured", type: "int", value: chk.assured === false || s.optional ? 0 : 1 },
+          { name: "quest_search_optional", type: "int", value: s.optional ? 1 : 0 },
           { name: "quest_search_pass", type: "string", value: chk.pass ?? s.text ?? "You find something." },
           { name: "quest_search_fail", type: "string", value: chk.fail ?? "You find nothing." },
         ];
@@ -1058,7 +1077,7 @@ export class QuestBuilder {
   }
 
   private check(): void {
-    const numbers = new Set(this.spec.stages.map((s) => s.n));
+    const numbers = new Set(this.spec.stages.filter((s) => !s.optional).map((s) => s.n));
     for (const n of numbers)
       if (n > 1 && !numbers.has(n - 1) && !this.spec.stages.some((s) => s.n === n && s.from !== n - 1)) {
         this.report.warnings.push(

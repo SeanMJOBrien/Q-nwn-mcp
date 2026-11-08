@@ -294,6 +294,60 @@ describe("build_quest", () => {
     }
   });
 
+  it("optional clue, an approaching NPC that joins, and a turn-in that needs and dismisses it", async () => {
+    const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+    (git["Placeable List"] as { value: GffObj[] }).value.push({
+      __struct_id: 9,
+      Tag: v("cexostring", "rug"),
+      OnUsed: v("resref", ""),
+    } as unknown as GffObj);
+    (git["Creature List"] as { value: GffObj[] }).value.push(
+      creature("dog", { ScriptOnNotice: v("resref", "x0_ch_hen_percep") }),
+    );
+    const { c, done } = await client();
+    try {
+      const dog = JSON.stringify({
+        name: "Dog",
+        giver: "dog",
+        stages: [
+          { do: "talk", journal: "a", approach: "*whines*", join: true },
+          { do: "talk", to: "farmer_ned", companion: "dog", dismiss: "dog", journal: "b", reward: { xp: 50 } },
+          { do: "search", optional: true, target: "rug", check: { skill: "search", dc: 13 }, reward: { xp: 75 } },
+        ],
+      });
+      const r = json(await c.callTool({ name: "build_quest", arguments: { spec: dog } }));
+      expect(r.success).toBe(true);
+      const [, , dogObj] = (git["Creature List"] as { value: GffObj[] }).value;
+      expect(getFieldStr(dogObj, "ScriptOnNotice")).toBe("q_approach");
+      expect(vars(dogObj)).toMatchObject({ MCP_Q_ORIG_NOTICE: "x0_ch_hen_percep", quest_approach_bark: "*whines*" });
+      const dogDlg = mockIndex.parsedGff.get("dq_dog.dlg") as unknown as GffObj;
+      const accept = getFieldList(dogDlg, "EntryList").find((e) =>
+        getFieldStr(e, "Comment").endsWith("s1:accept"),
+      ) as GffObj;
+      expect(getScriptParams(accept, "ActionParams")).toEqual({ target: "1", join: "1" });
+      const ned = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
+      const turnIn = getFieldList(ned, "StartingList").find(
+        (l) => getScriptParams(l, "ConditionParams").companion === "dog",
+      ) as GffObj;
+      expect(getScriptParams(turnIn, "ConditionParams")).toEqual({ target: "1", companion: "dog" });
+      const adv = getFieldList(ned, "EntryList")[getFieldNum(turnIn, "Index")];
+      expect(getScriptParams(adv, "ActionParams")).toEqual({ target: "1", dismiss: "dog" });
+      // The optional clue: no journal entry, available from stage 1, pays its reward, never assured.
+      const rug = (git["Placeable List"] as { value: GffObj[] }).value[0];
+      expect(vars(rug)).toMatchObject({
+        quest1: "1_q_dog",
+        quest1_reward_xp: 75,
+        quest_search_optional: 1,
+        quest_search_assured: 0,
+      });
+      const jrl = mockIndex.parsedGff.get("module.jrl") as unknown as GffObj;
+      const cat = getFieldList(jrl, "Categories").find((x) => getFieldStr(x, "Tag") === "q_dog") as GffObj;
+      expect(getFieldList(cat, "EntryList").map((e) => getFieldNum(e, "ID"))).toEqual([1, 2]);
+    } finally {
+      await done();
+    }
+  });
+
   it("explains a spec it can't build", async () => {
     const { c, done } = await client();
     try {

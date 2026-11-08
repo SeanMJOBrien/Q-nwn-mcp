@@ -80,6 +80,14 @@ Any stage may add:
   spent the search succeeds anyway, so a required clue can never block the quest), `examine: {skill, dc, var, pass, fail}` (a
   second check rolled on success by whoever is best at it, such as Lore on a found letter's seal; a pass sets module local
   string `var` to "1" and shows `pass` with that companion's name), `none` (text before the quest reaches this stage).
+- `optional: true` on a `search`: an optional clue — no journal entry, doesn't move the quest on, available once the quest is
+  at or past `from` (default 1), pays its `reward` to the party once (never assured).
+- `approach` on stage 1 (true, or a bark such as `"*whines*"`): the giver walks up to the first player it sees and starts its
+  conversation, once per player (`q_approach` on its OnPerception, chaining the old handler).
+- `join: true` on a talk stage: that NPC joins the speaker's party as a henchman when the stage advances (it needs the
+  `x0_ch_hen_*` scripts, e.g. `create_creature_blueprint henchman: true`). It counts toward the party's companion cap.
+- `companion: "<tag>"` on a talk stage: the line is offered only while that companion is in the party; `dismiss: "<tag>"`:
+  that companion leaves the party when the stage advances and walks to the NPC.
 - `keep: true` on `deliver`: the NPC examines the item and the party keeps it (a later stage can hand it on).
 - `script`: a script run on the advancing NPC when the stage advances (e.g. opening a gate).
 - `reward: {xp, xp_tier, xp_level, gold, item}`. An item reward on stage 1 is how a courier parcel is handed out.
@@ -87,7 +95,7 @@ Any stage may add:
   kill path both reaching stage 2). `end: "fail"` marks a failure ending.
 - Dialog lines: `offer`, `accept`, `acceptReply`, `decline`, `declineReply` (stage 1), `text` (the NPC's line when the stage
   advances), `reply`, `reminder` (while the party is at this stage), `missing` (deliver without the item), `plea`
-  (rescue/escort), `arrive` (escort arrival).
+  (rescue/escort), `arrive` (escort arrival). On the final stage, `reminder` is the thank-you line shown afterwards.
 
 ### Templates
 
@@ -130,6 +138,7 @@ Any stage may add:
 | `q_act` | Dialog action. With `target`, nothing else runs unless the advance happened, so nothing repeats. |
 | `q_roll` | A skill check rolled once, as an action; `q_chk roll=` reads the result. |
 | `q_ondeath`, `q_onenter`, `q_trigger`, `q_onused` | Event stages; run the stored original handler first. |
+| `q_approach` | On an NPC's OnPerception: walks up to the first player it sees and starts its conversation, once per player. |
 | `q_search` | Search stage on a placeable: the best-skilled party member rolls, limited tries per player, optional assured find, item, and an `examine` check. |
 | `q_mod_acquire`, `q_mod_tick` | Per-module wrappers for OnAcquireItem and OnHeartbeat, with the old handler built in. |
 
@@ -151,7 +160,7 @@ Any stage may add:
 
 `target=K` (advance and pay; `aoe=<radius>` advances every player nearby), `take_item=<tag>` `take_count=N`,
 `give_item=<resref>`, `take_gold=N`, `set_var=<name>` `var_value=<v>`, `hostile=1`, `leave=1`, `unlock=<door tag>` `open=1`,
-`destroy=<tag>`, `spawn=<resref>` `at=<waypoint tag>`, `escort=K`.
+`destroy=<tag>`, `spawn=<resref>` `at=<waypoint tag>`, `escort=K`, `join=1`, `dismiss=<tag>`.
 
 ### Eligibility (TFN's rules)
 

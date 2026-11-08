@@ -99,6 +99,19 @@ export interface StageInput {
   script?: string;
   /** search: text when the placeable is used before the quest reaches this stage. */
   none?: string;
+  /**
+   * search: an optional clue, not a numbered stage — no journal entry, doesn't move the quest on; available once the quest
+   * is at or past `from` (default 1); pays its `reward` to the party once.
+   */
+  optional?: boolean;
+  /** The NPC running this talk stage joins the speaker's party as a henchman when it advances. */
+  join?: boolean;
+  /** Talk stage: only offered while this companion (tag) is in the party. */
+  companion?: string;
+  /** Talk stage: this companion (tag) leaves the party when the stage advances and goes to the NPC. */
+  dismiss?: string;
+  /** Stage 1: the giver walks up to the first player it sees and starts its conversation; a string is a bark as it goes. */
+  approach?: boolean | string;
   /** Dialog lines (all optional; defaults are used). */
   offer?: string;
   accept?: string;
@@ -299,6 +312,12 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     const kind = (s.do ?? "talk") as StageKind;
     if (!STAGE_KINDS.includes(kind))
       throw new QuestSpecError(`unknown stage kind ${s.do}; use one of ${STAGE_KINDS.join(", ")}`);
+    if (s.optional) {
+      if (kind !== "search") throw new QuestSpecError("only a search stage can be optional");
+      const min = s.from ?? 1;
+      stages.push({ ...s, do: kind, n: min, from: min - 1, journal: (s.journal ?? "").trim(), end: false });
+      continue;
+    }
     const n = s.n ?? next;
     if (!Number.isInteger(n) || n < 1)
       throw new QuestSpecError(`stage numbers must be whole numbers from 1 (got ${s.n})`);
@@ -335,9 +354,9 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     if (s.do === "return") s.to = q.giver;
   }
 
-  // Endings: explicit, else every stage with the highest number.
-  const maxN = Math.max(...stages.map((s) => s.n));
-  if (!stages.some((s) => s.end)) for (const s of stages) if (s.n === maxN) s.end = true;
+  // Endings: explicit, else every stage with the highest number (optional clues never end a quest).
+  const maxN = Math.max(...stages.filter((s) => !s.optional).map((s) => s.n));
+  if (!stages.some((s) => s.end)) for (const s of stages) if (s.n === maxN && !s.optional) s.end = true;
 
   // Rewards: the top-level reward (or a sized default) on success endings that have none.
   const level = Math.max(1, Math.min(40, Math.round(input.level ?? 3)));

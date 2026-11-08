@@ -98,6 +98,11 @@ nodes by hand.** The full field reference is `docs/quest-system.md`; this phase 
   (often a companion) rolls, each player gets 2 tries, and a required clue is found anyway once tries run out. Add `item` /
   `itemName` to hand over what is found, and `examine: {skill, dc, var, pass}` for a second check by whoever knows most
   (Lore on a letter's seal); the message names that companion.
+- **Optional clues:** `search` with `optional: true` and a `reward` (e.g. `{"xp": 75}`): no journal entry, doesn't move the
+  quest on, available once the quest reaches `from`.
+- **NPCs that come to you or tag along:** `approach` on stage 1 makes the giver walk up and start talking; `join: true` makes it
+  join the party on acceptance (build it with `henchman: true`); a later talk stage with `companion` + `dismiss` (its tag)
+  needs it present and sends it off — a lost pet or a rescued child brought home.
 - **Look but keep:** `deliver` with `keep: true` lets an NPC examine an item the party carries on to someone else.
 - **Stage effects:** `script` runs a script on the NPC when the stage advances (opening a gate). A stage only your own script
   can detect (every enemy in a room dead) is `do: "custom"`: build_quest writes the journal entry and your script calls
