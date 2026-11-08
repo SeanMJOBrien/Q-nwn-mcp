@@ -59,6 +59,7 @@ export function generateCreatureLevelInclude(options: CreatureLevelOptions = {})
 //   MCP_SA_PINNED (string)   comma list of spells.2da rows always picked first at their level
 //   MCP_SA_DOMAIN (string)   JSON {"<class>": {"<spell level>": [domain spell ids]}}; one fills a slot per level
 //   MCP_DOMAINS (string)     JSON {"<class>": [domain1, domain2]} (domains.2da rows), checked in game
+//   MCP_SCHOOL (string)      JSON {"<class>": school} (spellschools.2da row), checked in game
 // At spawn it: levels up with LevelUpHenchman, buys gear from the module's stores,
 // rebuilds once (ObjectToJson/JsonToObject, state kept) to write spell abilities at
 // the right caster level and slot count, then verifies and logs [SPEC_OK]/[SPEC_FAIL].
@@ -441,7 +442,9 @@ int CL_Slots(object oCreature, int nClass, int nClassLevel, int nSpellLevel)
     int nBase = CL_Cell(sGain, "SpellLevel" + IntToString(nSpellLevel), nClassLevel - 1);
     if (nBase < 0) return -1;
     int nMod = GetAbilityModifier(CL_AbilityConst(Get2DAString("classes", "SpellcastingAbil", nClass)), oCreature);
-    return nBase + CL_BonusSpells(nMod, nSpellLevel);
+    // A specialist (School > 0) gets one extra slot at spell levels 1-9, none at cantrips (live-verified on the engine).
+    int nSpecialist = (nSpellLevel >= 1 && GetSpecialization(oCreature, nClass) > 0) ? 1 : 0;
+    return nBase + CL_BonusSpells(nMod, nSpellLevel) + nSpecialist;
 }
 
 // Spell level of nSpell for one class: its domain level when it is one of that class's domain spells
@@ -561,6 +564,32 @@ void CL_VerifyDomains(object oCreature)
         int bFeats = (nF1 < 0 || GetHasFeat(nF1, oCreature)) && (nF2 < 0 || GetHasFeat(nF2, oCreature));
         CL_Spec(oCreature, bFeats, "cl_domain_feats_" + IntToString(nClass),
             IntToString(nF1) + "," + IntToString(nF2), bFeats ? "present" : "missing");
+    }
+}
+
+// School: the class entry carries the planned school, and no ready ability is from a specialist's opposition school.
+void CL_VerifySchool(object oCreature)
+{
+    json jPlan = JsonParse(GetLocalString(oCreature, "MCP_SCHOOL"));
+    if (JsonGetType(jPlan) != JSON_TYPE_OBJECT) return;
+    int nCount = GetSpellAbilityCount(oCreature);
+    int nPos;
+    for (nPos = 1; nPos <= 3; nPos++)
+    {
+        int nClass = GetClassByPosition(nPos, oCreature);
+        if (nClass == CLASS_TYPE_INVALID) continue;
+        json jSchool = JsonObjectGet(jPlan, IntToString(nClass));
+        if (JsonGetType(jSchool) != JSON_TYPE_INTEGER) continue;
+        int nSchool = JsonGetInt(jSchool);
+        int nActual = GetSpecialization(oCreature, nClass);
+        CL_Spec(oCreature, nActual == nSchool, "cl_school_" + IntToString(nClass), IntToString(nSchool), IntToString(nActual));
+        if (nSchool <= 0) continue;
+        string sOpposed = Get2DAString("spellschools", "Letter", CL_Cell("spellschools", "Opposition", nSchool));
+        int nOpposed = 0;
+        int i;
+        for (i = 0; i < nCount; i++)
+            if (GetSpellAbilityReady(oCreature, i) && Get2DAString("spells", "School", GetSpellAbilitySpell(oCreature, i)) == sOpposed) nOpposed++;
+        CL_Spec(oCreature, nOpposed == 0, "cl_school_opposition_" + IntToString(nClass), "0", IntToString(nOpposed));
     }
 }
 
@@ -686,6 +715,7 @@ void CL_Verify(object oCreature)
         CL_VerifyDomainSpells(oCreature, jDomains, nCount);
     }
     CL_VerifyDomains(oCreature);
+    CL_VerifySchool(oCreature);
 
     // Gear: everything the creature holds equipped is usable (the engine drops what isn't).
     if (GetLocalFloat(oCreature, "MCP_GEAR_WEALTH") > 0.0)

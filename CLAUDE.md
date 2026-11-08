@@ -170,23 +170,18 @@ The rest are open.
       groups; `docs/encounter-composer-spec.md` and `docs/special-abilities-system.md` carry the update.
 
 15. **TODO (standing, user rule 2026-11-07) — branches and commits not yet merged into `master`.**
-    Checked 2026-11-07 after `git fetch --prune`; only `master`, the working branch and `area-avenue-rotation` remain. Update after every commit or merge.
+    Checked 2026-11-07 after `git fetch --prune`; only `master`, the working branch and `area-avenue-rotation` remain, none with unmerged commits. Update after every commit or merge.
     - **Merged 2026-11-07:** `systest-live-run-and-generalized-spec` was fast-forwarded into `master` (the SPEC_* assertions,
       encounter composer, Hollow Communion playtest fixes, Special-Abilities caster system, creature forge, weapon feat
       packages, area-connections trigger fixes, and this rule), plus `moonglow-run-plugin`'s one unique commit
       (`417da53` "Add moonglow_run_plugin and moonglow_list_plugins"), cherry-picked with an `src/index.ts` import conflict
       resolved. The working branch is now 0 ahead of `master`.
-    - **`systest-live-run-and-generalized-spec`** (working branch, pushed) — **15 commits** ahead of `master`:
-      `create_area_transition` `width`/`depth`/`rotation` options (`4d441e8`), `create_companion_system` /
-      `create_companion_dialog` (`64059a1`), the same size options on `place_trigger` (`13f44ec`), `compose_encounter`
-      forging its boss (`138e5a9`), the merge of `area-avenue-rotation` (`df26991`: its 9 commits plus the merge commit),
-      and Cleric domains in the forge.
-    - **`area-avenue-rotation`** (pushed) — **merged into the working branch 2026-11-07** after review: a new oracle test
-      ("rotated tile groups placed by hand match rotateGroupTileIndex") confirms its final group-rotation mapping against
-      633 hand-placed rotated groups (98.6 % of 1,886 tiles), entrance facing matches the verified door convention, and
-      the stale "may look scrambled" warnings were removed; skills now document `paint_group` `rotation` and the layout's
-      `avenue` option. Conflicts (`CLAUDE.md`, `adventure-tools.ts` imports, `tileset.test.ts`) kept both sides. Delete the
-      branch once the working branch reaches `master`.
+    - **Merged 2026-11-07 (second time):** the working branch fast-forwarded into `master` again with 16 more commits:
+      `create_area_transition` / `place_trigger` size options, `create_companion_system` / `create_companion_dialog`,
+      `compose_encounter` forging its boss, the `area-avenue-rotation` merge (`df26991`), Cleric domains (`a2ff791`), and
+      Wizard schools plus the `run_live_verification` stop-timing fix. The working branch is 0 ahead of `master`.
+    - **`area-avenue-rotation`** (pushed) — **fully merged** (reviewed and merged via the working branch: a new oracle test confirms
+      its group rotation against 633 hand-placed rotated groups, 98.6 % of 1,886 tiles). 0 commits ahead of `master`; safe to delete.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
@@ -939,7 +934,13 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
   adds feats from level 2 only). The forge now picks two domains (`domains` param, default the package's — Healing/Sun for
   the Cleric package; any class with `classes.2da PickDomains=1`), adds both `GrantedFeat`s, and `inc_cre_level` fills one
   slot per spell level with a domain spell (checked in game: `cl_domain_<class>`, `cl_domain_feats_<class>`,
-  `cl_spell_domain_<class>`). Wizards' school specialization (`PickSchool`) has the same gap and is not handled yet.
+  `cl_spell_domain_<class>`).
+  (8) **Wizard school (fixed 2026-11-07):** the forge writes `School` on the class entry (`school` param, default the package's —
+  General for package 10; any class with `PickSchool=1`), drops the opposition school's spells (`spellschools.2da Opposition` →
+  `Letter`, matched to `spells.2da School`), and `inc_cre_level` adds the specialist slot. **Live-verified:** an Evoker levelled to 7
+  had exactly +1 slot at spell levels 1-4 and none at cantrips versus an identical Generalist (`GetMemorizedSpellCountByLevel`).
+  Checked in game: `cl_school_<class>`, `cl_school_opposition_<class>`. The same run also contradicts the older "Wizard level 2+
+  slots stay 0 after LevelUpHenchman" finding below: both clones had real level 2-4 slots after levelling from a legal level-1 build.
   **New standard path:** `create_creature_level_system` + `forge_creature` (spawn-time levelling, store shopping, spell abilities, in-game
   verification). The Hollow Communion's 13 class-based creatures were rebuilt this way (58/58 live checks).
 

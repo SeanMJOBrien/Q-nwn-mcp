@@ -92,6 +92,8 @@ export interface ForgeParams {
   pinnedSpells?: number[];
   /** domains.2da rows for a class that picks domains (Cleric); default: the creature's package domains. */
   domains?: number[];
+  /** spellschools.2da row for a class that picks a school (Wizard); default: the creature's package school. */
+  school?: number;
 }
 
 export interface ForgeResult {
@@ -101,6 +103,8 @@ export interface ForgeResult {
   spellPoolSizes: Record<string, Record<string, number>>;
   gear: string;
   originalSpawn: string;
+  /** School written per school-picking class, with its opposition school. */
+  school?: Record<string, { id: number; label: string; opposition?: string }>;
   /** Domains written per domain-picking class, with their power feats. */
   domains?: Record<string, Array<{ id: number; label: string; feat?: number }>>;
   warnings: string[];
@@ -186,6 +190,43 @@ export function chooseDomains(
   }
   warnings.push(`no usable domains found for class ${classId}; it will have none`);
   return undefined;
+}
+
+/**
+ * The school for a class that picks one (classes.2da PickSchool = 1), or undefined for any other class. Requested
+ * school wins; otherwise the package's School (what LevelUpHenchman uses), falling back to the class's own package.
+ * 0 is General (no specialization).
+ */
+export function chooseSchool(
+  index: ModuleIndex,
+  classId: number,
+  packageId: number | undefined,
+  requested: number | undefined,
+  warnings: string[],
+): number | undefined {
+  if (twoDARow(index, "classes", classId)?.PickSchool !== "1") return undefined;
+  const valid = (id: number) => Number.isInteger(id) && hasCell(twoDARow(index, "spellschools", id) ?? {}, "Letter");
+  if (requested !== undefined) {
+    if (valid(requested)) return requested;
+    warnings.push(`school ${requested} is not a spellschools.2da row; using the package school instead`);
+  }
+  for (const pkg of [packageId, Number(twoDARow(index, "classes", classId)?.Package)]) {
+    if (pkg === undefined || !Number.isInteger(pkg)) continue;
+    const row = twoDARow(index, "packages", pkg);
+    if (!row || Number(row.ClassID) !== classId) continue;
+    const school = Number(row.School);
+    if (valid(school)) return school;
+  }
+  return 0;
+}
+
+/** spells.2da School letter of a specialist's opposition school (undefined for General). */
+export function oppositionLetter(index: ModuleIndex, school: number): string | undefined {
+  if (school <= 0) return undefined;
+  const opposition = Number(twoDARow(index, "spellschools", school)?.Opposition);
+  if (!Number.isInteger(opposition)) return undefined;
+  const letter = twoDARow(index, "spellschools", opposition)?.Letter;
+  return letter && letter !== "****" ? letter : undefined;
 }
 
 /** Domain spells by spell level for the given domains: { "1": [13], "3": [42, 171] }. */
@@ -289,6 +330,27 @@ export async function forgeCreature(
     }
   }
 
+  // School (Wizard): written on the class entry; a specialist's opposition-school spells leave its pool, and
+  // inc_cre_level adds the engine's specialist slot at spell levels 1-9 (live-verified: none at cantrips).
+  const schoolByClass: Record<string, number> = {};
+  for (const classId of classIds) {
+    const school = chooseSchool(
+      index,
+      classId,
+      classId === firstClass ? packageId : undefined,
+      params.school,
+      warnings,
+    );
+    if (school === undefined) continue;
+    schoolByClass[String(classId)] = school;
+    const entry = listOf(obj, "ClassList").find((c) => getFieldNum(c, "Class") === classId);
+    if (entry) setField(entry, "School", "byte", school);
+    else
+      warnings.push(
+        `class ${classId} is gained after level 1; LevelUpHenchman gives it the package's school, not ${school}`,
+      );
+  }
+
   // 2. Levelling plan and target.
   const targetLevel = params.level > 0 ? params.level : 0;
   setField(
@@ -312,6 +374,11 @@ export async function forgeCreature(
   for (const classId of classIds) {
     const p = classSpellPools(index, classId, seed);
     if (!p) continue;
+    const opposed = oppositionLetter(index, schoolByClass[String(classId)] ?? 0);
+    if (opposed) {
+      for (const level of Object.keys(p))
+        p[level] = p[level].filter((id) => twoDARow(index, "spells", id)?.School !== opposed);
+    }
     const doms = domainsByClass[String(classId)];
     if (doms) {
       // A domain spell is cast at its domain level; drop it from any other level of the class pool so each
@@ -335,6 +402,11 @@ export async function forgeCreature(
       name: "MCP_DOMAINS",
       type: "string",
       value: Object.keys(domainsByClass).length > 0 ? JSON.stringify(domainsByClass) : "",
+    },
+    {
+      name: "MCP_SCHOOL",
+      type: "string",
+      value: Object.keys(schoolByClass).length > 0 ? JSON.stringify(schoolByClass) : "",
     },
   );
 
@@ -396,6 +468,23 @@ export async function forgeCreature(
     ),
     gear,
     originalSpawn,
+    ...(Object.keys(schoolByClass).length > 0
+      ? {
+          school: Object.fromEntries(
+            Object.entries(schoolByClass).map(([c, id]) => {
+              const opposition = oppositionLetter(index, id);
+              return [
+                c,
+                {
+                  id,
+                  label: twoDARow(index, "spellschools", id)?.Label ?? String(id),
+                  ...(opposition ? { opposition } : {}),
+                },
+              ];
+            }),
+          ),
+        }
+      : {}),
     ...(Object.keys(domainsByClass).length > 0
       ? {
           domains: Object.fromEntries(
@@ -478,7 +567,7 @@ export function registerCreatureForgeTools(server: McpServer): void {
       "stores within a gold allowance that grows with level (role share x `gearWealth`, default 0.5; proficiency-checked, since the " +
       "engine refuses to equip items a creature isn't proficient with; ranged creatures also get a melee backup weapon in " +
       "their inventory; every purchase is logged as a [CL_LOOT] line that run_live_verification returns), and casters get " +
-      "spell abilities with the correct spells, caster level and slots per day (`pinnedSpells` are always picked first). A Cleric gets two `domains` (default: its package's): their power feats now and one domain spell per spell level at spawn. Target a blueprint (`resref`) or a placed instance (`area`+`tag`); call it " +
+      "spell abilities with the correct spells, caster level and slots per day (`pinnedSpells` are always picked first). A Cleric gets two `domains` (default: its package's): their power feats now and one domain spell per spell level at spawn. A Wizard gets a `school` (default: its package's, General): a specialist gains a slot per spell level 1-9 and loses its opposition school. Target a blueprint (`resref`) or a placed instance (`area`+`tag`); call it " +
       "for both copies. Needs create_creature_level_system once per module. Placed creatures spawn at module load, before " +
       "any PC exists, so use an absolute `level` for them; `levelRel` suits creatures spawned later by script or encounter.",
     {
@@ -515,6 +604,12 @@ export function registerCreatureForgeTools(server: McpServer): void {
         .optional()
         .describe(
           "JSON array of spells.2da rows a caster always gets first at their spell level (e.g. a boss's signature spell)",
+        ),
+      school: z
+        .string()
+        .optional()
+        .describe(
+          "Wizard only: spellschools.2da row chosen for the character (0 General, 1 Abjuration, 2 Conjuration, 3 Divination, 4 Enchantment, 5 Evocation, 6 Illusion, 7 Necromancy, 8 Transmutation). A specialist gets one extra slot per spell level 1-9 and never its opposition school's spells. Default: the package's (General).",
         ),
       domains: z
         .string()
@@ -567,6 +662,7 @@ export function registerCreatureForgeTools(server: McpServer): void {
         originalSpawn: args.originalSpawn,
         pinnedSpells,
         domains,
+        school: args.school !== undefined ? toI(args.school) : undefined,
       });
       await target.save();
       const hasSystem = index.resources.has(`${CREATURE_LEVEL_WRAPPER}.ncs`);

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { chooseDomains, classSpellPools, domainSpells } from "../tools/creature-forge-tools.js";
+import {
+  chooseDomains,
+  chooseSchool,
+  classSpellPools,
+  domainSpells,
+  oppositionLetter,
+} from "../tools/creature-forge-tools.js";
 import type { ModuleIndex } from "../types/module.js";
 import {
   DEFAULT_GEAR_STORES,
@@ -154,5 +160,64 @@ describe("cleric domains", () => {
     expect(src).toContain('"cl_domain_" + IntToString(nClass)');
     expect(src).toContain('"cl_spell_domain_" + IntToString(nClass)');
     expect(src).toContain("GetDomain(oCreature, 1, nClass)");
+  });
+});
+
+describe("wizard school", () => {
+  const index = {
+    twodaTables: new Map([
+      [
+        "classes",
+        {
+          columns: [],
+          rows: new Map([
+            [10, { PickSchool: "1", Package: "10" }],
+            [2, { PickSchool: "0" }],
+          ]),
+        },
+      ],
+      [
+        "packages",
+        {
+          columns: [],
+          rows: new Map([
+            [10, { ClassID: "10", School: "0" }],
+            [31, { ClassID: "10", School: "5" }],
+          ]),
+        },
+      ],
+      [
+        "spellschools",
+        {
+          columns: [],
+          rows: new Map([
+            [0, { Label: "General", Letter: "G", Opposition: "****" }],
+            [2, { Label: "Conjuration", Letter: "C", Opposition: "8" }],
+            [5, { Label: "Evocation", Letter: "V", Opposition: "2" }],
+          ]),
+        },
+      ],
+    ]),
+  } as unknown as ModuleIndex;
+
+  it("defaults to the package school, General for the base Wizard package", () => {
+    const w: string[] = [];
+    expect(chooseSchool(index, 10, 10, undefined, w)).toBe(0);
+    expect(chooseSchool(index, 10, 31, undefined, w)).toBe(5);
+    expect(chooseSchool(index, 10, 10, 5, w)).toBe(5);
+    expect(chooseSchool(index, 2, 2, 5, w)).toBeUndefined();
+    expect(w).toEqual([]);
+  });
+
+  it("finds the opposition school's spell letter", () => {
+    expect(oppositionLetter(index, 5)).toBe("C");
+    expect(oppositionLetter(index, 0)).toBeUndefined();
+  });
+
+  it("adds the specialist slot from spell level 1 and checks the school in game", () => {
+    const src = generateCreatureLevelInclude();
+    expect(src).toContain("nSpellLevel >= 1 && GetSpecialization(oCreature, nClass) > 0");
+    expect(src).toContain('"cl_school_" + IntToString(nClass)');
+    expect(src).toContain('"cl_school_opposition_" + IntToString(nClass)');
   });
 });
