@@ -13,18 +13,9 @@ Sub-skill of `/create-adventure`. Reads all prior sections of `adventure.md`, th
 - `adventure.md` must exist in the MCP temp directory (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp` or `/tmp/nwn-mcp`) and contain completed `## Plot`, `## Areas`, `## Environment`, `## Actors`, and `## Quests` sections.
 - A module must be loaded. If none is loaded, call `load_module` using the module name from `adventure.md`.
 
-## Creature forge: spawn-time levelling (preferred for every class-based creature)
+## Creature forge
 
-Use this instead of hand-building stat blocks, gear and spell wiring. You supply the specification; the tools apply the rules.
-
-1. Once per module: `create_creature_level_system` (optional `stores`: JSON array of store tags/resrefs NPCs may buy from; default four base-game stores).
-2. For each class-based creature, call `forge_creature` on the blueprint (`resref`) AND on each placed copy (`area` + `tag`), with: `race`, `classId`, `level` (absolute target; use this for anything placed in an area, since placed creatures spawn at module load before PCs exist), `gearRole` (`pc` for companions, `elite` for bosses and named leaders, `standard` for rank and file, `mook` for fodder), optional `gearWealth` (multiplier on the role share, default 0.5), `powerLevel` (`tougher`/`epic` only for bosses), `complexity: "simple"` for commoner-tier NPCs, `plan` (class id per level) for multiclass, and `originalSpawn` (`x0_ch_hen_spawn` for companions, `nw_c2_default9` otherwise).
-3. Optional: `pinnedSpells` (JSON array of `spells.2da` rows a caster always gets first, e.g. a boss's signature spell).
-   For every Cleric, pass `domains` chosen from the character (JSON array of two `domains.2da` rows: 0 Air, 1 Animal, 3 Death, 4 Destruction, 5 Earth, 6 Evil, 7 Fire, 8 Good, 9 Healing, 10 Knowledge, 13 Magic, 14 Plant, 15 Protection, 16 Strength, 17 Sun, 18 Travel, 19 Trickery, 20 War, 21 Water). The forge adds both domain power feats, and at spawn one slot per spell level holds a domain spell. Left out, every Cleric gets the package's Healing and Sun.
-   For every Wizard, pass `school` chosen from the character (spellschools.2da row: 0 General, 1 Abjuration, 2 Conjuration, 3 Divination, 4 Enchantment, 5 Evocation, 6 Illusion, 7 Necromancy, 8 Transmutation). A specialist gets one extra slot per spell level 1-9 and never casts its opposition school; left out, a Wizard is a Generalist.
-4. What happens at spawn: the creature is a legal level-1 build; `LevelUpHenchman` levels it to the target (live-verified to add every automatic feat and no illegal ones); it buys proficient gear from the stores within a level-scaled allowance (unspent allowance is discarded, never given as gold); archers also buy a melee backup weapon; casters get spell abilities with the right spells, caster level and slots per day; every purchase is logged as a `[CL_LOOT]` line for `/adventure-rewards`; then it logs `[SPEC_OK]`/`[SPEC_FAIL]` lines that `run_live_verification` reports.
-5. Don't add your own spell wrappers (`a_hen_spawn`, `a_ra_spawn`, `SA_OnSpawn`) or `bake_spec_ability_pool` for a forged creature, and don't add `ITEM_PROPERTY_AC_BONUS` to give armor AC: mundane armor already has base AC from its torso part.
-6. Animals, outsiders and other monster-class creatures are not forged. Choosing a ready-made monster from the default or custom palette (`list_blueprints`, `resman_search`, `place_creature`) is the right approach for them; don't build them from scratch.
+Hostile class-based creatures (enemies, bosses) are built with `forge_creature` after the one-time `create_creature_level_system`. The **creature-forge** skill has the recipe; read it first and never hand-build stat blocks, gear or spell wiring.
 
 ## Workflow
 
@@ -32,18 +23,9 @@ Fully autonomous. Make all decisions based on the plot document and spatial data
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-- `## Areas`
-- `## Environment`
-- `## Actors`
-- `## Quests`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "challenges", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -182,6 +164,8 @@ For each dangerous area, design enemy encounters with tactical diversity.
 - **Dungeon** — 8-14 enemies in 3-5 groups
 - **Boss room** — 1 boss + 2-4 adds
 
+**Encounter kinds:** `## Plot` and `plan_adventure_shape` list each area's events as kinds. Here you build the fighting kinds: `combat`, `ambush` (placed out of sight, waiting), `boss` (`compose_encounter`), and the first part of a `chain`. A chain is a lookout or scout camp placed early in the area with the main force held back: the main force is *not* placed; `/adventure-quests` makes it appear when the lookout dies (a `kill` stage with `spawn`), so place only the lookout here and note the chain in `## Challenges`. Social, obstacle, trap, discovery, friendly and rest events belong to the other phases; don't turn them into fights.
+
 **Placement exclusion zones (never place hostile creatures here):**
 - Within 10 tiles of the module start/entry point (player spawn) — gives the player time to orient before combat
 - Within 6 tiles of any area transition trigger or waypoint — prevents enemies from attacking players mid-transition or instantly on arrival
@@ -278,54 +262,42 @@ Place each creature blueprint directly with `place_creature`. Do NOT use encount
 
 **Idempotency check:** Before placing traps in an area, call `get_area_triggers(area: "...")`. If a trigger with the same tag is already placed, **skip** it.
 
-For each trap location identified in the plan, create a script and place a trigger.
+For each trap location identified in the plan, place a trigger and put a check on it. No trap script is written by hand.
 
-**Step 1: Write trap script** with `write_script`:
-
-```nwscript
-// a_trap_fire.nss — fire trap
-void main() {
-    object oPC = GetEnteringObject();
-    if (!GetIsPC(oPC)) return;
-    ApplyEffectToObject(DURATION_TYPE_INSTANT,
-        EffectDamage(d6(2), DAMAGE_TYPE_FIRE), oPC);
-    ApplyEffectToObject(DURATION_TYPE_INSTANT,
-        EffectVisualEffect(VFX_IMP_FLAME_M), oPC);
-}
-```
-
-**Step 2: Create trap blueprint** — Use `create_trap_blueprint` to create a dedicated trap trigger with detection/disarm DCs and the script pre-assigned:
+**Step 1: Create the trap blueprint** (detection/disarm DCs, one-shot, no script):
 
 ```
-create_trap_blueprint(
-  resref: "trap_fire_01",
-  tag: "trap_fire_01",
-  name: "Fire Trap",
-  scriptOnEnter: "a_trap_fire",
-  detectDC: "15",
-  disarmDC: "15",
-  oneShot: true,
-  size: "3.0"
-)
+create_trap_blueprint(resref: "trap_fire_01", tag: "trap_fire_01", name: "Fire Trap",
+                      detectDC: "15", disarmDC: "15", oneShot: true, size: "3.0")
 ```
 
-**Step 3: Place trap** — Use `place_trigger` with the created blueprint:
-```
-place_trigger(area: "dungeon", blueprint: "trap_fire_01", x: "55.0", y: "45.0")
-```
+**Step 2: Place it** with `place_trigger(area: "dungeon", blueprint: "trap_fire_01", x: "55.0", y: "45.0")`.
 To cover a corridor wall to wall, pass the corridor's `width`, a `depth` of 1-2 m and the
 `rotation` it runs (compass degrees, 0 = north, 90 = east); this replaces the blueprint's square.
 
+**Step 3: Add the check** with `add_skill_check` — every party member rolls a Reflex save, and failing hurts:
+
+```
+add_skill_check(area: "dungeon", tag: "trap_fire_01", kind: "trigger",
+  check: '{"save":"reflex","dc":13,"fail_damage":"2d6","half":"1","damage_type":"fire",
+           "fail_msg":"Flames burst from the wall!"}')
+```
+
+The same tool handles a door that must be forced (`kind: "door"`, `{"ability":"str","dc":10,"pass_unlock":"<door tag>","pass_open":"1"}`)
+and a clue on a placeable (`kind: "placeable"`, `{"skill":"lore","dc":15,"pass_msg":"…"}`). `difficulty` (easy 10, moderate 15,
+hard 20, veryhard 25) can replace `dc`; `who` is `best` (the best of the party rolls — the default for skills and
+abilities), `speaker` or `each` (the default for saves); `tries` caps attempts per player.
+
 **Trap types:**
 
-| Type | Damage | VFX | Script name |
-|------|--------|-----|-------------|
-| Fire | `d6(2)` fire | `VFX_IMP_FLAME_M` | `a_trap_fire` |
-| Acid | `d6(2)` acid | `VFX_IMP_ACID_L` | `a_trap_acid` |
-| Frost | `d6(2)` cold | `VFX_IMP_FROST_L` | `a_trap_frost` |
-| Shock | `d6(2)` electrical | `VFX_IMP_LIGHTNING_S` | `a_trap_shock` |
-| Poison | `d4(1)` + ability damage | `VFX_IMP_POISON_L` | `a_trap_poison` |
-| Spike | `d6(3)` piercing | `VFX_COM_BLOOD_CRT_RED` | `a_trap_spike` |
+| Type | Damage | `damage_type` | Flavor |
+|------|--------|---------------|--------|
+| Fire | `2d6` | `fire` | flames |
+| Acid | `2d6` | `acid` | acid spray |
+| Frost | `2d6` | `cold` | freezing blast |
+| Shock | `2d6` | `electrical` | lightning arc |
+| Poison | `1d4` | `piercing` | poison needle; also `"fail_ability":"con","fail_ability_amount":"1d2","ability_hours":"2"` for the Constitution loss |
+| Spike | `3d6` | `piercing` | spikes |
 
 Scale damage with target level:
 - Level 1-3: `d6(1)` to `d6(2)`
@@ -393,7 +365,7 @@ generates an include (`inc_gear` by default) that recolours a creature's equipme
 guards from one blueprint arrive in six different liveries at no design cost.
 
 ```
-create_gear_randomizer(includeName: "inc_gear")
+create_gear_randomizer()
 ```
 
 Wire it through a spawn script that **chains** the default AI rather than replacing it — dropping
@@ -452,7 +424,7 @@ Append a `## Challenges` section to `adventure.md`:
 ...
 
 **Traps:**
-- **[Trap Name]** (`trap_tag`) at (x, y) — [effect]. Script: `a_trap_name`. Damage: [dice].
+- **[Trap Name]** (`trap_tag`) at (x, y) — [effect]. Check: [save/skill, DC]. Damage: [dice].
 ...
 
 **Magic Items on Creatures:**
@@ -541,8 +513,7 @@ naturalAC: <scaled to tier>
 
 Pick for **appearance only** — stats, class, feats, spells, and equipment are set independently. Don't limit choices by source CR. A beholder with CR 2 is perfectly valid.
 
-> **These resref lists are quick-reference examples, not exhaustive catalogs.**
-> If no suitable blueprint is found in these lists, call `list_blueprints(type: "utc", pattern: "[search term]")` to search the full base game and HAK stack by resref, tag, and display name (including TLK-resolved names). Always prefer a thematic match from the full catalog over forcing a poor fit from the examples.
+> Resref lists here are examples; search the full catalog with `list_blueprints` when none fits.
 
 ### Undead
 
@@ -653,7 +624,6 @@ Pick for **appearance only** — stats, class, feats, spells, and equipment are 
 |----------|---------|---------|-----------|
 | Hostile creature | `hos_[type]` | `hos_gobwar` | 16 chars |
 | Boss creature | `boss_[name]` | `boss_chief` | 16 chars |
-| Trap script | `a_trap_[type]` | `a_trap_fire` | 16 chars |
 
 **Keep type names to 5-9 characters** to stay within the 16-char resref limit after prefixes.
 
@@ -680,3 +650,7 @@ Differentiate similar creatures with a numeric suffix: `hos_gobwar`, `hos_gobmag
 - **Magic items are loot.** Equipped magic items on defeated creatures become player loot. Note all magic items in adventure.md for `/adventure-rewards` analysis. Don't make magic items more powerful than the creature that carries them.
 - **Post-placement equipment changes.** For a forged creature, change `gearRole`/`gearWealth` and forge again rather than editing its equipment; spawn-time shopping replaces it. To give one a specific item, forge it with `gearWealth: "0"` and use `set_creature_equipment`.
 - **Difficulty calibration.** Use `suggest_encounter(partyLevel: "[level]", partySize: "1", difficulty: "medium")` to get CR-appropriate creature suggestions and validate your encounter compositions against XP budgets.
+
+## Finish
+
+Call `phase_check(phase: "challenges", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

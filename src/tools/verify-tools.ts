@@ -108,6 +108,139 @@ const COOP_PARAM = z
     "Enforce co-op reward rules as errors (default true). Pass false for a deliberately single-player module: the same findings are still reported, but as warnings.",
   );
 
+/** Runs every checker over the loaded module and returns the raw per-target results. Shared by verify_all and phase_check. */
+export async function collectVerifyResults(
+  index: ModuleIndex,
+  opts: { checkWalkable?: boolean; coop?: boolean },
+): Promise<VerifyResult[]> {
+  const { checkWalkable, coop } = opts;
+  const results: VerifyResult[] = [];
+  const resmanOpts = await buildResmanOptions(index);
+
+  // Blueprints, by extension.
+  const blueprintCheckers: Array<[string, (r: Report, i: ModuleIndex, o: GffObj) => void]> = [
+    ["uti", verifyItem],
+    ["utp", verifyPlaceable],
+    ["utd", verifyDoor],
+    ["utt", verifyTrigger],
+    ["ute", verifyEncounter],
+    ["utm", verifyStore],
+    ["utw", verifyWaypoint],
+    ["uts", verifySound],
+  ];
+
+  for (const [key, entry] of index.resources) {
+    if (entry.extension === "utc") {
+      const doc = index.parsedGff.get(key) as GffObj | undefined;
+      if (!doc) continue;
+      const report = new Report(entry.resref, "utc");
+      // A creature wired with the associate AI is a companion; hold it to
+      // the stricter rules automatically.
+      const isHenchman = getFieldStr(doc, "ScriptHeartbeat").startsWith("x0_ch_hen_");
+      await verifyCreature(report, index, doc, { henchman: isHenchman, resmanOpts });
+      results.push(report.result());
+      continue;
+    }
+    const checker = blueprintCheckers.find(([ext]) => ext === entry.extension);
+    if (!checker) continue;
+    const doc = index.parsedGff.get(key) as GffObj | undefined;
+    if (!doc) continue;
+    const report = new Report(entry.resref, entry.extension);
+    checker[1](report, index, doc);
+    results.push(report.result());
+  }
+
+  // Placed creature instances, straight from each area's live GIT.
+  //
+  // A placed instance's equipment/feats/etc. is a separate copy from its
+  // blueprint's (see CLAUDE.md's "separate copy" pitfall) — a creature
+  // placed by resref reference, or hand-edited after placement via
+  // set_creature_equipment/respec_weapon_feats/a direct GFF edit, can
+  // diverge freely from whatever standalone .utc file it started from (if
+  // any local .utc even exists for it — many placed hostiles in this
+  // pipeline never get one, since /adventure-challenges places individual
+  // creatures directly rather than through create_creature_blueprint for
+  // every single one). The loop above only ever sees a local .utc file;
+  // it silently skips a creature whose only representation is the placed
+  // instance itself, no matter how broken its live equipment/feats are —
+  // confirmed against a real module where a placed instance's armor was
+  // changed after placement and the mismatch was invisible to verify_all
+  // even though the identical check (armor_proficiency_mismatch) already
+  // existed. This loop closes that gap by checking the live placed copy
+  // directly, in addition to whatever blueprint-file check ran above.
+  for (const areaResref of index.areas.keys()) {
+    const gitDoc = index.parsedGff.get(`${areaResref}.git`) as GffObj | undefined;
+    if (!gitDoc) continue;
+    for (const [i, creature] of listOf(gitDoc, "Creature List").entries()) {
+      const tag = getFieldStr(creature, "Tag") || `#${i}`;
+      const report = new Report(`${areaResref}:${tag}`, "utc");
+      const isHenchman = getFieldStr(creature, "ScriptHeartbeat").startsWith("x0_ch_hen_");
+      await verifyCreature(report, index, creature, { henchman: isHenchman, resmanOpts });
+      results.push(report.result());
+    }
+  }
+
+  // Dialogs.
+  for (const [key, entry] of index.resources) {
+    if (entry.extension !== "dlg") continue;
+    const doc = index.parsedGff.get(key) as GffObj | undefined;
+    if (!doc) continue;
+    const report = new Report(entry.resref, "dlg");
+    verifyDialog(report, index, doc);
+    results.push(report.result());
+  }
+
+  // Areas.
+  for (const areaResref of index.areas.keys()) {
+    const report = new Report(areaResref, "are");
+    await verifyArea(report, index, areaResref, { checkWalkable, resmanOpts });
+    results.push(report.result());
+  }
+
+  // Journal.
+  const jrlKey = [...index.resources.keys()].find((k) => k.endsWith(".jrl"));
+  if (jrlKey) {
+    const doc = index.parsedGff.get(jrlKey) as GffObj | undefined;
+    if (doc) {
+      const report = new Report(jrlKey.replace(/\.jrl$/, ""), "jrl");
+      await verifyJournal(report, index, doc);
+      results.push(report.result());
+    }
+  }
+
+  // Module info.
+  const ifoKey = [...index.resources.keys()].find((k) => k.endsWith(".ifo"));
+  if (ifoKey) {
+    const doc = index.parsedGff.get(ifoKey) as GffObj | undefined;
+    if (doc) {
+      const report = new Report("module", "ifo");
+      verifyModuleInfo(report, index, doc);
+      results.push(report.result());
+    }
+  }
+
+  // Factions.
+  const facKey = [...index.resources.keys()].find((k) => k.endsWith(".fac"));
+  if (facKey) {
+    const doc = index.parsedGff.get(facKey) as GffObj | undefined;
+    if (doc) {
+      const report = new Report("repute", "fac");
+      verifyFaction(report, index, doc);
+      results.push(report.result());
+    }
+  }
+
+  // Co-op rules — module-wide, not per-asset.
+  const coopReport = new Report("module", "coop");
+  const coopOpts = { enforce: coop !== false, perPlayerScripts: perPlayerScripts(index) };
+  await verifyPartyRewards(coopReport, index, coopOpts);
+  await verifyJournalPartyFlags(coopReport, index, coopOpts);
+  await verifyPartyQuestState(coopReport, index, coopOpts);
+  results.push(coopReport.result());
+
+  return results;
+}
+
 export function registerVerifyTools(server: McpServer): void {
   // ─── Per-object blueprint/instance checkers ─────────────────────────────
 
@@ -344,130 +477,7 @@ export function registerVerifyTools(server: McpServer): void {
     READ_ONLY,
     async ({ checkWalkable, coop }) => {
       const index = requireIndex();
-      const results: VerifyResult[] = [];
-      const resmanOpts = await buildResmanOptions(index);
-
-      // Blueprints, by extension.
-      const blueprintCheckers: Array<[string, (r: Report, i: ModuleIndex, o: GffObj) => void]> = [
-        ["uti", verifyItem],
-        ["utp", verifyPlaceable],
-        ["utd", verifyDoor],
-        ["utt", verifyTrigger],
-        ["ute", verifyEncounter],
-        ["utm", verifyStore],
-        ["utw", verifyWaypoint],
-        ["uts", verifySound],
-      ];
-
-      for (const [key, entry] of index.resources) {
-        if (entry.extension === "utc") {
-          const doc = index.parsedGff.get(key) as GffObj | undefined;
-          if (!doc) continue;
-          const report = new Report(entry.resref, "utc");
-          // A creature wired with the associate AI is a companion; hold it to
-          // the stricter rules automatically.
-          const isHenchman = getFieldStr(doc, "ScriptHeartbeat").startsWith("x0_ch_hen_");
-          await verifyCreature(report, index, doc, { henchman: isHenchman, resmanOpts });
-          results.push(report.result());
-          continue;
-        }
-        const checker = blueprintCheckers.find(([ext]) => ext === entry.extension);
-        if (!checker) continue;
-        const doc = index.parsedGff.get(key) as GffObj | undefined;
-        if (!doc) continue;
-        const report = new Report(entry.resref, entry.extension);
-        checker[1](report, index, doc);
-        results.push(report.result());
-      }
-
-      // Placed creature instances, straight from each area's live GIT.
-      //
-      // A placed instance's equipment/feats/etc. is a separate copy from its
-      // blueprint's (see CLAUDE.md's "separate copy" pitfall) — a creature
-      // placed by resref reference, or hand-edited after placement via
-      // set_creature_equipment/respec_weapon_feats/a direct GFF edit, can
-      // diverge freely from whatever standalone .utc file it started from (if
-      // any local .utc even exists for it — many placed hostiles in this
-      // pipeline never get one, since /adventure-challenges places individual
-      // creatures directly rather than through create_creature_blueprint for
-      // every single one). The loop above only ever sees a local .utc file;
-      // it silently skips a creature whose only representation is the placed
-      // instance itself, no matter how broken its live equipment/feats are —
-      // confirmed against a real module where a placed instance's armor was
-      // changed after placement and the mismatch was invisible to verify_all
-      // even though the identical check (armor_proficiency_mismatch) already
-      // existed. This loop closes that gap by checking the live placed copy
-      // directly, in addition to whatever blueprint-file check ran above.
-      for (const areaResref of index.areas.keys()) {
-        const gitDoc = index.parsedGff.get(`${areaResref}.git`) as GffObj | undefined;
-        if (!gitDoc) continue;
-        for (const [i, creature] of listOf(gitDoc, "Creature List").entries()) {
-          const tag = getFieldStr(creature, "Tag") || `#${i}`;
-          const report = new Report(`${areaResref}:${tag}`, "utc");
-          const isHenchman = getFieldStr(creature, "ScriptHeartbeat").startsWith("x0_ch_hen_");
-          await verifyCreature(report, index, creature, { henchman: isHenchman, resmanOpts });
-          results.push(report.result());
-        }
-      }
-
-      // Dialogs.
-      for (const [key, entry] of index.resources) {
-        if (entry.extension !== "dlg") continue;
-        const doc = index.parsedGff.get(key) as GffObj | undefined;
-        if (!doc) continue;
-        const report = new Report(entry.resref, "dlg");
-        verifyDialog(report, index, doc);
-        results.push(report.result());
-      }
-
-      // Areas.
-      for (const areaResref of index.areas.keys()) {
-        const report = new Report(areaResref, "are");
-        await verifyArea(report, index, areaResref, { checkWalkable, resmanOpts });
-        results.push(report.result());
-      }
-
-      // Journal.
-      const jrlKey = [...index.resources.keys()].find((k) => k.endsWith(".jrl"));
-      if (jrlKey) {
-        const doc = index.parsedGff.get(jrlKey) as GffObj | undefined;
-        if (doc) {
-          const report = new Report(jrlKey.replace(/\.jrl$/, ""), "jrl");
-          await verifyJournal(report, index, doc);
-          results.push(report.result());
-        }
-      }
-
-      // Module info.
-      const ifoKey = [...index.resources.keys()].find((k) => k.endsWith(".ifo"));
-      if (ifoKey) {
-        const doc = index.parsedGff.get(ifoKey) as GffObj | undefined;
-        if (doc) {
-          const report = new Report("module", "ifo");
-          verifyModuleInfo(report, index, doc);
-          results.push(report.result());
-        }
-      }
-
-      // Factions.
-      const facKey = [...index.resources.keys()].find((k) => k.endsWith(".fac"));
-      if (facKey) {
-        const doc = index.parsedGff.get(facKey) as GffObj | undefined;
-        if (doc) {
-          const report = new Report("repute", "fac");
-          verifyFaction(report, index, doc);
-          results.push(report.result());
-        }
-      }
-
-      // Co-op rules — module-wide, not per-asset.
-      const coopReport = new Report("module", "coop");
-      const coopOpts = { enforce: coop !== false, perPlayerScripts: perPlayerScripts(index) };
-      await verifyPartyRewards(coopReport, index, coopOpts);
-      await verifyJournalPartyFlags(coopReport, index, coopOpts);
-      await verifyPartyQuestState(coopReport, index, coopOpts);
-      results.push(coopReport.result());
-
+      const results = await collectVerifyResults(index, { checkWalkable, coop });
       const failed = results.filter((r) => r.status === "fail");
       const warned = results.filter((r) => r.status === "warn");
       const errorCount = results.reduce((n, r) => n + r.errors.length, 0);

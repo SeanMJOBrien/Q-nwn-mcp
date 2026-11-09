@@ -117,10 +117,6 @@ Follow `area-rural` for the group vocabulary — it is identical — but use the
 
 ## Group names: use the display name
 
-`paint_group` matches the tileset's **display** names, not the raw identifiers in the
-`.set` file. The tables above list groups as the `.set` names them; the tool wants the spaced
-form — `Stone Room 1 1x2`, not `StoneRoom01_1x2`.
-
 Call `paint_group` with a deliberately wrong name to have it print every valid group for that
 tileset, then copy the name exactly:
 
@@ -130,9 +126,4 @@ paint_group(area: "...", feature: "?", x: "0", y: "0")
 
 Two further things the corpus build surfaced:
 
-- **Crosser and corner mismatch warnings are real.** A group placed against a different terrain
-  reports e.g. `corner mismatch (dirt vs grass)` — a visible seam. Either place a matching
-  transition tile or accept the seam knowingly.
-- **Interior room groups are mostly wall.** A `tic01` room tile reports 17-35% walkable; that is
-  normal for interiors and is why hand-built castle interiors are only ~30 tiles.
-
+Placing groups (display names, mismatch warnings): see the **nwn-tileset-conventions** skill, "Placing groups with paint_group".

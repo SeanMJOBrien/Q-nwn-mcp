@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased] — 2026-11-08
+
+- `build_companion`: one call builds, forges, places and wires a companion (replaces five calls).
+- `add_skill_check` + `q_check`/`q_check_evt`: one parameter-driven skill/ability/save check for dialogs, traps, doors and clues.
+- Forged casters no longer get self-concealment spells (Invisibility, Sanctuary, Darkness) and no longer ready a second spellbook.
+- `q_act` dismisses a companion before the quest advance and logs `[QUEST] dismiss` / `advance refused`.
+- Skills: new `creature-forge` skill; duplicated recipe and tile-warning blocks removed from 12 skills.
+- `phase_check(phase, step)`: start and end checks of every `/create-adventure` phase, writes `adventure-status.json`; the 9 phase skills call it instead of carrying a pre-check paragraph.
+- `suggest_area_size(biome, purpose, events, shape)`: cabin 2x2, inn 2x4, forest 4x4 or a 3x10 linear road; `/adventure-plot` records `Events`/`Travel` per location.
+- `build_quest` stage `spawn` (a bounty target appears when the quest is accepted; waypoint placed by the builder) and `q_act` `spawn_count`/`spawn_tag`/`spawn_key`/`spawn_hostile`; spawns once, only at a real waypoint.
+- Stage `check` accepts `ability` / `save` and `difficulty`; `add_skill_check` takes `event: "disarm"`; quest item gifts go to every party member.
+- `place_tile_doors(area)`: places and locks every door the painted tiles imply.
+- `create_creature_blueprint` accepts faction names and warns about the player faction; placement refusals name the fix.
+- `skill-lint.test.ts` fails the build on a skill that names an unregistered tool, a parameter it doesn't take, or a paragraph copied between skills.
+- `place_tile_doors` takes `genericDoor` for type-0 tile doors (every ttr01 building door); `suggest_area_size` notes an inn's upper floor of the same size; `verify_creature` no longer asks an Animal-class companion for a package or HENCH_LEVEL.
+- Docs: new `docs/adventure-tooling-reference.md`; `generation-rules-reference.md`, `MODULE_CREATION_PIPELINE.md`, `AREA_GENERATION_PIPELINE.md`, `quest-system.md`, `creature-forge-manual.md` and `CLAUDE.md` updated for S1–S9 (new §10 and discrepancy list 6 in the rules reference).
+- `plan_adventure_shape`: areas, events and encounter kinds (combat, ambush, boss, chain, social, obstacle, trap, discovery, friendly, rest) from play time; `verify_story` and a `### Story Graph` format, checked by `phase_check` at `plot` and `polish`.
+- A stage `spawn` now works on kill/pickup/explore/trigger/use/search stages (`QuestSpawn` in `inc_quest`), so a lookout's death can bring in the main force.
+- `/create-adventure` asks the scope first; `Scope`/`Skip phases` in `## Module`; `phase_check` reports declared skips as `skipped`.
+- `q_check`: `pass_/fail_ability` (+ `_amount`, `ability_hours`) for a temporary ability decrease (poison).
+- Fixed: `compose_encounter` now saves the forged boss blueprint to disk (it was forged only in memory; the placed copy was fine).
+
 ## [Unreleased] — 2026-10-02
 
 Spatial conventions (tile rotation, ground heights, walkmesh offsets, facing) re-verified against the 33 base-game tilesets and 504 real
@@ -24,6 +46,7 @@ This release also adds the local-variable tools (`get_object_variables`, `set_ob
 
 ### Added
 
+- **`analyze_walkmesh`**: read-only pathing diagnostic for tile-corner snags. Reports sliver walkable triangles (tiny area or needle-thin, flagged near tile corners), walkable/height mismatches along shared tile edges, and interior corners that are open on two adjacent quadrants but blocked or stepped between them. Pure logic in `util/walkmesh-analysis.ts` with unit tests on synthetic walkmeshes; not yet run against real areas.
 - **`get_object_variables`, `set_object_variables`, `remove_object_variable`**: read, merge (by name, case-insensitive; an existing variable is overwritten
   in place) and remove local variables (the GFF `VarTable`, which `modify_gff_field` refuses) on a placed instance (`area` + `tag`, or `area` + `listName` +
   `index`) or on a standalone blueprint (`resref` + `blueprintType`; only blueprints that exist as files in the loaded module). A placed instance's VarTable is

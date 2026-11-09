@@ -11,6 +11,10 @@ intent nwn-mcp serves: **AI-assisted work on a module a human is actively
 authoring.** The human stays in creative control; you read, analyze, and
 make targeted edits on request.
 
+## Ask what the user needs first
+
+Before touching anything, find out the purpose: one or two aspects of the module (a dialog, a quest, an NPC, a loot table)? NWScript only? one larger feature? or certain phases of an adventure project? Work only on that. If the request is already specific ("fix this script", "add a merchant"), the question is answered; don't ask it again.
+
 ## Always load first
 
 Every tool except `load_module` and `create_module` requires a module to

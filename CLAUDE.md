@@ -11,7 +11,26 @@ MCP (Model Context Protocol) server for Neverwinter Nights Enhanced Edition modu
 - **Do NOT auto-export HTML reports** after creating or painting areas. Only export reports when the user explicitly asks for one.
 - **Always repack after creating/painting test areas** so the user can see them in the toolset. Mention that you repacked.
 - **MCP server restart required after code changes.** After editing TypeScript source and running `npm run build`, the MCP server must be restarted for new/changed tools to become available. Ask the user to restart before attempting to use newly added tools.
+- **Reference docs:** `docs/README.md` maps each question to a document; `docs/adventure-tooling-reference.md` explains `phase_check`, `suggest_area_size`, `place_tile_doors`, `build_companion`, `q_check`/`add_skill_check`, quest `spawn` and `skill-lint`, and the recipe for reworking an existing module. Keep it current when those tools change.
 - **Keep skills in sync with tools.** When adding, renaming, or changing tool parameters/behavior, immediately update the `.claude/skills/` SKILL.md files that reference those tools. The LLM follows skill instructions, not tool schemas — if a skill doesn't mention a parameter, the LLM won't use it.
+
+## Skill-prompt reduction TODOs (user-requested 2026-11-08, priority order)
+
+Goal (S1-S9 built 2026-11-08, details below): fewer instructions in `.claude/skills/`, because the LLM follows skill text, not tool schemas, and every recipe a tool can
+run in one call is text that can't drift. **These come first; the numbered Project Health list below is unchanged (its numbers
+are referenced elsewhere).** Measured 2026-11-08 over 7,217 lines of skills: the four big adventure skills are 609-682 lines
+each; 6 paragraphs (11 KB) are copied verbatim across skills; Phase 3b (companions) in `adventure-actors` is ~180 lines;
+Phase 5b (doors) is only ~21 lines.
+
+- **S1. DONE 2026-11-08 — remove copy-pasted blocks.** The creature-forge recipe is the `creature-forge` skill; the two tile-matching warnings live in `nwn-tileset-conventions`; the "STOP if a section is missing" pre-check is `phase_check` (S5); the resref-list note is one line. `skill-lint.test.ts` (S9) now fails on any paragraph over 150 characters copied between skills.
+- **S2. DONE 2026-11-08 (needs an MCP restart; only the validation paths are unit-tested, the full build is not yet run against a real module) — `build_companion`.** One call: blueprint, forge, placement, recruit dialog, `verify_creature`. A matching `build_key_npc` (non-companion, combat-capable) was not built; Phase 3 still points at `forge_creature`.
+- **S3. DONE 2026-11-08 except a live test with a real player — #19, the generic check.** `q_check` / `q_check_evt` / `add_skill_check` (trigger, placeable on use or `event: "disarm"`, door). `build_quest` stage `check` takes `skill | ability | save` and `dc | difficulty` (ability/save/difficulty go through `q_check`, a plain skill DC through `q_roll`). Item gifts (`give_item`, a search's item) now go to every party member (`QuestGiveItem`); a test runs the three co-op verifiers over the whole generated quest runtime. Skills updated: `adventure-challenges`, `adventure-environment`, `adventure-quests`.
+- **S4. DONE 2026-11-08 — #18, area sizing as a tool.** `suggest_area_size(biome, purpose, events, shape)` (`util/area-size.ts`): cabin 2x2, inn 2x4, forest 4x4 for one event or 3x10 linear, more events add tiles, 32 max; says whether to use `adventure_generate_layout` (9x9 and up; 14x14 for several rooms) or paint by hand. `adventure-plot` records `Events` and `Travel` per location; `adventure-areas` Phase 3 calls the tool. The per-biome tile budgets are first estimates, not corpus-derived — tune them after real builds.
+- **S5. DONE 2026-11-08 — `phase_check(phase, step)`.** `start` fails with the missing `adventure.md` section; `end` checks the phase's own section, runs the phase's verifiers (area connectivity for `areas`, the matching `verify_*` object types otherwise, everything for `polish`/`rewards`) and writes `adventure-status.json`. All 9 phase skills call it first and last. `quests` still needs `verify_quest_completability` run separately (the result says so).
+- **S6. DONE 2026-11-08 — #17, spawn as a quest/dialog option.** Stage `spawn: {resref, area | at, x, y, count, tag, hostile}` (talk/return/deliver/rescue stages; quest-level `spawn` for templates); `build_quest` places the waypoint on walkable ground and a kill stage on the spawned resref/tag needs no placed copy; `q_act` spawns once per key, only at a real waypoint (`[QUEST_WARN]` instead of the NPC's own spot), with `spawn_count`/`spawn_tag`/`spawn_hostile`. Not built: the "spawn only into an area the party has entered" deferral, and a forge option (a bounty is a palette/blueprint creature; use `forge_creature` on the blueprint first).
+- **S7. DONE 2026-11-08 — `place_tile_doors(area, dryRun?, genericDoor?)`.** Blueprint from `doortypes.2da` (generic type-0 doors — every `ttr01` building door — need `genericDoor`, e.g. `x3_door_wood001`), position/bearing from the tile rotation, corridor doorways unlocked and every other door locked + plot, idempotent (1 m), generic type-0 doors reported not guessed. `adventure-areas` Phase 5b is one call. Unit-tested on the plan only; not run against a real area.
+- **S8. PARTLY DONE 2026-11-08 — let the tools carry their own rules.** Done: `create_creature_blueprint` takes faction names and warns when a blueprint ends in the player faction; placement refusals name the fix (`walkBuffer`/`collisionRadius` values, `adventure_find_walkable`). Left: `verify_all` coverage for the stat caps, collision/walk defaults per object kind (the skills still say 0.3-0.5 / 0.5 for furniture), and more "name the fix" errors outside placement.
+- **S9. DONE 2026-11-08 — `skill_lint`.** `src/skill-lint.test.ts` (in `npm run verify`) parses every `.claude/skills/**/SKILL.md`: a `tool_name(` that isn't registered, a parameter the tool doesn't take (from the tool's literal schema), a paragraph over 150 characters copied between skills. First run found two real skill bugs (`resman_search type=`, `create_gear_randomizer includeName`). Scripts and CLI programs that look like calls go in `NOT_TOOLS` (`util/skill-lint.ts`).
 
 ## Project Health TODOs (survey 2026-10-01)
 
@@ -196,6 +215,169 @@ The rest are open.
       areas), the `create_area` default-tile fix (`tile-solver.ts`/`.test.ts`, `paint-tools.ts`, its `CLAUDE.md` entry), and
       `graphify-out/`.
 
+16. **TODO (user-raised, 2026-11-08) — copy the quest-system fixes and additions into `~/git/Q-tfn-content-studio`.** This
+    project's quest system (`docs/quest-system.md`, `src/util/quest-{script,spec,builder}.ts`) was ported from TFN's
+    `inc_quest.nss`/`dlg_q_*` and the studio's own courier/rescue/escort runtime, then fixed and extended. Bring the useful parts
+    back. **Keep TFN's model, not ours:** TFN is a persistent world with per-player quest state (`SQLocalsPlayer`), NWNX
+    quest-giver highlighting, TFN's own XP/loot includes and `party_credit` kill credit — do *not* port this project's
+    whole-party credit or vanilla state. Studio rules apply: Python 3.9 stdlib only, write TFN only through
+    `changeset.apply_changeset`, generated scripts carry the `// tfn-studio quest runtime` header (`questrun.py`), keep
+    `PROGRESS.md`/`MANUAL.md` current, and the studio's tests must stay green.
+    - **Bug fixes to propose for TFN's own scripts** (TFN source, `~/git/the-frozen-north/src/nss`, via the studio's change set
+      or upstream, not silently):
+      - `inc_quest.nss` `AdvanceQuestSphere` ignores its `nTarget` and always calls `AdvanceQuest(..., 1)`, so `dlg_q_adv` with
+        `aoe=1` advances the wrong stage for any slot but 1.
+      - The slot loops (`for (i = 1; i < HIGHEST_QUEST_COUNT; i++)`, and `j = 0..19` in `UpdateQuestgiverHighlights`) stop at
+        19 although the comment and constant say 20 (the studio's `MAX_SLOT = 19` matches the bug; raise both together).
+      - `dlg_q_chk_advb` rolls Bluff, shifts alignment toward chaotic and advances the quest *inside a condition*: the engine
+        runs conditions whenever it builds the node list, so just seeing the option shifts alignment and rerolls. And a
+        successful bluff skips any number of stages (`bBluff` bypasses the one-behind rule), not one. Our fix: roll in an
+        action (`q_roll`), store the result, branch on it in the next node's condition.
+      - `AdvanceQuest` calls `InitializeItem`/`SetIdentified` on a `CreateItemOnObject` result without checking it.
+      - `on_item_acq.nss` only ever advances slot 1 of a quest item.
+      - TFN encodes stages as two digits (`GetSubString(sQuest, 0, 2)`): a quest with 100+ stages breaks.
+    - **Generator additions for `tfnstudio/quests.py`** (VIAS today: talk, kill, pickup, explore, deliver, rescue, escort), each
+      with UI fields in the Quest Builder, `describe`, validation and tests:
+      - `search` stage (placeable skill check by the best party member, companions included; tries per player; `assured`
+        find so a required clue can't block the quest; item handed over; optional `examine` second check, e.g. a companion's
+        Lore on a letter's seal) — needs a `q_search`-style runtime script in `questrun.py`.
+      - optional clues (`optional: true` search, no journal entry, pays a reward once).
+      - `approach` (an NPC walks up to the first player it sees and starts its conversation; `q_approach` on OnPerception,
+        chaining the old handler).
+      - `join` / `companion` / `dismiss` (an NPC joins on acceptance as a henchman; a later line needs it present and sends it
+        off) — check TFN's henchman system before using `AddHenchman` directly.
+      - `deliver` with `keep` (the NPC examines an item the party carries on), stage `script` (TFN's existing
+        `questK_self_script`/`questK_pc_script`, not exposed by the studio today), `custom` stages (journal entry only,
+        advanced by the module's own script), `trigger` and `use` stages, flat `xp` rewards beside TFN's tiers.
+      - Templates (`fetch`, `kill`, `bounty`, `deliver`, `rescue`, `escort`, `investigate`, `persuade-or-fight`) and the
+        derived defaults (tag from name, stage numbering, `from`, end stages, level-sized rewards) to shorten specs.
+      - A generic condition/action pair driven by script parameters (`q_chk`/`q_act`: items, gold, skill rank, rolls,
+        companions, variables; take/give, hostile, unlock, spawn, destroy, leave) — TFN would add these as new
+        `dlg_q_*`-style generic scripts beside its existing ones, not replace them.
+    - **Runtime details worth carrying over:** a pickup pays once per item (flag on the item); kills by companions, summons
+      and familiars credit their master (check against `party_credit.nss` first — TFN may already cover this); the escort
+      poll is the studio's own and needs no change.
+    - **Not to port:** whole-party journal advance, vanilla `NW_JOURNAL_ENTRY` state, the module-heartbeat bounty clock (TFN has
+      SQLite time), `q_mod_acquire`/`q_mod_tick` wrappers (TFN has `on_item_acq`/its own heartbeat).
+
+17. **MOSTLY DONE 2026-11-08 (see S6 above; the list below is the original spec, what's left is noted there)** (user-raised, 2026-11-08) — spawn creatures from dialog parameters as a real quest feature**, e.g. a bounty target
+    appearing in an area the party has already explored once the bounty is accepted. What exists: `q_act` already takes
+    `spawn=<resref> at=<waypoint tag>` (`src/util/quest-script.ts`), but only as a raw dialog parameter. Gaps:
+    - **Not in the `build_quest` spec.** No stage/line field emits it, so a quest author has to hand-edit `ActionParams`. Add a
+      `spawn` option (on an accept line or a stage's `onStart`) that `quest-builder.ts` turns into the parameters, and pair it
+      with the `kill` stage: the spawned creature's tag should be the kill target, so "accept → target appears → kill → return"
+      is one spec.
+    - **No once-only guard.** Without `target=K` on the same line, re-picking the line spawns again. Store a flag (module local
+      keyed on quest + stage) and skip if set; also skip if a creature with that tag is already alive.
+    - **Bad fallback.** A missing waypoint spawns at the NPC's own location — a hostile bounty next to the quest giver. Fail
+      quietly (log `[QUEST_WARN]`) instead, and have `build_quest` place the waypoint itself (`place_waypoint` in a named area,
+      walkable, away from transitions) when the spec names an area but no waypoint.
+    - **Options worth having:** `spawn_count` (a bounty and two guards), `spawn_tag` (override so several quests can reuse one
+      blueprint), faction/hostility (Hostile=1 by default; see the `create_faction` reputation limitation), and a forge option so
+      a class-based bounty is forged (`forge_creature`) rather than a palette pick.
+    - **"Already explored" check (optional).** Spawn only into an area at least one party member has entered (an area OnEnter
+      flag), or defer the spawn to that area's OnEnter if nobody has been there yet — so the target never appears somewhere
+      the party can't reach yet. Update `verify_quest_completability` to treat a spawned kill target as present, and
+      `docs/quest-system.md` / `adventure-quests` skill.
+
+18. **MOSTLY DONE 2026-11-08 (see S4 above; the list below is the original spec, what's left is noted there)** (user-raised, 2026-11-08) — area size rules by biome, area type and number of events.** Areas come out too big for
+    what happens in them. Wanted rules (to go into the `area-*` skills and, where `adventure_generate_layout` picks a size, into
+    code):
+    - **Small interiors:** a cabin is **2x2**; an inn is **2x4**. (Today `area-city-interior` caps every home at 3x4 and
+      suggests 4x3 for a tavern — tighten both; keep castle interiors exempt.)
+    - **Forest:** **4x4 is enough for one event.** A travel area can be **linear, e.g. 3x10**, with one encounter along the way.
+      (`area-forest` currently sizes from the 531-area corpus without regard to how many events the area holds.)
+    - **General rule to define:** size = f(biome, purpose, event count) — e.g. a minimum footprint per biome, plus N tiles per
+      additional event/encounter, and a "linear travel" shape option (long and narrow, entrance and exit at opposite ends).
+      Write it as one table shared by every `area-*` skill and `adventure-areas`, and have `/adventure-plot` record each area's
+      event count so `/adventure-areas` can size from it. Check the layout generator's real minimums first: BSP needs 14x14 for
+      4 rooms (see "Layout Rules"), so small or 3-wide areas must be painted directly (`create_area` + `paint_tiles`/
+      `paint_group`) or generated with fewer rooms — confirm what `adventure_generate_layout` does at 2x2, 4x4 and 3x10.
+
+19. **MOSTLY DONE 2026-11-08 (see S3 above; the list below is the original spec, what's left is noted there)** (user-raised, 2026-11-08) — one generic check script driven by parameters: any skill, ability or save, at any DC.**
+    Examples to cover with no new script each time: DC 10 Dexterity check to avoid a falling-stone trap, DC 10 Strength check to
+    force a door open, DC 15 Lore check. What exists: `q_roll` (`src/util/quest-script.ts`) takes `skill=<name> dc=N key=K` and
+    is **dialog-only** (it reads `GetPCSpeaker()`), skills only, with the best of the speaker and its companions rolling.
+    Gaps to close:
+    - **Abilities and saves:** `ability=str|dex|con|int|wis|cha` (d20 + ability modifier vs DC, via `GetAbilityModifier`) and
+      `save=fort|reflex|will` (`GetReflexSavingThrow` etc., or `ReflexSave`/`FortitudeSave`/`WillSave` for the engine's own
+      result and trap-damage conventions). Today `skill=` only; "Dexterity roll" has no skill behind it.
+    - **Other triggers:** a dialog-less entry point so the same parameters work from a trigger OnEnter, a placeable OnUsed/
+      OnDisarm, or a door OnFailToOpen (the "force the door" case). The actor is then `GetEnteringObject()`/`GetLastUsedBy()`/
+      `GetClickingObject()`; resolve it in one helper so the parameter set is identical in every context.
+    - **Outcomes as parameters, not code:** `on_pass`/`on_fail` actions reusing `q_act`'s verbs (`damage=<n> type=<…>`, `unlock`,
+      `open`, `spawn`, `set_var`, `advance`/`target=K`, `give_item`), so "fail the Dex check → 3d6 bludgeoning, pass → nothing"
+      and "pass the Str check → door opens" need no script. Add `damage_dice`/`damage_type` and a `half_on_pass` flag for
+      saves (reflex half damage).
+    - **Who rolls:** keep best-of-party (speaker plus companions) as the default for skills, but make it `who=speaker|best|each`
+      (a trap should roll for each party member who steps on it; a lore check for the best one). Per-roller attempt cap
+      (`tries=N`, tracked on the PC, never the module — see the co-op skill-check rules) and `again=1` as today.
+    - **Result for later branching:** keep the `QS_ROLL_<key>` local so a following `q_chk roll=<key>` still works; log one
+      `[QUEST] roll …` line (add `ability=`/`save=`) so `run_live_verification` surfaces it.
+    - **Spec and tooling:** a `check` option on `build_quest` stages/lines and on `place_trigger`/`place_placeable`/`place_door`
+      (or one `add_skill_check` tool) that writes the parameters; DCs named by difficulty (`easy`=10, `moderate`=15, `hard`=20,
+      `very hard`=25, or a number) so skills can say "moderate Lore check". Update `adventure-challenges` (traps),
+      `adventure-environment` (clue placeables), `adventure-quests`, and the "Skill-check puzzle/investigation challenges" rules.
+    - Verify: `verify_coop_rules` should accept it (per-PC tries), and add a unit test per ability/save/skill branch that the
+      generated script compiles.
+
+20. **MOSTLY DONE 2026-11-08 — ask the purpose of the work first.** Built: `/create-adventure` pre-flight step 0 asks the scope (whole adventure, some phases, one feature, NWScript only) and records `Scope:` and `Skip phases:` in `## Module`; `phase_check` returns `skipped` for a declared skip and later phases don't require its section; `module-explorer` asks first. Not done: a `set_project_scope` tool (the skill step is enough so far). Original request: The server and `/create-adventure` assume a whole module is
+    wanted. Add an opening question (in `/create-adventure` and as the first thing a session on this MCP does) about scope, so effort goes
+    where the user's goal is: only one or two aspects of a module (areas, NPCs, quests, encounters, loot, dialog)? NWScript only? one larger
+    feature (a quest system, a companion, a store, a set piece)? or only certain phases of an adventure project? The answer picks the
+    skills and tools: scripts-only means `nwn-logic-debug`/`write_script` and no area building; "one feature" means no `adventure.md`
+    pipeline; a partial adventure runs only the named phases (`phase_check` already takes a phase). Record the choice in `adventure.md`'s
+    `## Module` section (or a session note when there is no adventure) and have each skill read it. Open design points: the exact list of
+    scopes, whether the question is a skill step or a tool (`set_project_scope`), and how a later phase behaves when an earlier one was
+    skipped on purpose (`phase_check` start must accept a declared skip, not fail on the missing section).
+
+21. **PARTLY DONE 2026-11-08 — how adventures are composed: sizes, encounters, and stitching a rich story together.** Answers and status per bullet: `docs/adventure-composition.md`. Built: `plan_adventure_shape` (areas, events, encounter kinds incl. friendly and chain, in story order), spawn on event stages (multi-part encounters), `verify_story` and the `### Story Graph` format (checked by `phase_check` at `plot` and `polish`), the plot skill's intake/shape/graph steps. Open: outcome-dependent chains, `verify_encounter_chain`, a rival-party shape, a tone/theme check, recurring-NPC checks, an import format for the user's own material, and tuning all numbers against real builds. Original questions: Questions to
+    answer in design docs first, then tools and skills (none are settled; the current pipeline is a linear list of areas with one set of
+    hostiles and NPCs each):
+    - **How many areas, and how large?** `suggest_area_size` (S4) sizes one area from its events; nothing yet decides the *number* of
+      areas from a story length, party level or play time. A rule is needed from target play time and party size (areas, events per area,
+      total encounters), recorded in `## Module`.
+    - **Encounters per area size, and which kinds.** A table of kinds with a budget per tile count: combat, ambush, patrol, guarded camp,
+      set-piece boss, trap, skill-check obstacle (`add_skill_check`), social/persuasion, puzzle/clue, discovery, rest. Today `/adventure-challenges`
+      places hostiles by role and `compose_encounter` builds a boss group; there is no event-count-per-area rule beyond S4's size growth.
+    - **Friendly encounters.** Merchants, a wounded traveller, a recruitable companion (`build_companion`), a rival party, an ally who
+      joins for one fight, a safe camp. Needs a kind in the encounter table, a placement rule (not within the hostile aggro range, see
+      `/adventure-challenges`), and a hook into quests (`join`/`companion`/`dismiss` already exist).
+    - **Multi-part encounters.** A lookout, scout or recon camp met first, then the main force: the first fight (or a parley, or a
+      stealth pass) changes the second — alarm raised, patrol missing, a prisoner who talks, supplies taken. Needs a spec shape
+      (`encounter chain`: stages, each with a trigger and a consequence flag on the module), a runtime (spawn the next stage, alter its
+      strength or position from the outcome of the last, built on the S6 `spawn` and the quest variables), and verification
+      (`verify_encounter_chain`: every stage reachable, the outcome flags read).
+    - **Building from a rich story.** `/adventure-plot` writes one document from a short prompt. A user with a detailed story, a campaign
+      setting, or a pile of separate vignettes has no way to feed it in. Needs an intake step: read the user's material, split it into
+      beats (scene, NPC, location, secret, encounter, item), keep the user's own names and wording, and map beats onto areas, events and
+      quests instead of inventing replacements.
+    - **Stitching disparate encounters and vignettes into one narrative.** Connecting threads: a clue ledger (which discovery points to
+      which next beat, with at least two routes to each), recurring NPCs and objects across areas, escalation order (what the party must
+      have learned or done before a beat opens), foreshadowing placed in earlier areas, and a payoff list the ending must resolve.
+      Candidate tools: a `story_graph` in `adventure.md` (beats and links) with a check that every beat is reachable and every thread
+      pays off (`verify_story`), journal entries generated per beat, and `phase_check` end for `plot`/`polish` running it.
+    - **Larger narrative from the parts.** Act structure over the areas (setup, complication, turn, climax, resolution), a through-line
+      antagonist and motive that each area's content reflects (the Hollow Communion's Venn only got a motive after the fact — see the
+      2026-11-08 rework), and a tone/theme list the skills check content against.
+    Before any code: write `docs/adventure-composition.md` answering the bullets above with the current pipeline's real limits, then
+    split the work into tools and skill changes the same way S1-S9 were.
+
+22. **TODO (2026-11-08) — skill, code and doc disagreements found while updating the docs, not yet fixed.** Full text:
+    `docs/generation-rules-reference.md` §9 item 6.
+    - **Role/stat/gear tables are stale as tool inputs.** §2.3's "Combat Role Templates", "Stat Scaling" and "Gear-by-class pools" describe a
+      hand-built stat block; `forge_creature` now derives class, feats, gear and spells. Either trim them to what a model still decides
+      (`classId`, `level`, `gearRole`, `powerLevel`) and keep the rest only for monsters, or delete them from `adventure-challenges`/`adventure-actors`.
+    - **`suggest_area_size` budgets are unmeasured.** First estimates; the `area-*` skills still quote corpus medians (forest 32×32). Measure a few
+      real builds (and the corpus per events-per-area where `adventure.md`-like data exists), tune `BIOME_RULES`, and say in each `area-*` skill
+      which number to use when (corpus median = a whole exploration map; the tool = only what the events need).
+    - **`phase_check` has no declared-skip state** (also #20): a deliberately skipped phase fails the next phase's start check.
+    - **`place_tile_doors` has no default for generic type-0 doors** (every `ttr01` building door). Pick per-tileset defaults, or read the door model
+      from the tile, instead of requiring `genericDoor` on every call.
+    - **Older modules carry older generated scripts and pools** (`q_act` without `QuestGiveItem`/spawn guards, `inc_cre_level` that readies a second
+      spellbook, pools holding concealment spells). Add a `verify_*` check that compares a module's generated includes with the current generator
+      output (and names the tool to re-run), so a stale module is reported instead of discovered in play.
+
 ## Design Intent
 
 This MCP serves two purposes:
@@ -298,7 +480,7 @@ All 10 styles use a single BSP pipeline, differentiated by `StyleConfig` presets
 
 #### Layout Rules
 
-- **BSP rooms**: minimum 3x3, margin >= 2 (enforced, never collapses to 1). `minLeaf = 6` ensures each leaf can fit a 3-tile room + 2-tile margin — **this one hardcoded `6` is shared by every style, interior AND exterior.** `StyleConfig.splitThreshold` (10 for most interior styles, 12 for exterior) is assigned in every preset but **confirmed dead — never read anywhere in `bspPartition`** (found 2026-09-19 while designing the avenue-reservation feature below). Wiring it in looks like an obvious fix — DON'T, without also auditing every place that cites it: at a real `splitThreshold=10` minLeaf, a 4-room split needs 20 playable tiles per axis (22x22 total); at 12, exterior styles would need 24 playable (26x26 total) — both far above what's documented and actually relied on today. **The real minimum area for 4 rooms, any style, is 14x14 total (12x12 playable)** — `2 * minLeaf` per axis, off the one true shared constant. `adventure-areas/SKILL.md`'s "Interior minimum 12x12" line is correct (if for the wrong stated reason — its "(splitThreshold 10)" parenthetical describes config that isn't actually consulted); its "Exterior minimum 18x18" line is also correct in practice, but for a *different* reason than splitThreshold: BSP itself would happily hand back four 3x3 leaves at 14x14 for exterior too, but a 3x3 room can't fit any real 2x3+ building feature group — 18x18 is a feature-fit headroom guideline, not a value the code enforces or splitThreshold produces. Room size is a random fraction of available leaf space, randomly offset within the leaf.
+- **BSP rooms**: minimum 3x3, margin >= 2 (enforced, never collapses to 1). `minLeaf = 6` ensures each leaf can fit a 3-tile room + 2-tile margin — **this one hardcoded `6` is shared by every style, interior AND exterior.** `StyleConfig.splitThreshold` (10 for most interior styles, 12 for exterior) is assigned in every preset but **confirmed dead — never read anywhere in `bspPartition`** (found 2026-09-19 while designing the avenue-reservation feature below). Wiring it in looks like an obvious fix — DON'T, without also auditing every place that cites it: at a real `splitThreshold=10` minLeaf, a 4-room split needs 20 playable tiles per axis (22x22 total); at 12, exterior styles would need 24 playable (26x26 total) — both far above what's documented and actually relied on today. **The real minimum area for 4 rooms, any style, is 14x14 total (12x12 playable)** — `2 * minLeaf` per axis, off the one true shared constant. The old `adventure-areas` "Interior minimum 12x12" / "Exterior minimum 18x18" lines (replaced 2026-11-08 by `suggest_area_size`, which encodes 9x9 for one room and 14x14 for several) were guidelines, not code: the interior one matches the BSP floor (its "(splitThreshold 10)" parenthetical described config that isn't consulted), and the exterior one is, in practice, a feature-fit headroom figure: BSP itself would happily hand back four 3x3 leaves at 14x14 for exterior too, but a 3x3 room can't fit any real 2x3+ building feature group — 18x18 is a feature-fit headroom guideline, not a value the code enforces or splitThreshold produces. Room size is a random fraction of available leaf space, randomly offset within the leaf.
 - **L-shaped rooms**: Adjacent BSP siblings may merge into a single zone with probability `nonRectChance`. The zone solver handles arbitrary shapes.
 - **Corridor routing**: axis-overlap detection (straight connection at shared Y/X), L-bend fallback when rooms don't overlap on either axis.
 - **S-curves**: Probability controlled by `sCurveChance`. Offsets middle third by 1 tile perpendicular. Bends only on interior wall tiles (never first/last).
@@ -546,7 +728,7 @@ Three mechanisms for moving between areas:
 
 ## Trap Blueprints
 
-`create_trap_blueprint` creates a UTT trigger blueprint with NWN trap fields: `TrapDetectDC`, `TrapDisarmable`, `TrapFlag`, `TrapOneShot`, and a default square geometry. Place with `place_trigger`.
+`create_trap_blueprint` creates a UTT trigger blueprint with NWN trap fields: `TrapDetectDC`, `TrapDisarmable`, `TrapFlag`, `TrapOneShot`, and a default square geometry. Place with `place_trigger`, then put the trap's effect on it with `add_skill_check` (a party-wide save with damage dice) — no trap script.
 
 ## Quest Completability
 
@@ -920,6 +1102,17 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
 
 ## Known Pitfalls
 
+- **FIXED (2026-11-08, Hollow Communion playtest) — forged casters turned invisible and held two spellbooks.** A Cleric boss stood still and
+  invisible: the spell-like-ability pool (`classSpellPools`/`domainSpells`, `creature-forge-tools.ts`) held Invisibility, Improved
+  Invisibility, Invisibility Sphere, Sanctuary and Darkness, and the default combat AI casts self-buffs first. Those labels are now
+  excluded (`isSelfConcealmentSpell`; a `pinnedSpells` entry is the only way back). Separately, `CL_LevelStep` called
+  `LevelUpHenchman(..., bReadyAllSpells = TRUE)`, so a creature with `MCP_SA_POOL` also had every memorized spell ready — two spellbooks;
+  it now passes FALSE when the pool is set. **Existing modules need the pool edited** (`MCP_SA_POOL`/`MCP_SA_DOMAIN` on the blueprint and
+  the placed instance) and `inc_cre_level` regenerated. Also: `q_act` now dismisses a companion before (and regardless of) the quest
+  advance, finds it through `GetAssociate` as well as the faction list, and logs `[QUEST] advance refused` / `[QUEST] dismiss`.
+  **Not confirmed live (no player on the headless server):** the dog staying in the party, and Holt/guards not attacking — see the
+  hardened `a_gate_fight` (attack orders sent after the dialog ends; a dialog clears the NPC's queue) and `a_venn_flee` (retried jump).
+
 - **CORRECTIONS (2026-11-07, live-engine verified; details in `docs/creature-forge-spec.md` §11) — several older entries below are wrong:**
   (1) Armor base AC comes from the torso part (`parts_chest.2da` `ACBONUS` for `ArmorPart_Torso`), not from `ITEM_PROPERTY_AC_BONUS`
   (enhancement only). The `nw_aarcl*` items are real armor, not cosmetic; `equipped_armor_no_ac_bonus` was removed and
@@ -948,6 +1141,27 @@ Covered tcn01, dag01, tno01, tcm02, trm02, ttu01, trs02 this session.
   **New standard path:** `create_creature_level_system` + `forge_creature` (spawn-time levelling, store shopping, spell abilities, in-game
   verification). The Hollow Communion's 13 class-based creatures were rebuilt this way (58/58 live checks).
 
+- **FIXED (2026-10-22, user-raised) — `create_area`'s default ground-fill tile was picked at random among
+  tied-top-scoring candidates, which could land on a decorated/cluttered variant and then repeat it across
+  every cell of the area, and every cell got the identical orientation (visibly tiled/repetitive).** Found via
+  a real complaint against the NPC Activities demo area (`tfenguild` in `actingfenora`): `create_area` picked
+  `ttr01` tile 122 (model `ttr01_r01_01`) as its all-grass fill — a decorated "r" series tile — instead of 0-3
+  (the plain, no-group "a01"-"a04" series), because `findDefaultTile`'s tie-break (`src/util/tile-solver.ts`)
+  was `best[Math.floor(Math.random() * best.length)]`: uniform random among every tile+orientation combo tied
+  at the max score (most matching corners, no crossers, no doors) — real tilesets consistently model the
+  plainest/lowest-polygon variant of a corner pattern at the lowest tile ID, reserving later IDs in the same
+  tie for occasional-accent decorated variants, so a random pick is a coin flip against clutter every time.
+  Separately, `create_area`'s own fill loop (`src/tools/paint-tools.ts`) wrote the exact same `tileId`+
+  `orientation` to all `width*height` cells with zero per-cell variance, which reads as an obviously tiled
+  pattern even when the tile itself is plain. **Fix:** `findDefaultTile` now sorts tied candidates by `tileId`
+  ascending and deterministically returns the lowest (no more randomness, no more clutter-by-coin-flip);
+  `create_area`'s fill loop now varies `Tile_Orientation` per cell via a cheap deterministic formula
+  (`(baseOrientation + x*3 + y*7) % 4`) — free visual variety with zero corner/crosser risk, since a
+  symmetric all-one-terrain, no-crosser tile renders identically at every orientation. New regression test in
+  `tile-solver.test.ts` pins the deterministic-lowest-ID behavior across 20 repeated calls with a tied
+  fixture. **This is now the standing behavior for every tileset, not a one-off fix for `ttr01`** — no
+  per-tileset table was added (and none should be guessed in); the fix is structural, in the shared tie-break
+  and fill-loop logic every `create_area` call goes through.
 - **FIXED — the local compile toolchain's `nwscript.nss` can silently predate real NWN:EE engine functions, with a
   cryptic error that looks like a syntax bug in the generated script.** Found building the Special-Abilities
   random-caster system (`spec-ability-script.ts`): `create_spec_ability_system`'s generated include failed to
@@ -2890,7 +3104,7 @@ member; they divide nothing. Only **combat** XP is divided by the engine.
 
 ## Henchmen / Companions
 
-**Standard path (2026-11-07): `create_companion_system` (once per module) + `create_companion_dialog`
+**Standard path (2026-11-08): `create_companion_system` (once per module) + `build_companion` per companion (blueprint, forge, placement, dialog, verification in one call; `create_companion_dialog` is the lower-level piece). Earlier (2026-11-07): `create_companion_system` + `create_companion_dialog`
 (per companion), source in `src/util/companion-script.ts`.** The party cap is counted from the engine at
 join time (living henchmen of PC masters in the recruiting PC's party), never kept in a module counter —
 the hand-written Hollow Communion scripts kept `HC_HENCH_COUNT`, missed the decrement on dismiss and then

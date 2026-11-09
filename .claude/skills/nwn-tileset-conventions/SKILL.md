@@ -74,3 +74,15 @@ ground z = walkmesh z (node offset included) + Tile_Height × Transition(tileset
 - **"180° off" tile bugs** are almost always a clockwise/counter-clockwise or pre-rotation slip. Check against the neighbour rules above.
 - **Do not guess `Transition`.** Read it from the tileset; a custom tileset may use a fractional value.
 - **Do not trust tile-centre arithmetic** for positions on decorated terrain — probe it.
+
+## Placing groups with paint_group
+
+`paint_group` matches the tileset's **display** names, not the raw identifiers in the
+`.set` file. The tables above list groups as the `.set` names them; the tool wants the spaced
+form — `Stone Room 1 1x2`, not `StoneRoom01_1x2`.
+
+- **Crosser and corner mismatch warnings are real.** A group placed against a different terrain
+  reports e.g. `corner mismatch (dirt vs grass)` — a visible seam. Either place a matching
+  transition tile or accept the seam knowingly.
+- **Interior room groups are mostly wall.** A `tic01` room tile reports 17-35% walkable; that is
+  normal for interiors and is why hand-built castle interiors are only ~30 tiles.

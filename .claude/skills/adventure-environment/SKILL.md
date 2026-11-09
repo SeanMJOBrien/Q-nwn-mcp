@@ -19,15 +19,9 @@ Fully autonomous. Make all decisions based on the plot document and spatial data
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-- `## Areas`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "environment", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -239,8 +233,7 @@ Repack the module with `repack_module`.
 
 Use these resrefs directly. Organized by environment theme. Mix and match across themes where appropriate.
 
-> **These resref lists are quick-reference examples, not exhaustive catalogs.**
-> If no suitable blueprint is found in these lists, call `list_blueprints(type: "utp", pattern: "[search term]")` to search the full base game and HAK stack by resref, tag, and display name (including TLK-resolved names). Always prefer a thematic match from the full catalog over forcing a poor fit from the examples.
+> Resref lists here are examples; search the full catalog with `list_blueprints` when none fits.
 
 ### Tavern / Inn
 | Category | Resrefs |
@@ -358,4 +351,9 @@ When placing placeables, group related objects together (within 2-4m of each oth
 - **Area-wide sounds go at area center.** Radius = `max(width, height) * 10` to cover the entire area.
 - **Waypoint facing matters.** Entrance waypoints face into the area. Landmark waypoints face toward the landmark from the player's approach. Use `faceTowardX/Y` (or a compass `bearing`: 0 = north, 90 = east) — waypoints and creatures use compass degrees, placeables use a different raw angle.
 - **Group name → waypoint label.** Strip dimension suffixes: `"Lodge_2x2"` → `"Lodge"`, `"Temple_3x2"` → `"Temple"`.
+- **Hazards and clues that roll:** a stuck door, a falling-stone floor, a letter with a seal are checks, not scripts: `add_skill_check(area, tag, kind, check)` with a skill, ability or save and a DC or `difficulty`. A trap's trigger rolls for each player who steps on it; a placeable can check on use or, with `event: "disarm"`, when its trap is disarmed. A clue that moves a quest is a `search` stage in `/adventure-quests`, not this.
 - **Repack after placing.** Call `repack_module` at the end so the user can see changes in the toolset.
+
+## Finish
+
+Call `phase_check(phase: "environment", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

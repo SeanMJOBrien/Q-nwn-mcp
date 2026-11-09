@@ -23,6 +23,12 @@ The create-adventure pipeline is a **white-glove, spoiler-free experience**. The
 
 Before starting the pipeline, resolve these with the user:
 
+0. **Purpose and scope — ask first.** Ask what the user wants help with, so effort goes where their goal is (use AskUserQuestion; allow "Other"): **a whole adventure** (the full pipeline, default); **only some phases** of an adventure (which ones: plot, areas, environment, actors, quests, challenges, affordances, polish, rewards); **one feature** (a quest, a companion, a store, a set piece, an encounter chain) added to a module that already exists; or **NWScript only** (no areas or content). Only "a whole adventure" and "some phases" use this pipeline.
+   - *One feature:* skip this skill; use the matching tool directly (`build_quest`, `build_companion`, `compose_encounter`, `add_skill_check`, …) with `module-explorer`.
+   - *NWScript only:* use `nwn-logic-debug` and `write_script`; build no areas.
+   - *Some phases:* record the phases to leave out as `Skip phases:` in `## Module` (below). `phase_check` then reports those phases as skipped and later phases don't require their sections. Say plainly which earlier content the later phases will lack (a quests phase without areas has nowhere to put anything).
+   - Always record a one-line `Scope:` (what the user asked for, in their words).
+
 1. **Level range required.** The user's prompt must include a level range (e.g., "level 3-5", "for 5th level characters"). If missing, ask for one before proceeding — every downstream skill (challenges, affordances, rewards) depends on it.
 
 2. **D&D theme check.** NWN is a D&D game with medieval fantasy tilesets, creatures, and items. If the user's prompt is non-fantasy (sci-fi, modern, etc.), warn them: *"NWN's assets are medieval fantasy — a [genre] adventure won't have matching tilesets, creatures, or items. It won't look or feel right. Want to proceed anyway?"* If they confirm, continue. Otherwise help them adjust the concept.
@@ -52,6 +58,8 @@ Before starting the pipeline, resolve these with the user:
        - **Party Size:** [1-4]
        - **Difficulty:** [Normal/Hard]
        - **Area Mode:** [Full / Scaffold / Scaffold (Minimal)]
+       - **Scope:** [what the user asked for, one line]
+       - **Skip phases:** [comma-separated phases not to run, or leave out]
        ```
      - Call `create_module` with both `name` and `filename` set to the **adventure title exactly as written** (e.g., `name: "The Harvest of Bones"`, `filename: "The Harvest of Bones"`). The .mod file will be saved as `The Harvest of Bones.mod`.
    - If a module is already loaded and the user wants to add to it, skip module creation.
@@ -193,10 +201,7 @@ Each sub-skill writes its completion status to `adventure-status.json` in the MC
 - If `"failed"`: rollback the phase, re-run the sub-skill, or halt.
 - **Compile errors are the most common "partial" case.** If a script failed to compile, the dialog/quest that references it is broken. Fix the script or remove the reference before proceeding.
 
-**Each sub-skill is responsible for:**
-1. Reading the existing `adventure-status.json` (or creating it if missing).
-2. Appending its phase entry with status, warnings, and errors.
-3. Writing the updated JSON back to disk.
+**Each sub-skill calls `phase_check(phase, step: "start")` first and `phase_check(phase, step: "end")` last.** The tool checks the required `adventure.md` sections, runs the phase's verifiers and writes its entry to `adventure-status.json`, so no skill edits that file by hand.
 
 ## Sub-Skills
 

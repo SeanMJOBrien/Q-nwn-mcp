@@ -5,6 +5,13 @@ whether by the fully-automatic `/create-adventure` pipeline or by a human direct
 the same tools one step at a time. Written for anyone who wants the mental model
 without reading the code: **blueprint → build → inspect → furnish → snapshot for you.**
 
+## 0. `suggest_area_size` — decide how big it should be
+
+Before anything is built, `suggest_area_size(biome, events, purpose?, shape?)` turns "what happens here" into a size: a cabin is
+2×2, an inn 2×4 (often with an upper floor of the same size), a forest with one event 4×4, a forest road 3×10. More events add
+tiles, never past 32 per side. It also says whether steps 2–3 apply (the layout generator needs 9×9 or more; smaller areas and
+long narrow strips are painted by hand with `paint_tiles`/`paint_group`).
+
 ## 1. `create_area` — pour the foundation
 
 Makes a blank area of a given size (in tiles, like a grid — e.g. 12×12) using one
@@ -33,6 +40,12 @@ afterward.
 This is a photograph, not a construction tool. It reads back the finished area
 (tiles, rooms, anything placed in it) as data, so the LLM can see what's there before
 deciding what to do next. It never builds or changes anything.
+
+## 4b. `place_tile_doors` — the doors the scenery already implies
+
+Some tiles have a doorway built into their art (a house front, a gate). `place_tile_doors` puts a real, locked door object on
+every one in the area in a single call, at the exact spot and facing the tile's rotation gives it; corridor archways stay
+unlocked. (Tiles whose door type is "generic", such as every rural building, need a door blueprint passed as `genericDoor`.)
 
 ## 5. `place_creature` / `place_placeable` / `place_door` / etc. — furnish it
 

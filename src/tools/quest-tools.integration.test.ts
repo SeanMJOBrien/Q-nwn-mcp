@@ -31,6 +31,9 @@ vi.mock("../module-loader.js", () => ({
   buildResmanOptions: async () => ({ dirs: [mockIndex.tempDir] }),
   buildDialogSummary: () => ({}),
 }));
+vi.mock("../util/walkmesh.js", () => ({
+  checkPlacementWalkable: vi.fn(async () => ({ ok: true, z: 0.5 })),
+}));
 vi.mock("./tileset-tools.js", () => ({ invalidateTagToAreaCache: vi.fn() }));
 
 const v = (type: string, value: unknown) => ({ type, value });
@@ -343,6 +346,125 @@ describe("build_quest", () => {
       const jrl = mockIndex.parsedGff.get("module.jrl") as unknown as GffObj;
       const cat = getFieldList(jrl, "Categories").find((x) => getFieldStr(x, "Tag") === "q_dog") as GffObj;
       expect(getFieldList(cat, "EntryList").map((e) => getFieldNum(e, "ID"))).toEqual([1, 2]);
+    } finally {
+      await done();
+    }
+  });
+
+  it("spawns a bounty target on accept: waypoint placed, q_act parameters set, kill needs no placed copy", async () => {
+    await addResource("bounty_orc.utc", { __data_type: "UTC ", ...creature("bounty_orc") });
+    const { c, done } = await client();
+    try {
+      const spec = JSON.stringify({
+        name: "Orc Bounty",
+        giver: "farmer_ned",
+        template: "bounty",
+        target: "bounty_orc",
+        spawn: { resref: "bounty_orc", area: "fold", x: 20, y: 20, count: 2, tag: "bounty_orc_1" },
+      });
+      const r = json(await c.callTool({ name: "build_quest", arguments: { spec } }));
+      expect(r.success).toBe(true);
+
+      const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+      const wps = getFieldList(git, "WaypointList");
+      expect(wps.map((w) => getFieldStr(w, "Tag"))).toEqual(["b_orc_bounty_s1_spawn"]);
+      // The target was not placed in the area; the spawn creates it.
+      expect(getFieldList(git, "Creature List").map((x) => getFieldStr(x, "Tag"))).not.toContain("bounty_orc");
+
+      const ned = getFieldList(git, "Creature List").find((x) => getFieldStr(x, "Tag") === "farmer_ned") as GffObj;
+      const dlg = mockIndex.parsedGff.get(`${getFieldStr(ned, "Conversation")}.dlg`) as unknown as GffObj;
+      const accept = getFieldList(dlg, "EntryList").find((e) => getFieldStr(e, "Script") === "q_act") as GffObj;
+      expect(getScriptParams(accept, "ActionParams")).toMatchObject({
+        target: "1",
+        spawn: "bounty_orc",
+        at: "b_orc_bounty_s1_spawn",
+        spawn_count: "2",
+        spawn_tag: "bounty_orc_1",
+        spawn_key: "b_orc_bounty_1",
+      });
+      // The blueprint carries the kill wiring the spawned copies inherit.
+      const bp = mockIndex.parsedGff.get("bounty_orc.utc") as unknown as GffObj;
+      expect(getFieldStr(bp, "ScriptDeath")).toBe("q_ondeath");
+    } finally {
+      await done();
+    }
+  });
+
+  it("an ability check with a named difficulty uses q_check; a plain skill check still uses q_roll", async () => {
+    const { c, done } = await client();
+    try {
+      const spec = (check: object) =>
+        JSON.stringify({
+          name: "Hard Talk",
+          giver: "farmer_ned",
+          stages: [
+            { do: "talk", journal: "a" },
+            { do: "talk", journal: "b", check, end: true },
+          ],
+        });
+      const reply = () => {
+        const dlg = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
+        return getFieldList(dlg, "ReplyList").find((r) => getFieldStr(r, "Comment").endsWith(":try")) as GffObj;
+      };
+      json(await c.callTool({ name: "build_quest", arguments: { spec: spec({ ability: "cha", difficulty: "hard" }) } }));
+      expect(getFieldStr(reply(), "Script")).toBe("q_check");
+      expect(getScriptParams(reply(), "ActionParams")).toMatchObject({ ability: "cha", difficulty: "hard", who: "best" });
+      json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_hard_talk" } }));
+      json(await c.callTool({ name: "build_quest", arguments: { spec: spec({ skill: "persuade", dc: 15 }) } }));
+      expect(getFieldStr(reply(), "Script")).toBe("q_roll");
+    } finally {
+      await done();
+    }
+  });
+
+  it("an encounter chain: killing the lookout brings in the main force (spawn on an event stage)", async () => {
+    await addResource("wolf_pack.utc", { __data_type: "UTC ", ...creature("wolf_pack") });
+    const { c, done } = await client();
+    try {
+      const spec = JSON.stringify({
+        name: "Lookout and Pack",
+        giver: "farmer_ned",
+        stages: [
+          { do: "talk", journal: "Ned wants the wolves gone." },
+          { do: "kill", target: "wolf_alpha", journal: "The lookout is dead; the pack is coming.", spawn: { resref: "wolf_pack", area: "fold", x: 25, y: 25, count: 3, tag: "wolf_pack_1" } },
+          { do: "kill", target: "wolf_pack", journal: "The pack is destroyed." },
+          { do: "return", journal: "Ned paid me." },
+        ],
+      });
+      const r = json(await c.callTool({ name: "build_quest", arguments: { spec } }));
+      expect(r.success).toBe(true);
+      const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+      const wolf = getFieldList(git, "Creature List").find((x) => getFieldStr(x, "Tag") === "wolf_alpha") as GffObj;
+      expect(vars(wolf)).toMatchObject({
+        quest1_spawn: "wolf_pack",
+        quest1_spawn_at: "q_lookout_and_pack_s2_spawn",
+        quest1_spawn_key: "q_lookout_and_pack_2",
+        quest1_spawn_count: "3",
+        quest1_spawn_tag: "wolf_pack_1",
+      });
+      // The pack is spawned, not placed in the area; its death script is on the blueprint.
+      expect(getFieldList(git, "Creature List").map((x) => getFieldStr(x, "Tag"))).not.toContain("wolf_pack");
+      const bp = mockIndex.parsedGff.get("wolf_pack.utc") as unknown as GffObj;
+      expect(getFieldStr(bp, "ScriptDeath")).toBe("q_ondeath");
+      expect(getFieldList(git, "WaypointList").map((w) => getFieldStr(w, "Tag"))).toContain("q_lookout_and_pack_s2_spawn");
+    } finally {
+      await done();
+    }
+  });
+
+  it("refuses a spawn on a stage that isn't advanced from a dialog line", async () => {
+    const { c, done } = await client();
+    try {
+      const spec = JSON.stringify({
+        name: "Bad Spawn",
+        giver: "farmer_ned",
+        stages: [
+          { do: "talk", journal: "a" },
+          { do: "custom", journal: "b", spawn: { resref: "x", at: "wp" } },
+        ],
+      });
+      const r = await c.callTool({ name: "build_quest", arguments: { spec } });
+      expect(JSON.stringify(r)).toContain("not escort or custom");
     } finally {
       await done();
     }

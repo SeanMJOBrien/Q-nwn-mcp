@@ -323,6 +323,28 @@ describe("compose_encounter — placement mode", () => {
     }
   });
 
+  it("saves the forged boss blueprint to disk, not just to memory", async () => {
+    await setupArea();
+    addItemBlueprint("nw_cloth001");
+    const { client, cleanup } = await createTestClient();
+    try {
+      const parsed = json(
+        await client.callTool({ name: "compose_encounter", arguments: { role: "necromancer", bossCR: "6", targetEL: "6", area: "testarea" } }),
+      ) as { placed?: { boss: { resref: string } } };
+      const resref = parsed.placed!.boss.resref;
+      // The mocked jsonToGff writes the document as JSON, so this is what a repack would pack.
+      const onDisk = JSON.parse(await fs.readFile(path.join(tempDir, `${resref}.utc`), "utf8")) as GffObj;
+      expect((onDisk.ScriptSpawn as { value: string }).value).toBe("cf_spawn");
+      const vars = Object.fromEntries(
+        ((onDisk.VarTable as { value: GffObj[] }).value ?? []).map((v) => [(v.Name as { value: string }).value, (v.Value as { value: unknown }).value]),
+      );
+      expect(vars.MCP_GEAR_ROLE).toBe("elite");
+      expect(vars.MCP_ORIG_SPAWN).toBe("nw_c2_default9");
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("reuses an existing level system instead of rewriting it", async () => {
     await setupArea();
     mockIndex.resources.set("cf_spawn.ncs", { resref: "cf_spawn", extension: "ncs", filePath: path.join(tempDir, "cf_spawn.ncs"), sizeBytes: 1 });

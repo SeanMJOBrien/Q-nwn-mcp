@@ -19,20 +19,9 @@ Fully autonomous. Investigate → identify issues → fix them. Do NOT ask the u
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-- `## Areas`
-- `## Environment`
-- `## Actors`
-- `## Quests`
-- `## Challenges`
-- `## Affordances`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "polish", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -419,3 +408,7 @@ Three things the checker cannot tell you, which matter when reading its findings
 - **Faction validation.** Use `get_faction_details` to verify faction relationships. If a custom faction is needed but missing, use `create_faction` to add it. Use `set_faction_reputation` to fix incorrect faction relationships.
 - **Bulk cleanup.** Use `bulk_remove_objects(tagPattern: "temp_*", listName: "...", dryRun: true)` to find and remove orphaned objects. Always dry-run first.
 - **Undo safety net.** If a fix goes wrong, use `undo_last_change` to revert. Check `undo_history` to review recent mutations.
+
+## Finish
+
+Call `phase_check(phase: "polish", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

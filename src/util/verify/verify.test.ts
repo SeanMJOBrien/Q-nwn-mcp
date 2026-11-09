@@ -1292,6 +1292,25 @@ describe("verifyCreature", () => {
       expect(report.warnings.map((w) => w.code)).toContain("henchman_no_package");
     });
 
+    it("does not ask a non-player-class companion (an Animal dog) for a package or HENCH_LEVEL", async () => {
+      const obj = makeCreature("x0_ch_hen_", {
+        Conversation: { type: "resref", value: "dlg_x" },
+        ClassList: {
+          type: "list",
+          value: [{ __struct_id: 2, Class: { type: "int", value: 12 }, ClassLevel: { type: "short", value: 2 } }],
+        },
+      });
+      const index = makeIndex({
+        resources: new Map([["dlg_x.dlg", { resref: "dlg_x", extension: "dlg", filePath: "/x", sizeBytes: 1 }]]),
+        twodaTables: new Map([["classes", { columns: ["PlayerClass"], rows: new Map([[12, { PlayerClass: "0" }]]) }]]),
+      });
+      const report = new Report("t", "utc");
+      await verifyCreature(report, index, obj, { henchman: true });
+      const codes = report.warnings.map((w) => w.code);
+      expect(codes).not.toContain("henchman_no_package");
+      expect(codes).not.toContain("henchman_no_level_var");
+    });
+
     it("does not warn on StartingPackage 0 for an actual Barbarian companion", async () => {
       const obj = makeCreature("x0_ch_hen_", {
         Conversation: { type: "resref", value: "dlg_x" },

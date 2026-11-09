@@ -151,4 +151,33 @@ describe("companion tools", () => {
       await done();
     }
   });
+
+  describe("build_companion", () => {
+    const base = {
+      resref: "tester",
+      name: "Tester",
+      area: "a1",
+      x: "10",
+      y: "10",
+      race: "6",
+      classId: "4",
+      level: "3",
+      gender: "0",
+      introduction: "Hello.",
+      backstory: "A long story.",
+    };
+
+    it("rejects a resref over 16 characters, a non-standard race and an existing blueprint", async () => {
+      const { c, done } = await client();
+      let r = text(await c.callTool({ name: "build_companion", arguments: { ...base, resref: "x".repeat(17) } }));
+      expect(r.success).toBe(false);
+      expect(r.error).toMatch(/16 characters/);
+      r = text(await c.callTool({ name: "build_companion", arguments: { ...base, race: "20" } }));
+      expect(r.error).toMatch(/race must be 0-6/);
+      mockIndex.resources.set("tester.utc", {} as never);
+      r = text(await c.callTool({ name: "build_companion", arguments: base }));
+      expect(r.error).toMatch(/already exists/);
+      await done();
+    });
+  });
 });

@@ -1,6 +1,6 @@
 ---
 name: nwn-object-placement
-description: Use when placing, moving, orienting or re-heighting objects in an area — props, furniture, camps, creatures, waypoints, doors, ambient sounds — or when something is buried, floating, facing the wrong way, or "blocked by walkability/collision". Trigger on "place a table with chairs", "build a camp", "face the NPC toward…", "put this on the table", "the object is underground/floating", "move this group", "fix heights", "where is open ground", "place an ambient sound", or any use of place_creature/place_placeable/place_waypoint/place_door/place_sound/move_object/bulk_move_objects/fix_object_heights/probe_ground/adventure_find_walkable.
+description: Use when placing, moving, orienting or re-heighting objects in an area — props, furniture, camps, creatures, waypoints, doors, ambient sounds — or when something is buried, floating, facing the wrong way, or "blocked by walkability/collision". Trigger on "place a table with chairs", "build a camp", "face the NPC toward…", "put this on the table", "the object is underground/floating", "move this group", "fix heights", "where is open ground", "place an ambient sound", or any use of place_creature/place_placeable/place_waypoint/place_door/place_sound/move_object/bulk_move_objects/fix_object_heights/probe_ground/adventure_find_walkable/analyze_walkmesh, or creatures snagging/getting stuck at tile corners.
 ---
 
 # Placing objects correctly
@@ -64,6 +64,7 @@ block on walkability — doors sit at tile boundaries.
 | Tool | Parameters that matter here |
 |---|---|
 | `probe_ground` | `area`, `x`, `y`, `buffer` (clearance for the verdict, default 1) |
+| `analyze_walkmesh` | `area`; optional `minArea` (0.1 m²), `minAltitude` (0.05 m), `cornerRadius` (1.5), `clearance` (0.5), `maxStep` (0.15), `seamStep` (0.1), `limit` (50 per category). Read-only pathing diagnostic: sliver triangles (flagged `nearCorner`), tile-seam walkable/height mismatches, and corners blocked between two open quadrants. Heuristic leads, not the engine pathfinder: confirm each with `probe_ground` at the reported coordinates, then fix the tile choice/height, not the object. |
 | `place_creature` | `bearing` (compass), `faceTowardX/Y`, `walkBuffer`, `collisionRadius` (0.75) |
 | `place_placeable` | `bearing` (raw GFF CCW), `faceTowardX/Y`, `zOffset`, `collisionRadius` (1.0), `walkBuffer` |
 | `place_waypoint` | `bearing` (compass), `faceTowardX/Y`, `walkBuffer` |

@@ -275,6 +275,8 @@ export function registerEncounterComposerTools(server: McpServer): void {
         powerLevel: "tougher",
         originalSpawn: "nw_c2_default9",
       });
+      // forgeCreature only changes the in-memory document; without this the .utc on disk stays the bare build.
+      await bossTarget.save();
 
       const bossSpot = spots[0];
       const placeResult = await placeCreatureCore(index, resmanOpts, {

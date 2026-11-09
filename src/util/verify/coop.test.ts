@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ModuleIndex } from "../../types/module.js";
+import { generateQuestScripts } from "../quest-script.js";
 import { Report } from "./common.js";
 import { verifyJournalPartyFlags, verifyPartyQuestState, verifyPartyRewards } from "./scripts.js";
 
@@ -320,5 +321,17 @@ describe("co-op enforcement opt-out", () => {
     await verifyJournalPartyFlags(report, index, { enforce: false });
     expect(report.errors).toHaveLength(0);
     expect(report.warnings.map((w) => w.code)).toEqual(["reward_not_party_wide", "journal_not_party_wide"]);
+  });
+});
+
+describe("generated quest scripts", () => {
+  it("q_check, q_roll and the rest of the quest runtime pass every co-op rule (per-PC tries, party-wide rewards)", async () => {
+    for (const [resref, source] of Object.entries(generateQuestScripts())) await addScript(resref, source);
+    const report = new Report("quest-runtime", "coop");
+    const opts = { enforce: true, perPlayerScripts: new Set<string>() };
+    await verifyPartyRewards(report, index, opts);
+    await verifyJournalPartyFlags(report, index, opts);
+    await verifyPartyQuestState(report, index, opts);
+    expect(report.result()).toMatchObject({ errors: [], warnings: [] });
   });
 });

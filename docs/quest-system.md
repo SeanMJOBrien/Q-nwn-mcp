@@ -74,12 +74,13 @@ What is derived:
 
 Any stage may add:
 
-- `check: {skill, dc, else, prompt, pass, fail}` on talk-style stages: the PC line rolls the check once (the best rank among the
+- `check: {skill | ability | save, dc | difficulty, else, prompt, pass, fail}` on talk-style stages (ability and save checks and named difficulties run through `q_check`, a plain skill DC through `q_roll`; `search` stages take a skill only): the PC line rolls the check once (the best rank among the
   speaker and its companions); a pass advances, a fail does nothing (`else: "end"`) or turns the NPC hostile (`else: "fight"`).
 - `search` options: `check.tries` (attempts per player, default 2), `check.assured` (default true: once a player's tries are
   spent the search succeeds anyway, so a required clue can never block the quest), `examine: {skill, dc, var, pass, fail}` (a
   second check rolled on success by whoever is best at it, such as Lore on a found letter's seal; a pass sets module local
   string `var` to "1" and shows `pass` with that companion's name), `none` (text before the quest reaches this stage).
+- `spawn: {resref, area | at, x, y, count, tag, hostile}` on any stage but escort/custom/optional (stage 1 = on acceptance): creates the creature(s) when that stage advances the quest — on a dialog stage via its `q_act` line, on a kill/pickup/explore/trigger/use/search stage via `questK_spawn*` locals that `QuestAdvance` reads (a multi-part encounter: kill the lookout, the main force appears). With `area`, build_quest places the waypoint `<quest tag>_s<n>_spawn` on walkable ground; `at` names an existing one. The `q_act` line carries `spawn`, `at`, `spawn_key` (once per quest stage), and `spawn_count`/`spawn_tag`/`spawn_hostile` when set. A `kill` stage whose target is the spawned resref or tag needs no placed copy. A quest-level `spawn` (templates) goes onto stage 1.
 - `optional: true` on a `search`: an optional clue — no journal entry, doesn't move the quest on, available once the quest is
   at or past `from` (default 1), pays its `reward` to the party once (never assured).
 - `approach` on stage 1 (true, or a bark such as `"*whines*"`): the giver walks up to the first player it sees and starts its
@@ -137,6 +138,7 @@ Any stage may add:
 | `q_chk` | Dialog condition. Every parameter present must pass (table below). |
 | `q_act` | Dialog action. With `target`, nothing else runs unless the advance happened, so nothing repeats. |
 | `q_roll` | A skill check rolled once, as an action; `q_chk roll=` reads the result. |
+| `q_check` | One check for anything: a skill, an ability or a saving throw at any DC (`dc=` or `difficulty=easy|moderate|hard|veryhard`), rolled by the best of the party, the speaker or everyone (`who=`), with `tries=` per player and outcomes as parameters (`pass_`/`fail_` damage, `pass_`/`fail_ability` + `_amount` + `ability_hours` (a temporary ability decrease per roller, e.g. poison), message, unlock, destroy, spawn, set_var, give_item (every party member gets a copy), xp). Works as a dialog action, and on a trigger (OnEnter), placeable (OnUsed, or OnDisarm with `event: "disarm"`) or door (OnFailToOpen) through `add_skill_check` + `q_check_evt`. |
 | `q_ondeath`, `q_onenter`, `q_trigger`, `q_onused` | Event stages; run the stored original handler first. |
 | `q_approach` | On an NPC's OnPerception: walks up to the first player it sees and starts its conversation, once per player. |
 | `q_search` | Search stage on a placeable: the best-skilled party member rolls, limited tries per player, optional assured find, item, and an `examine` check. |
@@ -160,7 +162,7 @@ Any stage may add:
 
 `target=K` (advance and pay; `aoe=<radius>` advances every player nearby), `take_item=<tag>` `take_count=N`,
 `give_item=<resref>`, `take_gold=N`, `set_var=<name>` `var_value=<v>`, `hostile=1`, `leave=1`, `unlock=<door tag>` `open=1`,
-`destroy=<tag>`, `spawn=<resref>` `at=<waypoint tag>`, `escort=K`, `join=1`, `dismiss=<tag>`.
+`destroy=<tag>`, `spawn=<resref>` `at=<waypoint tag>` (+ `spawn_count=N` `spawn_tag=T` `spawn_key=K` `spawn_hostile=0`; spawns once, only at a real waypoint, and logs `[QUEST_WARN]` instead of falling back to the NPC's own spot), `escort=K`, `join=1`, `dismiss=<tag>`.
 
 ### Eligibility (TFN's rules)
 

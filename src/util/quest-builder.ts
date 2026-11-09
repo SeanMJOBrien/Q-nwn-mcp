@@ -35,12 +35,14 @@ import {
   generateHeartbeatWrapper,
   HEARTBEAT_WRAPPER,
 } from "./quest-script.js";
-import type { QuestSpec, Stage } from "./quest-spec.js";
+import { checkDc, type QuestSpec, type Stage } from "./quest-spec.js";
 import { writeAndCompileScript } from "./script-writer.js";
 import { rectTriggerGeometry } from "./trigger-geometry.js";
+import { checkPlacementWalkable } from "./walkmesh.js";
 
 const MAX_SLOTS = 20;
 const GIT_STRUCT_TRIGGER = 1;
+const GIT_STRUCT_WAYPOINT = 5;
 
 export class QuestBuildError extends Error {}
 
@@ -580,7 +582,11 @@ export class QuestBuilder {
     return d;
   }
 
+  /** Spawn parameters of the stage being wired; merged into its advancing q_act lines (the ones carrying `target`). */
+  private spawnParams: ScriptParams | undefined;
+
   private entry(d: { dlg: GffObj }, text: string, comment: string, script?: string, params?: ScriptParams): number {
+    if (script === "q_act" && params?.target !== undefined && this.spawnParams) params = { ...params, ...this.spawnParams };
     const e = makeEntry(text, script, { params });
     setField(e, "Comment", "cexostring", comment);
     const list = getFieldList(d.dlg, "EntryList");
@@ -682,11 +688,18 @@ export class QuestBuilder {
     if (s.check) {
       const key = `${this.spec.tag}_${s.n}`.slice(0, 32);
       const intro = this.entry(d, s.offer ?? "What do you want?", `${c}intro`);
-      const tryIt = this.reply(d, s.check.prompt ?? `[${s.check.skill}] Hear me out.`, `${c}try`, "q_roll", {
-        skill: s.check.skill,
-        dc: String(s.check.dc),
-        key,
-      });
+      const chk = s.check;
+      const what = chk.skill ?? chk.ability ?? chk.save ?? "";
+      // Skill checks with a plain DC use q_roll; ability, save and named-difficulty checks use the generic q_check.
+      const generic = !!(chk.ability || chk.save || chk.difficulty);
+      const rollParams: ScriptParams = { key };
+      if (chk.skill) rollParams.skill = chk.skill;
+      if (chk.ability) rollParams.ability = chk.ability;
+      if (chk.save) rollParams.save = chk.save;
+      if (chk.dc !== undefined) rollParams.dc = String(chk.dc);
+      if (chk.difficulty) rollParams.difficulty = chk.difficulty.replace(" ", "");
+      if (generic) rollParams.who = chk.save ? "speaker" : "best";
+      const tryIt = this.reply(d, chk.prompt ?? `[${what}] Hear me out.`, `${c}try`, generic ? "q_check" : "q_roll", rollParams);
       const pass = this.entry(d, s.check.pass ?? thanks, `${c}pass`, "q_act", { target });
       const failParams: ScriptParams = s.check.else === "fight" ? { hostile: "1" } : {};
       const fail = this.entry(
@@ -771,10 +784,86 @@ export class QuestBuilder {
 
   // --- stages
 
+  private waypointExists(tag: string): boolean {
+    return this.areas().some((a) => {
+      try {
+        return getFieldList(this.git(a), "WaypointList").some((w) => getFieldStr(w, "Tag") === tag);
+      } catch {
+        return false;
+      }
+    });
+  }
+
+  /** A stage's `spawn` as q_act parameters; places the waypoint when the spec names an area instead of a waypoint. */
+  private async prepareSpawn(s: Stage): Promise<ScriptParams | undefined> {
+    const sp = s.spawn;
+    if (!sp) return undefined;
+    let at = sp.at;
+    if (!at) {
+      const area = (sp.area as string).toLowerCase();
+      if (!this.index.areas.has(area)) throw new QuestBuildError(`stage ${s.n}: spawn area ${area} isn't in the module`);
+      at = `${this.spec.tag}_s${s.n}_spawn`.slice(0, 32);
+      if (!this.waypointExists(at)) {
+        if (this.dryRun) {
+          this.report.placed.push(`waypoint ${at} would be placed in ${area}`);
+        } else {
+          const spot =
+            sp.x !== undefined && sp.y !== undefined
+              ? { x: sp.x, y: sp.y }
+              : (await findSimpleWalkableSpots(this.index, this.resman, area, 1))[0];
+          if (!spot) throw new QuestBuildError(`stage ${s.n}: no walkable spot in ${area} for the spawn waypoint`);
+          const walk = await checkPlacementWalkable(spot.x, spot.y, area, this.index, this.resman);
+          if (!walk.ok) throw new QuestBuildError(`stage ${s.n}: spawn point (${spot.x}, ${spot.y}) in ${area}: ${walk.reason}`);
+          const list = getFieldList(this.git(area), "WaypointList");
+          list.push({
+            __struct_id: GIT_STRUCT_WAYPOINT,
+            Appearance: { type: "byte", value: 1 },
+            Description: { type: "cexolocstring", value: {} },
+            HasMapNote: { type: "byte", value: 0 },
+            LinkedTo: { type: "cexostring", value: "" },
+            LocalizedName: { type: "cexolocstring", value: { "0": `Quest ${this.spec.tag} spawn` } },
+            MapNote: { type: "cexolocstring", value: {} },
+            MapNoteEnabled: { type: "byte", value: 0 },
+            Tag: { type: "cexostring", value: at },
+            TemplateResRef: { type: "resref", value: "" },
+            XPosition: { type: "float", value: spot.x },
+            YPosition: { type: "float", value: spot.y },
+            ZPosition: { type: "float", value: walk.z ?? 0 },
+            XOrientation: { type: "float", value: 0 },
+            YOrientation: { type: "float", value: 1 },
+          } as unknown as GffObj);
+          this.markGit(area);
+          this.report.placed.push(`waypoint ${at} in ${area} at (${spot.x.toFixed(1)}, ${spot.y.toFixed(1)})`);
+        }
+      }
+    } else if (!this.waypointExists(at)) {
+      this.report.warnings.push(`stage ${s.n}: spawn waypoint ${at} isn't placed anywhere; nothing will spawn until it is`);
+    }
+    if (!(await resolveBlueprint(this.index, sp.resref, "utc", this.resman)))
+      throw new QuestBuildError(`stage ${s.n}: no creature blueprint ${sp.resref} to spawn`);
+    const params: ScriptParams = { spawn: sp.resref, at, spawn_key: `${this.spec.tag}_${s.n}` };
+    if (sp.count && sp.count > 1) params.spawn_count = String(sp.count);
+    if (sp.tag) params.spawn_tag = sp.tag;
+    if (sp.hostile === false) params.spawn_hostile = "0";
+    return params;
+  }
+
+  /** Is this kill target created by a stage's spawn (so it needs no placed copy)? Returns the spawned blueprint. */
+  private spawnedTarget(ref: string): string | undefined {
+    const r = ref.toLowerCase();
+    for (const st of this.spec.stages) {
+      const sp = st.spawn;
+      if (sp && (sp.resref.toLowerCase() === r || sp.tag?.toLowerCase() === r)) return sp.resref;
+    }
+    return undefined;
+  }
+
   private async wireStage(s: Stage): Promise<void> {
+    this.spawnParams = await this.prepareSpawn(s);
     const tag = this.spec.tag;
     let by = "";
     let slot: number | undefined;
+    let owner: Participant | undefined;
     switch (s.do) {
       case "talk":
       case "return":
@@ -806,8 +895,11 @@ export class QuestBuilder {
         break;
       }
       case "kill": {
-        let target = this.creature(s.target as string);
-        if (!target || !target.copies.some((c) => c.where.startsWith("git:"))) target = await this.placeCreature(s);
+        const spawned = this.spawnedTarget(s.target as string);
+        let target = this.creature(spawned ?? (s.target as string));
+        if (spawned) {
+          if (!target) throw new QuestBuildError(`stage ${s.n}: no blueprint ${spawned} for the spawned kill target`);
+        } else if (!target || !target.copies.some((c) => c.where.startsWith("git:"))) target = await this.placeCreature(s);
         const placedCount = target.copies.filter((c) => c.where.startsWith("git:")).length;
         if (placedCount > 3) {
           this.report.warnings.push(
@@ -816,6 +908,7 @@ export class QuestBuilder {
         }
         slot = this.assignSlot(target, s);
         this.writeStageVars(target, s, slot);
+        owner = target;
         this.setEvent(target, slot, "ScriptDeath", "q_ondeath", "MCP_Q_ORIG_DEATH");
         by = s.target as string;
         break;
@@ -824,6 +917,7 @@ export class QuestBuilder {
         const item = await this.item(s);
         slot = this.assignSlot(item, s);
         this.writeStageVars(item, s, slot);
+        owner = item;
         mergeVarTable(item.copies[0].obj, [{ name: "quest_event", type: "int", value: slot }]);
         this.needAcquire = true;
         await this.placeItem(s, item);
@@ -834,6 +928,7 @@ export class QuestBuilder {
         const area = this.area(s.area as string);
         slot = this.assignSlot(area, s);
         this.writeStageVars(area, s, slot);
+        owner = area;
         this.setEvent(area, slot, "OnEnter", "q_onenter", "MCP_Q_ORIG_ENTER");
         by = s.area as string;
         break;
@@ -842,6 +937,7 @@ export class QuestBuilder {
         const trig = this.createTrigger(s);
         slot = this.assignSlot(trig, s);
         this.writeStageVars(trig, s, slot);
+        owner = trig;
         this.setEvent(trig, slot, "ScriptOnEnter", "q_trigger", "MCP_Q_ORIG_ENTER");
         by = trig.label;
         break;
@@ -851,11 +947,12 @@ export class QuestBuilder {
         if (!plc) throw new QuestBuildError(`stage ${s.n}: no placed placeable tagged ${s.target}`);
         slot = this.assignSlot(plc, s);
         this.writeStageVars(plc, s, slot);
+        owner = plc;
         this.setEvent(plc, slot, "OnUsed", "q_search", "MCP_Q_ORIG_USED");
         const chk = s.check as NonNullable<Stage["check"]>;
         const vars: Array<{ name: string; type: "int" | "string" | "float"; value: number | string }> = [
-          { name: "quest_search_skill", type: "string", value: chk.skill },
-          { name: "quest_search_dc", type: "int", value: chk.dc },
+          { name: "quest_search_skill", type: "string", value: chk.skill ?? "" },
+          { name: "quest_search_dc", type: "int", value: checkDc(chk) },
           { name: "quest_search_tries", type: "int", value: chk.tries ?? 2 },
           { name: "quest_search_assured", type: "int", value: chk.assured === false || s.optional ? 0 : 1 },
           { name: "quest_search_optional", type: "int", value: s.optional ? 1 : 0 },
@@ -891,11 +988,25 @@ export class QuestBuilder {
         if (!plc) throw new QuestBuildError(`stage ${s.n}: no placed placeable tagged ${s.target}`);
         slot = this.assignSlot(plc, s);
         this.writeStageVars(plc, s, slot);
+        owner = plc;
         this.setEvent(plc, slot, "OnUsed", "q_onused", "MCP_Q_ORIG_USED");
         for (const c of plc.copies) setField(c.obj, "Useable", "byte", 1);
         by = s.target as string;
         break;
       }
+    }
+    if (s.spawn && owner && slot !== undefined && !s.optional && this.spawnParams) {
+      // Event stage: QuestAdvance reads these when the stage advances (dialog stages carry the same values on their q_act line).
+      const sp = this.spawnParams;
+      const vars: Array<{ name: string; type: "int" | "string" | "float"; value: number | string }> = [
+        { name: `quest${slot}_spawn`, type: "string", value: sp.spawn },
+        { name: `quest${slot}_spawn_at`, type: "string", value: sp.at },
+        { name: `quest${slot}_spawn_key`, type: "string", value: sp.spawn_key },
+      ];
+      if (sp.spawn_count) vars.push({ name: `quest${slot}_spawn_count`, type: "string", value: sp.spawn_count });
+      if (sp.spawn_tag) vars.push({ name: `quest${slot}_spawn_tag`, type: "string", value: sp.spawn_tag });
+      if (sp.spawn_hostile) vars.push({ name: `quest${slot}_spawn_hostile`, type: "string", value: sp.spawn_hostile });
+      this.setVars(owner, vars);
     }
     this.report.stages.push({
       n: s.n,

@@ -47,13 +47,16 @@ These are resolved once, before Phase 1, and nothing below can proceed without t
    Sub-skills run via the Agent tool (never the Skill tool, which would leak their
    reasoning into the visible chat) specifically so spoilers never reach the
    orchestrator's own visible output, regardless of what any phase decides internally.
-5. **The orchestrator only actively reviews after 2 of the 9 phases** — Areas
+5. **Every phase brackets itself with `phase_check`:** `start` refuses to run when a required `adventure.md` section is missing
+   (the old per-skill pre-check paragraph), `end` checks the phase's own section, runs the verifiers that belong to it and writes
+   `adventure-status.json`. This is separate from, and in addition to, the orchestrator's two reviews below.
+6. **The orchestrator only actively reviews after 2 of the 9 phases** — Areas
    (`check_area_connectivity`) and Quests (`verify_quest_completability`) — and trusts
    Polish (Phase 8) to catch everything else. This is itself a priority call: these two
    are judged the highest-risk, most cascade-prone failures (an unreachable area or an
    uncompletable quest breaks every phase built on top of it), so they're the only ones
    worth a mid-pipeline interruption.
-6. **Dispatch efficiency has its own priority order** (added after a real rate-limit
+7. **Dispatch efficiency has its own priority order** (added after a real rate-limit
    incident): combine naturally-grouped calls first, prefer forking over a fresh agent
    once context exists to share, do small bespoke edits directly rather than dispatch
    for them, and never parallelize anything that mutates `adventure.md` or module state
@@ -105,8 +108,11 @@ aesthetic doors, and the connectivity graph between them.
    triggers), chosen because one call wires both areas' light-shaft portal and landing
    waypoint atomically instead of needing matched setup on each side.
 
-**Sizing floor:** interior areas 12×12 minimum, exterior 18×18 minimum — below this the
-BSP split can't guarantee a 3-tile room with a 2-tile margin.
+**Sizing:** `suggest_area_size(biome, purpose, events, shape)` decides each area's size from the events the plot assigns it
+(`Events` and `Travel` per location): cabin 2×2, inn 2×4 with an upper floor of the same size, a one-event forest 4×4, a forest road
+3×10. `adventure_generate_layout` needs at least 9×9 (one room) or 14×14 (several; the BSP split can't guarantee a 3-tile room with a
+2-tile margin below that), so smaller areas and linear strips are painted by hand. Aesthetic doors are placed by
+`place_tile_doors` (generic type-0 doors need `genericDoor`).
 
 ---
 
@@ -137,10 +143,10 @@ after the fact than to get density exactly right on the first pass everywhere.
 **Objective:** place non-hostile NPCs (companions, Key NPCs, ambient creatures), all
 on Commoner faction, with greeting dialogs.
 
-**Logic — companion creation order is canonical and sequential, never reordered:**
-race → racial feats → ability scores → class → class feats → skill points → HP,
-matching `build_npc_stat_block`'s own fast path. **Give every companion clothing, even
-with no mechanical property** — an empty chest slot isn't a valid default.
+**Logic — class-based creatures (companions, Key NPCs) are built by `forge_creature`:** a legal level-1 build (race → racial feats →
+ability scores → class → class feats → skill points → HP, gated by `feat-legality.ts`), levelled to the target at spawn, with gear
+bought at spawn. A companion is one `build_companion` call (blueprint, forge, placement, recruit dialog, verification). **Every
+creature gets baseline clothing before it shops** — an empty chest slot isn't a valid default.
 
 **Gear priority (shared with Challenges, see below):** weapon first, then armor second
 with whatever gold remains — armor tier comes from the creature's own baked Armor
@@ -150,15 +156,11 @@ enchantment**: compare by base AC Bonus first, and only reach for a magical item
 it's the enchanted version of that same highest-affordable-base-AC item — never trade
 down base AC for a cheaper magic bonus.
 
-**Casters get randomized spells by default** — `create_random_abilities_system`,
-wired onto the creature's spawn/end-round scripts, is the project-wide default for
-every caster this pipeline generates (companion or Key NPC) unless the plot needs a
-fixed ability. The one sequencing difference that matters: a **companion**'s spells
-come alive through the live `LevelUpHenchman()` call at recruit (`a_hen_join`,
-`bReadyAllSpells: TRUE`); a **non-companion Key NPC** is never recruited and never gets
-that call, so it needs the random-abilities wiring (or a fixed `spells` param) applied
-directly at build time — skipping this is the single most common way a caster NPC ships
-with nothing to cast.
+**Casters get spell abilities from the forge** — `forge_creature` bakes a pool of spell-like abilities (`SpecAbilityList`) and the
+spawn script marks a slot-sized random subset ready; companions and Key NPCs are treated the same, because levelling happens at
+spawn rather than at recruit. A caster's pool never holds self-concealment spells (a Cleric boss once stood invisible),
+`pinnedSpells` fixes a signature spell, and a creature with a pool is levelled with `bReadyAllSpells` FALSE so it doesn't also ready
+a second memorized spellbook. (`create_random_abilities_system` remains as a fallback; it is no longer the default.)
 
 **Ranged creatures need a melee weapon too** (even unequipped, in inventory) — the base
 AI auto-switches on ammo depletion only if one exists to find.
@@ -167,15 +169,14 @@ AI auto-switches on ammo depletion only if one exists to find.
 
 ## Phase 5 — Quests
 
-**Objective:** implement the plot's quest objectives as real journal entries, items,
-condition/action scripts, and dialog branches — modifying existing NPC dialogs in
-place rather than building new ones.
+**Objective:** implement the plot's quest objectives as real journal entries, items and dialog branches — modifying existing NPC
+dialogs in place rather than building new ones — by one `build_quest` call per quest from a short spec.
 
-**Logic:** quest **stage** state lives on `GetModule()` only, never on a PC object —
-the co-op-correctness rule, since per-PC state would let one player progress while
-others can't see it. Item-possession checks correctly stay per-PC
-(`GetPCSpeaker()`) — the two kinds of state aren't interchangeable.
-`AddJournalQuestEntry`'s `bAllPartyMembers` defaults `TRUE` and is never overridden.
+**Logic:** quest state is the engine's own journal number for the quest tag, and an advance is **whole-party** — any member's
+advance moves every journal and pays every player in full — the co-op-correctness rule, since per-PC state would let one player
+progress while others can't. No quest scripts are written by hand: conditions and actions are the generated `q_chk`/`q_act` with
+parameters, rolls are `q_roll`/`q_check` (skill, ability or save at any DC), and a creature that should appear on acceptance is a
+stage `spawn`. Item gifts go to every player.
 
 **Dialog ordering is a hard, mechanical rule, not a preference:** the engine evaluates
 a `StartingList` top-to-bottom and takes the first entry whose condition is `TRUE`, so
@@ -184,11 +185,9 @@ the original unconditioned greeting must be **last**. The skill achieves this by
 inserting the new lowest-priority entry at position 0, repeatedly, rather than
 appending.
 
-**Priority:** journal → quest items (checked for tag collisions before creating) →
-condition scripts → action scripts → dialog modification, with a **mandatory
-per-NPC verify before moving to the next NPC** — this phase doesn't batch all dialog
-edits and verify once at the end; it closes the loop on each NPC before touching the
-next, so a broken dialog never compounds into a second one. Combat placement and
+**Priority:** a dry run of each quest first (its dialog outline is the only place the generated conversation order shows), then the
+build, then `verify_dialog` per NPC touched and `verify_quest_completability` — this phase closes the loop on each quest before
+the next, so a broken dialog never compounds into a second one. Combat placement and
 reward/XP assignment are explicitly **not** this phase's job (Challenges and Rewards
 own those).
 
@@ -197,7 +196,8 @@ own those).
 ## Phase 6 — Challenges
 
 **Objective:** place hostile creatures with tactical roles (melee/caster/healer/tank)
-and traps, all Hostile faction, escalating toward the climax area the plot named.
+and traps, all Hostile faction, escalating toward the climax area the plot named. A trap is a placed trigger with an
+`add_skill_check` (a party-wide Reflex save with damage dice); no trap script is written by hand.
 
 **Logic — difficulty tiers by target-level bracket**, each with its own CR/HP/Primary-
 Stat/Natural-AC range (Minion/Standard/Elite/Boss). **No non-Boss tier's Primary Stat
@@ -205,7 +205,7 @@ exceeds 15 — the Elite Array's own ceiling** — at any bracket; difficulty st
 escalates with level through CR, HP, secondary stats, and Natural AC once Primary Stat
 hits that ceiling. Only Boss may exceed it.
 
-**Gear budget priority, identical to Actors':** weapon first, armor second with
+**Gear budget priority, identical to Actors' (bought at spawn by `forge_creature`; allowance = level wealth × role share × `gearWealth`):** weapon first, armor second with
 whatever remains, armor tier gated by the creature's baked proficiency feat, highest
 AC within that tier preferred over the cheapest option that merely clears the
 proficiency bar. Budget comes from `get_wealth_budget(level, role)` — `pc`/`elite` get

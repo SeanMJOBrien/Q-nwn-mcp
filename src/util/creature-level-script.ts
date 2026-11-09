@@ -787,7 +787,8 @@ void CL_LevelStep(object oCreature, int nTarget)
         int nNext = GetHitDice(oCreature) + 1;
         string sClass = CL_Token(sPlan, nNext - 1);
         int nClass = sClass == "" ? CLASS_TYPE_INVALID : StringToInt(sClass);
-        if (LevelUpHenchman(oCreature, nClass, TRUE, PACKAGE_INVALID) == 0)
+        // Spell abilities are the one spellbook: don't also ready every memorized spell (a second, duplicate set).
+        if (LevelUpHenchman(oCreature, nClass, GetLocalString(oCreature, "MCP_SA_POOL") == "", PACKAGE_INVALID) == 0)
         {
             CL_Log(GetTag(oCreature) + " LevelUpHenchman refused level " + IntToString(nNext)
                 + " class " + IntToString(nClass) + "; stopping at " + IntToString(GetHitDice(oCreature)));

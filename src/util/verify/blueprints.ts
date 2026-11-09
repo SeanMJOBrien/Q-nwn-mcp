@@ -926,7 +926,10 @@ export async function verifyCreature(
 
     const startingPackage = getFieldNum(obj, "StartingPackage");
     const primaryClass = classList.length > 0 ? getFieldNum(classList[0], "Class") : undefined;
-    if (primaryClass !== undefined && primaryClass !== CLASS_TYPE_BARBARIAN && startingPackage === 0) {
+    // An animal or other monster-class companion (a dog) isn't levelled by package or HENCH_LEVEL.
+    const playerClass =
+      primaryClass === undefined || index.twodaTables.get("classes")?.rows.get(primaryClass)?.PlayerClass !== "0";
+    if (playerClass && primaryClass !== undefined && primaryClass !== CLASS_TYPE_BARBARIAN && startingPackage === 0) {
       report.warn(
         "henchman_no_package",
         `Companion's StartingPackage is 0 (Barbarian's package) but its primary class is ${primaryClass} — LevelUpHenchman() will make Barbarian-appropriate feat/skill/spell picks for the wrong class`,
@@ -937,7 +940,7 @@ export async function verifyCreature(
 
     const vars = listOf(obj, "VarTable");
     const hasLevel = vars.some((v) => ["HENCH_LEVEL", "MCP_LEVEL", "MCP_LEVEL_REL"].includes(getFieldStr(v, "Name").toUpperCase()));
-    if (!hasLevel) {
+    if (!hasLevel && playerClass) {
       report.warn(
         "henchman_no_level_var",
         "Companion has no HENCH_LEVEL local variable — the recruit script has no level target and will leave it at level 1",

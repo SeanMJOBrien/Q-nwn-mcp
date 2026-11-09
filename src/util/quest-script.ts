@@ -30,6 +30,8 @@ export const QUEST_SCRIPTS = [
   "q_chk",
   "q_act",
   "q_roll",
+  "q_check",
+  "q_check_evt",
   "q_ondeath",
   "q_onenter",
   "q_trigger",
@@ -216,6 +218,60 @@ void QuestRewardParty(object oObject, object oPC, int nSlot)
     }
 }
 
+// Gives every player in oPC's party their own copy of an item (co-op: nobody is left without it).
+void QuestGiveItem(object oPC, string sItem)
+{
+    object oMember = GetFirstFactionMember(oPC, TRUE);
+    while (GetIsObjectValid(oMember))
+    {
+        object oItem = CreateItemOnObject(sItem, oMember, 1);
+        if (GetIsObjectValid(oItem)) SetIdentified(oItem, TRUE);
+        oMember = GetNextFactionMember(oPC, TRUE);
+    }
+}
+
+// Creates nCount creatures (blueprint sResref) at the waypoint tagged sAt: once per key (module local QS_SPAWN_<key>), only at a real
+// waypoint, not while a creature tagged sTag is still alive, 1.5 m apart, Hostile when bHostile. Used by q_act (spawn=) and by QuestAdvance
+// (a stage's questK_spawn locals, so a kill/explore/trigger/use/search stage can bring the next group in).
+void QuestSpawn(string sResref, string sAt, string sKey, string sTag, int nCount, int bHostile)
+{
+    object oWaypoint = GetWaypointByTag(sAt);
+    if (sKey == "") sKey = sResref + "_" + sAt;
+    sKey = "QS_SPAWN_" + sKey;
+    object oAlive = sTag != "" ? GetObjectByTag(sTag) : OBJECT_INVALID;
+    if (!GetIsObjectValid(oWaypoint))
+    {
+        WriteTimestampedLogEntry("[QUEST_WARN] spawn=" + sResref + " has no waypoint tagged '" + sAt + "'; nothing spawned");
+        return;
+    }
+    if (GetLocalInt(GetModule(), sKey) == 1)
+    {
+        WriteTimestampedLogEntry("[QUEST] spawn skipped (already spawned) key=" + sKey);
+        return;
+    }
+    if (GetIsObjectValid(oAlive) && !GetIsDead(oAlive))
+    {
+        WriteTimestampedLogEntry("[QUEST] spawn skipped (" + sTag + " is alive)");
+        return;
+    }
+    SetLocalInt(GetModule(), sKey, 1);
+    if (nCount < 1) nCount = 1;
+    if (nCount > 8) nCount = 8;
+    location lBase = GetLocation(oWaypoint);
+    vector vBase = GetPositionFromLocation(lBase);
+    int i;
+    for (i = 0; i < nCount; i++)
+    {
+        location lSpot = Location(GetAreaFromLocation(lBase), Vector(vBase.x + 1.5 * i, vBase.y, vBase.z), GetFacingFromLocation(lBase));
+        object oNew = CreateObject(OBJECT_TYPE_CREATURE, sResref, lSpot, FALSE, sTag);
+        if (!GetIsObjectValid(oNew))
+            WriteTimestampedLogEntry("[QUEST_WARN] spawn=" + sResref + " could not be created");
+        else if (bHostile)
+            ChangeToStandardFaction(oNew, STANDARD_FACTION_HOSTILE);
+    }
+    WriteTimestampedLogEntry("[QUEST] spawn resref=" + sResref + " count=" + IntToString(nCount) + " at=" + sAt);
+}
+
 // --- Advancing
 
 // Advances oPC's whole party to slot nSlot's stage and pays everyone, if oPC is eligible. Returns TRUE on an advance.
@@ -243,6 +299,11 @@ int QuestAdvance(object oObject, object oPC, int nSlot, string sVia = "")
     if (sPCScript != "") ExecuteScript(sPCScript, oPC);
     string sSelfScript = GetLocalString(oObject, sBase + "_self_script");
     if (sSelfScript != "") ExecuteScript(sSelfScript, oObject);
+    string sSpawn = GetLocalString(oObject, sBase + "_spawn");
+    if (sSpawn != "")
+        QuestSpawn(sSpawn, GetLocalString(oObject, sBase + "_spawn_at"), GetLocalString(oObject, sBase + "_spawn_key"),
+            GetLocalString(oObject, sBase + "_spawn_tag"), StringToInt(GetLocalString(oObject, sBase + "_spawn_count")),
+            GetLocalString(oObject, sBase + "_spawn_hostile") != "0");
 
     WriteTimestampedLogEntry("[QUEST] advance tag=" + sTag + " stage=" + IntToString(nStage) + " via=" + sVia
         + " pc=" + GetName(oPC) + " object=" + GetTag(oObject));
@@ -467,6 +528,41 @@ int QuestHasCompanion(object oPC, string sTag)
     return FALSE;
 }
 
+// Takes the companion with sTag out of oPC's party and sends it to oWhere's side. Looks at the speaker's henchmen first,
+// then at every party member, so it works however the companion joined. Returns TRUE when one was found.
+int QuestDismissCompanion(object oPC, string sTag, object oWhere)
+{
+    object oFound = OBJECT_INVALID;
+    int i;
+    for (i = 1; i <= 8 && !GetIsObjectValid(oFound); i++)
+    {
+        object oHench = GetAssociate(ASSOCIATE_TYPE_HENCHMAN, oPC, i);
+        if (!GetIsObjectValid(oHench)) break;
+        if (GetTag(oHench) == sTag) oFound = oHench;
+    }
+    if (!GetIsObjectValid(oFound))
+    {
+        object oMember = GetFirstFactionMember(oPC, FALSE);
+        while (GetIsObjectValid(oMember) && !GetIsObjectValid(oFound))
+        {
+            if (!GetIsPC(oMember) && GetTag(oMember) == sTag) oFound = oMember;
+            oMember = GetNextFactionMember(oPC, FALSE);
+        }
+    }
+    if (!GetIsObjectValid(oFound))
+    {
+        WriteTimestampedLogEntry("[QUEST] dismiss tag=" + sTag + " not found in the party");
+        return FALSE;
+    }
+    object oMaster = GetMaster(oFound);
+    if (!GetIsObjectValid(oMaster)) oMaster = oPC;
+    RemoveHenchman(oMaster, oFound);
+    AssignCommand(oFound, ClearAllActions(TRUE));
+    AssignCommand(oFound, ActionMoveToObject(oWhere, FALSE, 1.5));
+    WriteTimestampedLogEntry("[QUEST] dismiss tag=" + sTag + " removed=" + (GetIsObjectValid(GetMaster(oFound)) ? "no" : "yes"));
+    return TRUE;
+}
+
 // Number of items with sTag oPC carries (stacks counted).
 int QuestCountItems(object oPC, string sTag)
 {
@@ -612,7 +708,7 @@ int StartingConditional()
 //   take_gold=N               take gold from the speaker            set_var=<name> var_value=<v>  module local string
 //   hostile=1                 this NPC turns hostile (a fight)      leave=1   this NPC walks off and disappears
 //   unlock=<door tag> [open=1]  unlock (and open) a door           destroy=<tag>  destroy the nearest object with tag
-//   spawn=<resref> at=<waypoint tag>  create a creature there      escort=K  this NPC starts following the speaker
+//   spawn=<resref> at=<waypoint tag> [spawn_count=N spawn_tag=T spawn_key=K spawn_hostile=0]  create creature(s) there, once      escort=K  this NPC starts following the speaker
 //   join=1                    this NPC joins the speaker's party     dismiss=<tag>  that companion leaves the party, comes here
 #include "inc_quest"
 
@@ -621,12 +717,21 @@ void main()
     object oPC = GetPCSpeaker();
     string s;
 
+    // Dismissing a companion doesn't depend on the quest advance (the line's condition already checked it was here).
+    s = GetScriptParam("dismiss");
+    if (s != "") QuestDismissCompanion(oPC, s, OBJECT_SELF);
+
     s = GetScriptParam("target");
     if (s != "")
     {
         string sAoe = GetScriptParam("aoe");
         if (sAoe != "") QuestAdvanceSphere(OBJECT_SELF, StringToInt(s), StringToFloat(sAoe), "talk");
-        else if (!QuestAdvance(OBJECT_SELF, oPC, StringToInt(s), "talk")) return;
+        else if (!QuestAdvance(OBJECT_SELF, oPC, StringToInt(s), "talk"))
+        {
+            WriteTimestampedLogEntry("[QUEST] advance refused slot=" + s + " object=" + GetTag(OBJECT_SELF) + " pc=" + GetName(oPC)
+                + " value=" + GetLocalString(OBJECT_SELF, QuestSlotName(StringToInt(s))));
+            return;
+        }
     }
 
     s = GetScriptParam("take_item");
@@ -640,8 +745,7 @@ void main()
     s = GetScriptParam("give_item");
     if (s != "")
     {
-        object oItem = CreateItemOnObject(s, oPC, 1);
-        if (GetIsObjectValid(oItem)) SetIdentified(oItem, TRUE);
+        QuestGiveItem(oPC, s);
     }
 
     s = GetScriptParam("take_gold");
@@ -671,11 +775,8 @@ void main()
 
     s = GetScriptParam("spawn");
     if (s != "")
-    {
-        object oWaypoint = GetWaypointByTag(GetScriptParam("at"));
-        location lWhere = GetIsObjectValid(oWaypoint) ? GetLocation(oWaypoint) : GetLocation(OBJECT_SELF);
-        CreateObject(OBJECT_TYPE_CREATURE, s, lWhere);
-    }
+        QuestSpawn(s, GetScriptParam("at"), GetScriptParam("spawn_key"), GetScriptParam("spawn_tag"),
+            StringToInt(GetScriptParam("spawn_count")), GetScriptParam("spawn_hostile") != "0");
 
     s = GetScriptParam("escort");
     if (s != "" && !QuestEscortActive(OBJECT_SELF) && QuestIsEligible(OBJECT_SELF, oPC, StringToInt(s)))
@@ -688,25 +789,6 @@ void main()
         SetAssociateListenPatterns(OBJECT_SELF);
         AddHenchman(oPC, OBJECT_SELF);
         AssignCommand(oPC, SpeakString("HENCHMAN_CMD_FOLLOW", TALKVOLUME_SILENT_SHOUT));
-    }
-
-    s = GetScriptParam("dismiss");
-    if (s != "")
-    {
-        // The companion with this tag leaves the speaker's party and goes to this NPC.
-        object oMember = GetFirstFactionMember(oPC, FALSE);
-        while (GetIsObjectValid(oMember))
-        {
-            if (!GetIsPC(oMember) && GetTag(oMember) == s)
-            {
-                object oMaster = GetMaster(oMember);
-                if (GetIsObjectValid(oMaster)) RemoveHenchman(oMaster, oMember);
-                AssignCommand(oMember, ClearAllActions());
-                AssignCommand(oMember, ActionMoveToObject(OBJECT_SELF, FALSE, 1.5));
-                break;
-            }
-            oMember = GetNextFactionMember(oPC, FALSE);
-        }
     }
 
     if (GetScriptParam("hostile") == "1")
@@ -749,6 +831,313 @@ void main()
     SetLocalInt(oPC, "QS_ROLL_" + sKey, bPass ? 1 : 2);
     WriteTimestampedLogEntry("[QUEST] roll key=" + sKey + " roller=" + GetName(oRoller) + " dc=" + IntToString(nDC)
         + " result=" + (bPass ? "pass" : "fail"));
+}
+`,
+  q_check: `// q_check: one skill / ability / saving-throw check for anything — a dialog line, a trap trigger, a clue placeable, a stuck door.
+// What is rolled (one of):   skill=<name>   ability=str|dex|con|int|wis|cha   save=fort|reflex|will
+// Difficulty:                dc=N   or   difficulty=easy(10)|moderate(15)|hard(20)|veryhard(25)
+//   key=<unique key>         remembered per player; a later q_chk roll=<key> roll_result=pass|fail branches on it (default: this object's tag)
+//   who=best|speaker|each    best = the highest modifier among the player and its companions rolls (default for skills and abilities);
+//                            speaker = the player alone; each = every player in the party rolls (default for saves, i.e. traps)
+//   tries=N                  attempts per player (default 1); a pass is final      again=1  allow a fresh roll
+// Outcomes, by prefix pass_ / fail_  (run once for the party; pass_ if anyone passed):
+//   pass_damage=3d6[+N] fail_damage=3d6   damage dealt to the roller (damage_type=bludgeoning|piercing|slashing|fire|cold|acid|electrical|sonic|magical|divine|negative|positive)
+//   half=1                   a passed save still takes half of fail_damage (reflex half damage) and of fail_ability_amount
+//   fail_ability=str|dex|con|int|wis|cha  fail_ability_amount=1d2 (dice or number, default 1)  ability_hours=N (game hours, default 1)
+//                            the roller loses that many points of the ability for a while (a poison needle); pass_ability likewise
+//   pass_msg= fail_msg=      floating text      pass_unlock=<door tag> [pass_open=1]   pass_destroy=<tag>
+//   pass_spawn=<resref> pass_at=<waypoint tag>  (same for fail_)     pass_set_var=<name> pass_var_value=<v>   pass_give_item=<resref>   pass_xp=N
+// The actor is whoever triggered the script: the dialog speaker, the creature entering a trigger, the user of a placeable,
+// or the one who failed to open a door.
+#include "inc_quest"
+
+int CheckDC()
+{
+    string sDC = GetScriptParam("dc");
+    if (sDC != "") return StringToInt(sDC);
+    string sD = GetStringLowerCase(GetScriptParam("difficulty"));
+    if (sD == "easy") return 10;
+    if (sD == "hard") return 20;
+    if (sD == "veryhard" || sD == "very_hard") return 25;
+    return 15;
+}
+
+int CheckAbilityId(string sAbility)
+{
+    string s = GetStringLowerCase(sAbility);
+    if (s == "str") return ABILITY_STRENGTH;
+    if (s == "dex") return ABILITY_DEXTERITY;
+    if (s == "con") return ABILITY_CONSTITUTION;
+    if (s == "int") return ABILITY_INTELLIGENCE;
+    if (s == "wis") return ABILITY_WISDOM;
+    if (s == "cha") return ABILITY_CHARISMA;
+    return -1;
+}
+
+int CheckSaveId(string sSave)
+{
+    string s = GetStringLowerCase(sSave);
+    if (s == "fort") return 1;
+    if (s == "reflex") return 2;
+    if (s == "will") return 3;
+    return 0;
+}
+
+// nKind: 1 skill, 2 ability, 3 save. The modifier that decides who rolls when the best of the party rolls.
+int CheckModifier(object oCreature, int nKind, int nWhat)
+{
+    if (nKind == 1) return GetSkillRank(nWhat, oCreature);
+    if (nKind == 2) return GetAbilityModifier(nWhat, oCreature);
+    if (nWhat == 1) return GetFortitudeSavingThrow(oCreature);
+    if (nWhat == 2) return GetReflexSavingThrow(oCreature);
+    return GetWillSavingThrow(oCreature);
+}
+
+int CheckRoll(object oCreature, int nKind, int nWhat, int nDC)
+{
+    if (nKind == 1) return GetIsSkillSuccessful(oCreature, nWhat, nDC);
+    if (nKind == 2) return d20() + GetAbilityModifier(nWhat, oCreature) >= nDC;
+    int nResult;
+    if (nWhat == 1) nResult = FortitudeSave(oCreature, nDC);
+    else if (nWhat == 2) nResult = ReflexSave(oCreature, nDC);
+    else nResult = WillSave(oCreature, nDC);
+    return nResult > 0;
+}
+
+int CheckDamageType(string sType)
+{
+    string s = GetStringLowerCase(sType);
+    if (s == "piercing") return DAMAGE_TYPE_PIERCING;
+    if (s == "slashing") return DAMAGE_TYPE_SLASHING;
+    if (s == "fire") return DAMAGE_TYPE_FIRE;
+    if (s == "cold") return DAMAGE_TYPE_COLD;
+    if (s == "acid") return DAMAGE_TYPE_ACID;
+    if (s == "electrical") return DAMAGE_TYPE_ELECTRICAL;
+    if (s == "sonic") return DAMAGE_TYPE_SONIC;
+    if (s == "magical") return DAMAGE_TYPE_MAGICAL;
+    if (s == "divine") return DAMAGE_TYPE_DIVINE;
+    if (s == "negative") return DAMAGE_TYPE_NEGATIVE;
+    if (s == "positive") return DAMAGE_TYPE_POSITIVE;
+    return DAMAGE_TYPE_BLUDGEONING;
+}
+
+// "3d6", "2d8+4" or a plain number.
+int CheckDice(string sDice)
+{
+    string s = GetStringLowerCase(sDice);
+    int nD = FindSubString(s, "d");
+    if (nD < 0) return StringToInt(s);
+    int nCount = StringToInt(GetStringLeft(s, nD));
+    if (nCount < 1) nCount = 1;
+    if (nCount > 20) nCount = 20;
+    string sRest = GetStringRight(s, GetStringLength(s) - nD - 1);
+    int nPlus = 0;
+    int nP = FindSubString(sRest, "+");
+    if (nP >= 0)
+    {
+        nPlus = StringToInt(GetStringRight(sRest, GetStringLength(sRest) - nP - 1));
+        sRest = GetStringLeft(sRest, nP);
+    }
+    int nSides = StringToInt(sRest);
+    if (nSides < 1) nSides = 1;
+    int nTotal = nPlus;
+    int i;
+    for (i = 0; i < nCount; i++) nTotal += Random(nSides) + 1;
+    return nTotal;
+}
+
+// Damage for one roller after its own roll.
+void CheckDamage(object oRoller, int bPass)
+{
+    int nAmount = 0;
+    string sFail = GetScriptParam("fail_damage");
+    if (bPass)
+    {
+        string sPass = GetScriptParam("pass_damage");
+        if (sPass != "") nAmount = CheckDice(sPass);
+        else if (sFail != "" && GetScriptParam("half") == "1") nAmount = CheckDice(sFail) / 2;
+    }
+    else if (sFail != "") nAmount = CheckDice(sFail);
+    if (nAmount > 0)
+        ApplyEffectToObject(DURATION_TYPE_INSTANT, EffectDamage(nAmount, CheckDamageType(GetScriptParam("damage_type"))), oRoller);
+}
+
+// Temporary ability loss for one roller after its own roll (poison, a draining curse). The effect is capped at 10 points.
+void CheckAbilityDamage(object oRoller, int bPass)
+{
+    string sAbility = GetScriptParam(bPass ? "pass_ability" : "fail_ability");
+    if (sAbility == "") return;
+    int nAbility = CheckAbilityId(sAbility);
+    if (nAbility < 0) return;
+    string sAmount = GetScriptParam(bPass ? "pass_ability_amount" : "fail_ability_amount");
+    int nAmount = sAmount == "" ? 1 : CheckDice(sAmount);
+    if (bPass && GetScriptParam("half") == "1") nAmount = nAmount / 2;
+    if (nAmount < 1) return;
+    if (nAmount > 10) nAmount = 10;
+    int nHours = StringToInt(GetScriptParam("ability_hours"));
+    if (nHours < 1) nHours = 1;
+    ApplyEffectToObject(DURATION_TYPE_TEMPORARY, EffectAbilityDecrease(nAbility, nAmount), oRoller, HoursToSeconds(nHours));
+}
+
+// The actions that happen once for the party.
+void CheckOutcome(string sPrefix, object oPC)
+{
+    string s = GetScriptParam(sPrefix + "msg");
+    if (s != "") FloatingTextStringOnCreature(s, oPC, FALSE);
+
+    s = GetScriptParam(sPrefix + "unlock");
+    if (s != "")
+    {
+        object oDoor = GetObjectByTag(s);
+        if (GetIsObjectValid(oDoor))
+        {
+            SetLocked(oDoor, FALSE);
+            if (GetScriptParam(sPrefix + "open") == "1") AssignCommand(oDoor, ActionOpenDoor(oDoor));
+        }
+    }
+
+    s = GetScriptParam(sPrefix + "destroy");
+    if (s != "")
+    {
+        object oTarget = GetNearestObjectByTag(s);
+        if (!GetIsObjectValid(oTarget)) oTarget = GetObjectByTag(s);
+        if (GetIsObjectValid(oTarget)) DestroyObject(oTarget);
+    }
+
+    s = GetScriptParam(sPrefix + "spawn");
+    if (s != "")
+    {
+        object oWaypoint = GetWaypointByTag(GetScriptParam(sPrefix + "at"));
+        if (GetIsObjectValid(oWaypoint)) CreateObject(OBJECT_TYPE_CREATURE, s, GetLocation(oWaypoint));
+        else WriteTimestampedLogEntry("[QUEST_WARN] q_check spawn=" + s + " has no waypoint " + GetScriptParam(sPrefix + "at"));
+    }
+
+    s = GetScriptParam(sPrefix + "set_var");
+    if (s != "") SetLocalString(GetModule(), s, GetScriptParam(sPrefix + "var_value"));
+
+    s = GetScriptParam(sPrefix + "give_item");
+    if (s != "")
+    {
+        QuestGiveItem(oPC, s);
+    }
+
+    s = GetScriptParam(sPrefix + "xp");
+    if (s != "")
+    {
+        object oMember = GetFirstFactionMember(oPC, TRUE);
+        while (GetIsObjectValid(oMember))
+        {
+            GiveXPToCreature(oMember, StringToInt(s));
+            oMember = GetNextFactionMember(oPC, TRUE);
+        }
+    }
+}
+
+void main()
+{
+    object oActor = GetPCSpeaker();
+    if (!GetIsObjectValid(oActor)) oActor = GetEnteringObject();
+    if (!GetIsObjectValid(oActor)) oActor = GetLastUsedBy();
+    if (!GetIsObjectValid(oActor)) oActor = GetClickingObject();
+    if (!GetIsObjectValid(oActor)) oActor = GetLastDisarmed();
+    object oPC = QuestResolvePC(oActor);
+    if (!GetIsObjectValid(oPC)) return;
+
+    string sKey = GetScriptParam("key");
+    if (sKey == "") sKey = GetTag(OBJECT_SELF);
+
+    int nKind = 0;
+    int nWhat = 0;
+    string s = GetScriptParam("skill");
+    if (s != "") { nKind = 1; nWhat = QuestSkillId(s); }
+    else
+    {
+        s = GetScriptParam("ability");
+        if (s != "") { nKind = 2; nWhat = CheckAbilityId(s); }
+        else
+        {
+            s = GetScriptParam("save");
+            if (s != "") { nKind = 3; nWhat = CheckSaveId(s); }
+        }
+    }
+    if (nKind == 0 || (nKind == 2 && nWhat < 0) || (nKind == 3 && nWhat == 0))
+    {
+        WriteTimestampedLogEntry("[QUEST_WARN] q_check on " + GetTag(OBJECT_SELF) + " has no valid skill, ability or save parameter");
+        return;
+    }
+    int nDC = CheckDC();
+    int nTries = StringToInt(GetScriptParam("tries"));
+    if (nTries < 1) nTries = 1;
+    int bAgain = GetScriptParam("again") == "1";
+    string sWho = GetStringLowerCase(GetScriptParam("who"));
+    if (sWho == "") sWho = (nKind == 3) ? "each" : "best";
+    string sKind = (nKind == 1) ? "skill" : ((nKind == 2) ? "ability" : "save");
+
+    int bAnyPass = FALSE;
+    int bRolled = FALSE;
+    object oMember = (sWho == "each") ? GetFirstFactionMember(oPC, TRUE) : oPC;
+    while (GetIsObjectValid(oMember))
+    {
+        string sTryVar = "QS_TRY_" + sKey;
+        int bPassed = GetLocalInt(oMember, "QS_ROLL_" + sKey) == 1;
+        if (bAgain) { DeleteLocalInt(oMember, sTryVar); bPassed = FALSE; }
+        if (bPassed) bAnyPass = TRUE;
+        else if (GetLocalInt(oMember, sTryVar) < nTries)
+        {
+            SetLocalInt(oMember, sTryVar, GetLocalInt(oMember, sTryVar) + 1);
+            object oRoller = oMember;
+            if (sWho == "best")
+            {
+                int nBest = CheckModifier(oMember, nKind, nWhat);
+                object oCompanion = GetFirstFactionMember(oMember, FALSE);
+                while (GetIsObjectValid(oCompanion))
+                {
+                    if (!GetIsPC(oCompanion) && GetMaster(oCompanion) == oMember && CheckModifier(oCompanion, nKind, nWhat) > nBest)
+                    {
+                        nBest = CheckModifier(oCompanion, nKind, nWhat);
+                        oRoller = oCompanion;
+                    }
+                    oCompanion = GetNextFactionMember(oMember, FALSE);
+                }
+            }
+            int bPass = CheckRoll(oRoller, nKind, nWhat, nDC);
+            SetLocalInt(oMember, "QS_ROLL_" + sKey, bPass ? 1 : 2);
+            CheckDamage(oRoller, bPass);
+            CheckAbilityDamage(oRoller, bPass);
+            if (bPass) bAnyPass = TRUE;
+            bRolled = TRUE;
+            WriteTimestampedLogEntry("[QUEST] check key=" + sKey + " " + sKind + "=" + GetScriptParam(sKind) + " dc=" + IntToString(nDC)
+                + " roller=" + GetName(oRoller) + " result=" + (bPass ? "pass" : "fail"));
+        }
+        oMember = (sWho == "each") ? GetNextFactionMember(oPC, TRUE) : OBJECT_INVALID;
+    }
+
+    if (bRolled) CheckOutcome(bAnyPass ? "pass_" : "fail_", oPC);
+    else if (!bAnyPass) FloatingTextStringOnCreature("You have no more tries.", oPC, FALSE);
+}
+`,
+  q_check_evt: `// q_check_evt: the event wrapper for a q_check on a trigger (OnEnter), placeable (OnUsed or OnDisarm) or door (OnFailToOpen).
+// Runs the object's original handler (chk_orig), copies each chk_<name> string local into the script parameter <name>, and runs q_check.
+#include "inc_quest"
+
+void main()
+{
+    string sOrig = GetLocalString(OBJECT_SELF, "chk_orig");
+    if (sOrig != "") ExecuteScript(sOrig, OBJECT_SELF);
+
+    string sList = "skill,ability,save,dc,difficulty,key,who,tries,again,half,damage_type,ability_hours,"
+        + "pass_damage,fail_damage,pass_ability,fail_ability,pass_ability_amount,fail_ability_amount,pass_msg,fail_msg,pass_unlock,fail_unlock,pass_open,fail_open,pass_destroy,fail_destroy,"
+        + "pass_spawn,fail_spawn,pass_at,fail_at,pass_set_var,fail_set_var,pass_var_value,fail_var_value,"
+        + "pass_give_item,fail_give_item,pass_xp,fail_xp,";
+    while (sList != "")
+    {
+        int nComma = FindSubString(sList, ",");
+        string sName = GetStringLeft(sList, nComma);
+        sList = GetStringRight(sList, GetStringLength(sList) - nComma - 1);
+        string sValue = GetLocalString(OBJECT_SELF, "chk_" + sName);
+        if (sValue != "") SetScriptParam(sName, sValue);
+    }
+    ExecuteScript("q_check", OBJECT_SELF);
 }
 `,
   q_ondeath: `// q_ondeath: kill stage. Runs the creature's original OnDeath (MCP_Q_ORIG_DEATH), then credits the killer's party.
@@ -884,8 +1273,7 @@ void main()
     string sItem = GetLocalString(oSelf, "quest_search_item");
     if (sItem != "")
     {
-        object oItem = CreateItemOnObject(sItem, oPC, 1);
-        if (GetIsObjectValid(oItem)) SetIdentified(oItem, TRUE);
+        QuestGiveItem(oPC, sItem);
     }
     if (bOptional)
     {

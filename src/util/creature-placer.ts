@@ -10,6 +10,7 @@
 
 import { GIT_STRUCT_ID } from "../config.js";
 import { checkPlacementWalkable } from "./walkmesh.js";
+import { COLLISION_FIX, WALK_FIX } from "./placement-hints.js";
 import { resolveBlueprint, getGitDoc, writeBackGit, updateAreaCounts } from "./git-helpers.js";
 import { getFieldStr, getFieldLocStr, getFieldList, getFieldNum } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
@@ -62,7 +63,7 @@ export async function placeCreatureCore(
       success: false,
       error: "Position is not safe for placement",
       position: { x: xN, y: yN },
-      detail: walkCheck.reason,
+      detail: `${walkCheck.reason} ${WALK_FIX}`,
     };
   }
 
@@ -100,7 +101,7 @@ export async function placeCreatureCore(
     if (collision.collision) {
       return {
         success: false,
-        error: `Placement blocked: '${collision.nearbyTag}' is ${collision.distance}m away (minimum ${colRadius}m). Choose a different position.`,
+        error: `Placement blocked: '${collision.nearbyTag}' is ${collision.distance}m away (minimum ${colRadius}m). ${COLLISION_FIX}`,
       };
     }
   }

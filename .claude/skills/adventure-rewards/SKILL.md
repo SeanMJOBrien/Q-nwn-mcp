@@ -19,21 +19,9 @@ Fully autonomous. Make all decisions based on the adventure document and module 
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-- `## Areas`
-- `## Environment`
-- `## Actors`
-- `## Quests`
-- `## Challenges`
-- `## Affordances`
-- `## Polish`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "rewards", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -306,8 +294,7 @@ digits — for longswords `002` is +1, `010` is +2, `012` is +3.
    Reward items are the adventure's signature loot — their descriptions should make the player feel rewarded and connected to the story.
 3. **Never duplicate** items already on creatures (`## Challenges` magic items) or in containers (`## Affordances` container loot)
 
-> **These resref lists are quick-reference examples, not exhaustive catalogs.**
-> If no suitable blueprint is found in these lists, call `list_blueprints(type: "uti", pattern: "[search term]")` to search the full base game and HAK stack by resref, tag, and display name (including TLK-resolved names). Always prefer a thematic match from the full catalog over forcing a poor fit from the examples.
+> Resref lists here are examples; search the full catalog with `list_blueprints` when none fits.
 
 **Base Game Magic Item Search Patterns:**
 
@@ -657,3 +644,7 @@ Call `repack_module()` to save all changes.
 - **Module description is mandatory (Phase 7b).** Every delivered module gets a real `Mod_Description` — target level, party size, henchmen count, estimated playtime, and at most one vague atmospheric hook. Never a plot spoiler.
 - **DM guide is mandatory (Phase 7c).** Every delivered module gets a `dm-guide.md` sidecar — full spoilers, written for a human running the module at a tabletop. Unlike every other deliverable in this pipeline, this one is spoilers-on by design.
 - **Repack after all changes.** Call `repack_module` at the end so the user can see changes in the toolset.
+
+## Finish
+
+Call `phase_check(phase: "rewards", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

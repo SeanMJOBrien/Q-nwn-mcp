@@ -6,6 +6,11 @@ pipeline and the MCP tools it drives. Sourced from `.claude/skills/*/SKILL.md`,
 that need the concrete numbers, not the narrative — see "Discrepancies noticed" at the
 end for places where the skill docs and the code disagree.
 
+**Updated 2026-11-08** for the skill-prompt reduction (S1-S9): quests are built by `build_quest`, creatures by `forge_creature`,
+companions by `build_companion`, phases start and end through `phase_check`, areas are sized by `suggest_area_size`, tile doors are
+placed by `place_tile_doors`, checks run through `q_check`. §10 lists those tools and rules in one place; the full tool reference
+is [adventure-tooling-reference.md](adventure-tooling-reference.md).
+
 ---
 
 ## 1. Adventure Creation Pipeline
@@ -16,7 +21,9 @@ Master directive skill. Runs 9 phases via the **Agent tool** (`subagent_type:
 "general-purpose"`), never the Skill tool — Skill runs inline and would leak spoilers
 into the user's chat. Each phase reads `adventure.md` (in `$MCP_FOLDER_TEMP`) and
 appends its own section; a sidecar `adventure-status.json` records
-`success`/`partial`/`failed` per phase.
+`success`/`partial`/`failed` per phase. **Every phase calls `phase_check(phase, "start")` first** (fails with the missing
+`adventure.md` section) **and `phase_check(phase, "end")` last** (checks the phase's own section was appended, runs the phase's
+verifiers, writes the status entry) — no skill edits the status file by hand (§10.1).
 
 **Pre-flight** (before any sub-skill runs), the orchestrator resolves with the user:
 1. **Level range** — required; every downstream skill depends on it.
@@ -92,9 +99,11 @@ procedure, phase by phase:
   table (23 base-game tilesets listed with Int/Ext + notes); 9 DLC/extended tilesets
   are explicitly banned (`tib01`, `tni02`, `tni01`, `tts02`, `ttf02`, `tcm02`, `trm02`,
   `trs02`, `tms01`).
-- **Phase 3** — dimensions: interior minimum 12×12 (splitThreshold 10, 4 rooms),
-  exterior minimum 18×18 (splitThreshold 12, needs bigger leaves for 2×3 building
-  features). Medium 18-22, large 22-26. Feature selection (`adventure_list_features`)
+- **Phase 3** — dimensions come from `suggest_area_size(biome, purpose, events, shape)` using each location's `Events` and
+  `Travel` fields from `## Plot` (§10.2): cabin 2×2, inn 2×4 (often with an upper floor of the same size), a one-event forest
+  4×4, a forest road 3×10 linear; more events add tiles; 32 per side at most. `adventure_generate_layout` is used from 9×9 (one
+  room) and 14×14 (several); below that, and for linear strips, the area is painted by hand. (The old fixed minimums of 12×12
+  interior / 18×18 exterior are gone from the skill; they were guidelines, not code limits — see §5.1.) Feature selection (`adventure_list_features`)
   is **mandatory** before generating layout when Area Mode is `Full` — omitting
   `preferredFeatures` yields zero placed features. Settlement areas must put a
   house/dwelling feature first in the preference list. "Chessboard"/"Portal" features
@@ -102,10 +111,9 @@ procedure, phase by phase:
 - **Phase 4** — build order: `create_area` → `adventure_apply_layout`
   (`autoRepack: true`) → perimeter-encapsulation and terrain-adjacency checks (see §5).
 - **Phase 5** — atmosphere via `set_area_properties` (see §6).
-- **Phase 5b** — place a real Door GIT object for every tile with `doorPlacements` in
-  `get_tileset_details`. `type: 0` = terrain/feature door (locked + `Plot=1`);
-  `type: 1+` = crosser/corridor door (left unlocked). World position/bearing computed
-  via `forwardRotate` — see the door-placement formula in the skill and in §5.
+- **Phase 5b** — `place_tile_doors(area)` places a real Door GIT object for every tile with door placements (blueprint from
+  `doortypes.2da`, position/bearing from the tile rotation; corridor doorways unlocked, every other door locked + `Plot=1`).
+  Generic type-0 doors (every `ttr01` building door) need the `genericDoor` parameter. See §5.6 and §10.3.
 - **Phase 6** — connectivity validation via `visualize_area` zones.
 - **Phase 7** — **all** inter-area transitions use `adventure_create_transition`
   exclusively (see §5.5) — the skill explicitly forbids doors, `link_doors`, or
@@ -129,9 +137,10 @@ thematic filler placeable.
 
 ### 1.5 Actors (`/adventure-actors`)
 
-Places non-hostile NPCs (always faction 2, Commoner) and ambient creatures with
-greeting-only dialogs (no quest logic — that's `/adventure-quests`). See §2/§3 for
-NPC/companion generation rules in detail. Ambient creature counts scale with area size
+Places non-hostile NPCs (always faction 2, Commoner — `create_creature_blueprint` accepts `faction: "commoner"` and warns
+when a blueprint is left in the player faction) and ambient creatures with greeting-only dialogs (no quest logic — that's
+`/adventure-quests`). Class-based NPCs are built with `forge_creature` (once per module `create_creature_level_system`),
+companions with `build_companion` (§3). See §2/§3 for NPC/companion generation rules in detail. Ambient creature counts scale with area size
 (3-4 at ~8×8, 5-6 at ~12×12, 7-8 at ~18×18). Walk routes use the `NW_GENERIC_MASTER`
 bitmask (`NW_FLAG_DAY_NIGHT_POSTING = 0x400 = 1024`) plus tagged waypoints
 (`WP_<tag>_01..04`, or `POST_<tag>` for a single stand-still spot); all blueprint edits
@@ -140,20 +149,23 @@ the GIT snapshot.
 
 ### 1.6 Quests (`/adventure-quests`)
 
-Modifies existing NPC dialogs in place rather than creating new ones. Core mechanism:
-multiple **condition-gated root entries** in a dialog's `StartingList`, evaluated
-top-to-bottom by the engine — highest quest stage first, the original unconditioned
-greeting always **last**. Inserted lowest-priority-first at `parentIndex: 0` so each
-insert pushes the previous entries down.
+Every quest is one `build_quest(spec, dryRun)` call from a short spec (`name`, `giver`, stages with `do` + `journal`; or a template:
+`fetch`, `kill`, `bounty`, `deliver`, `rescue`, `escort`, `investigate`, `persuade-or-fight`). The tool writes the journal, merges
+the dialog lines into the NPCs' existing conversations (condition-gated roots, highest stage first, the original greeting always
+last), writes the stage variables and event wiring, creates quest items, places unplaced kill targets and sizes rewards from
+`level`. Skills never write quest scripts, journal entries or dialog nodes by hand; checks and effects are parameters of the
+generated `q_chk`/`q_act` (conditions and actions), `q_roll`/`q_check` (rolls), `q_search` (search stages). Reference:
+[quest-system.md](quest-system.md).
 
-Quest **stage** state lives on `GetModule()` (co-op safe — every party member shares
-one copy); **item-possession** checks correctly stay on `GetPCSpeaker()` (a genuinely
-per-PC fact). Naming: `q_[tag]`, `c_q[tag]_s[N]` (condition), `a_q[tag]_s[N]` (action),
-`c_q[tag]_has` (item check), `qi_[tag]` (quest item) — all ≤16 chars, so quest short
-names are kept to 5-7 characters. Condition scripts use `int StartingConditional()`;
-action scripts use `void main()`. `AddJournalQuestEntry`'s 4th arg
-(`bAllPartyMembers`) is never passed `FALSE` in this pipeline. No XP/reward calls in
-quest scripts — that's `/adventure-rewards`.
+- **State is the engine journal**, not a module local: a player's stage is `NW_JOURNAL_ENTRY<tag>`; an advance is **whole-party**
+  (any member's advance moves every journal and pays every player 100 %). Slots live as `questK = "<stage>_<tag>"` locals on the
+  NPC/item/placeable involved. Item-possession checks look at the whole party.
+- **Optional stage fields in current use:** `check` (skill, ability or save; `dc` or `difficulty`; `else: "fight"`), `search` stages
+  with `examine`, `optional` clues, `approach`/`join`/`companion`/`dismiss` (an NPC walks up, joins, is brought home), `deliver`
+  with `keep`, `script`, `custom` stages, and **`spawn`** (a creature or group appears when a talk/return/deliver/rescue line is
+  picked; stage 1 = on acceptance; §10.6).
+- No XP/reward calls outside `build_quest`'s `reward` fields (`xp`, `xp_tier`, `gold`, `item`); `/adventure-rewards` sets flat XP.
+- Naming: tags derive from the name (`q_…`, at most 27 characters); resrefs stay within 16 characters.
 
 ### 1.7 Challenges (`/adventure-challenges`)
 
@@ -165,9 +177,12 @@ transition, or 8 tiles of a friendly NPC. Group composition patterns: patrol (2-
 guard post (2-4), ambush (3-4), boss fight (3-5: 1 boss + 2-4 adds), lone sentry (1).
 Creature count by area role: safe (0-2), transition (3-6 in 1-2 groups), adventure
 area (5-10 in 2-3 groups), dungeon (8-14 in 3-5 groups), boss room (1 boss + 2-4 adds).
-Traps: max 2-3 per area, damage scaled to level (`d6(1-2)` at level 1-3 up to `d6(3-4)`
-at 7-10), DCs scaled 12-15 / 16-20 / 20-25 by level band — a fixed DC 15 becomes an
-auto-success by level 5.
+Traps: max 2-3 per area. A trap is `create_trap_blueprint` + `place_trigger` + `add_skill_check` (a party-wide Reflex save
+with `fail_damage` dice, `half`, `damage_type`) — no hand-written trap script. Damage scales with level (`d6(1-2)` at level 1-3
+up to `d6(3-4)` at 7-10), DCs scale 12-15 / 16-20 / 20-25 by level band — a fixed DC 15 becomes an auto-success by level 5.
+Class-based hostiles are built with `forge_creature` (identity from `create_creature_blueprint`, class/level/gear role from the
+encounter design); themed boss groups with `compose_encounter` (forges the boss, saves the blueprint, places it with minions to
+reach a target EL).
 
 Party-size scaling of creature counts: solo = base; party of 2 = +1/group; party of 3
 = +1/group and +1 boss; party of 4 = +2/group and +2 boss. Difficulty scaling: Hard =
@@ -200,7 +215,7 @@ audit (no hostiles in safe areas, boss present in the climax area), an affordanc
 integrity check, and a plot-vs-module consistency pass. Issue priority order:
 Blocking > Breaking > Wrong > Minor — never skip the first two. **Final gate:**
 `verify_all(checkWalkable: true)` — module is shippable only at `shippable: true`
-(zero errors). See §7.
+(zero errors) — followed by `phase_check("polish", "end")`, which re-runs every verifier and records the status. See §7.
 
 ### 1.10 Rewards (`/adventure-rewards`)
 
@@ -239,13 +254,15 @@ position via `Repos_PosX/Posy`), and a `VarTable` merge-by-name.
 `HENCHMAN_CREATURE_SCRIPTS` (`x0_ch_hen_*` family) — then an optional `scripts` JSON
 overlay applies on top (unknown field names are dropped with a warning, not
 silently ignored). Both script sets are base-game resources and are never written
-into the module's own files.
+into the module's own files. `faction` takes a standard name (`hostile`, `commoner`, `merchant`, `defender`, `pc`) or an ID; the
+result carries a `warnings` entry when the blueprint ends in faction 0 (the player faction), naming the fix. Only the five
+standard factions take part in reputation lookups reliably (CLAUDE.md "create_faction limitation").
 
 ### 2.2 Actor conventions (`/adventure-actors`)
 
 - **Faction is always 2 (Commoner)** for every actor this skill places, regardless of
   the source blueprint's default (many defaults are Hostile — e.g. wolf, boar, rat,
-  raven).
+  raven). The skill states the rule once in "Faction Rules"; the tool's warning (above) is the safety net.
 - Humanoid source-blueprint table: 25 entries from elderly humans through numbered
   mercenary tiers (`nw_humanmerc001`..`006` for lv2/4/6/8/10/12 human fighters,
   `nw_dwarfmerc001`..`003`, `nw_elfmerc001`..`002`, `nw_elfmage001`/`005`,
@@ -304,6 +321,12 @@ counted in the EL math), `standard`=50%, `mook`=25% (the latter two are project
 heuristics, not book rules). Per-slot split (`SLOT_SHARE`): weapon 35%, armor 30%,
 shield 10%, accessories 15%, consumables 10%.
 
+**Who spends it:** `forge_creature` does the shopping at spawn — `allowance = wealthByLevel × ROLE_SHARE × gearWealth`
+(`gearWealth` default 0.5; stored as the local `MCP_GEAR_WEALTH` on the blueprint and every placed copy; 0 keeps the current gear,
+for a plot item). Armor is chosen by highest base AC the creature is proficient with within 30 % of the allowance; unspent
+allowance is discarded, never given as gold. The Hollow Communion was set to 0.125 (a quarter of the default) on 2026-11-08.
+Details: [creature-forge-manual.md](creature-forge-manual.md).
+
 **Prices are read from real blueprints, never computed** — NWN derives item cost from
 `itempropdef.2da`'s `Cost` column (a +1 longsword is 1,648gp in NWN vs. ~2,315gp by
 the 3.5e formula), and magic-item enchantment level is **not** encoded in a resref's
@@ -361,77 +384,45 @@ advisory):
 | `ScriptHeartbeat` starts with `x0_ch_hen_` | `henchman_no_follow_ai` | **error** | Nothing drives following |
 | Not built on a pure-Commoner `ClassList` | `henchman_commoner_class` | **error** | `LevelUpHenchman()` grants no feats/spellbook |
 | Has a `Conversation` set | `henchman_no_dialog` | **error** | No way to recruit or command it at all |
-| Has a `HENCH_LEVEL` VarTable entry | `henchman_no_level_var` | *warning* | Recruit script has no level target, stays level 1 |
+| Has a `HENCH_LEVEL` (or `MCP_LEVEL`/`MCP_LEVEL_REL`) VarTable entry | `henchman_no_level_var` | *warning* | Recruit script has no level target, stays level 1 |
+| `StartingPackage` matches the primary class (non-Barbarian ≠ 0) | `henchman_no_package` | *warning* | `LevelUpHenchman()` makes the wrong class's picks |
 | Has a non-zero/non-`65535` `SoundSetFile` | `henchman_no_voice` | *warning* | Silent on join/dismiss/combat — cosmetic, not blocking |
 
-So the dialog and the two associate-AI scripts are hard requirements; the soundset is
+Both warnings in the last two rows are skipped for a non-player class (`classes.2da` `PlayerClass=0`, e.g. an Animal-class
+dog companion), which is levelled by neither package nor `HENCH_LEVEL`. So the dialog and the two associate-AI scripts are hard requirements; the soundset is
 the one genuinely optional piece, exactly as the class/CLAUDE.md framing implies.
 
 ### 3.3 Full recruit machinery (`/adventure-actors` Phase 3b)
 
-Companions are capped at **3 per adventure** (`a_mod_load` sets
-`SetMaxHenchmen(4)`, leaving one slot spare). Six shared scripts, written once per
-module (idempotency check: `list_resources(pattern: "a_hen_*")`):
+Companions are capped at **3 per adventure** (`create_companion_system`'s `maxCompanions`, default 3). **Standard path:**
+`create_companion_system` once per module, then `build_companion` per companion
+([adventure-tooling-reference.md](adventure-tooling-reference.md) §4); the individual tools (`create_creature_blueprint`,
+`forge_creature`, `place_creature`, `create_companion_dialog`) are for a non-standard look or a creature that isn't a PC race.
 
-| Resref | Role |
-|---|---|
-| `c_hen_free` | `StartingConditional` — TRUE when companion has no master |
-| `c_hen_mine` | `StartingConditional` — TRUE when the speaking PC is its master |
-| `a_hen_join` | Recruit: level up, `SetAssociateListenPatterns`, `AddHenchman`, bark |
-| `a_hen_leave` | Dismiss: `RemoveHenchman`, clear associate state, bark |
-| `a_hen_stay` / `a_hen_follow` | Stand ground / follow, via `bkRespondToHenchmenShout` |
+`create_companion_system` writes and compiles `inc_companion`, the conditions `c_hen_mine` / `c_hen_full` / `c_hen_free` and the
+actions `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`. **The party cap is counted from the engine at join time**
+(living henchmen of PC masters in the recruiting PC's party), never kept in a module counter — the hand-written Hollow Communion
+scripts kept `HC_HENCH_COUNT` and missed the decrement on dismiss and on death. Join raises `SetMaxHenchmen` before
+`AddHenchman`, sets the associate listen patterns and sends the follow command, so no `a_mod_load` is needed. (The old six-script
+`a_hen_*` + `a_mod_load` + `a_hen_death` recipe is superseded.)
 
-`a_mod_load` is chained into the existing `Mod_OnModLoad` (never replaces it) and
-raises the henchman cap before any `AddHenchman()` call can run — `AddHenchman` is a
-silent no-op when the cap is too low.
+Each companion's dialog has **four StartingList roots**, evaluated top-to-bottom, first TRUE wins: in-party hub
+(`c_hen_mine`), party-full (`c_hen_full`), pre-recruit exposition (`c_hen_free`), and an unconditioned fallback.
 
-Each companion's dialog has **three StartingList roots in this exact order**
-(engine evaluates top-to-bottom, first TRUE wins):
-1. `condition: c_hen_mine` — in-party hub (Hold this position / Stay close to me / We
-   should part ways / Never mind).
-2. `condition: c_hen_free` — pre-recruit exposition (Tell me about yourself / Will
-   you travel with me? / Another time).
-3. No condition — short fallback line (prevents an empty conversation if both
-   conditions are false).
+**Building and levelling.** `build_companion` creates the blueprint (PC-race appearance = race for races 0-6, stock `x0_ch_hen_*`
+AI, faction 2), then `forge_creature` writes a *legal level-1 build* and the creature levels to its target at spawn (`cf_spawn` →
+`LevelUpHenchman`), buys gear within its allowance and gets spell abilities — not at recruit. Never build a companion on a
+Commoner chassis (class 20: no feats, no spellbook). Class IDs 0=Barbarian … 10=Wizard; domains for a Cleric, school for a
+Wizard, `pinnedSpells` for a signature spell. Voice: a TYPE 0 (PC) soundset row by class and gender (`COMPANION_SOUNDSETS` in
+`companion-tools.ts`, used only when `soundset.2da` confirms the row's gender); TYPE 3 NPC rows leave a companion mute.
 
-Blueprint creation always passes `classes` **explicitly**, starting at **level 1** —
-the companion is leveled live to `HENCH_LEVEL` via `LevelUpHenchman()` when
-`a_hen_join` fires, which is what grants the correct feat/proficiency/spell
-progression by the engine's own rules. Building at a pre-set higher level instead of
-leveling live is the documented root cause of the "cleric henchman has no spells" bug.
+Companions are skipped in the walk-waypoint phase (`x0_ch_hen_spawn` sets `NW_FLAG_IMMOBILE_AMBIENT_ANIMATIONS`).
 
-**Chassis-race-class table** (verified against the real blueprint `ClassList`, not
-assumed from resref/name — three entries were found wrong when checked):
-
-| Archetype | Resref | Class |
-|---|---|---|
-| Fighter | `nw_dwarfmerc002` / `nw_bandit001` | Fighter (4) |
-| Ranger/archer | `nw_elfranger001` | Ranger (7) |
-| Cleric/healer | `nw_halfcel001` | **Native class is Fighter** — must explicitly override `classes` to Cleric (2); resref used for appearance only |
-| Wizard | `nw_elfmage001` / `nw_elfmerc001` | Wizard (10) |
-| Rogue | `nw_halfmerc001` | Rogue (8) |
-
-Never build a companion on a Commoner chassis (`nw_bartender`, `nw_oldman`,
-`nw_convict`, `nw_shopkeep` are all class 20 — zero feats, zero spellbook, zero BAB).
-
-**Companion soundsets** — TYPE 0 (PC voiceset) rows only, by archetype/gender (e.g.
-Fighter/Barbarian: 419♂/357♀; Wizard/Sorcerer: 418♂/361♀; Cleric/Druid: 366♂/422♀).
-TYPE 3 NPC rows are sparse and leave the companion intermittently mute. Validate with
-`resolve_2da(soundset, row)` before use — `RESREF` must not be `****` and `GENDER`
-must match.
-
-Companions are skipped in the walk-waypoint phase (`x0_ch_hen_spawn` sets
-`NW_FLAG_IMMOBILE_AMBIENT_ANIMATIONS` and never reads `NW_GENERIC_MASTER`).
-
-**Cross-skill guardrails**: `/adventure-quests` must not overwrite a companion's
-`Conversation` or insert a `parentIndex: 0` quest root (would unshift ahead of the two
-conditional roots and break recruitment); `/adventure-challenges` must never make a
-companion hostile; `/adventure-polish` must whitelist `x0_ch_hen_*` in reference
-checks.
-
-Every companion must pass `verify_creature(henchman: true)` and `verify_dialog` with
-**zero errors** before the phase reports success; after two failed fix attempts the
-phase records `"status": "partial"` rather than claiming success.
+**Cross-skill guardrails**: `/adventure-quests` must not overwrite a companion's `Conversation` (`build_quest` merges its lines
+into the existing roots; a stage with `companion`/`dismiss`/`join` uses the same companion tags); `/adventure-challenges` must
+never make a companion hostile; `/adventure-polish` must whitelist `x0_ch_hen_*` in reference checks. Every companion must pass
+`verify_creature(henchman: true)` and `verify_dialog` with **zero errors** before the phase reports success. Companion
+recruiting, dialog and party limits can't be tested on the headless server (no player).
 
 ---
 
@@ -445,9 +436,9 @@ Builds a `.utm` (clone or `buildMinimalUtm()` from scratch). Fields:
 unlimited), `IdentifyPrice` (default **100**). `inventory` is a JSON array of
 `{resref, infinite?, category?}`; each resolved item gets `Infinite` set per the flag
 and is filed into one of 5 `StoreList` categories (0=Armor,1=Weapons,2=Potions/
-Scrolls/Misc,3=Wands/Magic,4=Misc). If `category` is omitted, it's auto-detected from
-the item's `BaseItem` row via a hardcoded base-item-ID → category table (falls back to
-4 for anything unmatched, and is clamped to max 4 regardless).
+Scrolls/Misc,3=Wands/Magic,4=Misc). If `category` is omitted, it is read from the item's `baseitems.2da` `StorePanel` column (the real 0-4 bucket the engine and
+toolset use; 4 when unknown), replacing an earlier hand-kept table that misfiled a Kukri, Dagger, Bolts and a Heavy Flail.
+`verify_store`'s `store_item_miscategorized` flags any item whose bucket disagrees with its `StorePanel`.
 
 The skill's recommended override for a general store is `markUp: 120, markDown: 80,
 storeGold: -1, maxBuyPrice: 0, identifyPrice: 100` — i.e. the tool's defaults are
@@ -499,6 +490,11 @@ player.
 ## 5. Area Generation / Sizing Rules
 
 ### 5.1 Unified BSP pipeline (`src/util/layout-generator.ts`)
+
+**Real minimums:** BSP `minLeaf = 6` is shared by every style; `splitThreshold` is assigned in the presets but never read. Four
+rooms need 14×14 total, one room 9×9 (`MIN_SINGLE_ROOM_AREA_SIZE`); the old "interior 12×12 / exterior 18×18" lines were
+guidelines (the exterior one is feature-fit headroom). `suggest_area_size` encodes these (`MIN_GENERATED_SIDE = 9`,
+`MIN_MULTI_ROOM_SIDE = 14`) and says when to paint by hand instead.
 
 All 10 styles (`dungeon`, `cave`, `dwelling`, `forest`, `rural`, `city`, `plains`,
 `desert`, `castle`, `tundra`) run through one BSP generator, differentiated entirely
@@ -629,9 +625,10 @@ per-portal afterward via `edit_dialog_node`. Tag is capped at 11 chars (resrefs
 deliberate scope choice against the corpus-typical pattern, now cross-referenced
 directly in the skill (see §9, item 1, resolved).
 
-### 5.6 Door placement formula (`adventure-areas` Phase 5b)
+### 5.6 Door placement formula (`place_tile_doors`, `adventure-areas` Phase 5b)
 
-For each tile with `doorPlacements` (from `get_tileset_details`):
+`place_tile_doors(area, dryRun?, genericDoor?)` applies the formula below to every tile of an area (§10.3). For each tile with
+`doorPlacements` (from `get_tileset_details`):
 ```
 worldX = col*10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[0]
 worldY = row*10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[1]
@@ -644,7 +641,9 @@ Verified on 3,717 real doors: positions match, bearings match exactly or ±180°
 `doorPlacements[].type` (a `doortypes.2da` row) resolves to the exact
 `TemplateResRef` the tile expects — never resolve via `genericdoors.2da`, a separate
 table for hand-placed doors with no tile association (confirmed as a real mistake
-made once on the `tileset-proving-grounds` module).
+made once on the `tileset-proving-grounds` module). **Type 0 ("Generic") has no `TemplateResRef`**: every `ttr01` building door is
+type 0, so the tool needs `genericDoor` (e.g. `x3_door_wood001`) for those or lists them under `skipped`. A tile that also carries
+a crosser is a corridor doorway and stays unlocked; every other tile door is locked, lockable and `Plot`.
 
 ---
 
@@ -737,6 +736,13 @@ tileset, is an NPC standing somewhere reachable).
   reachability along the way.
 - `verify_coop_rules` (also folded into `verify_all`) is the co-op-specific subset —
   see §8.
+- **`phase_check(phase, "end")`** is the per-phase gate: it runs the same verifiers (`collectVerifyResults`, the body of
+  `verify_all`) and keeps the findings whose object type belongs to the phase (`areas` → area connectivity + `are`; `actors` →
+  `utc`/`dlg`/`utm`; `challenges` → `utc`/`ute`/`utt`; `quests` → `dlg`/`jrl`/`coop`; `polish`/`rewards` → everything), then writes
+  `adventure-status.json`. For `quests` it still tells the caller to run `verify_quest_completability`.
+- **`skill-lint.test.ts`** (part of `npm run verify`) is the gate for the skills themselves: unregistered tool names, parameters a
+  tool doesn't take, and paragraphs over 150 characters copied between skills fail the build (§10.7).
+- `verify_creature` skips the package and level-variable companion warnings for non-player classes (§3.2).
 
 ---
 
@@ -751,7 +757,12 @@ one player and silently skips the rest of the party — invisible in solo testin
 - **`AddJournalQuestEntry`'s 4th arg (`bAllPartyMembers`) defaults `TRUE`** — never
   pass `FALSE` in this pipeline (a persistent-world module tracking independent
   per-player quest state is a different, valid architecture, but not this one).
-- **Shared quest state must live on `GetModule()`**, never a single PC — see §1.6.
+- **Quest state is the engine journal and advances are whole-party** (§1.6) — nothing is stored on a single PC except per-player
+  *tries* of a check (`QS_TRY_<key>`, `QS_ROLL_<key>`), which must be per PC so a second player gets their own attempts. A
+  hand-written script must not store shared state on `GetPCSpeaker()`/`GetLastUsedBy()` (`quest_state_on_single_pc` warning).
+- **Item gifts from the quest runtime go to every player** (`QuestGiveItem`: `q_act give_item`, `q_check pass_/fail_give_item`, a
+  search stage's item). A test runs all three co-op verifiers over the whole generated quest runtime and expects no findings;
+  modules built before 2026-11-08 carry an older `q_act` that fails `reward_not_party_wide` until `create_quest_system` is re-run.
 - **`create_reward_system`** (`src/tools/reward-tools.ts`) generates `inc_reward.nss`
   and proves it compiles via a throwaway probe script before returning. Policies:
   `full` (default — every player gets 100% of every reward, matching BioWare's own
@@ -828,3 +839,75 @@ as a record of what was wrong and what changed, not as open issues.
    mismatch was only in the task brief's assumption (and, separately, in a shortcut
    used for a one-off display module built earlier in the same session, which still
    works at runtime but doesn't match this codebase's standard pattern).
+
+6. **OPEN (2026-11-08) — doc/skill/code disagreements found while updating this file, not fixed here.**
+   - ~~`adventure-challenges` Phase 7 told the model to hand-write a script for the Poison trap's ability damage.~~ **FIXED 2026-11-08:**
+     `q_check` has `pass_/fail_ability` (+ `_amount`, `ability_hours`), applied per roller as a temporary ability decrease; the skill's Poison row uses it.
+   - The "Combat Role Templates", "Stat Scaling" and "Gear-by-class weapon/armor/shield pools" tables in §2.3 describe a hand-built
+     stat block; `forge_creature` now derives class, feats, gear and spells itself (the skill says not to set `cr`, `hp`, ability
+     scores, `feats`, `spells` or `equipment`). The tables remain correct for monsters and as design guidance for choosing
+     `classId`, `level` and `gearRole`, but are no longer inputs to a tool call.
+   - `suggest_area_size`'s per-biome tile budgets are first estimates and differ from the corpus medians in the `area-*` skills
+     (for example `area-forest` reports 32×32 medians; the tool gives 4×4 for one event). Intentional (the rule is "only what the
+     events need"), but unmeasured against real builds.
+   - `phase_check` has no declared-skip state, so a pipeline run that skips a phase on purpose (TODO #20) fails the next phase's start check.
+   - `place_tile_doors` has no door blueprint for generic type-0 tile doors unless `genericDoor` is passed; the skill's Phase 5b names the parameter
+     but no default is chosen.
+   - Modules built before 2026-11-08 carry older generated scripts (`q_act` without `QuestGiveItem`/spawn guards, `inc_cre_level` that
+     readies a second spellbook, a spell pool holding concealment spells); they need `create_quest_system` / `create_creature_level_system`
+     re-run and the pools edited (CLAUDE.md "Known Pitfalls", Hollow Communion entry).
+
+---
+
+## 10. Tools and rules added by the skill-prompt reduction (2026-11-08)
+
+One row per rule; the full behaviour of each tool is in [adventure-tooling-reference.md](adventure-tooling-reference.md).
+
+### 10.1 `phase_check(phase, step)`
+`start`: every section in `REQUIRED_SECTIONS[phase]` must exist and be non-empty (each phase needs all earlier sections: plot needs
+Module; areas Module+Plot; … rewards through Polish) or the call returns `isError` with the exact STOP message. `end`: the phase's own
+section (`OWN_SECTION`) must exist; `areas` also checks connectivity from `Mod_Entry_Area`; verifier findings are filtered by object
+type per phase (`PHASE_VERIFY_TYPES`); the entry `{status: success|partial, warnings, errors}` is merged into `adventure-status.json`.
+
+### 10.2 `suggest_area_size(biome, events, purpose?, shape?)`
+| Rule | Value |
+|---|---|
+| Cabin / home | 2×2 (grows to at most 3×4 with more events) |
+| Inn / tavern | 2×4, often an upper floor of the same size via stairs; cap 4×6 |
+| Shop / hall | 2×3 (cap 3×4) / 4×6 (cap 8×8) |
+| Forest, one event | 4×4 (16 tiles, +8 per extra event) |
+| Linear (forest, rural, desert, frozen, underdark, dungeon, cave) | narrow strip: forest 3×10 (+4 length per extra event); others 3-4 wide, 10-12 long |
+| Other biomes (base tiles, +per event) | rural 36 +16; city exterior 324 +40; castle exterior 100 +30; desert 64 +20; frozen 36 +16; ruins 36 +12; underdark 64 +20; dungeon 64 +16; cave 100 +24; castle interior 36 +12 |
+| Limits | 32 per side; below 9×9 and for linear strips → paint by hand; 14×14 and up → several rooms (min(4, events)) |
+
+### 10.3 `place_tile_doors(area, dryRun?, genericDoor?)`
+Blueprint from `doortypes.2da` `TemplateResRef` (type 0 needs `genericDoor`); position and bearing from §5.6; corridor doorways
+unlocked, all others `Locked`/`Lockable`/`Plot`; a door within 1 m is left alone (idempotent).
+
+### 10.4 `build_companion`
+One call: companion system if missing → blueprint (faction 2, henchman AI, PC-race appearance) → `forge_creature` (gearRole `pc`) →
+save → place → four-root dialog → `verify_creature(henchman)`. Not for non-PC-race companions (build those with the individual
+tools).
+
+### 10.5 Checks (`q_check`, `add_skill_check`, stage `check`)
+Exactly one of `skill` / `ability` / `save`; `dc` or `difficulty` (easy 10, moderate 15, hard 20, veryhard 25); `who` best (skills,
+abilities) / speaker / each (saves); `tries` per player; outcomes `pass_`/`fail_` damage dice + type, `half` on a passed save, msg,
+unlock, open, destroy, spawn+at, set_var, give_item (party-wide), xp. `add_skill_check` targets a trigger (OnEnter), placeable
+(OnUsed, or OnDisarm with `event: "disarm"`) or door (OnFailToOpen). A `build_quest` stage `check` uses `q_roll` for a skill with a
+plain DC and `q_check` otherwise.
+
+### 10.6 Quest `spawn`
+`spawn: {resref, area | at, x?, y?, count?, tag?, hostile?}` on talk/return/deliver/rescue stages (quest-level `spawn` for templates →
+stage 1). With `area`, a waypoint `<tag>_s<n>_spawn` is placed on walkable ground. Runtime: once per `spawn_key`, only at a real
+waypoint (else `[QUEST_WARN]`), skipped while a creature tagged `spawn_tag` is alive, 1-8 creatures 1.5 m apart, Hostile unless
+`spawn_hostile=0`.
+
+### 10.7 `skill-lint.test.ts`
+Registered tool names and literal parameter names are collected from `src/tools/*.ts`; each `.claude/skills/*/SKILL.md` is checked
+for unknown `tool(` calls, unknown named arguments, and verbatim paragraphs over 150 characters shared with another skill.
+
+### 10.8 Rules carried by the tools
+Faction names and the player-faction warning (§2.1); placement refusals name the fix (`walkBuffer`, `collisionRadius`,
+`adventure_find_walkable`); `compose_encounter` saves its forged boss blueprint to disk; the forge never puts self-concealment
+spells in a spell pool (Darkness, Invisibility, Improved Invisibility, Invisibility Sphere, Sanctuary, Ethereal/Ghostly Visage)
+and levels a pooled creature with `bReadyAllSpells` FALSE; equipment gold is the `MCP_GEAR_WEALTH` multiplier.

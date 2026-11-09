@@ -1,18 +1,99 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { indexAreaCreatures, requireIndex } from "../module-loader.js";
+import { buildResmanOptions, indexAreaCreatures, requireIndex } from "../module-loader.js";
 import type { FlatDialogNode } from "../types/dialog.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import type { CreatureRecord } from "../types/module.js";
 import { flattenDialog } from "../util/dialog-walker.js";
 import { bandDifficulty, clusterHostiles } from "../util/encounter-difficulty.js";
-import { numParam, optNumParam, toI } from "../util/params.js";
+import { numParam, optNumParam, toF, toI } from "../util/params.js";
+import { loadAreaWalkGrid } from "../util/walkgrid.js";
+import { analyzeWalkmesh } from "../util/walkmesh-analysis.js";
 import { collectQuestVarAwards } from "../util/quest-vars.js";
 import { isBaseGameResource, isBaseGameScript, loadScriptSources } from "../util/verify/common.js";
 import { buildAreaTransitions, buildTagToAreaMap } from "./tileset-tools.js";
+import type { ModuleIndex } from "../types/module.js";
+
+/** Breadth-first reachability over door/trigger transitions from a start area. */
+export function computeConnectivity(
+  index: ModuleIndex,
+  start: string,
+): { graph: Record<string, string[]>; reachable: Set<string>; unreachable: string[] } {
+  const tagToArea = buildTagToAreaMap(index);
+  const graph: Record<string, string[]> = {};
+  for (const [areaResref] of index.areas) {
+    const transitions = buildAreaTransitions(index, areaResref, tagToArea);
+    graph[areaResref] = [...new Set(transitions.map((t) => t.targetArea))];
+  }
+  const reachable = new Set<string>([start]);
+  const queue = [start];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const neighbor of graph[current] || []) {
+      if (!reachable.has(neighbor)) {
+        reachable.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+  return { graph, reachable, unreachable: [...index.areas.keys()].filter((a) => !reachable.has(a)) };
+}
 
 export function registerAnalysisTools(server: McpServer): void {
+  server.tool(
+    "analyze_walkmesh",
+    "Read-only walkmesh pathing diagnostic for an area: finds the small defects that make creatures snag at tile corners and edges. Reports (1) slivers - walkable triangles that are tiny (area) or needle-thin (shortest altitude), flagged nearCorner when within cornerRadius of a tile corner; (2) seams - runs along shared tile edges where one tile's walkmesh is walkable and its neighbour's is not, or the ground height steps; (3) corners - interior tile corners that are open on two adjacent quadrants at a creature-sized clearance but blocked or stepped at the edge point or corner between them. Heuristic geometry on the tile .wok files (not the engine pathfinder): a finding is a strong lead on where to look, e.g. with probe_ground. Coordinates are world metres, +X east, +Y north, 10 m per tile. Findings are capped by `limit` per category; counts are always the full totals.",
+    {
+      area: z.string().describe("Area resref"),
+      minArea: optNumParam("Walkable triangles smaller than this many m^2 are slivers (default 0.1)"),
+      minAltitude: optNumParam("Walkable triangles whose shortest altitude is below this many metres are slivers (default 0.05)"),
+      cornerRadius: optNumParam("A sliver within this many metres of a tile corner is flagged nearCorner (default 1.5)"),
+      clearance: optNumParam("Creature-sized radius in metres for the corner crossing probes (default 0.5)"),
+      maxStep: optNumParam("Ground height difference in metres across a seam that counts as a step (default 0.15)"),
+      seamStep: optNumParam("Sample spacing in metres along tile edges (default 0.1)"),
+      limit: optNumParam("Max findings returned per category (default 50)"),
+    },
+    { readOnlyHint: true, idempotentHint: true },
+    async ({ area, minArea, minAltitude, cornerRadius, clearance, maxStep, seamStep, limit }) => {
+      const index = requireIndex();
+      const resmanOpts = await buildResmanOptions(index);
+      const loaded = await loadAreaWalkGrid(area.toLowerCase(), index, resmanOpts);
+      if (!loaded) {
+        return { content: [{ type: "text", text: JSON.stringify({ error: `Area '${area}' not found in the loaded module` }) }] };
+      }
+
+      const opt = (v: string | undefined) => (v === undefined ? undefined : toF(v));
+      const result = analyzeWalkmesh({ ...loaded, grid: loaded.tiles }, {
+        minArea: opt(minArea), minAltitude: opt(minAltitude), cornerRadius: opt(cornerRadius),
+        clearance: opt(clearance), maxStep: opt(maxStep), seamStep: opt(seamStep),
+      });
+      const cap = limit === undefined ? 50 : Math.max(1, toI(limit));
+      const nearCorner = result.slivers.filter((s) => s.nearCorner).length;
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            area,
+            summary: {
+              tilesAnalyzed: result.tilesAnalyzed,
+              tilesWithoutWalkmesh: result.tilesWithoutWalkmesh,
+              walkableTriangles: result.walkableTriangles,
+              slivers: result.slivers.length,
+              slivers_nearCorner: nearCorner,
+              seamIssues: result.seams.length,
+              cornerIssues: result.corners.length,
+            },
+            slivers: result.slivers.slice(0, cap),
+            seams: result.seams.slice(0, cap),
+            corners: result.corners.slice(0, cap),
+          }, null, 2),
+        }],
+      };
+    },
+  );
+
   server.tool(
     "get_dependency_graph",
     "Show resource dependency graph. Resources depend on other resources via script references, conversation assignments, etc.",
@@ -836,31 +917,7 @@ export function registerAnalysisTools(server: McpServer): void {
         return { content: [{ type: "text", text: `Start area "${start || "(none)"}" not found in module.` }] };
       }
 
-      // Build transition graph
-      const tagToArea = buildTagToAreaMap(index);
-      const graph: Record<string, string[]> = {};
-      for (const [areaResref] of index.areas) {
-        const transitions = buildAreaTransitions(index, areaResref, tagToArea);
-        const targets = [...new Set(transitions.map((t) => t.targetArea))];
-        graph[areaResref] = targets;
-      }
-
-      // BFS from start
-      const reachable = new Set<string>();
-      const queue = [start];
-      reachable.add(start);
-      while (queue.length > 0) {
-        const current = queue.shift()!;
-        for (const neighbor of graph[current] || []) {
-          if (!reachable.has(neighbor)) {
-            reachable.add(neighbor);
-            queue.push(neighbor);
-          }
-        }
-      }
-
-      const allAreas = [...index.areas.keys()];
-      const unreachable = allAreas.filter((a) => !reachable.has(a));
+      const { graph, reachable, unreachable } = computeConnectivity(index, start);
 
       return {
         content: [

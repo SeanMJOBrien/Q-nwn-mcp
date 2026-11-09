@@ -123,6 +123,26 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 }
 
 /**
+ * Spells a combat creature must never get as a spell-like ability: the default combat AI casts self-buffs before
+ * a fight, so a pool holding any of these produced a boss that turned invisible (or unattackable) and stood still.
+ * Matched by spells.2da label (Invisibility Purge is a dispel and stays).
+ */
+const SELF_CONCEALMENT_LABELS = new Set([
+  "darkness",
+  "invisibility",
+  "improved_invisibility",
+  "invisibility_sphere",
+  "sanctuary",
+  "ethereal_visage",
+  "ghostly_visage",
+]);
+
+export function isSelfConcealmentSpell(index: ModuleIndex, spellId: number): boolean {
+  const label = twoDARow(index, "spells", spellId)?.Label;
+  return !!label && SELF_CONCEALMENT_LABELS.has(label.toLowerCase());
+}
+
+/**
  * Every spell on a class's list, grouped by spell level and shuffled by seed.
  * Reads the spell's own class column (never resolving through Master — the bug that
  * leaked Extract Brain into a Cleric's book) and keeps only real spells (UserType 1).
@@ -139,6 +159,7 @@ export function classSpellPools(
   for (const [spellId, row] of index.twodaTables.get("spells")?.rows ?? []) {
     if (isRetired2DARow(row)) continue;
     if (hasCell(row, "UserType") && row.UserType !== "1") continue;
+    if (isSelfConcealmentSpell(index, spellId)) continue;
     const cell = row[column];
     if (!cell || cell === "****") continue;
     const level = Number(cell);
@@ -239,7 +260,7 @@ export function domainSpells(index: ModuleIndex, domains: number[]): Record<stri
       const cell = row[`Level_${level}`];
       if (!cell || cell === "****") continue;
       const spell = Number(cell);
-      if (!Number.isInteger(spell)) continue;
+      if (!Number.isInteger(spell) || isSelfConcealmentSpell(index, spell)) continue;
       const list = (out[String(level)] ??= []);
       if (!list.includes(spell)) list.push(spell);
     }

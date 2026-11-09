@@ -28,19 +28,9 @@ rule always triggers.
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-- `## Areas`
-- `## Environment`
-- `## Actors`
-- `## Quests`
-- `## Challenges`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "affordances", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -127,8 +117,7 @@ Based on context, design the full affordance layout:
 
 Use `resman_search` to find item resrefs for store inventory and container loot.
 
-> **These resref lists are quick-reference examples, not exhaustive catalogs.**
-> If no suitable blueprint is found in these lists, call `list_blueprints(type: "uti", pattern: "[search term]")` to search the full base game and HAK stack by resref, tag, and display name (including TLK-resolved names). Always prefer a thematic match from the full catalog over forcing a poor fit from the examples.
+> Resref lists here are examples; search the full catalog with `list_blueprints` when none fits.
 
 **Common items to look up:**
 
@@ -149,7 +138,7 @@ Use `resman_search` to find item resrefs for store inventory and container loot.
 
 Also search for a base game store blueprint to clone:
 ```
-resman_search(pattern="store", type=".utm")
+resman_search(pattern="store")
 ```
 or try patterns like `nw_shopgen`, `x2_store`, `nw_mer`. Pick the simplest store (fewest pre-stocked items to clean out).
 
@@ -607,3 +596,7 @@ Use base game item costs. If a store's total affordable inventory exceeds starti
 - **Module script conflicts.** Always check `get_module_info` for an existing `Mod_OnClientEntr` script before writing a new one. Extend, don't replace.
 - **Gold is generous, not excessive.** The player should be able to buy core gear (weapon + armor + potions) but not everything in the store. This creates meaningful choices.
 - **Repack after all changes.** Call `repack_module` at the end so the user can see changes in the toolset.
+
+## Finish
+
+Call `phase_check(phase: "affordances", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

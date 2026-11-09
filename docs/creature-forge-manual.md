@@ -26,6 +26,7 @@ logic each one follows. Design history and the engine findings behind the rules 
 | `create_creature_level_system` | Once per module, and again after changing stores | Writes `inc_cre_level` (all spawn-time logic) and `cf_spawn` (the spawn wrapper), compiles them. |
 | `forge_creature` | Per blueprint and per placed copy | Legal level-1 build, levelling plan, spell pool, domains/school, gear settings, spawn wiring. |
 | `create_companion_system` | Once per module with companions | Shared recruit, dismiss and order scripts. |
+| `build_companion` | Per companion (replaces the three rows around it) | One call: blueprint, forge, placement, recruit dialog and a `verify_creature` pass. See [adventure-tooling-reference.md](adventure-tooling-reference.md) §4. |
 | `create_companion_dialog` | Per companion | Four-root dialog, set as the Conversation of the blueprint and every placed copy. |
 | `compose_encounter` | Per themed boss fight | Plans or builds a forged Hostile boss plus enough palette minions to reach a target Encounter Level. |
 | `run_live_verification` | After building | Runs the module headless, returns the in-game checks, loot lines and engine errors. |
@@ -273,6 +274,14 @@ All verified on the live engine; details in [`creature-forge-spec.md`](creature-
 - Each ready special-ability entry is one cast at its `SpellCasterLevel`.
 - A specialist Wizard gets one extra slot at spell levels 1–9 and none at cantrips.
 - `GetDomain` / `GetSpecialization` read the class entry's `Domain1`/`Domain2`/`School`.
+
+- A caster's spell-like-ability pool never holds self-concealment spells (Darkness, Invisibility, Improved Invisibility, Invisibility Sphere,
+  Sanctuary, Ethereal/Ghostly Visage): the default combat AI casts self-buffs first and the creature stood invisible and idle.
+  `isSelfConcealmentSpell` in `creature-forge-tools.ts`; a `pinnedSpells` entry is the only way back.
+- A creature with a spell-ability pool (`MCP_SA_POOL`) levels with `bReadyAllSpells` FALSE; with it TRUE it also had every memorized spell
+  ready, a second spellbook on top of the pool.
+- `MCP_GEAR_WEALTH` (`gearWealth`) is a multiplier on the role's gold budget, default 0.5, 0 keeps the current gear. It is a local on the
+  blueprint and on each placed copy.
 
 ## Limits
 

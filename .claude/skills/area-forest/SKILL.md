@@ -15,7 +15,7 @@ Medians from 507 `ttf01` areas across the corpus in `~/git`.
 
 | Property | Value | What it means |
 |---|---|---|
-| Size | **32×32** (1024 tiles) | The largest biome in the corpus. Forests are maps, not rooms. |
+| Size | **32×32** (1024 tiles) in the corpus | Only an exploration forest needs that. Size from events with `suggest_area_size`: 4×4 for one event, 3×10 linear for a road with one encounter. |
 | Unique tile IDs | **15** | |
 | Tile variety | **1%** | The defining statistic — see below. |
 | Uses elevation | **1%** | Keep `Tile_Height` at 0 throughout. |
@@ -92,10 +92,6 @@ Drop 2–5 of these into an otherwise uniform canopy. They are the content.
 
 ## Group names: use the display name
 
-`paint_group` matches the tileset's **display** names, not the raw identifiers in the
-`.set` file. The tables above list groups as the `.set` names them; the tool wants the spaced
-form — `Stone Room 1 1x2`, not `StoneRoom01_1x2`.
-
 Call `paint_group` with a deliberately wrong name to have it print every valid group for that
 tileset, then copy the name exactly:
 
@@ -105,9 +101,4 @@ paint_group(area: "...", feature: "?", x: "0", y: "0")
 
 Two further things the corpus build surfaced:
 
-- **Crosser and corner mismatch warnings are real.** A group placed against a different terrain
-  reports e.g. `corner mismatch (dirt vs grass)` — a visible seam. Either place a matching
-  transition tile or accept the seam knowingly.
-- **Interior room groups are mostly wall.** A `tic01` room tile reports 17-35% walkable; that is
-  normal for interiors and is why hand-built castle interiors are only ~30 tiles.
-
+Placing groups (display names, mismatch warnings): see the **nwn-tileset-conventions** skill, "Placing groups with paint_group".

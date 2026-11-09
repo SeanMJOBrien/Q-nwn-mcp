@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { factionWarning, parseFaction } from "../util/placement-hints.js";
 import path from "path";
 import fs from "fs/promises";
 
@@ -41,7 +42,7 @@ export function registerBlueprintTools(server: McpServer): void {
       name: z.string().describe("Creature display name (first name)"),
       sourceResref: z.string().optional().describe("Base creature to clone from (e.g. 'nw_dog', 'nw_oldman')"),
       appearance: optNumParam("Appearance row from appearance.2da"),
-      faction: optNumParam("Faction ID"),
+      faction: optNumParam("Faction: a standard name (hostile, commoner, merchant, defender, pc) or an ID. Standard factions only (0=PC 1=Hostile 2=Commoner 3=Merchant 4=Defender); the default is 0, the player faction, and the result warns about it."),
       cr: optNumParam("Challenge rating"),
       hp: optNumParam("Hit points"),
       race: optNumParam("Racial type (racialtypes.2da row)"),
@@ -73,7 +74,7 @@ export function registerBlueprintTools(server: McpServer): void {
       const params: CreatureBuildParams = {
         resref, tag, name, sourceResref, conversation, lootable, henchman,
         appearance: appearance !== undefined ? toI(appearance) : undefined,
-        faction: faction !== undefined ? toI(faction) : undefined,
+        faction: parseFaction(faction),
         cr: cr !== undefined ? toF(cr) : undefined,
         hp: hp !== undefined ? toI(hp) : undefined,
         race: race !== undefined ? toI(race) : undefined,
@@ -102,10 +103,12 @@ export function registerBlueprintTools(server: McpServer): void {
         return { content: [{ type: "text", text: result.error ?? "create_creature_blueprint failed." }] };
       }
 
+      const built = index.parsedGff.get(`${resref.toLowerCase()}.utc`) as GffObj | undefined;
+      const warning = factionWarning(built ? getFieldNum(built, "FactionID") : params.faction);
       return {
         content: [{
           type: "text",
-          text: JSON.stringify(result, null, 2),
+          text: JSON.stringify(warning ? { ...result, warnings: [warning] } : result, null, 2),
         }],
       };
     },

@@ -26,6 +26,7 @@ import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from
 import type { GffObj } from "../types/gff.js";
 import { snapshotGitForUndo } from "../util/undo.js";
 import { checkCollision } from "../util/collision.js";
+import { COLLISION_FIX, WALK_FIX } from "../util/placement-hints.js";
 import { placeCreatureCore } from "../util/creature-placer.js";
 import {
   compassToOrientation,
@@ -207,6 +208,7 @@ export function registerPlacementTools(server: McpServer): void {
               error: "Position is not safe for placement",
               position: { x: xN, y: yN },
               detail: walkCheck.reason,
+              fix: WALK_FIX,
             }, null, 2),
           }],
         };
@@ -274,7 +276,7 @@ export function registerPlacementTools(server: McpServer): void {
           return {
             content: [{
               type: "text",
-              text: `Placement blocked: '${collision.nearbyTag}' is ${collision.distance}m away (minimum ${colRadius}m). Choose a different position or lower collisionRadius.`,
+              text: `Placement blocked: '${collision.nearbyTag}' is ${collision.distance}m away (minimum ${colRadius}m). ${COLLISION_FIX}`,
             }],
           };
         }
@@ -346,6 +348,7 @@ export function registerPlacementTools(server: McpServer): void {
               error: "Position is not safe for placement",
               position: { x: xN, y: yN },
               detail: walkCheck.reason,
+              fix: WALK_FIX,
             }, null, 2),
           }],
         };
@@ -513,6 +516,7 @@ export function registerPlacementTools(server: McpServer): void {
               error: "Position is not safe for placement",
               position: { x: xN, y: yN },
               detail: walkCheck.reason,
+              fix: WALK_FIX,
             }, null, 2),
           }],
         };
@@ -599,6 +603,7 @@ export function registerPlacementTools(server: McpServer): void {
               error: "Position is not safe for placement",
               position: { x: xN, y: yN },
               detail: walkCheck.reason,
+              fix: WALK_FIX,
             }, null, 2),
           }],
         };
@@ -747,6 +752,7 @@ export function registerPlacementTools(server: McpServer): void {
               error: "Position is not safe for placement",
               position: { x: xN, y: yN },
               detail: walkCheck.reason,
+              fix: WALK_FIX,
             }, null, 2),
           }],
         };

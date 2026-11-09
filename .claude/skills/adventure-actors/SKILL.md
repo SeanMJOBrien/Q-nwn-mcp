@@ -13,18 +13,9 @@ Sub-skill of `/create-adventure`. Reads the plot, areas, and environment section
 - `adventure.md` must exist in the MCP temp directory (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp` or `/tmp/nwn-mcp`) and contain completed `## Plot`, `## Areas`, and `## Environment` sections.
 - A module must be loaded. If none is loaded, call `load_module` using the module name from `adventure.md`.
 
-## Creature forge: spawn-time levelling (preferred for every class-based creature)
+## Creature forge
 
-Use this instead of hand-building stat blocks, gear and spell wiring. You supply the specification; the tools apply the rules.
-
-1. Once per module: `create_creature_level_system` (optional `stores`: JSON array of store tags/resrefs NPCs may buy from; default four base-game stores).
-2. For each class-based creature, call `forge_creature` on the blueprint (`resref`) AND on each placed copy (`area` + `tag`), with: `race`, `classId`, `level` (absolute target; use this for anything placed in an area, since placed creatures spawn at module load before PCs exist), `gearRole` (`pc` for companions, `elite` for bosses and named leaders, `standard` for rank and file, `mook` for fodder), optional `gearWealth` (multiplier on the role share, default 0.5), `powerLevel` (`tougher`/`epic` only for bosses), `complexity: "simple"` for commoner-tier NPCs, `plan` (class id per level) for multiclass, and `originalSpawn` (`x0_ch_hen_spawn` for companions, `nw_c2_default9` otherwise).
-3. Optional: `pinnedSpells` (JSON array of `spells.2da` rows a caster always gets first, e.g. a boss's signature spell).
-   For every Cleric, pass `domains` chosen from the character (JSON array of two `domains.2da` rows: 0 Air, 1 Animal, 3 Death, 4 Destruction, 5 Earth, 6 Evil, 7 Fire, 8 Good, 9 Healing, 10 Knowledge, 13 Magic, 14 Plant, 15 Protection, 16 Strength, 17 Sun, 18 Travel, 19 Trickery, 20 War, 21 Water). The forge adds both domain power feats, and at spawn one slot per spell level holds a domain spell. Left out, every Cleric gets the package's Healing and Sun.
-   For every Wizard, pass `school` chosen from the character (spellschools.2da row: 0 General, 1 Abjuration, 2 Conjuration, 3 Divination, 4 Enchantment, 5 Evocation, 6 Illusion, 7 Necromancy, 8 Transmutation). A specialist gets one extra slot per spell level 1-9 and never casts its opposition school; left out, a Wizard is a Generalist.
-4. What happens at spawn: the creature is a legal level-1 build; `LevelUpHenchman` levels it to the target (live-verified to add every automatic feat and no illegal ones); it buys proficient gear from the stores within a level-scaled allowance (unspent allowance is discarded, never given as gold); archers also buy a melee backup weapon; casters get spell abilities with the right spells, caster level and slots per day; every purchase is logged as a `[CL_LOOT]` line for `/adventure-rewards`; then it logs `[SPEC_OK]`/`[SPEC_FAIL]` lines that `run_live_verification` reports.
-5. Don't add your own spell wrappers (`a_hen_spawn`, `a_ra_spawn`, `SA_OnSpawn`) or `bake_spec_ability_pool` for a forged creature, and don't add `ITEM_PROPERTY_AC_BONUS` to give armor AC: mundane armor already has base AC from its torso part.
-6. Animals, outsiders and other monster-class creatures are not forged. Choosing a ready-made monster from the default or custom palette (`list_blueprints`, `resman_search`, `place_creature`) is the right approach for them; don't build them from scratch.
+Build every class-based creature with `forge_creature` (once per module `create_creature_level_system`) as described in the **creature-forge** skill — read it before creating any creature. Don't hand-build stat blocks, gear or spell wiring.
 
 ## Workflow
 
@@ -32,16 +23,9 @@ Fully autonomous. Make all decisions based on the plot document and spatial data
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-- `## Areas`
-- `## Environment`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "actors", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -121,49 +105,27 @@ in follow mode, so no `a_mod_load` change is needed for companions.
 Also call `create_creature_level_system` once per module if `cf_spawn` doesn't exist yet (it is
 shared with `/adventure-challenges`).
 
-#### Step 2: Per companion — blueprint, dialog, forge
-
-Create, place and forge the companion, then give it its dialog:
+#### Step 2: Per companion — one call
 
 ```
-create_creature_blueprint(
-  resref: "<name>", tag: "<name>",
-  name: "<display name>",
-  faction: 2,
-  henchman: true,
-  race: <racialtypes.2da row for the NPC's described race>,
-  appearance: <same numeric value as race, for the 7 standard PC races — see note below>,
-  gender: <0=male, 1=female>,
-  soundset: <TYPE 0 row matching gender — see table>
-)
-place_creature(area: "<area>", blueprint: "<name>", x: ..., y: ...)
-forge_creature(resref: "<name>", race: "<race>", classId: "<class>", level: "<module target level>",
-               gearRole: "pc", originalSpawn: "x0_ch_hen_spawn")
-forge_creature(area: "<area>", tag: "<name>", race: "<race>", classId: "<class>", level: "<module target level>",
-               gearRole: "pc", originalSpawn: "x0_ch_hen_spawn")
-create_companion_dialog(creature: "<name>",
-               introduction: "<first meeting: who they are, why they are here>",
-               backstory: "<answer to 'Tell me about yourself'>",
-               accept: "<agreeing to join, in their voice>", farewell: "<when dismissed>",
-               partyFull: "<when the party already has enough help>")
+build_companion(resref: "<name>", name: "<display name>", area: "<area>", x: ..., y: ...,
+                race: <0-6>, classId: <class>, level: "<module target level>", gender: <0|1>,
+                introduction: "<first meeting: who they are, why they are here>",
+                backstory: "<answer to 'Tell me about yourself'>",
+                accept: "<agreeing to join, in their voice>", farewell: "<when dismissed>",
+                partyFull: "<when the party already has enough help>")
 ```
 
-Class IDs: 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger
-8=Rogue 9=Sorcerer 10=Wizard. The forge writes the legal level-1 build, package, alignment
-fit and spawn wiring; at spawn the companion levels to `level`, buys proficient gear and,
-for a caster, gets spell abilities. Don't set `classes`, `feats`, `spells`, `equipment`,
-`scripts` or `varTable` on the blueprint yourself.
-
-**Appearance rule — no chassis needed.** `appearance.2da` rows 0–6 (Dwarf, Elf, Gnome,
-Halfling, Half-Elf, Half-Orc, Human) map 1:1 by label to the same numeric values as the
-`race` parameter for the 7 standard PC races (verified directly against `appearance.2da`).
-Set `race` and `appearance` to the same value and the companion renders correctly with no
-`sourceResref` cloning required — this covers all 11 classes, not just the 5 with a
-verified chassis in the fallback table below. Skip `sourceResref` entirely unless the plot
-calls for a specific non-standard look (see "Companion source blueprints" below for that
-fallback path, and its caveats). `buildMinimalUtc()` now writes the full composite
-body-part field set (`BodyPart_*`, `ArmorPart_RFoot`, `Appearance_Head`, `Color_*`)
-this rendering path needs — nothing further to set by hand here.
+It writes the shared scripts if missing, builds the henchman blueprint (stock `x0_ch_hen_*`
+AI, Commoner faction, a PC voiceset chosen from class and gender), forges it, places it,
+wires the four-root dialog and runs `verify_creature` — read `verify` and `forged.warnings`
+in the result. Class IDs: 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin
+7=Ranger 8=Rogue 9=Sorcerer 10=Wizard. Race 0–6 (Dwarf, Elf, Gnome, Halfling, Half-Elf,
+Half-Orc, Human) is also the appearance, so no chassis is needed. For a Cleric pass `domains`,
+for a Wizard `school`, for a signature spell `pinnedSpells` (see the **creature-forge** skill).
+Don't set `classes`, `feats`, `spells`, `equipment`, `scripts` or `varTable` yourself.
+Use the individual tools (`create_creature_blueprint`, `forge_creature`, `place_creature`,
+`create_companion_dialog`) only for a non-standard look or a creature that isn't a PC race.
 
 #### Equipment and spells
 
@@ -202,7 +164,7 @@ any `[SPEC_FAIL]` before reporting success.
 For each companion: `verify_creature(resref: "<resref>", henchman: true)` and
 `verify_dialog(resref: "dlg_hen_<resref>")`. **Both must return zero errors.** Fix and
 re-verify; after two failed attempts record `"status": "partial"` in
-`adventure-status.json` with the error list rather than reporting success.
+`adventure-status.json` (pass the errors to `phase_check`) rather than reporting success.
 
 #### Companion source blueprints — fallback only, for a specific non-standard look
 
@@ -226,25 +188,6 @@ carries, so its native `ClassList` doesn't matter once the creature is forged. C
 carries over whatever other legacy fields (`Phenotype`) the source NPC has — another reason
 to prefer the chassis-free default path unless you specifically need one of these looks.
 
-**CORRECTION (superseded twice — read the final state, not the history): the invisible
-companion bug was NOT the `Tail`/`Wings` field pair.** A from-scratch companion (built
-via the chassis-free default path) rendered invisible, both in the toolset and in a live
-game session, until the toolset's own property editor touched it. A first hypothesis —
-diffing against a shopkeeper control creature and finding it had legacy `Tail`/`Wings`
-that a from-scratch companion lacked — was wrong: the shopkeeper uses a monster-model
-appearance (a single fixed model), the wrong rendering category to compare against, and
-the user re-reported the identical symptom after that "fix" shipped. **The real cause,
-found by diffing two genuine, live, actively-hosted-PW henchman blueprints
-(`~/tfndev`'s `hen_dorna.utc`/`hen_linu.utc`) against the broken creature's raw GFF:**
-standard-race appearances render as a composite model assembled from per-part fields
-(`BodyPart_*`, `ArmorPart_RFoot`, `Appearance_Head`, `Color_*`) that `buildMinimalUtc()`
-never wrote at all — real henchmen carry the full set, real henchmen carry NO legacy
-`Tail`/`Wings` fields, and `Tail_New`/`Wings_New` should be `dword` not `byte`.
-`buildMinimalUtc()` now writes the correct field set and types. **Lesson: when diffing
-against a "known-working" control creature to root-cause a rendering bug, first confirm
-the control uses the same appearance-rendering category (composite PC-race model vs.
-single monster model) as the broken creature** — same discipline as the tile-rotation
-corpus-verification rule elsewhere in this project.
 
 | Archetype | Resref | Class |
 |-----------|--------|-------|
@@ -254,23 +197,9 @@ corpus-verification rule elsewhere in this project.
 | Wizard | `nw_elfmage001` / `nw_elfmerc001` | Wizard (class 10) |
 | Rogue | `nw_halfmerc001` | Rogue (class 8) |
 
-#### Companion soundsets — TYPE 0 (PC voicesets) only
+#### Companion voices
 
-TYPE 0 rows carry the full `VOICE_CHAT_*` range the associate AI barks. TYPE 3 NPC sets
-are sparse and leave the companion intermittently mute.
-
-| Archetype | Male | Female |
-|-----------|------|--------|
-| Fighter / Barbarian | 419 | 357 |
-| Ranger / archer | 420 | 433 |
-| Wizard / Sorcerer | 418 | 361 |
-| Cleric / Druid | 366 | 422 |
-| Rogue / Bard | 367 | 421 |
-| Commoner / rescued NPC | 368 | 423 |
-
-Validate before use: `resolve_2da(table: "soundset", row: "<n>")` — confirm `RESREF` is
-not `****` and `GENDER` matches the creature. If nothing validates, omit `soundset`
-rather than writing a garbage row (a creature-TYPE row makes a human companion growl).
+`build_companion` picks a TYPE 0 (PC) voiceset from class and gender and checks it against `soundset.2da`; TYPE 3 NPC sets leave a companion mute, so never set one by hand.
 
 #### Companions get no walk waypoints
 
@@ -495,8 +424,7 @@ Repack the module with `repack_module`.
 ## Faction Rules
 
 - **ALL actors placed by this skill use Commoner faction (ID 2).** No exceptions.
-- Always set `faction=2` in `create_creature_blueprint` regardless of the source blueprint's default faction.
-- Standard NWN factions only: 0=PC, 1=Hostile, 2=Commoner, 3=Merchant, 4=Defender.
+- Standard NWN factions only (`faction: "commoner"` or 2; the tool warns when a blueprint is left in the player faction).
 - **No custom factions.** Out of scope for a one-shot module.
 - Hostile creatures are placed by `/adventure-challenges`, not this skill.
 - If `/adventure-quests` needs a merchant NPC, it can change the faction to 3 (Merchant) later.
@@ -507,10 +435,7 @@ Repack the module with `repack_module`.
 
 Pick the one that best matches the plot's NPC description. Clone it and override name/faction/dialog.
 
-**IMPORTANT:** Always set `faction=2` when cloning. Many of these blueprints default to Hostile.
-
-> **These resref lists are quick-reference examples, not exhaustive catalogs.**
-> If no suitable blueprint is found in these lists, call `list_blueprints(type: "utc", pattern: "[search term]")` to search the full base game and HAK stack by resref, tag, and display name (including TLK-resolved names). Always prefer a thematic match from the full catalog over forcing a poor fit from the examples.
+> Resref lists here are examples; search the full catalog with `list_blueprints` when none fits.
 
 | Description | Resref | Notes |
 |------------|--------|-------|
@@ -582,7 +507,6 @@ Clone each type once with `create_creature_blueprint`, setting `faction=2`.
 
 - **Tile coordinates:** Column = x (left to right), Row = y (bottom to top). World position = tile * 10.0 + 5.0 for center.
 - **Do NOT auto-export HTML reports.**
-- **Always set faction=2.** Never trust the source blueprint's default faction.
 - **Dialog resref must be created before the creature blueprint** that references it (or create them in the right order: dialog first, then blueprint with `conversation` field).
 - **No quest logic in dialogs.** NPCs can hint at the situation but do NOT assign quests, give journal entries, or run scripts. That's `/adventure-quests`'s job.
 - **Repack after placing.** Call `repack_module` at the end so the user can see changes in the toolset.
@@ -609,3 +533,7 @@ Clone each type once with `create_creature_blueprint`, setting `faction=2`.
   the *entire* file to a stale in-memory snapshot). If a repair task needs raw
   `nwn_gff` scripting on top of this skill's normal MCP-tool flow, see the ordering
   rule in the main project `CLAUDE.md`'s Known Pitfalls before mixing the two.
+
+## Finish
+
+Call `phase_check(phase: "actors", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

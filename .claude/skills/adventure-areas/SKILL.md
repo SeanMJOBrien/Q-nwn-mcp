@@ -64,14 +64,9 @@ else story-related (an overview/orientation line is fine; plot content is not �
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "areas", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -145,11 +140,7 @@ Pick the best match based on:
 
 ### Phase 3: Dimensions + Layout Plan
 
-Propose area dimensions based on the plot's description of the location's scale. Interior and exterior areas have different minimums due to exterior styles needing larger rooms for building features (2x2, 2x3 houses etc.):
-- **Interior** — minimum 12x12 for 4 rooms (splitThreshold 10)
-- **Exterior** — minimum 18x18 for 4 rooms (splitThreshold 12, needs larger leaves for 2x3 features)
-- Medium area: 18x18 to 22x22
-- Large exploration area: 22x22 to 26x26
+Size every area with `suggest_area_size(biome, purpose, events, shape)`, using the area's **Events** and **Travel** fields from `## Plot` (`shape: "linear"` when Travel is yes). It returns width, height, the build method and, for the generator, a room count. Cabins are 2x2, inns 2x4, a forest with one event 4x4, a forest road 3x10; more events add tiles. Use the returned size as is — don't round up to "feel" bigger. Below 9x9, and for linear strips, skip `adventure_generate_layout`: `create_area`, then `paint_tiles`/`paint_group` by hand.
 
 **Preferred approach: Use `adventure_generate_layout`** to get a server-generated layout with zones, crossers, and transition points. This tool encodes all the layout rules (perimeter encapsulation, room separation, adjacency chains, walkable ratio) so you don't need to reason about them manually.
 
@@ -271,23 +262,7 @@ Set ambient properties with `set_area_properties`. The reference tables below ar
 
 ### Phase 5b: Place Aesthetic Doors
 
-After painting, scan the tile grid for tiles that have `doorPlacements` defined in the tileset (via `get_tileset_details`). These are visual archways built into the tile geometry — placing a door object completes the look. Place **all** door types: terrain-based, feature, and crosser-based.
-
-Each door placement in the tileset data has two key fields:
-- **`type`** — placement category: `0` = terrain/feature door (room entrances, gates), `1+` = crosser door (corridor/doorway passages)
-- **`doorType`** — appearance ID (e.g., `6013`). Look this up as a row in `doortypes.2da` to get the correct door blueprint resref. Use that blueprint with `place_door`.
-
-**Step 1: Compute the world position** for each door placement:
-- World X = `col * 10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[0]`
-- World Y = `row * 10 + 5 + forwardRotate(doorX, doorY, tileOrientation)[1]`
-- Bearing = `(doorOrientation + tileOrientation * 90) % 360` (raw GFF Bearing, degrees, counter-clockwise; `place_door` takes it as is)
-
-Where `forwardRotate` for orientation 0-3: case 0=(x,y), case 1=(-y,x), case 2=(-x,-y), case 3=(y,-x) — a counter-clockwise turn, the same direction `Tile_Orientation` rotates the tile.
-Verified on 3,717 real doors: positions match; the bearing matches exactly or ±180° (a door looks the same turned half a turn).
-
-**Step 2: Place and lock based on placement `type`:**
-- **`type: 0` (terrain/feature doors):** Lock via `modify_gff_field` — set `Locked` (byte) to `1`, `Lockable` (byte) to `1`, and `Plot` (byte) to `1`. These are aesthetic and stay locked unless a quest or area transition explicitly unlocks them.
-- **`type: 1+` (crosser/corridor doors):** These are passageways — do NOT lock them. Leave them unlocked so the player can pass through freely.
+After painting, call `place_tile_doors(area)` for every area. It places and locks every door the painted tiles imply (gates, building doors, corridor archways): the blueprint comes from `doortypes.2da`, the position and bearing from the tile's rotation, corridor doorways stay unlocked and every other door is locked and plot. Safe to run twice. Tiles whose door type is generic (type 0 — every `ttr01` building door) have no blueprint: pass `genericDoor` (e.g. `x3_door_wood001`) or they are listed under `skipped` and need `place_door` by hand.
 
 ---
 
@@ -421,3 +396,7 @@ The solver prioritizes preserving crossers over exact corner matching. At a Pit/
   happens: `repack_module` then `load_module` to re-read from disk. Prefer choosing an
   entry area whose default position is already walkable, verified with
   `adventure_find_walkable` on a bounding box around it.
+
+## Finish
+
+Call `phase_check(phase: "areas", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

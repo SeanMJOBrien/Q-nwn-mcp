@@ -19,17 +19,9 @@ Fully autonomous. Make all decisions based on the plot document and existing mod
 
 ---
 
-### Pre-Check: Validate adventure.md
+### Pre-Check
 
-Read `adventure.md` from the MCP temp directory. Verify these sections exist and are non-empty:
-- `## Module`
-- `## Plot`
-- `## Areas`
-- `## Environment`
-- `## Actors`
-
-If any required section is missing or contains no content below its heading:
-**STOP.** Output: `"ERROR: adventure.md is missing required section [name]. The prerequisite skill has not run or failed. Cannot proceed."`
+Call `phase_check(phase: "quests", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
 
 ---
 
@@ -108,7 +100,17 @@ nodes by hand.** The full field reference is `docs/quest-system.md`; this phase 
   can detect (every enemy in a room dead) is `do: "custom"`: build_quest writes the journal entry and your script calls
   `AddJournalQuestEntry(tag, n, oPC)`.
 - **Skill gates:** `check: {skill, dc, else: "fight"}` on a talk stage. The PC line rolls once (the best of the speaker and
-  its companions), so retrying the conversation can't reroll.
+  its companions), so retrying the conversation can't reroll. A check may be an `ability` (`str`..`cha`) or a `save`
+  (`fort`/`reflex`/`will`) instead of a `skill`, and `difficulty` (`easy` 10, `moderate` 15, `hard` 20, `veryhard` 25) instead
+  of `dc`.
+- **Something appears:** `spawn: {resref, area | at, count, tag, hostile}` on a stage creates the creature(s) when that stage
+  advances: when its dialog line is picked (talk/return/deliver/rescue; stage 1 = the quest is accepted) or when it is
+  completed (kill/pickup/explore/trigger/use/search). A bounty target in an explored area, an ambush.
+- **Multi-part encounter (chain):** a `kill` stage on the lookout or scout with a `spawn` of the main force at a waypoint, then a
+  `kill` stage on the main force: killing the lookout is what brings them. Put the two groups far apart in the area, the
+  second at the waypoint; the second blueprint needs no placed copy. Name an `area` (and optionally `x`,`y`) and build_quest places the waypoint on walkable ground; or give an
+  existing waypoint as `at`. It happens once. A `kill` stage targeting that resref (or `tag`) needs no placed copy. For a
+  `bounty` template, `spawn` at the top of the spec is the shortcut for stage 1.
 - **Branches:** two stages with the same `n` are alternative ways to reach that stage (persuade *or* kill); `from` forks;
   `end: "fail"` marks a failure ending.
 - **Write the lines.** Defaults exist for every dialog line, but they are generic: give `offer`, `accept`, `text`,
@@ -172,3 +174,7 @@ summon credits its master. Nothing is stored on `GetModule()` or on NPCs.
 - **No combat placement** beyond quest kill targets: hostile groups are `/adventure-challenges`' job.
 - **Do NOT auto-export HTML reports.**
 - **Repack after all changes.**
+
+## Finish
+
+Call `phase_check(phase: "quests", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.

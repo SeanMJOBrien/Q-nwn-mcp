@@ -33,8 +33,14 @@ export const TEMPLATES = [
 export type TemplateName = (typeof TEMPLATES)[number];
 
 export interface StageCheck {
-  skill: string;
-  dc: number;
+  /** One of skill, ability (str/dex/con/int/wis/cha) or save (fort/reflex/will); a search stage takes a skill only. */
+  skill?: string;
+  ability?: string;
+  save?: string;
+  /** A number, or leave out and give `difficulty`. */
+  dc?: number;
+  /** easy (10), moderate (15), hard (20) or veryhard (25), instead of dc. */
+  difficulty?: "easy" | "moderate" | "hard" | "very hard" | "veryhard";
   /** What a failed check leads to: "fight" (the NPC turns hostile; a kill stage can still finish it), "end" (nothing). */
   else?: "fight" | "end";
   /** PC line offering the check. */
@@ -64,6 +70,31 @@ export interface StageReward {
   xp_level?: number;
   gold?: number;
   item?: string;
+}
+
+/**
+ * A creature that appears when this stage advances the quest (stage 1 = when the quest is accepted): a bounty target in an
+ * area the party has already explored, an ambush, guards, the next part of a multi-part encounter. On a dialog stage it rides
+ * on the q_act line; on a kill/pickup/explore/trigger/use/search stage it is written as the slot's questK_spawn locals.
+ * A kill stage whose target is this resref or tag needs no placed copy.
+ */
+export interface StageSpawn {
+  // Appears when the stage advances. A kill/explore/trigger/use/search stage with a spawn is how an encounter chain is built:
+  // kill the lookout (stage 2) and the main force appears at its waypoint (spawn on stage 2), then kill it (stage 3).
+  /** Creature blueprint resref. */
+  resref: string;
+  /** Instance tag (default: the blueprint's own). Lets several quests reuse one blueprint. */
+  tag?: string;
+  /** How many (default 1). */
+  count?: number;
+  /** Tag of an existing waypoint to appear at. */
+  at?: string;
+  /** Otherwise: an area (and optionally x,y) where the builder places a waypoint itself, on walkable ground. */
+  area?: string;
+  x?: number;
+  y?: number;
+  /** Hostile faction (default true). */
+  hostile?: boolean;
 }
 
 /** A stage as the model writes it (only `do` and `journal` are needed for most kinds). */
@@ -112,6 +143,8 @@ export interface StageInput {
   dismiss?: string;
   /** Stage 1: the giver walks up to the first player it sees and starts its conversation; a string is a bark as it goes. */
   approach?: boolean | string;
+  /** Creature(s) that appear when this stage's line advances the quest. */
+  spawn?: StageSpawn;
   /** Dialog lines (all optional; defaults are used). */
   offer?: string;
   accept?: string;
@@ -149,6 +182,8 @@ export interface QuestInput {
   /** Thank-you line for the end stage. */
   thanks?: string;
   stages?: StageInput[];
+  /** Template shortcut: spawn this when the quest is accepted (e.g. the bounty target). */
+  spawn?: StageSpawn;
   autowire?: boolean;
 }
 
@@ -180,6 +215,32 @@ export function tagFromName(name: string, prefix = "q_"): string {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
   return `${prefix}${slug}`.slice(0, 27).replace(/_+$/, "");
+}
+
+export const DIFFICULTY_DC: Record<string, number> = { easy: 10, moderate: 15, hard: 20, veryhard: 25, "very hard": 25 };
+
+/** The numeric DC of a check: `dc`, else the named difficulty. */
+export function checkDc(c: StageCheck): number {
+  return c.dc ?? DIFFICULTY_DC[c.difficulty ?? ""] ?? 15;
+}
+
+function validateCheck(c: StageCheck, n: number, skillOnly: boolean): void {
+  const kinds = [c.skill, c.ability, c.save].filter(Boolean).length;
+  if (kinds !== 1) throw new QuestSpecError(`stage ${n}: a check needs exactly one of skill, ability or save`);
+  if (skillOnly && !c.skill) throw new QuestSpecError(`stage ${n}: a search check is a skill check`);
+  if (c.dc === undefined && !c.difficulty) throw new QuestSpecError(`stage ${n}: a check needs dc or difficulty`);
+}
+
+/** Dialog stages put the spawn on their q_act line; event stages put it on the slot's locals and QuestAdvance runs it. */
+const SPAWN_KINDS: StageKind[] = ["talk", "return", "deliver", "rescue", "kill", "pickup", "explore", "trigger", "use", "search"];
+
+function validateSpawn(sp: StageSpawn, n: number, kind: StageKind): void {
+  if (!SPAWN_KINDS.includes(kind))
+    throw new QuestSpecError(`stage ${n} (${kind}): spawn works on ${SPAWN_KINDS.join(", ")} stages (not escort or custom)`);
+  if (!sp.resref) throw new QuestSpecError(`stage ${n}: spawn needs a resref`);
+  if (!sp.at && !sp.area) throw new QuestSpecError(`stage ${n}: spawn needs an at (waypoint tag) or an area to place one in`);
+  if (sp.count !== undefined && (!Number.isInteger(sp.count) || sp.count < 1 || sp.count > 8))
+    throw new QuestSpecError(`stage ${n}: spawn count must be a whole number from 1 to 8`);
 }
 
 const TAG_RE = /^[a-z][a-z0-9_]*$/;
@@ -300,6 +361,11 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
   }
   if (stagesIn.length === 0) throw new QuestSpecError("a quest needs stages (or a template)");
 
+  if (q.spawn) {
+    const [first, ...rest] = stagesIn;
+    stagesIn = [{ ...first, spawn: first.spawn ?? q.spawn }, ...rest];
+  }
+
   // Stage 1 is always accepting the quest from the giver.
   if ((stagesIn[0].do ?? "talk") !== "talk" || (stagesIn[0].to && stagesIn[0].to !== q.giver)) {
     stagesIn = [{ do: "talk", journal: `I agreed to help: ${name}.` }, ...stagesIn];
@@ -324,6 +390,7 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     if (s.n === undefined || s.n >= next) next = n + 1;
     const journal = (s.journal ?? "").trim();
     if (!journal) throw new QuestSpecError(`stage ${n} (${kind}) needs a journal line`);
+    if (s.spawn) validateSpawn(s.spawn, n, kind);
     stages.push({ ...s, do: kind, n, from: s.from ?? n - 1, journal, end: s.end ?? false });
   }
 
@@ -338,6 +405,7 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     if (s.do === "kill" || s.do === "rescue" || s.do === "escort" || s.do === "use" || s.do === "search")
       need("target", "a target");
     if (s.do === "search" && !s.check) throw new QuestSpecError(`stage ${s.n} (search) needs a check {skill, dc}`);
+    if (s.check) validateCheck(s.check, s.n, s.do === "search");
     if (s.do === "pickup" && !s.item && !s.itemName)
       throw new QuestSpecError(`stage ${s.n} (pickup) needs an item or itemName`);
     if (s.do === "explore" || s.do === "trigger") need("area", "an area");

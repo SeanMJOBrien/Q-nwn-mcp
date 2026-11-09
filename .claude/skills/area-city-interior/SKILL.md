@@ -72,7 +72,7 @@ model from `DoorKitchen01`; mismatching them is the interior equivalent of a tex
 one `HomeLower01_2x2` plus stairs to a `HomeUpper01_2x2`, rather than assembling rooms by hand.
 
 **Rule: a home interior (a personal residence — a Living room/Kitchen/`Home*` dwelling, not an
-Inn/tavern or Shop) is capped at 3×4 tiles (12 tiles).** This is tighter than the general p90=60
+Inn/tavern or Shop) is capped at 3×4 tiles (12 tiles); a cabin is 2×2 and an inn/tavern 2×4, often with `StairsUp`/`StairsDown` to an upper floor of the same size — get the figure from `suggest_area_size`.** This is tighter than the general p90=60
 guidance above, deliberately — a house's room scale reads as intentionally tight and lived-in, not
 merely small. `create_area(width: "3", height: "4", tileset: "tin01")` or `"4"/"3"` is the right
 call for a single-room home; a house with more than one functional room (kitchen + living room,
@@ -110,10 +110,6 @@ a castle's halls, jails, and baileys legitimately exceed this.**
 
 ## Group names: use the display name
 
-`paint_group` matches the tileset's **display** names, not the raw identifiers in the
-`.set` file. The tables above list groups as the `.set` names them; the tool wants the spaced
-form — `Stone Room 1 1x2`, not `StoneRoom01_1x2`.
-
 Call `paint_group` with a deliberately wrong name to have it print every valid group for that
 tileset, then copy the name exactly:
 
@@ -123,9 +119,4 @@ paint_group(area: "...", feature: "?", x: "0", y: "0")
 
 Two further things the corpus build surfaced:
 
-- **Crosser and corner mismatch warnings are real.** A group placed against a different terrain
-  reports e.g. `corner mismatch (dirt vs grass)` — a visible seam. Either place a matching
-  transition tile or accept the seam knowingly.
-- **Interior room groups are mostly wall.** A `tic01` room tile reports 17-35% walkable; that is
-  normal for interiors and is why hand-built castle interiors are only ~30 tiles.
-
+Placing groups (display names, mismatch warnings): see the **nwn-tileset-conventions** skill, "Placing groups with paint_group".
