@@ -171,5 +171,16 @@ export function findDefaultTile(tileset: TilesetInfo, terrain?: string): TilePla
       best.push(m);
     }
   }
-  return best[Math.floor(Math.random() * best.length)];
+
+  // Among ties, prefer the lowest tile ID rather than a random pick. In every
+  // real tileset checked (e.g. ttr01's plain "a01"-"a04" grass tiles at IDs
+  // 0-3), the plainest/lowest-polygon variant of a corner pattern is modeled
+  // first and gets the lowest ID — later IDs in the same tie tend to be
+  // decorated variants (rocks, tufts, debris) added for occasional accent use,
+  // not for repeating across a whole area's ground fill. A random pick could
+  // just as easily land on one of those cluttered variants and, since
+  // findDefaultTile's result is written to every cell of a new area
+  // (see create_area in paint-tools.ts), repeat it everywhere.
+  best.sort((a, b) => a.tileId - b.tileId);
+  return best[0];
 }

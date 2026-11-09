@@ -90,6 +90,21 @@ describe("findDefaultTile", () => {
     expect(result).not.toBeNull();
     expect(result!.tileId).not.toBe(5);
   });
+
+  it("prefers the lowest tile ID among tied top-scoring matches, deterministically", () => {
+    // Two tiles with identical corners/crossers (tying for the max score) —
+    // real tilesets put the plainest/lowest-polygon variant of a corner
+    // pattern at the lowest ID, with later IDs reserved for decorated
+    // variants, so a tie should resolve to the lowest ID every time rather
+    // than a random pick.
+    const tileset = makeTileset();
+    tileset.tiles.push(makeTile(6, "Forest", "Forest", "Forest", "Forest"));
+    for (let i = 0; i < 20; i++) {
+      const result = findDefaultTile(tileset, "Forest");
+      expect(result).not.toBeNull();
+      expect(result!.tileId).toBe(0);
+    }
+  });
 });
 
 describe("validateTilePlacement", () => {

@@ -61,13 +61,22 @@ export function registerPaintTools(server: McpServer): void {
         return { content: [{ type: "text", text: `No suitable default tile found for terrain: ${defaultTerrain || tileset.defaultTerrain}` }] };
       }
 
-      // Build Tile_List
+      // Build Tile_List. The same plain tile ID is used for every cell (that's
+      // the point — a repeated low-poly tile reads as clean ground, not as a
+      // visible repeating pattern), but its *orientation* is varied per cell
+      // with a cheap deterministic formula so flat fill doesn't look like a
+      // tiled wallpaper. A symmetric all-one-terrain, no-crosser tile renders
+      // identically at every orientation, so this is free visual variety with
+      // no risk of a corner/crosser mismatch at tile boundaries.
       const tileList: GffObj[] = [];
       for (let i = 0; i < width * height; i++) {
+        const x = i % width;
+        const y = Math.floor(i / width);
+        const orientation = (defaultPlacement.orientation + x * 3 + y * 7) % 4;
         tileList.push({
           __struct_id: i,
           Tile_ID: { type: "int", value: defaultPlacement.tileId },
-          Tile_Orientation: { type: "int", value: defaultPlacement.orientation },
+          Tile_Orientation: { type: "int", value: orientation },
           Tile_Height: { type: "int", value: 0 },
           Tile_MainLight1: { type: "byte", value: 0 },
           Tile_MainLight2: { type: "byte", value: 0 },
