@@ -204,16 +204,16 @@ The rest are open.
     - **Merged 2026-11-08 (fourth time):** the quest-system work was fast-forwarded into `master`: dialog script parameters and
       native quest fields (`f1747e0`), the quest system (`39b39ec`), search/custom stages (`db5948d`), optional clues, approaching
       NPCs and join/companion/dismiss (`b544602`), and this TODO update. The working branch is 0 ahead of `master`.
+    - **Committed 2026-11-09, not yet merged or pushed:** two commits on `systest-live-run-and-generalized-spec`, 2 ahead of `origin/master`:
+      `de41f69` (analyze_walkmesh util, create_area default-tile fix) and `deb7aca` (S1-S9, adventure composition tools, quest spawn/check
+      runtime, forge and verify fixes, docs). `master` is still `f7847c0`. Only `graphify-out/` remains untracked and is deliberately not committed.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
       `spatial-conventions-and-variable-tools`, `weapon-preference-variety`, `moonglow-run-plugin` (its unique commit had
       been cherry-picked; every moonglow file in `master` was checked identical before deleting), and `area-avenue-rotation`
       (fully merged via the working branch).
-    - **Uncommitted work in the working tree** (not commits, listed so it isn't lost): `analyze_walkmesh`
-      (`src/util/walkmesh-analysis.ts` + test, `analysis-tools.ts`, `nwn-object-placement` skill, `CHANGELOG.md`; untested on real
-      areas), the `create_area` default-tile fix (`tile-solver.ts`/`.test.ts`, `paint-tools.ts`, its `CLAUDE.md` entry), and
-      `graphify-out/`.
+    - **Uncommitted work in the working tree:** only `graphify-out/` (untracked, not for commit).
 
 16. **TODO (user-raised, 2026-11-08) — copy the quest-system fixes and additions into `~/git/Q-tfn-content-studio`.** This
     project's quest system (`docs/quest-system.md`, `src/util/quest-{script,spec,builder}.ts`) was ported from TFN's
