@@ -204,9 +204,9 @@ The rest are open.
     - **Merged 2026-11-08 (fourth time):** the quest-system work was fast-forwarded into `master`: dialog script parameters and
       native quest fields (`f1747e0`), the quest system (`39b39ec`), search/custom stages (`db5948d`), optional clues, approaching
       NPCs and join/companion/dismiss (`b544602`), and this TODO update. The working branch is 0 ahead of `master`.
-    - **Committed 2026-11-09, not yet merged or pushed:** two commits on `systest-live-run-and-generalized-spec`, 2 ahead of `origin/master`:
-      `de41f69` (analyze_walkmesh util, create_area default-tile fix) and `deb7aca` (S1-S9, adventure composition tools, quest spawn/check
-      runtime, forge and verify fixes, docs). `master` is still `f7847c0`. Only `graphify-out/` remains untracked and is deliberately not committed.
+    - **Merged 2026-11-09 (fifth time):** the working branch fast-forwarded into `master` and both were pushed: `de41f69` (analyze_walkmesh util,
+      create_area default-tile fix), `deb7aca` (S1-S9, adventure composition tools, quest spawn/check runtime, forge and verify fixes, docs) and
+      this TODO update. The working branch is 0 ahead of `master`. Only `graphify-out/` remains untracked and is deliberately not committed.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
