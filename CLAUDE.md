@@ -261,6 +261,8 @@ The rest are open.
       SQLite time), `q_mod_acquire`/`q_mod_tick` wrappers (TFN has `on_item_acq`/its own heartbeat).
 
 17. **DONE 2026-11-09 (user: "spawn only into an explored area" is not needed; spawns may target any area, and NWN doesn't run an area with no player in it) (see S6 above; the list below is the original spec).** A class-based bounty is forged with `forge_creature` on its blueprint first.
+    Original request (2026-11-08): spawn creatures from dialog parameters as a real quest feature, e.g. a bounty target appearing once the
+    bounty is accepted. What exists: `q_act` already takes
     `spawn=<resref> at=<waypoint tag>` (`src/util/quest-script.ts`), but only as a raw dialog parameter. Gaps:
     - **Not in the `build_quest` spec.** No stage/line field emits it, so a quest author has to hand-edit `ActionParams`. Add a
       `spawn` option (on an accept line or a stage's `onStart`) that `quest-builder.ts` turns into the parameters, and pair it
