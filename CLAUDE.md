@@ -159,7 +159,7 @@ The rest are open.
     (`git push -u origin area-avenue-rotation`) so it won't recur. Left as its own
     pushed branch, explicitly undecided: develop it further or delete it later.
 
-14. **TODO (user-raised, 2026-11-07) — creature forge gaps.** `forge_creature`/`create_creature_level_system`
+14. **ACCEPTED AS COMPLETE 2026-11-09 (user) — creature forge gaps.** Monster-class forging is not wanted; palette monsters are placed as-is. `forge_creature`/`create_creature_level_system`
     (`src/tools/creature-forge-tools.ts`, generated NWScript in `src/util/creature-level-script.ts`) cover
     class-based creatures. Five gaps were left; three are now closed in the tools.
     - ~~**Fixed signature spell.**~~ **DONE 2026-11-07:** `forge_creature` `pinnedSpells` (stored as
@@ -260,8 +260,7 @@ The rest are open.
     - **Not to port:** whole-party journal advance, vanilla `NW_JOURNAL_ENTRY` state, the module-heartbeat bounty clock (TFN has
       SQLite time), `q_mod_acquire`/`q_mod_tick` wrappers (TFN has `on_item_acq`/its own heartbeat).
 
-17. **DONE 2026-11-09 except a forge option (see S6 above; the list below is the original spec).** Added `spawn.when: "entered"` (the group waits until a player is in the spawn area; polling, not an OnEnter hook). A class-based bounty is still forged by running `forge_creature` on its blueprint first. (user-raised, 2026-11-08) — spawn creatures from dialog parameters as a real quest feature**, e.g. a bounty target
-    appearing in an area the party has already explored once the bounty is accepted. What exists: `q_act` already takes
+17. **DONE 2026-11-09 (user: "spawn only into an explored area" is not needed; spawns may target any area, and NWN doesn't run an area with no player in it) (see S6 above; the list below is the original spec).** A class-based bounty is forged with `forge_creature` on its blueprint first.
     `spawn=<resref> at=<waypoint tag>` (`src/util/quest-script.ts`), but only as a raw dialog parameter. Gaps:
     - **Not in the `build_quest` spec.** No stage/line field emits it, so a quest author has to hand-edit `ActionParams`. Add a
       `spawn` option (on an accept line or a stage's `onStart`) that `quest-builder.ts` turns into the parameters, and pair it

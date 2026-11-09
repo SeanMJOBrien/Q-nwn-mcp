@@ -93,8 +93,6 @@ export interface StageSpawn {
   area?: string;
   x?: number;
   y?: number;
-  /** "entered": wait until a player is in the spawn waypoint's area before the group appears (default "now"). */
-  when?: "now" | "entered";
   /** Hostile faction (default true). */
   hostile?: boolean;
 }
@@ -240,8 +238,6 @@ function validateSpawn(sp: StageSpawn, n: number, kind: StageKind): void {
   if (!SPAWN_KINDS.includes(kind))
     throw new QuestSpecError(`stage ${n} (${kind}): spawn works on ${SPAWN_KINDS.join(", ")} stages (not escort or custom)`);
   if (!sp.resref) throw new QuestSpecError(`stage ${n}: spawn needs a resref`);
-  if (sp.when !== undefined && sp.when !== "now" && sp.when !== "entered")
-    throw new QuestSpecError(`stage ${n}: spawn when must be "now" or "entered"`);
   if (!sp.at && !sp.area) throw new QuestSpecError(`stage ${n}: spawn needs an at (waypoint tag) or an area to place one in`);
   if (sp.count !== undefined && (!Number.isInteger(sp.count) || sp.count < 1 || sp.count > 8))
     throw new QuestSpecError(`stage ${n}: spawn count must be a whole number from 1 to 8`);

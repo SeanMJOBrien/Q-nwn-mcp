@@ -360,7 +360,7 @@ describe("build_quest", () => {
         giver: "farmer_ned",
         template: "bounty",
         target: "bounty_orc",
-        spawn: { resref: "bounty_orc", area: "fold", x: 20, y: 20, count: 2, tag: "bounty_orc_1", when: "entered" },
+        spawn: { resref: "bounty_orc", area: "fold", x: 20, y: 20, count: 2, tag: "bounty_orc_1" },
       });
       const r = json(await c.callTool({ name: "build_quest", arguments: { spec } }));
       expect(r.success).toBe(true);
@@ -381,7 +381,6 @@ describe("build_quest", () => {
         spawn_count: "2",
         spawn_tag: "bounty_orc_1",
         spawn_key: "b_orc_bounty_1",
-        spawn_when: "entered",
       });
       // The blueprint carries the kill wiring the spawned copies inherit.
       const bp = mockIndex.parsedGff.get("bounty_orc.utc") as unknown as GffObj;

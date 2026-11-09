@@ -186,8 +186,6 @@ stage advances. Dialog stages still put the same values on their `q_act` line. `
 waypoint, not while the tagged creature lives, 1–8 creatures 1.5 m apart, Hostile by default. A chain is a `kill` on the lookout with a `spawn` of the
 main force, then a `kill` on the main force (§6 of this file and [adventure-composition.md](adventure-composition.md)).
 
-`spawn.when: "entered"` (`spawn_when=entered` on a `q_act` line, `questK_spawn_when` local) makes `QuestSpawn` wait, polling every 5 s for up to an hour, until a player is in the waypoint's area, so nothing appears in an area the party has not reached. Default `now`.
-
 ## 15. Known gaps
 
 - `place_tile_doors`, `build_companion` and `build_quest` `spawn` are unit/integration-tested but not exercised against a real painted area or a live
