@@ -78,7 +78,7 @@ function questFields(extras?: NodeExtras): Record<string, unknown> {
   if (!extras?.quest) return { Quest: { type: "cexostring", value: "" } };
   return {
     Quest: { type: "cexostring", value: extras.quest },
-    QuestEntry: { type: "dword", value: extras.questEntry ?? 0 },
+    QuestEntry: { type: "dword", value: Number(extras.questEntry ?? 0) },
   };
 }
 

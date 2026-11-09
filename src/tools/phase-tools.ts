@@ -24,6 +24,9 @@ import {
   type Phase,
   type PhaseEntry,
   requiredFor,
+  SCOPE_KINDS,
+  setScopeFields,
+  skipFromRun,
   stopMessage,
 } from "../util/phase-check.js";
 import { computeConnectivity } from "./analysis-tools.js";
@@ -58,6 +61,59 @@ async function recordStatus(tempDir: string, phase: Phase, entry: PhaseEntry): P
 }
 
 export function registerPhaseTools(server: McpServer): void {
+  server.tool(
+    "set_project_scope",
+    "Record what the user wants from this session, so effort goes to their goal. Ask them first (whole adventure, only some phases, one feature, or NWScript only), then call this. Always writes project-scope.json in the module temp dir. For whole_adventure and some_phases it also writes `Scope:` and `Skip phases:` into adventure.md's ## Module (creating adventure.md when missing); phase_check then returns skipped for the skipped phases and later phases stop requiring their sections. `phases` lists the phases to RUN for some_phases (everything else is skipped). With no arguments it returns the recorded scope.",
+    {
+      kind: z.enum(SCOPE_KINDS).optional().describe("whole_adventure | some_phases | one_feature | nwscript_only"),
+      scope: z.string().optional().describe("One line, the user's own words: what they asked for"),
+      phases: z.string().optional().describe("JSON array of phases to run (some_phases only), e.g. [\"quests\",\"challenges\"]"),
+    },
+    { idempotentHint: true },
+    async ({ kind, scope, phases }) => {
+      const index = requireIndex();
+      const scopePath = path.join(index.tempDir, "project-scope.json");
+      if (!kind) {
+        const raw = await readIfExists(scopePath);
+        return text(raw ? JSON.parse(raw) : { recorded: false, message: "No scope recorded. Ask the user what they want, then call set_project_scope." });
+      }
+      if (!scope?.trim()) return text({ ok: false, error: "scope is required: one line in the user's words." }, true);
+      let run: Phase[] = [];
+      if (kind === "some_phases") {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(phases ?? "[]");
+        } catch {
+          return text({ ok: false, error: "phases must be a JSON array of phase names." }, true);
+        }
+        const names = Array.isArray(parsed) ? parsed.map(String) : [];
+        const bad = names.filter((n) => !(PHASES as readonly string[]).includes(n));
+        if (names.length === 0 || bad.length > 0) {
+          return text({ ok: false, error: `some_phases needs "phases": a JSON array drawn from ${PHASES.join(", ")}${bad.length ? ` (unknown: ${bad.join(", ")})` : ""}.` }, true);
+        }
+        run = names as Phase[];
+      }
+      const skip: Phase[] = kind === "some_phases" ? skipFromRun(run) : [];
+      const usesPipeline = kind === "whole_adventure" || kind === "some_phases";
+      let wroteAdventure = false;
+      if (usesPipeline) {
+        const adventurePath = path.join(index.tempDir, "adventure.md");
+        const md = (await readIfExists(adventurePath)) ?? `# Adventure: ${index.moduleName}\n`;
+        await fs.writeFile(adventurePath, setScopeFields(md, scope.trim(), skip));
+        wroteAdventure = true;
+      }
+      const record = { kind, scope: scope.trim(), run: kind === "some_phases" ? run : undefined, skip, usesAdventurePipeline: usesPipeline };
+      await fs.writeFile(scopePath, JSON.stringify(record, null, 2));
+      const next =
+        kind === "nwscript_only"
+          ? "No adventure pipeline: use write_script / compile_script and nwn-logic-debug; do not build areas."
+          : kind === "one_feature"
+            ? "No adventure.md pipeline: build just that feature with the matching tool (build_quest, build_companion, compose_encounter, create_store_blueprint...) in the existing module."
+            : `Run the pipeline; phase_check skips ${skip.length ? skip.join(", ") : "nothing"}.`;
+      return text({ ok: true, ...record, wroteAdventure, next });
+    },
+  );
+
   server.tool(
     "phase_check",
     "Start and end check for one /create-adventure phase. A phase named under `Skip phases` in adventure.md's ## Module (the user's declared scope) returns skipped:true on both steps — do nothing — and no later phase requires its section. step=\"start\": verifies the adventure.md sections the phase needs exist and are non-empty — if not it returns isError with the exact message to STOP on. step=\"end\": verifies the phase appended its own section, runs the verifiers for that phase (area connectivity for 'areas'; verify_* findings of the matching object types for the others; everything for 'polish'/'rewards'), and writes the phase's entry to adventure-status.json (success / partial with the error list). Pass `warnings`/`errors` for anything the phase itself wants recorded. For 'quests' also run verify_quest_completability.",

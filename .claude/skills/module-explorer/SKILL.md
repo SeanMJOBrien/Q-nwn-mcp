@@ -13,7 +13,7 @@ make targeted edits on request.
 
 ## Ask what the user needs first
 
-Before touching anything, find out the purpose: one or two aspects of the module (a dialog, a quest, an NPC, a loot table)? NWScript only? one larger feature? or certain phases of an adventure project? Work only on that. If the request is already specific ("fix this script", "add a merchant"), the question is answered; don't ask it again.
+Before touching anything, find out the purpose: one or two aspects of the module (a dialog, a quest, an NPC, a loot table)? NWScript only? one larger feature? or certain phases of an adventure project? Work only on that, and record it with `set_project_scope` (kind one_feature or nwscript_only) so later calls and other models see it. If the request is already specific ("fix this script", "add a merchant"), the question is answered; don't ask it again.
 
 ## Always load first
 

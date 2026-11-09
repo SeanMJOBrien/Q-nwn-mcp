@@ -1,3 +1,4 @@
+import { resrefError } from "../util/resref.js";
 import { z } from "zod";
 import path from "path";
 import fs from "fs/promises";
@@ -114,6 +115,7 @@ export function registerWriteTools(server: McpServer): void {
     },
     { destructiveHint: true },
     async ({ resref, tag, name, baseItem, sourceResref, cost, description, plot, stackSize, charges, addCost, properties }) => {
+      { const bad = resrefError(resref); if (bad) return bad; }
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
       const key = `${resrefLower}.uti`;

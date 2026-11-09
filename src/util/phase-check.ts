@@ -139,3 +139,37 @@ export function mergeStatus(existing: unknown, phase: Phase, entry: PhaseEntry):
   doc.phases[phase] = entry;
   return doc;
 }
+
+export const SCOPE_KINDS = ["whole_adventure", "some_phases", "one_feature", "nwscript_only"] as const;
+export type ScopeKind = (typeof SCOPE_KINDS)[number];
+
+/** Phases to skip so that only `run` remain (the order of PHASES is kept). */
+export function skipFromRun(run: Phase[]): Phase[] {
+  return PHASES.filter((p) => !run.includes(p));
+}
+
+/**
+ * Writes `- **Scope:**` and `- **Skip phases:**` into the `## Module` section (replacing existing lines, appending
+ * missing ones, creating the section when absent). An empty skip list removes the Skip phases line.
+ */
+export function setScopeFields(markdown: string, scope: string, skip: Phase[]): string {
+  const lines = markdown.split("\n");
+  let start = lines.findIndex((l) => /^##\s+Module\s*$/.test(l));
+  if (start < 0) {
+    const tail = markdown.endsWith("\n") || markdown === "" ? "" : "\n";
+    return `${markdown}${tail}\n## Module\n${fieldLines(scope, skip).join("\n")}\n`;
+  }
+  let end = lines.findIndex((l, i) => i > start && /^##\s+/.test(l));
+  if (end < 0) end = lines.length;
+  const body = lines.slice(start + 1, end).filter((l) => !/^[-*]\s*\*\*(Scope|Skip phases):\*\*/i.test(l));
+  while (body.length > 0 && body[body.length - 1].trim() === "") body.pop();
+  const out = [...lines.slice(0, start + 1), ...body, ...fieldLines(scope, skip), "", ...lines.slice(end)];
+  start = 0;
+  return out.join("\n");
+}
+
+function fieldLines(scope: string, skip: Phase[]): string[] {
+  const out = [`- **Scope:** ${scope}`];
+  if (skip.length) out.push(`- **Skip phases:** ${skip.join(", ")}`);
+  return out;
+}

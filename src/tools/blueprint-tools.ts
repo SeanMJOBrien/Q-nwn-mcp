@@ -8,6 +8,7 @@
  * - create_trap_blueprint: Create a new UTT trap trigger blueprint
  */
 
+import { resrefError } from "../util/resref.js";
 import { z } from "zod";
 import { factionWarning, parseFaction } from "../util/placement-hints.js";
 import path from "path";
@@ -69,6 +70,7 @@ export function registerBlueprintTools(server: McpServer): void {
     },
     { destructiveHint: true },
     async ({ resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation, str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment, inventory, lootable, henchman, scripts, soundset, startingPackage, varTable }) => {
+      { const bad = resrefError(resref); if (bad) return bad; }
       const index = requireIndex();
 
       const params: CreatureBuildParams = {
@@ -134,6 +136,7 @@ export function registerBlueprintTools(server: McpServer): void {
     },
     { destructiveHint: true },
     async ({ resref, tag, name, creatures, sourceResref, active, difficulty, maxCreatures, recCreatures, respawns, respawnTime }) => {
+      { const bad = resrefError(resref); if (bad) return bad; }
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
       const key = `${resrefLower}.ute`;
@@ -236,6 +239,7 @@ export function registerBlueprintTools(server: McpServer): void {
     },
     { destructiveHint: true },
     async ({ resref, tag, name, sourceResref, markUp, markDown, storeGold, maxBuyPrice, identifyPrice, inventory }) => {
+      { const bad = resrefError(resref); if (bad) return bad; }
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
       const key = `${resrefLower}.utm`;
@@ -395,6 +399,7 @@ export function registerBlueprintTools(server: McpServer): void {
     },
     { destructiveHint: true },
     async ({ resref, tag, name, scriptOnEnter, sourceResref, detectDC, disarmDC, oneShot, size }) => {
+      { const bad = resrefError(resref); if (bad) return bad; }
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
       const detectN = detectDC !== undefined ? toI(detectDC) : 15;

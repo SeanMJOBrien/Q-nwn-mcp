@@ -27,7 +27,7 @@ Before starting the pipeline, resolve these with the user:
    - *One feature:* skip this skill; use the matching tool directly (`build_quest`, `build_companion`, `compose_encounter`, `add_skill_check`, …) with `module-explorer`.
    - *NWScript only:* use `nwn-logic-debug` and `write_script`; build no areas.
    - *Some phases:* record the phases to leave out as `Skip phases:` in `## Module` (below). `phase_check` then reports those phases as skipped and later phases don't require their sections. Say plainly which earlier content the later phases will lack (a quests phase without areas has nowhere to put anything).
-   - Always record a one-line `Scope:` (what the user asked for, in their words).
+   - Always record the answer with `set_project_scope(kind, scope, phases)` (`kind` is whole_adventure, some_phases, one_feature or nwscript_only; `phases` is the JSON list of phases to run for some_phases). It writes `Scope:` and `Skip phases:` into `## Module` for you and saves `project-scope.json`; call it with no arguments to read the scope back.
 
 1. **Level range required.** The user's prompt must include a level range (e.g., "level 3-5", "for 5th level characters"). If missing, ask for one before proceeding — every downstream skill (challenges, affordances, rewards) depends on it.
 

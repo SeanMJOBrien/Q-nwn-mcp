@@ -103,9 +103,9 @@ nodes by hand.** The full field reference is `docs/quest-system.md`; this phase 
   its companions), so retrying the conversation can't reroll. A check may be an `ability` (`str`..`cha`) or a `save`
   (`fort`/`reflex`/`will`) instead of a `skill`, and `difficulty` (`easy` 10, `moderate` 15, `hard` 20, `veryhard` 25) instead
   of `dc`.
-- **Something appears:** `spawn: {resref, area | at, count, tag, hostile}` on a stage creates the creature(s) when that stage
+- **Something appears:** `spawn: {resref, area | at, count, tag, hostile, when}` on a stage creates the creature(s) when that stage
   advances: when its dialog line is picked (talk/return/deliver/rescue; stage 1 = the quest is accepted) or when it is
-  completed (kill/pickup/explore/trigger/use/search). A bounty target in an explored area, an ambush.
+  completed (kill/pickup/explore/trigger/use/search). A bounty target in an explored area, an ambush. Use `when: "entered"` so the group waits until a player is in that area.
 - **Multi-part encounter (chain):** a `kill` stage on the lookout or scout with a `spawn` of the main force at a waypoint, then a
   `kill` stage on the main force: killing the lookout is what brings them. Put the two groups far apart in the area, the
   second at the waypoint; the second blueprint needs no placed copy. Name an `area` (and optionally `x`,`y`) and build_quest places the waypoint on walkable ground; or give an

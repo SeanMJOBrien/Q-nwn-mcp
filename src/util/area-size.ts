@@ -43,6 +43,11 @@ interface BiomeRule {
   linear?: { width: number; length: number; perEvent: number };
 }
 
+// Measured 2026-11-09 over 1,019 unique hand-built areas (chronicles, FR_Tethyr, Typhaeon, UoA, TFN, hos1), by median tiles for
+// areas holding 1-3 / 4-8 / 9-15 creatures + area-transition/trap triggers + usable placeables:
+//   interior 6/10/15 (cabin 4, inn 8, shop 6 below agree) · castle_interior 25/24/25 · dungeon 64/70/112 · cave 130/90/169.
+// Rural 96, forest 240, frozen 256, underdark 256, castle_exterior 225 are whole exploration maps (few samples, n 8-25), far larger than
+// the budgets below on purpose: these budgets size only what the events need. city_exterior, desert and ruins had too few samples (n < 10).
 const BIOME_RULES: Record<Exclude<Biome, "interior">, BiomeRule> = {
   forest: { baseTiles: 16, perEvent: 8, linear: { width: 3, length: 10, perEvent: 4 } },
   rural: { baseTiles: 36, perEvent: 16, linear: { width: 4, length: 12, perEvent: 4 } },
@@ -53,8 +58,8 @@ const BIOME_RULES: Record<Exclude<Biome, "interior">, BiomeRule> = {
   ruins: { baseTiles: 36, perEvent: 12 },
   underdark: { baseTiles: 64, perEvent: 20, linear: { width: 4, length: 12, perEvent: 4 } },
   dungeon: { baseTiles: 64, perEvent: 16, linear: { width: 3, length: 10, perEvent: 4 } },
-  cave: { baseTiles: 100, perEvent: 24, linear: { width: 4, length: 12, perEvent: 4 } },
-  castle_interior: { baseTiles: 36, perEvent: 12 },
+  cave: { baseTiles: 120, perEvent: 24, linear: { width: 4, length: 12, perEvent: 4 } },
+  castle_interior: { baseTiles: 25, perEvent: 8 },
 };
 
 /** Fixed small-interior footprints (width x height) and how much each extra event grows them, capped. */

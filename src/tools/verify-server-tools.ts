@@ -26,6 +26,7 @@ import { requireIndex } from "../module-loader.js";
 import { erfPack } from "../nim-tools.js";
 import { clearDirtyUnder } from "../util/dirty-state.js";
 import { optNumParam, toI } from "../util/params.js";
+import { parseLootLines, upsertSpawnLoot } from "../util/verify-server/loot.js";
 import {
   bracketTagCount,
   DEFAULT_ERROR_PATTERNS,
@@ -222,9 +223,13 @@ export function registerVerifyServerTools(server: McpServer): void {
         .describe(
           `Case-insensitive substrings to flag as engine errors in the log. Default: ${JSON.stringify(DEFAULT_ERROR_PATTERNS)}.`,
         ),
+      recordLoot: z
+        .boolean()
+        .optional()
+        .describe("Write the [CL_LOOT] lines (what forged creatures bought and will drop) into adventure.md's `## Spawn Loot` section when a module is loaded and adventure.md exists. Default true."),
     },
     { idempotentHint: true },
-    async ({ modulePath, expectedCheckLines, timeoutSeconds, errorPatterns }) => {
+    async ({ modulePath, expectedCheckLines, timeoutSeconds, errorPatterns, recordLoot }) => {
       const verifyServerDir = MCP_FOLDER_VERIFYSERVER;
       const composeFile = path.join(verifyServerDir, "docker-compose.yml");
       try {
@@ -287,6 +292,19 @@ export function registerVerifyServerTools(server: McpServer): void {
       const rawLogExcerpt =
         combinedTail.length > RAW_EXCERPT_MAX_CHARS ? combinedTail.slice(-RAW_EXCERPT_MAX_CHARS) : combinedTail;
 
+      let lootRecorded: string | undefined;
+      const loot = parseLootLines(parsed.otherTaggedLines);
+      if (recordLoot !== false && loot.length > 0) {
+        try {
+          const adventurePath = path.join(requireIndex().tempDir, "adventure.md");
+          const md = await fs.readFile(adventurePath, "utf8");
+          await fs.writeFile(adventurePath, upsertSpawnLoot(md, loot));
+          lootRecorded = `${loot.length} creature(s) written to adventure.md ## Spawn Loot`;
+        } catch {
+          // No module loaded or no adventure.md: the lines are still in otherTaggedLines.
+        }
+      }
+
       return {
         content: [
           {
@@ -294,6 +312,7 @@ export function registerVerifyServerTools(server: McpServer): void {
             text: JSON.stringify(
               {
                 loaded: poll.sawLoadingModule,
+                ...(lootRecorded ? { lootRecorded } : {}),
                 timedOut: poll.timedOut,
                 moduleName,
                 engineErrors: parsed.engineErrors,

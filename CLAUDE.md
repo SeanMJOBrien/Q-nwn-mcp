@@ -105,7 +105,7 @@ The rest are open.
    tool knows the limitation up front.
 6. ~~**DONE — `docs/` index.**~~ `docs/README.md` is a question → document table of contents for every doc and subfolder
    (created 2026-10-02). Keep it current when a doc is added.
-7. ~~**IN PROGRESS — integration coverage is thin.**~~ Only 2 integration test
+7. ~~**DONE 2026-11-09 — integration coverage is thin.**~~ `dialog-journal-encounter.integration.test.ts` (15 tests) covers dialog, journal, encounter and blueprint tools with a write plus a read-back plus the matching `verify_*`, including failure paths; it found and fixed two real bugs (a string `QuestEntry` written to a dword field; creature, item, store, trap and encounter blueprints accepting a resref over 16 characters, now `resrefError`). Original note: Only 2 integration test
    files existed (`tools.integration.test.ts`, `npc-tools.integration.test.ts`)
    against 30+ tool files; dialog, journal, faction, encounter, and blueprint
    tools — the highest blast-radius mutations — had none. First slice done:
@@ -125,7 +125,7 @@ The rest are open.
     stopped at `[1.2.0]` while `package.json` had moved to `1.3.1`. Backfilled
     `[1.3.0]` and `[1.3.1]` entries from the release commit bodies
     (`c834d68`, `f83be47`). Keep extending it on future version bumps.
-11. **TODO (user-raised, 2026-10-01) — skill for doors and area transitions.**
+11. **DONE 2026-11-09 — skill for doors and area transitions.** `area-connections` gained a "Tool sequence" section (`place_tile_doors` / `place_door`, `link_doors`, `create_area_transition`, `place_trigger`, `adventure_create_transition`, then `probe_ground`, `fix_object_heights`, `verify_*`, `check_area_connectivity`). Original request:
     Transition triggers are squares drawn on the tileset floor that move a
     creature to the next area named on the trigger. No skill currently explains
     this mechanic (door-based vs. trigger-based transitions, how the destination
@@ -172,8 +172,7 @@ The rest are open.
     - ~~**List of spawn-bought loot for `/adventure-rewards`.**~~ **DONE 2026-11-07:** every purchase is kept in
       `MCP_GEAR_LOG` and logged as one `[CL_LOOT] tag= resref= area= droppable= items=resref@slot[xstack]:gp,…`
       line per creature, returned by `run_live_verification` in `otherTaggedLines`. Skill updated:
-      `adventure-rewards` (From `## Challenges`). Still open: nothing writes these lines into `adventure.md`
-      automatically — the rewards phase has to run `run_live_verification` itself.
+      `adventure-rewards` (From `## Challenges`). `run_live_verification` now writes them into `adventure.md` `## Spawn Loot` (2026-11-09, `recordLoot`, default on; `adventure-rewards` reads it).
     - **Monster-class creatures** (Animal, Beast, Outsider, Undead, Construct, …). Not forged. **Choosing a
       ready-made monster from the default or custom palette and placing it as-is is acceptable for non-player-class
       creatures** — they don't need to be built. What would still need work, only if wanted: forge support that
@@ -260,7 +259,7 @@ The rest are open.
     - **Not to port:** whole-party journal advance, vanilla `NW_JOURNAL_ENTRY` state, the module-heartbeat bounty clock (TFN has
       SQLite time), `q_mod_acquire`/`q_mod_tick` wrappers (TFN has `on_item_acq`/its own heartbeat).
 
-17. **MOSTLY DONE 2026-11-08 (see S6 above; the list below is the original spec, what's left is noted there)** (user-raised, 2026-11-08) — spawn creatures from dialog parameters as a real quest feature**, e.g. a bounty target
+17. **DONE 2026-11-09 except a forge option (see S6 above; the list below is the original spec).** Added `spawn.when: "entered"` (the group waits until a player is in the spawn area; polling, not an OnEnter hook). A class-based bounty is still forged by running `forge_creature` on its blueprint first. (user-raised, 2026-11-08) — spawn creatures from dialog parameters as a real quest feature**, e.g. a bounty target
     appearing in an area the party has already explored once the bounty is accepted. What exists: `q_act` already takes
     `spawn=<resref> at=<waypoint tag>` (`src/util/quest-script.ts`), but only as a raw dialog parameter. Gaps:
     - **Not in the `build_quest` spec.** No stage/line field emits it, so a quest author has to hand-edit `ActionParams`. Add a
@@ -280,7 +279,7 @@ The rest are open.
       the party can't reach yet. Update `verify_quest_completability` to treat a spawned kill target as present, and
       `docs/quest-system.md` / `adventure-quests` skill.
 
-18. **MOSTLY DONE 2026-11-08 (see S4 above; the list below is the original spec, what's left is noted there)** (user-raised, 2026-11-08) — area size rules by biome, area type and number of events.** Areas come out too big for
+18. **DONE 2026-11-09 (see S4 above; the list below is the original spec).** Budgets measured against 1,019 unique hand-built areas: cave base 120, castle interior base 25; interior, dungeon and the rest agree or are deliberately smaller (comment above `BIOME_RULES` in `area-size.ts`). City exterior, desert and ruins had too few samples to tune. (user-raised, 2026-11-08) — area size rules by biome, area type and number of events.** Areas come out too big for
     what happens in them. Wanted rules (to go into the `area-*` skills and, where `adventure_generate_layout` picks a size, into
     code):
     - **Small interiors:** a cabin is **2x2**; an inn is **2x4**. (Today `area-city-interior` caps every home at 3x4 and
@@ -294,7 +293,7 @@ The rest are open.
       4 rooms (see "Layout Rules"), so small or 3-wide areas must be painted directly (`create_area` + `paint_tiles`/
       `paint_group`) or generated with fewer rooms — confirm what `adventure_generate_layout` does at 2x2, 4x4 and 3x10.
 
-19. **MOSTLY DONE 2026-11-08 (see S3 above; the list below is the original spec, what's left is noted there)** (user-raised, 2026-11-08) — one generic check script driven by parameters: any skill, ability or save, at any DC.**
+19. **DONE 2026-11-09 except a live test with a real player (see S3 above; the list below is the original spec).** `quest-script.live.test.ts` compiles every generated quest script with the real compiler. (user-raised, 2026-11-08) — one generic check script driven by parameters: any skill, ability or save, at any DC.**
     Examples to cover with no new script each time: DC 10 Dexterity check to avoid a falling-stone trap, DC 10 Strength check to
     force a door open, DC 15 Lore check. What exists: `q_roll` (`src/util/quest-script.ts`) takes `skill=<name> dc=N key=K` and
     is **dialog-only** (it reads `GetPCSpeaker()`), skills only, with the best of the speaker and its companions rolling.
@@ -321,7 +320,7 @@ The rest are open.
     - Verify: `verify_coop_rules` should accept it (per-PC tries), and add a unit test per ability/save/skill branch that the
       generated script compiles.
 
-20. **MOSTLY DONE 2026-11-08 — ask the purpose of the work first.** Built: `/create-adventure` pre-flight step 0 asks the scope (whole adventure, some phases, one feature, NWScript only) and records `Scope:` and `Skip phases:` in `## Module`; `phase_check` returns `skipped` for a declared skip and later phases don't require its section; `module-explorer` asks first. Not done: a `set_project_scope` tool (the skill step is enough so far). Original request: The server and `/create-adventure` assume a whole module is
+20. **DONE 2026-11-09 — ask the purpose of the work first.** `set_project_scope(kind, scope, phases?)` records it (`project-scope.json`, plus `Scope:`/`Skip phases:` in `## Module` for pipeline kinds); `/create-adventure` and `module-explorer` call it. Earlier status: Built: `/create-adventure` pre-flight step 0 asks the scope (whole adventure, some phases, one feature, NWScript only) and records `Scope:` and `Skip phases:` in `## Module`; `phase_check` returns `skipped` for a declared skip and later phases don't require its section; `module-explorer` asks first. Not done: a `set_project_scope` tool (the skill step is enough so far). Original request: The server and `/create-adventure` assume a whole module is
     wanted. Add an opening question (in `/create-adventure` and as the first thing a session on this MCP does) about scope, so effort goes
     where the user's goal is: only one or two aspects of a module (areas, NPCs, quests, encounters, loot, dialog)? NWScript only? one larger
     feature (a quest system, a companion, a store, a set piece)? or only certain phases of an adventure project? The answer picks the

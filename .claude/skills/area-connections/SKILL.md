@@ -98,6 +98,20 @@ hand-built modules look like. Reserve it for:
 Tag limit is **11 characters** (resrefs become `a_at_<tag>` / `a_rt_<tag>`, max 16). Call it once
 per pair — it builds both directions.
 
+## Tool sequence
+
+**Door to door (two areas share a wall, gate or building face):**
+
+1. `place_tile_doors(area, dryRun: true)` lists every door a painted tile owns; run it without `dryRun` to place them (add `genericDoor` for `ttr01`-style type-0 doors, e.g. `x3_door_wood001`). Or `place_door(area, blueprint, x, y, bearing)` by hand.
+2. `link_doors(area1, door1Tag, area2, door2Tag)` sets `LinkedTo` and `LinkedToFlags` on both doors. Do not add a script.
+3. `verify_door` on both doors, then `check_area_connectivity`.
+
+**Open terrain (no wall):** `create_area_transition(sourceArea, sourceX, sourceY, targetArea, targetX, targetY, tag, width, depth, rotation)` is one-way: a trigger in the source, a waypoint in the target. Call it twice with source and target swapped for a two-way link. `place_trigger` alone places only the trigger, with no destination.
+
+**Magical or ambiguous crossings:** `adventure_create_transition` builds both directions in one call (tag up to 11 characters).
+
+**Always last:** `probe_ground` at each landing point, `fix_object_heights` (dry run first), `verify_trigger`, and `check_area_connectivity` for the whole module.
+
 ## Transition height — the check that matters
 
 A transition the player cannot reach is worse than no transition. Creatures are snapped to the

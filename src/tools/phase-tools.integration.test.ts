@@ -120,3 +120,36 @@ describe("phase_check", () => {
     }
   });
 });
+
+describe("set_project_scope", () => {
+  it("records some_phases into adventure.md so phase_check skips the rest", async () => {
+    mockIndex.moduleName = "Demo";
+    await fs.writeFile(path.join(tempDir, "adventure.md"), "# Adventure: Demo\n\n## Module\n- **Title:** Demo\n\n## Plot\np\n");
+    const { c, close } = await client();
+    try {
+      const set = body(await c.callTool({ name: "set_project_scope", arguments: { kind: "some_phases", scope: "only quests", phases: '["quests"]' } }));
+      expect(set.ok).toBe(true);
+      expect(set.skip).toContain("areas");
+      expect(set.skip).not.toContain("quests");
+      const skipped = body(await c.callTool({ name: "phase_check", arguments: { phase: "areas", step: "start" } }));
+      expect(skipped.skipped).toBe(true);
+      const read = body(await c.callTool({ name: "set_project_scope", arguments: {} }));
+      expect(read.kind).toBe("some_phases");
+    } finally {
+      await close();
+    }
+  });
+
+  it("nwscript_only writes no adventure.md; bad phases are refused", async () => {
+    const { c, close } = await client();
+    try {
+      const r = body(await c.callTool({ name: "set_project_scope", arguments: { kind: "nwscript_only", scope: "fix my scripts" } }));
+      expect(r.wroteAdventure).toBe(false);
+      await expect(fs.access(path.join(tempDir, "adventure.md"))).rejects.toThrow();
+      const bad = await c.callTool({ name: "set_project_scope", arguments: { kind: "some_phases", scope: "x", phases: '["nope"]' } });
+      expect(bad.isError).toBe(true);
+    } finally {
+      await close();
+    }
+  });
+});

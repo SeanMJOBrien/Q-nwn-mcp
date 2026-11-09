@@ -176,6 +176,8 @@ the same check at the end of `plot` and `polish` (unknown areas are ignored at `
 phase would have written (`parseScope`, `requiredFor` in `src/util/phase-check.ts`). `/create-adventure` asks for the scope first (pre-flight step 0);
 `module-explorer` asks it at the start of a session. One feature or NWScript only: don't use the pipeline.
 
+`set_project_scope(kind, scope, phases?)` records the answer: `kind` is `whole_adventure`, `some_phases` (`phases` = the JSON list to run; the rest become `Skip phases`), `one_feature` or `nwscript_only`. It always writes `project-scope.json` in the temp dir, and for the two pipeline kinds it writes `Scope:`/`Skip phases:` into `## Module` (`setScopeFields`). With no arguments it reads the recorded scope back.
+
 ## 14. Spawn on event stages (encounter chains)
 
 A stage `spawn` on a `kill`, `pickup`, `explore`, `trigger`, `use` or `search` stage (not optional searches, escort or custom) is written as the slot's
@@ -184,9 +186,13 @@ stage advances. Dialog stages still put the same values on their `q_act` line. `
 waypoint, not while the tagged creature lives, 1–8 creatures 1.5 m apart, Hostile by default. A chain is a `kill` on the lookout with a `spawn` of the
 main force, then a `kill` on the main force (§6 of this file and [adventure-composition.md](adventure-composition.md)).
 
+`spawn.when: "entered"` (`spawn_when=entered` on a `q_act` line, `questK_spawn_when` local) makes `QuestSpawn` wait, polling every 5 s for up to an hour, until a player is in the waypoint's area, so nothing appears in an area the party has not reached. Default `now`.
+
 ## 15. Known gaps
 
 - `place_tile_doors`, `build_companion` and `build_quest` `spawn` are unit/integration-tested but not exercised against a real painted area or a live
   game. `q_check` and the whole quest runtime have never run with a real player (the headless server has none).
 - `quests` needs a separate completability call from `phase_check`. A skipped phase is declared in `## Module` (§13).
-- Area budgets in `suggest_area_size` are estimates; compare against a few real builds and adjust `BIOME_RULES`.
+- Area budgets in `suggest_area_size`: measured 2026-11-09 against 1,019 unique hand-built areas (comment above `BIOME_RULES`). Interior, dungeon, cave and castle interior now match the medians; forest, rural, frozen, underdark and castle exterior are whole exploration maps in the corpus (n 8-25) and are deliberately smaller here; city exterior, desert and ruins had too few samples.
+- `run_live_verification` writes the forged creatures' `[CL_LOOT]` lines into adventure.md `## Spawn Loot` (`recordLoot`, default on) for `/adventure-rewards`.
+- `src/util/quest-script.live.test.ts` (env-gated) compiles every generated quest script with the real compiler.

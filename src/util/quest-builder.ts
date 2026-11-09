@@ -845,6 +845,7 @@ export class QuestBuilder {
     if (sp.count && sp.count > 1) params.spawn_count = String(sp.count);
     if (sp.tag) params.spawn_tag = sp.tag;
     if (sp.hostile === false) params.spawn_hostile = "0";
+    if (sp.when === "entered") params.spawn_when = "entered";
     return params;
   }
 
@@ -1006,6 +1007,7 @@ export class QuestBuilder {
       if (sp.spawn_count) vars.push({ name: `quest${slot}_spawn_count`, type: "string", value: sp.spawn_count });
       if (sp.spawn_tag) vars.push({ name: `quest${slot}_spawn_tag`, type: "string", value: sp.spawn_tag });
       if (sp.spawn_hostile) vars.push({ name: `quest${slot}_spawn_hostile`, type: "string", value: sp.spawn_hostile });
+      if (sp.spawn_when) vars.push({ name: `quest${slot}_spawn_when`, type: "string", value: sp.spawn_when });
       this.setVars(owner, vars);
     }
     this.report.stages.push({

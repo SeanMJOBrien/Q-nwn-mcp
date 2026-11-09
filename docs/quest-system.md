@@ -80,7 +80,7 @@ Any stage may add:
   spent the search succeeds anyway, so a required clue can never block the quest), `examine: {skill, dc, var, pass, fail}` (a
   second check rolled on success by whoever is best at it, such as Lore on a found letter's seal; a pass sets module local
   string `var` to "1" and shows `pass` with that companion's name), `none` (text before the quest reaches this stage).
-- `spawn: {resref, area | at, x, y, count, tag, hostile}` on any stage but escort/custom/optional (stage 1 = on acceptance): creates the creature(s) when that stage advances the quest — on a dialog stage via its `q_act` line, on a kill/pickup/explore/trigger/use/search stage via `questK_spawn*` locals that `QuestAdvance` reads (a multi-part encounter: kill the lookout, the main force appears). With `area`, build_quest places the waypoint `<quest tag>_s<n>_spawn` on walkable ground; `at` names an existing one. The `q_act` line carries `spawn`, `at`, `spawn_key` (once per quest stage), and `spawn_count`/`spawn_tag`/`spawn_hostile` when set. A `kill` stage whose target is the spawned resref or tag needs no placed copy. A quest-level `spawn` (templates) goes onto stage 1.
+- `spawn: {resref, area | at, x, y, count, tag, hostile, when}` on any stage but escort/custom/optional (stage 1 = on acceptance): creates the creature(s) when that stage advances the quest — on a dialog stage via its `q_act` line, on a kill/pickup/explore/trigger/use/search stage via `questK_spawn*` locals that `QuestAdvance` reads (a multi-part encounter: kill the lookout, the main force appears). With `area`, build_quest places the waypoint `<quest tag>_s<n>_spawn` on walkable ground; `at` names an existing one. The `q_act` line carries `spawn`, `at`, `spawn_key` (once per quest stage), and `spawn_count`/`spawn_tag`/`spawn_hostile`/`spawn_when` when set. `when: "entered"` makes the group wait (polling every 5 s, up to an hour) until a player is in the waypoint's area, so a bounty target or ambush never appears somewhere the party has not reached. A `kill` stage whose target is the spawned resref or tag needs no placed copy. A quest-level `spawn` (templates) goes onto stage 1.
 - `optional: true` on a `search`: an optional clue — no journal entry, doesn't move the quest on, available once the quest is
   at or past `from` (default 1), pays its `reward` to the party once (never assured).
 - `approach` on stage 1 (true, or a bark such as `"*whines*"`): the giver walks up to the first player it sees and starts its
@@ -162,7 +162,7 @@ Any stage may add:
 
 `target=K` (advance and pay; `aoe=<radius>` advances every player nearby), `take_item=<tag>` `take_count=N`,
 `give_item=<resref>`, `take_gold=N`, `set_var=<name>` `var_value=<v>`, `hostile=1`, `leave=1`, `unlock=<door tag>` `open=1`,
-`destroy=<tag>`, `spawn=<resref>` `at=<waypoint tag>` (+ `spawn_count=N` `spawn_tag=T` `spawn_key=K` `spawn_hostile=0`; spawns once, only at a real waypoint, and logs `[QUEST_WARN]` instead of falling back to the NPC's own spot), `escort=K`, `join=1`, `dismiss=<tag>`.
+`destroy=<tag>`, `spawn=<resref>` `at=<waypoint tag>` (+ `spawn_count=N` `spawn_tag=T` `spawn_key=K` `spawn_hostile=0` `spawn_when=entered`; spawns once, only at a real waypoint, and logs `[QUEST_WARN]` instead of falling back to the NPC's own spot), `escort=K`, `join=1`, `dismiss=<tag>`.
 
 ### Eligibility (TFN's rules)
 

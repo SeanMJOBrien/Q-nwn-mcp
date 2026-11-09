@@ -53,3 +53,24 @@ describe("phase-check", () => {
     expect(requiredFor("actors", ["areas"])).toContain("Plot");
   });
 });
+
+import { setScopeFields, skipFromRun } from "./phase-check.js";
+
+describe("setScopeFields", () => {
+  it("adds scope and skip lines that parseScope reads back", () => {
+    const out = setScopeFields("# A\n\n## Module\n- **Title:** T\n\n## Plot\nx\n", "just quests", skipFromRun(["quests", "challenges"]));
+    const got = parseScope(out);
+    expect(got.scope).toBe("just quests");
+    expect(got.skip).toEqual(["plot", "areas", "environment", "actors", "affordances", "polish", "rewards"]);
+    expect(out).toContain("## Plot\nx");
+  });
+  it("replaces earlier values and drops the skip line when none", () => {
+    const first = setScopeFields("## Module\n- **Title:** T\n", "a", ["areas"]);
+    const second = setScopeFields(first, "b", []);
+    expect(parseScope(second)).toEqual({ scope: "b", skip: [] });
+    expect(second.match(/Scope:/g)).toHaveLength(1);
+  });
+  it("creates the Module section when absent", () => {
+    expect(parseScope(setScopeFields("# A\n", "x", [])).scope).toBe("x");
+  });
+});
