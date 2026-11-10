@@ -32,7 +32,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | A5 | CLAUDE.md: archive done TODOs; priority + acceptance for open ones | done | see `git log` ("A5:"); CLAUDE.md 448 lines; open TODOs renumbered #30-#40 |
 | B1 | #29 design document | done | `docs/module-projects.md`, decisions D1-D3 approved (approved by the user 2026-11-10); Salt Gate temp dir backed up to `adventures/The-Salt-Gate-Conspiracy/temp-backup/` |
 | B2 | `export_project` | done | `src/util/project.ts`, `src/tools/project-tools.ts`; MCP restart needed. Real round trip (pack back to a .mod, compare) is not run: no nim tools in this shell, it goes into B3 as a gated live test |
-| B3 | Load a module from its project | todo | |
+| B3 | Load a module from its project | done | `packProject` + `load_module` on a directory; MCP restart needed. Checked with the real nim tools (`NIM_FOLDER_NWTOOLS=../nwn-tools/linux/neverwinter`): `project.live.test.ts`, and the Salt Gate backup exported, packed and loaded gives the same counts (220 resources, 6 areas, 65 creatures, 0 warnings). JSON-equal, not byte-identical |
 | B4 | Keep project in step; detect files changed on disk | todo | |
 | B5 | Change the repack/send rules everywhere | todo | |
 | B6 | `adopt_module` writes the project; migrate Salt Gate | todo | |

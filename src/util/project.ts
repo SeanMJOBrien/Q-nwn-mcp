@@ -109,3 +109,49 @@ export async function exportProject(index: ModuleIndex, projectDir: string): Pro
   await writeIfChanged(path.join(projectDir, "nasher.cfg"), nasherConfig(index.moduleName));
   return summary;
 }
+
+/** True when `dir` is a module project (has project.json). */
+export async function isProjectDir(dir: string): Promise<boolean> {
+  try {
+    return (await fs.stat(path.join(dir, PROJECT_MANIFEST))).isFile();
+  } catch {
+    return false;
+  }
+}
+
+export async function readManifest(projectDir: string): Promise<ProjectManifest> {
+  return JSON.parse(await fs.readFile(path.join(projectDir, PROJECT_MANIFEST), "utf-8")) as ProjectManifest;
+}
+
+/**
+ * Packs the project into a .mod (default `<projectDir>/build/module.mod`): JSON back to binary GFF with nwn_gff, other
+ * files copied, everything flat into a staging directory, then nwn_erf. Returns the .mod path.
+ */
+export async function packProject(projectDir: string, outMod?: string): Promise<string> {
+  const { jsonToGff, erfPack } = await import("../nim-tools.js");
+  const { clearDirtyUnder } = await import("./dirty-state.js");
+  const manifest = await readManifest(projectDir);
+  const out = outMod ?? path.join(projectDir, "build", "module.mod");
+  const staging = path.join(projectDir, "build", ".staging");
+  await fs.rm(staging, { recursive: true, force: true });
+  await fs.mkdir(staging, { recursive: true });
+  try {
+    for (const fileName of manifest.resources) {
+      const ext = path.extname(fileName).slice(1).toLowerCase();
+      const src = path.join(projectDir, projectPath(fileName));
+      const dest = path.join(staging, fileName);
+      if (GFF_EXTENSIONS.has(ext)) {
+        await jsonToGff(JSON.parse(await fs.readFile(src, "utf-8")), dest);
+      } else {
+        await fs.copyFile(src, dest);
+      }
+    }
+    await fs.mkdir(path.dirname(out), { recursive: true });
+    await fs.rm(out, { force: true });
+    await erfPack(staging, out);
+  } finally {
+    clearDirtyUnder(staging);
+    await fs.rm(staging, { recursive: true, force: true });
+  }
+  return out;
+}

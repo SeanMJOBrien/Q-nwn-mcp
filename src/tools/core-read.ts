@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { loadModule, requireIndex } from "../module-loader.js";
 import { gffToJson, readTextFile, disassembleNcs } from "../nim-tools.js";
 import { GFF_EXTENSIONS, NWN_FOLDER_USER } from "../config.js";
+import { isProjectDir, packProject } from "../util/project.js";
 import { getFieldLocStr, getFieldStr, getFieldNum, getFieldList } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
 
@@ -14,7 +15,7 @@ export function registerCoreReadTools(server: McpServer): void {
     "load_module",
     "Load and index a NWN module (.mod) file. Must be called before using other tools. If just a filename is given (e.g., 'mymod.mod'), it is resolved from the NWN_FOLDER_USER/modules/ directory. Refuses if the currently-loaded module has unpacked changes since its last repack_module — call repack_module first, or pass force:true to discard them.",
     {
-      modPath: z.string().describe("Module filename (e.g., 'mymod.mod') or absolute path"),
+      modPath: z.string().describe("Module filename (e.g., 'mymod.mod'), absolute path, or a module project directory (made by export_project; packed to build/module.mod first)"),
       force: z.boolean().optional().describe("Discard any unpacked changes on the currently-loaded module instead of refusing"),
     },
     { idempotentHint: true },
@@ -30,6 +31,17 @@ export function registerCoreReadTools(server: McpServer): void {
           // Fall through — will fail with a clear error from loadModule
         }
       }
+      // A module project directory (docs/module-projects.md): pack it into build/module.mod, then load that.
+      let packedFrom: string | undefined;
+      try {
+        if ((await fs.stat(resolvedPath)).isDirectory()) {
+          if (!(await isProjectDir(resolvedPath))) throw new Error(`load_module: ${resolvedPath} is a directory without project.json (not a module project; run export_project first).`);
+          packedFrom = resolvedPath;
+          resolvedPath = await packProject(resolvedPath);
+        }
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
       const index = await loadModule(resolvedPath, { force });
       const typeCounts: Record<string, number> = {};
       for (const entry of index.resources.values()) {
@@ -40,6 +52,7 @@ export function registerCoreReadTools(server: McpServer): void {
           type: "text",
           text: JSON.stringify({
             moduleName: index.moduleName,
+            ...(packedFrom ? { project: packedFrom } : {}),
             areaCount: index.areas.size,
             resourceCount: index.resources.size,
             creatureCount: index.creatures.length,
