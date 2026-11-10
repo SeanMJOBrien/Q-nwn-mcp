@@ -616,8 +616,8 @@ was written, and its path.
 
 Every module has a **disconnected DM area** the DM can teleport to, holding a **chest** with two **book items**: the full story (the basis of the module) and the DM guide. Players never reach it: no door, trigger or portal leads in or out. `audit_module` reports "DM area and books" until all of it exists.
 
-1. `create_area` a small area, resref `dm_area`, name "DM Area", about 3x3, tileset `ttr01` (an exterior grass tileset has walkable ground; interior tilesets fill with wall). Do not link it to any other area.
-2. `adventure_find_walkable` for open ground, then `place_waypoint` tag `DM_AREA` there (the DM jumps to it) and `place_placeable` blueprint `plc_chest1`, tag `dm_chest`, then `add_items_to_container` to turn it into a container.
+1. The area is a **fixed template**, not designed per module: 2x2 `tcn01` (City Exterior), no wind, no music or ambient sound, always daytime, with a `DM_AREA` waypoint and a chest tagged `dm_chest` named "DM Chest". The files are `src/templates/dm_area.are`, `.git`, `.gic` in the MCP repo (until `create_dm_area` exists, copy them into the module's temp dir, add `dm_area` to `module.ifo`'s `Mod_Area_list`, then `repack_module`; a module that already has `dm_area` keeps it). Never link it to another area.
+2. Only the chest's contents change per module.
 3. Books are item blueprints with `baseItem` 74 (Book). Put the whole text in `description` (read the file, keep headings, no summary): `create_item_blueprint` resref `dm_book_story`, tag `dm_book_story`, name "<Title>: The Story" (text = `adventure.md`), and resref `dm_book_guide`, tag `dm_book_guide`, name "<Title>: DM Guide" (text = `dm-guide.md`, written in Phase 7c). If a text is over about 6,000 characters, split at a paragraph break into volumes `dm_book_story_1`, `dm_book_story_2` ... (names "(Volume 1 of N)"), keeping "story" / "guide" in each tag.
 4. `add_items_to_container` with `containerTag` `dm_chest` and every book resref, then `get_area_placeables` to confirm the books are inside.
 5. `phase_check` end for `rewards`, and `audit_module`: the "DM area and books" row must be done.
