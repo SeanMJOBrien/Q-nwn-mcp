@@ -5,7 +5,7 @@ describe("generateCompanionScripts", () => {
   const src = generateCompanionScripts();
 
   it("writes every script, include first", () => {
-    expect(Object.keys(src)).toEqual([...COMPANION_SCRIPTS]);
+    expect(Object.keys(src)).toEqual(["inc_sim", ...COMPANION_SCRIPTS]);
     expect(src.inc_companion).toContain("const int CMP_MAX_COMPANIONS = 3;");
   });
 
@@ -32,10 +32,10 @@ describe("generateCompanionScripts", () => {
   });
 
   it("wires each action to the shared include", () => {
-    expect(src.a_hen_join).toContain("CMP_Join(OBJECT_SELF, GetPCSpeaker())");
+    expect(src.a_hen_join).toContain("CMP_Join(OBJECT_SELF, SimSpeaker())");
     expect(src.a_hen_leave).toContain("CMP_Leave(OBJECT_SELF)");
     expect(src.a_hen_stay).toContain("HENCHMAN_CMD_STANDGROUND");
-    expect(src.c_hen_full).toContain("!CMP_PartyHasRoom(GetPCSpeaker())");
+    expect(src.c_hen_full).toContain("!CMP_PartyHasRoom(SimSpeaker())");
   });
 });
 

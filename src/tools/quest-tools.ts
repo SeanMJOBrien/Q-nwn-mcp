@@ -1,3 +1,4 @@
+import { SIM_INCLUDE } from "../util/sim-script.js";
 /**
  * Quest tools: the parameter-driven, whole-party quest system (docs/quest-system.md).
  *
@@ -23,7 +24,7 @@ export async function writeQuestSystem(index: ModuleIndex): Promise<{
 }> {
   const scripts: Array<{ resref: string; compiled: boolean | "include"; compilerOutput?: string }> = [];
   for (const [resref, source] of Object.entries(generateQuestScripts())) {
-    const isInclude = resref === QUEST_INCLUDE;
+    const isInclude = resref === QUEST_INCLUDE || resref === SIM_INCLUDE;
     const r = await writeAndCompileScript(index, resref, source, !isInclude);
     scripts.push({
       resref,

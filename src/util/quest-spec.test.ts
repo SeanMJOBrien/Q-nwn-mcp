@@ -87,12 +87,12 @@ describe("quest runtime", () => {
   const src = generateQuestScripts();
   it("credits the whole party and pays every player", () => {
     expect(src.inc_quest).toContain("AddJournalQuestEntry(sTag, nStage, oPC, TRUE, FALSE, FALSE)");
-    expect(src.inc_quest).toContain("GetFirstFactionMember(oPC, TRUE)");
+    expect(src.inc_quest).toContain("SimFirstPC(oPC)");
     expect(src.inc_quest).toContain("const int QS_MAX_SLOTS = 20;");
   });
   it("advances an AoE stage with its own slot, and credits companions' kills to their master", () => {
     expect(src.q_act).toContain('QuestAdvanceSphere(OBJECT_SELF, StringToInt(s), StringToFloat(sAoe), "talk")');
-    expect(src.inc_quest).toContain("if (GetIsPC(oCreature)) QuestAdvance(oObject, oCreature, nSlot, sVia);");
+    expect(src.inc_quest).toContain("if (SimIsPlayer(oCreature)) QuestAdvance(oObject, oCreature, nSlot, sVia);");
     expect(src.q_ondeath).toContain("QuestResolvePC(GetLastKiller())");
   });
   it("keeps conditions free of side effects: skill checks roll in an action", () => {

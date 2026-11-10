@@ -1,3 +1,4 @@
+import { SIM_INCLUDE } from "../util/sim-script.js";
 /**
  * Companion (henchman) tools.
  *
@@ -50,7 +51,7 @@ export async function writeCompanionSystem(
   const sources = generateCompanionScripts({ maxCompanions });
   const scripts: CompanionSystemResult["scripts"] = [];
   for (const [resref, source] of Object.entries(sources)) {
-    const isInclude = resref === COMPANION_INCLUDE;
+    const isInclude = resref === COMPANION_INCLUDE || resref === SIM_INCLUDE;
     const r = await writeAndCompileScript(index, resref, source, !isInclude);
     scripts.push({
       resref,
