@@ -50,8 +50,8 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | E6 | Uniform `isError` | done | `util/tool-result.ts` `errorResult`; 101 single-line failure returns in 21 tool files now set `isError`; `is-error-guard.test.ts` fails on a new one. Not covered: failures returned across several lines or as `{ success: false }` JSON (the guard looks only at one-line text returns); MCP restart needed |
 | E7 | Seeded generation | done | `util/rng.ts` (`random`, `withSeed`, `freshSeed`); layout generator uses it (23 calls), `style.seed` on `adventure_generate_layout`, result carries `seed`; zone solver and the encounter-composer resref suffix use it; `rng.test.ts` fails on any other `Math.random(`. The forge had no `Math.random` to replace. MCP restart needed |
 | F1 | Creature and caster tools: decision table | done | `docs/creature-tools.md` |
-| F2 | Deprecation notes; `build_key_npc` | in progress | step 1: deprecation text |
-| F3 | Small missing tools | todo | |
+| F2 | Deprecation notes; `build_key_npc` | done | "DEPRECATED: use forge_creature" in the 7 descriptions (build_npc_stat_block, level_creature, build_npc_level_library, equip_npc_by_role, bake_spec_ability_pool, create_spec_ability_system, create_random_abilities_system); skills already used the forge (only `systest-module` calls old tools, on purpose); `build_key_npc` added (validation unit-tested, full build not run against a real module); MCP restart needed |
+| F3 | Small missing tools | in progress | |
 | G1 | Follow-ups for `story-vs-pipeline.md`; adopt fill step | todo | |
 | G2 | Release: CHANGELOG, version | todo | |
 | B7 | Review plain-`fs` writers: route them through the project sync (TODO #41) | done | `afterRemove` added; `adventure-tools`, `bulk-tools`, `object-mgmt-tools`, `write-tools` (clone), `paint-tools` (delete_area), `quest-tools` (dry-run include), `dm-area-tools`, `moonglow-tools` now sync; probe scripts are ignored by the sync; `project-sync-guard.test.ts` fails on a new raw-fs writer. MCP restart needed. Not covered: tools that remove resources by other means than the ones above (none found) |

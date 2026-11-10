@@ -77,7 +77,8 @@ For each NPC described in the plot's `### Key NPCs` section:
    blueprint's stats. **A combat-capable Key NPC** (a guard captain, a rival duelist, a cult
    leader who talks before it fights) is built with `forge_creature` (see "Creature forge" at
    the top of this skill) on its blueprint and its placed copy: `gearRole: "elite"` for a boss
-   or named leader, `"standard"` otherwise, and `originalSpawn: "nw_c2_default9"`.
+   or named leader, `"standard"` otherwise, and `originalSpawn: "nw_c2_default9"`. For a standard
+   PC race, `build_key_npc` does the blueprint, forge, placement and verify in one call.
 
 ---
 

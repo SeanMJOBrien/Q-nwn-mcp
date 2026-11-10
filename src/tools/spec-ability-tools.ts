@@ -79,7 +79,7 @@ export function registerSpecAbilityTools(server: McpServer): void {
 
   server.tool(
     "bake_spec_ability_pool",
-    "Compute and write an OVERSIZED candidate pool of spells onto a creature's SpecAbilityList — every spell its " +
+    "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Compute and write an OVERSIZED candidate pool of spells onto a creature's SpecAbilityList — every spell its " +
       "class/level could legally know, per the loaded module's own classes.2da/cls_spgn_<class>.2da/spells.2da, " +
       "including real D&D 3.5 ability-score bonus spells (not encoded in any 2DA — computed directly). This is the " +
       "build-time half of the Special-Abilities random-caster system: REPLACES SpecAbilityList outright (same " +
@@ -194,7 +194,7 @@ export function registerSpecAbilityTools(server: McpServer): void {
 
   server.tool(
     "create_spec_ability_system",
-    "Generate the Special-Abilities runtime include (inc_spec_ability by default). Its SA_OnSpawn(oCreature), " +
+    "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Generate the Special-Abilities runtime include (inc_spec_ability by default). Its SA_OnSpawn(oCreature), " +
       "called once per spawn, randomly marks a real-slot-sized subset of a creature's PRE-BAKED SpecAbilityList " +
       "pool (bake_spec_ability_pool) 'ready' via the engine's own SetSpellAbilityReady(), un-readying the rest — " +
       "so the same NPC shows a different effective spell loadout each playthrough. Unlike " +

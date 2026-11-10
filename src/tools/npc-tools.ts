@@ -291,7 +291,7 @@ export function registerNpcTools(server: McpServer): void {
 
   server.tool(
     "build_npc_stat_block",
-    "Compute and write a full mechanical stat block (ability scores, FeatList, SkillList, HP, StartingPackage) onto an EXISTING creature blueprint OR a placed instance, following the canonical race->racial feats->ability scores->class->class feats->skill points->HP creation order. " +
+    "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Compute and write a full mechanical stat block (ability scores, FeatList, SkillList, HP, StartingPackage) onto an EXISTING creature blueprint OR a placed instance, following the canonical race->racial feats->ability scores->class->class feats->skill points->HP creation order. " +
       "Reads race_feat_<race>.2da, cls_feat_<class>.2da (List=3 automatic feats), cls_bfeat_<class>.2da (bonus feat slots), cls_skill_<class>.2da (class skills), and classes.2da/racialtypes.2da live from the loaded module — nothing hardcoded except a small curated per-class weapon preference used to fill bonus/generic feat slots. " +
       "Deterministic, no dice rolling: 'elite' power level uses the literal Elite Array (15/14/13/12/10/8); other levels use a D&D 3.5 point-buy budget. Primarily intended for Henchmen (companions are always built as a blueprint before placement); works on any single-class creature blueprint or placed instance. Does not set race/appearance/gender/name — those are create_creature_blueprint's job, set them first. " +
       "For re-leveling an ALREADY-PLACED creature in one call (no manual delete+re-place dance to sync the instance), prefer level_creature instead.",
@@ -390,7 +390,7 @@ export function registerNpcTools(server: McpServer): void {
 
   server.tool(
     "level_creature",
-    "Change a creature's level (up OR down) by a delta, in one call — recomputes its FULL stat block at the new level " +
+    "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Change a creature's level (up OR down) by a delta, in one call — recomputes its FULL stat block at the new level " +
       "(build_npc_stat_block's race->racial feats->ability scores->class->class feats->skill points->HP sequence) " +
       "AND re-bakes its Special-Abilities pool (bake_spec_ability_pool) to match, then writes both directly onto " +
       "the SAME object (blueprint or placed instance) — no delete+re-place dance needed to sync a placed instance. " +
@@ -528,7 +528,7 @@ export function registerNpcTools(server: McpServer): void {
 
   server.tool(
     "build_npc_level_library",
-    "Batch-build a resref library of correctly-leveled creature blueprints for one race/class — one " +
+    "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Batch-build a resref library of correctly-leveled creature blueprints for one race/class — one " +
       "build_npc_stat_block (+ bake_spec_ability_pool) pass per level in `levels`, done server-side in a single " +
       "call instead of an LLM looping N separate tool calls. Each blueprint is named " +
       "`<resrefPrefix>_lvl<NN>` (zero-padded, e.g. sa_wiz_lvl05, sa_wiz_lvl20). " +
@@ -690,7 +690,7 @@ export function registerNpcTools(server: McpServer): void {
 
   server.tool(
     "equip_npc_by_role",
-    "Equip a creature (blueprint or placed instance) with caller-supplied gear, validated against its baked FeatList proficiencies before equipping — never guesses a real item resref itself (source items with list_blueprints/resman_search first, exactly as documented). " +
+    "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Equip a creature (blueprint or placed instance) with caller-supplied gear, validated against its baked FeatList proficiencies before equipping — never guesses a real item resref itself (source items with list_blueprints/resman_search first, exactly as documented). " +
       "Rejects (or with force:true, equips anyway and warns) a weapon/shield the creature has none of the baseitems.2da ReqFeat proficiency feats for, and Chest-slot armor whose AC-Bonus-derived weight tier has no matching Armor Proficiency feat. " +
       "Reports a get_wealth_budget reference figure for the given level/role, recommends a weapon type from a curated per-class preference list when no righthand item was supplied (deterministically varied by the creature's own tag/resref, so same-class NPCs don't all converge on one weapon), and runs verify_creature as its own last step so gear validity and legitimacy are confirmed in one call.",
     {

@@ -75,7 +75,7 @@ export async function ensureRandomAbilitiesInclude(
 export function registerRandomAbilitiesTools(server: McpServer): void {
   server.tool(
     "create_random_abilities_system",
-    "Generate the random-caster-abilities include (inc_random_abil by default). Its RA_OnSpawn(oCreature) rolls a " +
+    "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Generate the random-caster-abilities include (inc_random_abil by default). Its RA_OnSpawn(oCreature) rolls a " +
       "fresh, random spell/ability set for a caster creature every time the module loads, computed entirely in " +
       "NWScript from base-game classes.2da/cls_spgn_<class>.2da/spells.2da — no build-time baking. For Cleric/Druid/" +
       "Paladin/Ranger/Wizard it writes a REAL memorized spellbook via the engine's own SetMemorizedSpell(), picked " +
