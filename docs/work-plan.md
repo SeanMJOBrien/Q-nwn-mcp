@@ -49,8 +49,8 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | E5 | `create_faction` limitation surfaced | done | tool descriptions (create_faction, set_faction_reputation), `verify_creature` warning `custom_faction_unreliable`, adventure-challenges skill; MCP restart needed |
 | E6 | Uniform `isError` | done | `util/tool-result.ts` `errorResult`; 101 single-line failure returns in 21 tool files now set `isError`; `is-error-guard.test.ts` fails on a new one. Not covered: failures returned across several lines or as `{ success: false }` JSON (the guard looks only at one-line text returns); MCP restart needed |
 | E7 | Seeded generation | done | `util/rng.ts` (`random`, `withSeed`, `freshSeed`); layout generator uses it (23 calls), `style.seed` on `adventure_generate_layout`, result carries `seed`; zone solver and the encounter-composer resref suffix use it; `rng.test.ts` fails on any other `Math.random(`. The forge had no `Math.random` to replace. MCP restart needed |
-| F1 | Creature and caster tools: decision table | todo | needs decision D4 |
-| F2 | Deprecation notes; `build_key_npc` | todo | |
+| F1 | Creature and caster tools: decision table | done | `docs/creature-tools.md` |
+| F2 | Deprecation notes; `build_key_npc` | in progress | step 1: deprecation text |
 | F3 | Small missing tools | todo | |
 | G1 | Follow-ups for `story-vs-pipeline.md`; adopt fill step | todo | |
 | G2 | Release: CHANGELOG, version | todo | |

@@ -2,6 +2,7 @@
 
 | Question | Read |
 |---|---|
+| Which creature tool do I use? Which ones are deprecated? | [creature-tools.md](creature-tools.md) |
 | Can quests, companions and checks be tested without a player? | [player-simulation.md](player-simulation.md) |
 | How will a module be stored as a project and built on request (design, TODO #29)? | [module-projects.md](module-projects.md) |
 | How do skill-check puzzles and per-player rewards work in co-op? | [coop-skill-checks-and-rewards.md](coop-skill-checks-and-rewards.md) |
