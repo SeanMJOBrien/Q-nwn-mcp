@@ -22,4 +22,8 @@ describe("findStaleGenerated", () => {
     expect(findStaleGenerated(new Map())).toEqual([]);
     expect(findStaleGenerated(new Map([["inc_cre_level", "// something else"]]))).toHaveLength(1);
   });
+  it("skips a script marked hand-edited", () => {
+    const patched = `// hand-edited: Salt Gate store list\n${generateCreatureLevelInclude().replace("CL_GearLeft(oCreature, 45)", "CL_GearLeft(oCreature, 35)")}`;
+    expect(findStaleGenerated(new Map([["inc_cre_level", patched]]))).toEqual([]);
+  });
 });

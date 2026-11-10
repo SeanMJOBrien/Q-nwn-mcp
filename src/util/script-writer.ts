@@ -13,6 +13,7 @@ import path from "path";
 import { buildResmanOptions } from "../module-loader.js";
 import { compileScript } from "../nim-tools.js";
 import { markDirty } from "./dirty-state.js";
+import { hasHandEditedHeader } from "./hand-edited.js";
 import { afterWrite, beforeWrite } from "./project-sync.js";
 import type { ModuleIndex } from "../types/module.js";
 
@@ -34,12 +35,21 @@ export async function writeAndCompileScript(
   resref: string,
   source: string,
   doCompile: boolean,
+  opts: { allowHandEdited?: boolean } = {},
 ): Promise<WriteScriptResult> {
   const resrefLower = resref.toLowerCase();
   const nssKey = `${resrefLower}.nss`;
   const ncsKey = `${resrefLower}.ncs`;
 
   const nssPath = path.join(index.tempDir, `${resrefLower}.nss`);
+  if (!opts.allowHandEdited) {
+    const existing = await fsPromises.readFile(nssPath, "utf-8").catch(() => null);
+    if (existing !== null && existing !== source && hasHandEditedHeader(existing)) {
+      throw new Error(
+        `${resrefLower}.nss starts with a "// hand-edited:" header, so a generator will not overwrite it. Delete that header line to let the generator rewrite the file, or put your change in a wrapper script.`,
+      );
+    }
+  }
   await beforeWrite(nssPath);
   await fsPromises.writeFile(nssPath, source, "utf-8");
   markDirty(nssPath);

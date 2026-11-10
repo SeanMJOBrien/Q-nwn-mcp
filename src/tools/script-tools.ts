@@ -219,7 +219,7 @@ export function registerScriptTools(server: McpServer): void {
     { idempotentHint: true },
     async ({ resref, source, compile: doCompile }) => {
       const index = requireIndex();
-      const written = await writeAndCompileScript(index, resref, source, doCompile !== false);
+      const written = await writeAndCompileScript(index, resref, source, doCompile !== false, { allowHandEdited: true });
       const result: Record<string, unknown> = { success: true, ...written };
 
       return {

@@ -11,6 +11,7 @@ import { requireIndex } from "../module-loader.js";
 import { buildAdoptedAdventure, hasStoryContent } from "../util/adopt.js";
 import { ADVENTURE_FILES, ensureAdventureDir } from "../util/adventure-dir.js";
 import { buildAudit, gapList, type VerifyCounts } from "../util/audit.js";
+import { exportProject, isProjectDir } from "../util/project.js";
 import { gatherSnapshot } from "../util/module-snapshot.js";
 import { filterForPhase, PHASES, type Phase } from "../util/phase-check.js";
 import { parseStoryGraph, verifyStory } from "../util/story-graph.js";
@@ -66,7 +67,7 @@ export function registerAdoptTools(server: McpServer): void {
 
   server.tool(
     "adopt_module",
-    "Write adventure.md from what the loaded module already contains (areas, creatures, dialogs, journal, stores), so the adventure phases and the review can work on a hand-built or half-built module. Only sections the module has content for are written; a missing section is a gap to fill (listed in `gaps`). Anything it cannot know (tone, premise, motives, roles) is marked `(not recorded)` for the user to fill in — ask them, never invent it. Keeps the recorded Scope/Skip phases. Refuses to replace an adventure.md that already has story content unless overwrite is true. Run audit_module next.",
+    "Write adventure.md from what the loaded module already contains (areas, creatures, dialogs, journal, stores), so the adventure phases and the review can work on a hand-built or half-built module. Only sections the module has content for are written; a missing section is a gap to fill (listed in `gaps`). Anything it cannot know (tone, premise, motives, roles) is marked `(not recorded)` for the user to fill in — ask them, never invent it. Also writes the module as a project beside it (every resource as JSON in src/, see export_project). Keeps the recorded Scope/Skip phases. Refuses to replace an adventure.md that already has story content unless overwrite is true. Run audit_module next.",
     {
       overwrite: z.boolean().optional().describe("Replace an adventure.md that already has story content (default false)"),
     },
@@ -81,9 +82,13 @@ export function registerAdoptTools(server: McpServer): void {
       }
       const result = buildAdoptedAdventure(gatherSnapshot(index), existing);
       await fs.writeFile(file, result.markdown);
+      // The module becomes a project (docs/module-projects.md): every resource as JSON beside the story files.
+      const hadProject = await isProjectDir(dir);
+      const project = await exportProject(index, dir);
       return text({
         ok: true,
         file,
+        project: { dir, created: !hadProject, gff: project.gff, scripts: project.scripts, skipped: project.skipped },
         gaps: result.gaps,
         notRecorded: [...new Set(result.notRecorded)],
         next: "Show the user what was adopted, ask them to fill the (not recorded) fields in their own words, then call audit_module and let them choose which gaps to fill.",

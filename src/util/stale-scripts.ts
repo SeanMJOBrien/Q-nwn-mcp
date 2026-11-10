@@ -8,6 +8,7 @@
  */
 
 import { COMPANION_INCLUDE, DEFAULT_MAX_COMPANIONS, generateCompanionScripts } from "./companion-script.js";
+import { hasHandEditedHeader } from "./hand-edited.js";
 import { generateCreatureLevelInclude, generateCreatureLevelWrapper } from "./creature-level-script.js";
 
 export interface StaleFinding {
@@ -52,7 +53,7 @@ export function findStaleGenerated(sources: Map<string, string>): StaleFinding[]
   const out: StaleFinding[] = [];
   for (const g of GENERATED_SCRIPTS) {
     const existing = sources.get(g.resref);
-    if (existing === undefined) continue;
+    if (existing === undefined || hasHandEditedHeader(existing)) continue;
     const fresh = g.regenerate(existing);
     if (fresh === undefined) {
       out.push({ resref: g.resref, tool: g.tool, message: `${g.resref} is not in the current generated form (its settings could not be read back)` });
