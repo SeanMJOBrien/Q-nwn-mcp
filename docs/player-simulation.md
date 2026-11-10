@@ -30,3 +30,15 @@ One module local, `MCP_TEST_ACTOR` (object, set by the driver on the module obje
 Generated scripts use them in place of `GetIsPC` and `GetPCSpeaker()`; PC-only faction loops become inclusive loops that keep the `SimIsPlayer` filter. Without the local set, behaviour is unchanged for real players.
 
 Not measurable on a stand-in (stays "not checkable" in C3): real conversation UI, `GetPCSpeaker()` inside the engine's own dialog flow, OnClientEnter, per-player persistence, the NPC dialog-condition gating that the dialog engine evaluates (the driver calls the condition and action scripts directly).
+
+## C2 result (2026-11-10): `run_live_verification` with `simulate`
+
+Usage: `run_live_verification({ simulate: '{"steps":[...]}', expectedCheckLines: "<steps + quest log lines + 1>" })`. Each step: `npc` (tag), `script` (`q_act`, `q_chk`, `q_roll`, `a_hen_join`, ...), `params` (the dialog node's script parameters), `kind: "condition"` with `expect`, and optional `expectStage`, `expectGold`, `expectItem`. The result has `simResults.ok/fail/done`. Set `expectedCheckLines` high enough that the run does not stop before `[SIM_DONE]` (quest scripts log `[QUEST]` lines that count too).
+
+Measured on the real engine with a throwaway module (one commoner giver, `build_quest` with a two-stage talk/return quest):
+- `SetScriptParam` then `ExecuteScript` on the NPC passes the parameters to `q_chk` and `q_act`; a condition's result is read back through `SIM_COND`.
+- Accept and hand-in: quest stage 1 and 2 reached on the stand-in, gold paid, "no longer eligible" and "hand-in eligible" conditions correct (5 of 5).
+- A deliberately wrong run reported all three failures (wrong stage, NPC not found, wrong condition result) and `[SIM_DONE] ok=0 fail=3`, so a failure is not silent.
+- The module's own `.mod` and project were not touched: the driver exists only in the throwaway build.
+
+Limits: a module built before `inc_sim` needs `create_quest_system` / `create_companion_system` re-run. `inc_reward` still loops on real PCs only. Dialog flow (condition gating on the dialog engine, node order) is not exercised; steps call the scripts a node would call.

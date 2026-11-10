@@ -178,3 +178,7 @@ summon credits its master. Nothing is stored on `GetModule()` or on NPCs.
 ## Finish
 
 Call `phase_check(phase: "quests", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.
+
+## Run the quest without a player
+
+After `build_quest`, walk the quest on the real engine with a stand-in player: `run_live_verification` with `simulate` (see `docs/player-simulation.md`). One step per dialog line you built: `q_chk` conditions with `expect`, `q_act` actions with `expectStage` (and `expectGold` / `expectItem`). Use the `params` the build plan listed (`[target=1]`, `[quest=<tag> stage=2 op=at]`). Set `expectedCheckLines` to the step count plus the quest log lines plus one so `[SIM_DONE]` is reached. Fix every `[SIM_FAIL]` before the phase ends.
