@@ -696,6 +696,9 @@ describe("comprehensive module — every mockable nwn-mcp system, one shared mod
 
     const resolved = await call("resolve_blueprint", { resource: "hero_comp.utc" });
     expect(resolved.resource).toBe("hero_comp.utc");
+    const rawDoc = await call("resolve_blueprint", { resource: "hero_comp.utc", raw: true });
+    expect(rawDoc.resource).toBeUndefined(); // the raw GFF has no summary wrapper
+    expect(rawDoc.Tag).toBeDefined(); // type-wrapped fields as stored
   });
 
   it("core reads: list_resources, get_resource, get_module_info", async () => {

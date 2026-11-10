@@ -13,19 +13,21 @@ export function registerResmanTools(server: McpServer): void {
 
   server.tool(
     "resolve_blueprint",
-    "Resolve any resource from the full resman stack (base game BIFs + HAKs + override + development) and return its GFF as JSON. Use this to look up base game or HAK blueprints by resref (e.g., 'nw_cloth001.uti', 'nw_dog.utc', 'plc_chest1.utp').",
+    "Resolve any resource from the full resman stack (base game BIFs + HAKs + override + development) and return its GFF. By default the result is a readable SUMMARY (formatGffSummary: fields unwrapped, long lists shortened). Pass raw: true for the full type-wrapped GFF JSON exactly as stored (every field, every list entry), e.g. to read an item's PropertiesList or a creature's FeatList. Use this to look up base game or HAK blueprints by resref (e.g., 'nw_cloth001.uti', 'nw_dog.utc', 'plc_chest1.utp').",
     {
       resource: z.string().describe("Resource filename with extension (e.g., 'nw_cloth001.uti')"),
+      raw: z.boolean().optional().describe("Return the full GFF JSON unsummarised (default false: a summary)."),
     },
     { readOnlyHint: true, idempotentHint: true },
-    async ({ resource }) => {
+    async ({ resource, raw }) => {
       const index = requireIndex();
+      const present = (doc: GffObj) => (raw ? doc : formatGffSummary(doc, resource));
 
       // Check module's own parsed GFF first
       const moduleKey = resource.toLowerCase();
       const moduleDoc = index.parsedGff.get(moduleKey);
       if (moduleDoc) {
-        return { content: [{ type: "text", text: JSON.stringify(formatGffSummary(moduleDoc as GffObj, resource), null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(present(moduleDoc as GffObj), null, 2) }] };
       }
 
       // Resolve from resman stack via extract-then-parse (fast)
@@ -34,7 +36,7 @@ export function registerResmanTools(server: McpServer): void {
         const cacheDir = path.join(index.tempDir, "blueprint_cache");
         await fs.mkdir(cacheDir, { recursive: true });
         const doc = await resmanExtractToJson(resource, cacheDir, resman);
-        return { content: [{ type: "text", text: JSON.stringify(formatGffSummary(doc as GffObj, resource), null, 2) }] };
+        return { content: [{ type: "text", text: JSON.stringify(present(doc as GffObj), null, 2) }] };
       } catch (e) {
         return { content: [{ type: "text", text: `Resource not found in resman: ${resource}\n${e}` }] };
       }
