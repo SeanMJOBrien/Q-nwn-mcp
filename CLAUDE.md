@@ -42,6 +42,17 @@ S1-S9 (skill-prompt reduction) and #1, #4, #6-#11, #13, #14, #17, #18, #24, #27 
 - **#34 randomise head/hair/skin colour for PC-race NPCs** (port GvE3's verified ranges; text in `docs/henchmen-and-caster-history.md`) — P5. **#35 randomised gear appearance** (`docs/gear-and-npc-generation-history.md`) — P6. **#36 re-bake a spell pool after a live level-up** — P5; **#37 auto-fill the DM quickbar** (three unknowns, `docs/henchmen-and-caster-history.md`) — P6.
 - **#38 commit the verify server's simplification (`~/nwn-mcp-verify-server`) — P4**, next time it is used. **#39 encounter composer: does "CR 6" mean whole-fight EL or the boss's own CR? — P4**, ask the user. **#40 Hollow Communion open questions (armor AC premise, Elowen's 2nd-level slot) — P5**, `docs/verification-history.md`.
 - **#41 plain-`fs` writers and the project sync — done 2026-11-10 (B7).** Guarded by `src/tools/project-sync-guard.test.ts`: a new raw-fs write to the temp dir must call `util/project-sync` or be listed there with its reason.
+- **#42-#50 story-versus-pipeline follow-ups** (`docs/story-vs-pipeline.md`, written 2026-11-09; finding numbers in brackets). Order: checks first, then requirements, then templates.
+  - **#42 [3] payoff has a consumer — P3.** `verify_story`/`verify_journal`: every item or clue a journal entry names has a dialog line, script or trigger that uses it, and an item used up by one scene is not needed later. Acceptance: a unit test with a journal entry naming an item nobody asks for fails; the Salt Gate proof items pass.
+  - **#43 [4] journal timing — P3.** `verify_journal` warns when an area OnEnter advances a quest stage that is not an `explore` stage. Acceptance: test with the Hollow Communion shape.
+  - **#44 [5] a choice carries its consequence — P4.** A stage that changes a creature's stance names the group; check flags creatures sharing a tag prefix with a converted NPC. Acceptance: test with the Gorrukh shape.
+  - **#45 [1,2] story record required — P3.** `phase_check` end for `plot` refuses `(not recorded)`; `verify_story` requires a graph above a size; `adopt_module` drafts a graph from areas, quests and key NPCs. Acceptance: Salt Gate adopt then fill shows `story_no_graph` cleared.
+  - **#46 [7] motives before actors — P4.** Each key NPC and the antagonist has a motive on record before `actors`; the actor dialog carries a line of it; `audit_module` lists NPCs without one.
+  - **#47 [8] areas carry beats — P4.** Each location records one beat; `audit_module` flags an area with no beat.
+  - **#48 [3b] aftermath beat — P5.** Plot template gains an aftermath beat; `build_quest` ends a quest on a return stage by default.
+  - **#49 [9] sequel hook — P6.** Optional "open thread" field in the plot and a Chapter 2 template reusing NPCs and items.
+  - **#50 [10] companion lines per beat — P6.** A conditional dialog root per major beat on each companion.
+  - Adopt fill step (done 2026-11-10): `audit_module` returns `fillIn`, the `(not recorded)` fields by heading; the module-explorer skill says to ask the user.
 
 ## Design Intent
 

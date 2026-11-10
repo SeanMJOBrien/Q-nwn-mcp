@@ -153,3 +153,27 @@ export function hasStoryContent(markdown: string | null): boolean {
   const sections = parseSections(markdown);
   return [...sections.entries()].some(([name, body]) => name !== "Module" && body.length > 0);
 }
+
+export interface NotRecordedField {
+  /** The nearest heading above it, e.g. "Chief Gorrukh Ashfang" or "Premise". */
+  where: string;
+  /** The field label ("Motivation") or "(text)" for a whole paragraph. */
+  field: string;
+}
+
+/** Every `(not recorded)` in adventure.md with the heading it sits under, so the user can be asked field by field. */
+export function listNotRecorded(md: string): NotRecordedField[] {
+  const out: NotRecordedField[] = [];
+  let where = "";
+  for (const line of md.split("\n")) {
+    const h = /^#{2,4}\s+(.*)$/.exec(line);
+    if (h) {
+      where = h[1].replace(/`/g, "").trim();
+      continue;
+    }
+    if (!line.includes("(not recorded)")) continue;
+    const label = /^[-*]\s+\*\*(.+?):\*\*/.exec(line);
+    out.push({ where, field: label ? label[1] : "(text)" });
+  }
+  return out;
+}

@@ -1,3 +1,4 @@
+import { listNotRecorded } from "./adopt.js";
 import fs from "fs/promises";
 import os from "os";
 import path from "path";
@@ -208,3 +209,15 @@ describe("countFights", () => {
     expect(countFights([{ x: 0, y: 0 }, { x: 100, y: 0 }])).toBe(2);
   });
 });
+
+describe("listNotRecorded", () => {
+  it("names the heading and field of every (not recorded)", () => {
+    const md = "## Plot\n\n### Premise\n(not recorded) The module has no description.\n\n#### Chief Gorrukh\n- **Role:** (not recorded)\n- **Motivation:** (not recorded)\n- **Dialog:** dlg_g\n";
+    expect(listNotRecorded(md)).toEqual([
+      { where: "Premise", field: "(text)" },
+      { where: "Chief Gorrukh", field: "Role" },
+      { where: "Chief Gorrukh", field: "Motivation" },
+    ]);
+  });
+});
+

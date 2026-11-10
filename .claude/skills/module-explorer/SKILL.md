@@ -152,4 +152,4 @@ authoring and palette-level tileset changes are out of scope for editing
 - `clear_footprint(area, x, y, width, height, tileId?)` overwrites a rectangle with one tile before repainting a group there, so nothing from an earlier `paint_group` is left behind.
 - `bulk_modify_list(resource, type, listPath, where?, set, dryRun?)` sets the same scalar fields on every matching struct of one list (a faction flip across `Creature List`); edits a copy and commits only if every change applied.
 - `verify_creature` warns `lootable_flag_off` for a geared, class-based creature with `Lootable` 0 and no `LOOT_INTENTIONAL`.
-
+- After `adopt_module`, `audit_module` returns `fillIn`: every `(not recorded)` story field with its heading. Ask the user for each in their own words, or offer a draft derived from the module's dialogs and journal and write it only if they accept; never invent it.

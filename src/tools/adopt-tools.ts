@@ -8,7 +8,7 @@ import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { requireIndex } from "../module-loader.js";
-import { buildAdoptedAdventure, hasStoryContent } from "../util/adopt.js";
+import { buildAdoptedAdventure, hasStoryContent, listNotRecorded } from "../util/adopt.js";
 import { ADVENTURE_FILES, ensureAdventureDir } from "../util/adventure-dir.js";
 import { buildAudit, gapList, type VerifyCounts } from "../util/audit.js";
 import { exportProject, isProjectDir } from "../util/project.js";
@@ -136,7 +136,9 @@ export function registerAdoptTools(server: McpServer): void {
         adventureDir: dir,
         gaps: gapList(rows),
         rows,
-        next: "Tell the user what is done and what is missing, in plain words, and ask which gaps they want to fill. Then call set_project_scope with their goal (kind, focus) and use that focus's skills.",
+        // The fill step: every unrecorded story field with where it sits, so the user is asked field by field.
+        fillIn: md ? listNotRecorded(md).slice(0, 80) : [],
+        next: "Tell the user what is done and what is missing, in plain words, and ask which gaps they want to fill. For the story fields in `fillIn`: ask the user for each in their own words (or offer a draft derived from the module's dialogs and journal and write it only if they accept it), then record it in adventure.md. Then call set_project_scope with their goal (kind, focus) and use that focus's skills.",
       });
     },
   );
