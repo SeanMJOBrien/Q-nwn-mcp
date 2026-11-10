@@ -54,7 +54,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | F3 | Small missing tools | todo | |
 | G1 | Follow-ups for `story-vs-pipeline.md`; adopt fill step | todo | |
 | G2 | Release: CHANGELOG, version | todo | |
-| B7 | Review plain-`fs` writers: route them through the project sync (TODO #41) | todo | user-requested 2026-11-10; after B5 |
+| B7 | Review plain-`fs` writers: route them through the project sync (TODO #41) | in progress | step 1: list the writers | user-requested 2026-11-10; after B5 |
 | M1-M4 | Salt Gate module track (see below) | done | All four done 2026-11-10. Oswin's quest rebuilt with the hub builder from a spec reconstructed out of the module (dry run matched every line, slot and reward); `dlg_oswin` passes `verify_dialog`; simulation of its accept steps 3 of 3. `audit_module`: 9 of 11 rows done; open: story fields `(not recorded)` and the player-facing module description (the user's to supply). Not play-tested by a person; `.mod` not built (rule). `temp-backup/` can be deleted. Remaining stale warnings: forged-creature stat-formula warnings (196) |
 | H | Content features (#21/#24, #25, #26) | not planned in detail | design first, one at a time |
 
@@ -68,7 +68,7 @@ Packages not listed here can proceed without an answer.
   from it; direct edits are made to the JSON files, which removes the tool-versus-`nwn_gff` overwrite problem.
 - **D3 (B1):** may `run_live_verification` build a throwaway `.mod` without asking? Recommendation: yes, it is
   never sent to the user.
-- **D4 (F1):** is `forge_creature` the one supported way to build a class-based creature, with
+- **D4 (F1) — approved 2026-11-10: yes, keep the old tools working, remove them from skills.** Original question: ** is `forge_creature` the one supported way to build a class-based creature, with
   `build_npc_stat_block`, `level_creature`, `equip_npc_by_role`, random abilities and special abilities
   marked deprecated? Recommendation: yes; keep the old tools working, remove them from skills.
 
