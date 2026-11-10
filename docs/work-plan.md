@@ -40,8 +40,8 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | C2 | Player simulation: harness | done | `simulate` on `run_live_verification` (`sim-driver.ts`, `inc_sim`); checked on the real engine: a two-stage quest passes 5 of 5, a wrong run reports 3 failures; `docs/player-simulation.md`, adventure-quests skill. MCP restart already done |
 | C3 | Re-check quests, companions, checks, dialog; test goals (#23) | done | Salt Gate 13 of 13 steps on the real engine; per-feature table in `docs/player-simulation.md`; `goal` and `verdict` in `run_live_verification` (MCP restart needed to take effect). Skill-check steps and the hand-written `a_qsalt_*` scripts are not covered |
 | D1 | #28: `build_quest` answers return to the hub | done | `wireHub` in `quest-builder.ts`, test in `quest-tools.integration.test.ts`, `docs/quest-system.md`. User decision: hub = "About: <quest>" per active subject plus [Leave]. Not run on the engine (needs a real conversation); MCP restart needed |
-| D2 | #28: `add_dialog_node` | todo | |
-| D3 | State-dependent main lines | todo | |
+| D2 | #28: `add_dialog_node` | done | new NPC answers return to the hub; `end: true` opts out; test added; MCP restart needed |
+| D3 | State-dependent main lines | done | `addReturnLinks` re-enters via `[Anything else?]` for state-changing answers (copies the start list); no `greeting` field added: `offer` / `reminder` already are the per-state greetings (decision in `docs/quest-system.md`); skills updated |
 | E1 | `trace_dialog_path` root choice | todo | |
 | E2 | `list_script_references`: triggers, refresh | todo | |
 | E3 | `resolve_blueprint` raw output | todo | |

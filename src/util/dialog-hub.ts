@@ -15,6 +15,8 @@ import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types
 
 /** Comment value that marks an NPC entry as deliberately ending the conversation. */
 export const END_MARK = "end";
+/** Comment of the shared reply that re-runs the dialog's start conditions. */
+export const REENTER_MARK = "hub:reenter";
 
 export interface ReturnLinkOptions {
   /** Entry indices that must stay terminal (in addition to those whose Comment is "end"). */
@@ -22,6 +24,8 @@ export interface ReturnLinkOptions {
   /** When set, only these dead-end entries are linked (used when merging lines into an existing dialog). */
   onlyEntries?: Iterable<number>;
   exitText?: string;
+  /** Text of the shared reply that re-enters the dialog from the start (default "[Anything else?]"). */
+  reenterText?: string;
 }
 
 export interface ReturnLinkResult {
@@ -47,6 +51,28 @@ export function addReturnLinks(doc: GffObj, options: ReturnLinkOptions = {}): Re
   const only = options.onlyEntries ? new Set(options.onlyEntries) : undefined;
   const result: ReturnLinkResult = { linked: [], terminal: [], exitsAdded: 0, noHub: [] };
   const assigned = new Set<number>();
+  const conditionalRoots = starting.filter((l) => getFieldStr(l, "Active") !== "").length;
+  let reenterIdx = replies.findIndex((r) => getFieldStr(r, "Comment") === REENTER_MARK);
+  // An answer that changes state (runs a script or sets a journal entry) must not return to a menu built for the old
+  // state (the offer still listing "accept"): it re-enters the dialog, so the start conditions pick the line that is active now.
+  const reenter = (): number => {
+    if (reenterIdx >= 0) return reenterIdx;
+    replies.push({
+      __struct_id: replies.length,
+      Animation: { type: "dword", value: 0 },
+      AnimLoop: { type: "byte", value: 1 },
+      Comment: { type: "cexostring", value: REENTER_MARK },
+      Delay: { type: "dword", value: 4294967295 },
+      EntriesList: { type: "list", value: starting.map((l, i) => linkCopy(l, i)) },
+      Quest: { type: "cexostring", value: "" },
+      Script: { type: "resref", value: "" },
+      Sound: { type: "resref", value: "" },
+      Text: { type: "cexolocstring", value: { "0": options.reenterText ?? "[Anything else?]" } },
+      ActionParams: { type: "list", value: [] },
+    } as unknown as GffObj);
+    reenterIdx = replies.length - 1;
+    return reenterIdx;
+  };
 
   for (const s of starting) {
     const root = getFieldNum(s, "Index");
@@ -115,6 +141,18 @@ export function addReturnLinks(doc: GffObj, options: ReturnLinkOptions = {}): Re
       }
       if (only && !only.has(e)) continue;
       const out = getFieldList(entry, "RepliesList");
+      const changesState = getFieldStr(entry, "Script") !== "" || getFieldStr(entry, "Quest") !== "";
+      if (conditionalRoots > 0 && changesState) {
+        out.push({
+          __struct_id: out.length,
+          Index: { type: "dword", value: reenter() },
+          Active: { type: "resref", value: "" },
+          ConditionParams: { type: "list", value: [] },
+          IsChild: { type: "byte", value: 0 },
+        } as unknown as GffObj);
+        result.linked.push(e);
+        continue;
+      }
       for (const hl of hubLinks) {
         if (viaReplies.has(getFieldNum(hl, "Index"))) continue; // do not offer the question just asked
         out.push(linkCopy(hl, out.length));

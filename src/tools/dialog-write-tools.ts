@@ -400,6 +400,10 @@ export function registerDialogWriteTools(server: McpServer): void {
         .describe('JSON object of ConditionParams for the condition, e.g. {"quest":"q_wolf","op":"at","stage":"1"}'),
       quest: z.string().optional().describe("Journal tag this node advances natively when it plays"),
       questEntry: optNumParam("Journal entry ID (stage) the node sets; needs quest"),
+      end: z
+        .boolean()
+        .optional()
+        .describe("A new NPC entry (parentType 'reply') normally returns to the main dialog's PC options (dialog rule); end: true makes it end the conversation on purpose (a fight starts, a cutscene takes over)."),
     },
     { destructiveHint: true },
     async ({
@@ -413,6 +417,7 @@ export function registerDialogWriteTools(server: McpServer): void {
       conditionParams,
       quest,
       questEntry,
+      end,
     }) => {
       let extras: NodeExtras;
       let condParams: ScriptParams | undefined;
@@ -421,6 +426,7 @@ export function registerDialogWriteTools(server: McpServer): void {
           params: parseParamsArg(params, "params"),
           quest,
           questEntry: questEntry !== undefined ? toI(questEntry) : undefined,
+          end: !!end,
         };
         condParams = parseParamsArg(conditionParams, "conditionParams");
       } catch (e) {
@@ -536,6 +542,12 @@ export function registerDialogWriteTools(server: McpServer): void {
       }
       links.push(makeLink(newIndex, condition, condParams));
 
+      // Dialog rule: a new NPC answer returns to the main dialog unless it is marked to end the conversation.
+      let returnedToHub = false;
+      if (newNodeType === "entry" && !end) {
+        returnedToHub = addReturnLinks(dlg, { onlyEntries: [newIndex] }).linked.includes(newIndex);
+      }
+
       // Write back to disk
       const entry = index.resources.get(key);
       if (!entry) {
@@ -562,6 +574,7 @@ export function registerDialogWriteTools(server: McpServer): void {
                 addedIndex: newIndex,
                 parentType,
                 parentIndex: parentIdx,
+                ...(newNodeType === "entry" ? { returnedToHub, endsConversation: !!end || !returnedToHub } : {}),
                 totalEntries: entries.length,
                 totalReplies: replies.length,
               },

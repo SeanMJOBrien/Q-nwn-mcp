@@ -189,6 +189,24 @@ describe("dialog tools", () => {
     expect(bad.success).not.toBe(true);
   });
 
+  it("add_dialog_node: a new NPC answer returns to the main dialog unless end is set", async () => {
+    await call("create_dialog", { resref: "dlg_a", nodes: NODES });
+    const replies = list(mockIndex.parsedGff.get("dlg_a.dlg") as GffObj, "ReplyList");
+    const pc = replies.findIndex((r) => (r.Text as { value: Record<string, string> }).value["0"] === "Hi.") ;
+    const hubReply = pc >= 0 ? pc : 0;
+    const back = await call("add_dialog_node", { dialog: "dlg_a", parentIndex: String(hubReply), parentType: "reply", text: "A new answer." });
+    expect(back.success).toBe(true);
+    expect(back.returnedToHub).toBe(true);
+    const doc = mockIndex.parsedGff.get("dlg_a.dlg") as GffObj;
+    const added = list(doc, "EntryList")[back.addedIndex as number];
+    expect(list(added, "RepliesList").length).toBeGreaterThan(0);
+    const fight = await call("add_dialog_node", { dialog: "dlg_a", parentIndex: String(hubReply), parentType: "reply", text: "Draw steel!", end: true });
+    expect(fight.endsConversation).toBe(true);
+    const f = list(mockIndex.parsedGff.get("dlg_a.dlg") as GffObj, "EntryList")[fight.addedIndex as number];
+    expect(list(f, "RepliesList")).toHaveLength(0);
+    expect(errorCodes(await call("verify_dialog", { resref: "dlg_a" }))).toEqual([]);
+  });
+
   it("edit_dialog_node changes the text in place and leaves the dialog valid", async () => {
     await call("create_dialog", { resref: "dlg_a", nodes: NODES });
     await call("edit_dialog_node", { dialog: "dlg_a", nodeType: "entry", nodeIndex: "0", text: "Well met." });

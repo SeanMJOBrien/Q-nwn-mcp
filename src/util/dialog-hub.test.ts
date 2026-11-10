@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDialogDocument } from "../tools/dialog-write-tools.js";
-import { getFieldList, getFieldNum } from "../types/gff.js";
+import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
 import { addReturnLinks, dialogShape } from "./dialog-hub.js";
 
@@ -63,4 +63,37 @@ describe("addReturnLinks", () => {
     const back = getFieldList(entries[2], "RepliesList");
     expect(back.map((l) => (l.Active as { value: string }).value)).toEqual(["c_has", ""]);
   });
+
+  it("an answer that changes state re-enters the dialog so the start conditions pick the active line", () => {
+    const d = buildDialogDocument([
+      {
+        speaker: "npc",
+        text: "Quest offer.",
+        condition: "q_chk",
+        conditionParams: { target: "1" },
+        children: [
+          { speaker: "pc", text: "I accept.", children: [{ speaker: "npc", text: "Good.", script: "q_act", params: { target: "1" } }] },
+          { speaker: "pc", text: "No.", children: [{ speaker: "npc", text: "Pity." }] },
+          { speaker: "pc", text: "Bye." },
+        ],
+      },
+      { speaker: "npc", text: "Greetings." },
+    ]) as unknown as GffObj;
+    const r = addReturnLinks(d);
+    expect(r.linked.length).toBe(2);
+    const entries = getFieldList(d, "EntryList");
+    const replies = getFieldList(d, "ReplyList");
+    const reenterIdx = replies.findIndex((x) => getFieldStr(x, "Comment") === "hub:reenter");
+    expect(reenterIdx).toBeGreaterThanOrEqual(0);
+    // "Good." (runs a script) goes through the re-entry reply, whose entries mirror the start list with its conditions
+    const good = entries.findIndex((e) => getFieldLocStr(e, "Text") === "Good.");
+    expect(getFieldList(entries[good], "RepliesList").map((l) => getFieldNum(l, "Index"))).toEqual([reenterIdx]);
+    const targets = getFieldList(replies[reenterIdx], "EntriesList");
+    expect(targets).toHaveLength(getFieldList(d, "StartingList").length);
+    expect(getFieldStr(targets[0], "Active")).toBe("q_chk");
+    // "Pity." changes nothing, so it returns to the hub as before
+    const pity = entries.findIndex((e) => getFieldLocStr(e, "Text") === "Pity.");
+    expect(getFieldList(entries[pity], "RepliesList").map((l) => getFieldNum(l, "Index"))).not.toContain(reenterIdx);
+  });
 });
+
