@@ -35,7 +35,7 @@ describe("journal_advance_on_enter (#43)", () => {
   const are = (script: string) => ({ OnEnter: res(script) }) as unknown as GffObj;
   it("flags an area OnEnter that advances a stage that is not about arriving, and lets an arrival entry pass", () => {
     const src = new Map([["a_enter", 'void main(){ AddJournalQuestEntry("q_salt", 2, GetEnteringObject()); AddJournalQuestEntry("q_salt", 3, GetEnteringObject()); }']]);
-    const j = journal([[2, "The cabal holds the old mill; I found a ledger there."], [3, "I've reached the Salt Road Straits."]]);
+    const j = journal([[2, "The ledger names who paid for the raids."], [3, "I've reached the Salt Road Straits."]]);
     const out = findStoryDefects(idx({ gff: { "area1.are": are("a_enter") }, areas: ["area1"] }), src, j);
     const flagged = out.filter((d) => d.code === "journal_advance_on_enter");
     expect(flagged).toHaveLength(1);
