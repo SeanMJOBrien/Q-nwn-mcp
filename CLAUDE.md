@@ -10,7 +10,7 @@ MCP (Model Context Protocol) server for Neverwinter Nights Enhanced Edition modu
   A branch leaves the list only once it is merged (count 0) or deliberately deleted.
 - **Per-module files go in `adventures/<Title-With-Dashes>/`** (git-ignored; user rule 2026-11-09). Every LLM-built module keeps its story (`adventure.md`), DM guide (`dm-guide.md`), `adventure-status.json`, `project-scope.json` and any other file specific to it there, e.g. `adventures/The-Salt-Gate-Conspiracy/`. `get_adventure_dir` gives the path; skills never write these into the temp dir.
 - **Every module has a DM area and two books** (user rule 2026-11-09). A disconnected DM area the DM can teleport to (a `DM_AREA` waypoint; no transition leads in or out), holding a chest placeable with two book items (`baseItem` 74): the full story that the module is based on (`adventure.md`) and the DM guide (`dm-guide.md`). Built by `/adventure-rewards` Phase 7d; `audit_module` has a "DM area and books" row. The area is a fixed template, never rebuilt per module: `src/templates/dm_area.{are,git,gic}` (2x2 `tcn01`, no wind, music or ambient sound, always daytime, a `DM_AREA` waypoint and a chest `dm_chest` named "DM Chest"); a module copies it in and only the books in the chest change. `create_dm_area` does the copy and fills the chest.
-- **Dialog structure: branches return to the main dialog** (user rule 2026-11-09). A branch must not end the conversation. After an NPC answer the conversation goes back to the main dialog state (the NPC's menu of PC options) and continues until the player picks the explicit exit option ("Goodbye" / "That's all for now"). Only the exit reply ends the conversation. Seen in The Salt Gate Conspiracy: Stonewake's two information questions both ended the talk, so the quest-accept option was never reached. Not yet applied to the tools, skills or existing dialogs: TODO #28.
+- **Dialog structure: branches return to the main dialog** (user rule 2026-11-09). A branch must not end the conversation. After an NPC answer the conversation goes back to the main dialog state (the NPC's menu of PC options) and continues until the player picks the explicit exit option ("Goodbye" / "That's all for now"). Only the exit reply ends the conversation. Seen in The Salt Gate Conspiracy: Stonewake's two information questions both ended the talk, so the quest-accept option was never reached. Applied to `create_dialog`, the companion dialog, `verify_dialog` and the dialog skills; still open for `build_quest` merged lines, `add_dialog_node` and the existing Salt Gate dialogs: TODO #28 and work-plan packages D1-D3, M2.
 - **Each module is a project the user can open, built only on request** (user rule 2026-11-09). A module made with this MCP has its own folder and files (`adventures/<Title-With-Dashes>/`) that the user can reference as an existing module project, and its content is stored there as nasher source: every GFF resource converted to JSON (the `nwn_gff` JSON form, committed-style, one file per resource) with scripts as `.nss`, in nasher's `src/` layout, plus the story and DM-guide files. The `.mod` is a build product, made only once all changes are in **and the user asks for it**. When the work looks complete, offer to build and send it; the user may decline and ask for more changes or more content, and then nothing is built. No repack-and-send after each step. Not yet implemented: TODO #29.
 - **Do NOT auto-export HTML reports** after creating or painting areas. Only export reports when the user explicitly asks for one.
 - **Always repack after creating/painting test areas** so the user can see them in the toolset. Mention that you repacked.
@@ -218,7 +218,7 @@ The rest are open.
       `spatial-conventions-and-variable-tools`, `weapon-preference-variety`, `moonglow-run-plugin` (its unique commit had
       been cherry-picked; every moonglow file in `master` was checked identical before deleting), and `area-avenue-rotation`
       (fully merged via the working branch).
-    - **Not pushed (2026-11-09):** `master` on origin is `657f83b`; the working branch is 5 commits ahead (`1e340ea` dialog rule, `f4d0a8f` `create_dm_area`, `4914238` TODOs 22 and 24, `8f36b5d` module-project rule, and the work plan `docs/work-plan.md`). Push when the user asks.
+    - **Not pushed (2026-11-10):** `master` on origin is `657f83b` (local `master` the same); the working branch `systest-live-run-and-generalized-spec` is 6 commits ahead: `1e340ea` dialog rule, `f4d0a8f` `create_dm_area`, `4914238` TODOs 22 and 24, `8f36b5d` module-project rule, `0f9ac61` work plan, and `A1` (CLAUDE.md contradictions fixed). Push when the user asks.
     - **Uncommitted work in the working tree:** only `graphify-out/` (untracked, not for commit).
 
 16. **PARTLY DONE 2026-11-09 — the bug list is verified against TFN's source and the port is planned; no studio code is changed yet (`docs/tfn-quest-findings.md`; the same plan is appended to the studio's `PROGRESS.md`). One correction below: only the two `i = 1` slot loops stop at 19; the `j = 0` loop covers 20.** Original request (user-raised, 2026-11-08) — copy the quest-system fixes and additions into `~/git/Q-tfn-content-studio`.** This
@@ -466,15 +466,6 @@ npm run start        # Run compiled output
 | `NWN_FOLDER_USER` | *(empty)* | NWN user documents dir — enables custom TLK, HAK, override/, development/ loading |
 | `MCP_FOLDER_TEMP` | `%TEMP%/nwn-mcp` | Temp directory for extracted modules |
 | `MCP_FOLDER_VERIFYSERVER` | `~/nwn-mcp-verify-server` | Checkout of the throwaway headless-engine verify server, used by `run_live_verification` |
-
-## NWScript Function Reference
-
-`nwscript-docs/` holds one cleaned markdown file per NWScript engine function,
-named exactly by function name (e.g. `AngleToVector.md`, `GetSpellUsesLeft.md`),
-sourced from nwnlexicon.com and stripped of wiki chrome. To look up a function's
-signature, parameters, remarks, or example usage, read `nwscript-docs/<FunctionName>.md`
-directly (exact-name match — don't grep/scan the whole directory). Not every engine
-function has a page; absence isn't authoritative.
 
 ## NWScript Function Reference
 
@@ -794,10 +785,6 @@ All placement and movement tools **block** if the target position is non-walkabl
 **Enforced on:** `place_creature`, `place_placeable`, `place_waypoint`, `place_trigger`, `place_encounter`, `place_store`, `move_object`, `bulk_move_objects`, `create_area_transition`, `adventure_create_transition` (both source and target positions).
 
 **Excluded:** `place_door` (doors sit at tile boundaries near walls), `place_sound` (audio sources don't need walkable positions), movement of Door List and SoundList objects.
-
-## Walkmesh Caching
-
-The `wok_cache/` directory is lazy-initialized on first use via `ensureWokCacheDir()` in `walkmesh.ts`. Reset on each `load_module` via `setWokCacheDir(tempDir)`. All walkmesh consumers (placement tools, paint tools) call `ensureWokCacheDir()` — never create the dir manually.
 
 ## Object Height Correction
 
@@ -4007,9 +3994,10 @@ project must stay reproducible):
 
 ## Testing
 
-**Everything runs locally. No hosted CI, and none is wanted** — modules generated with
-this server are one-off and local, so module generation and testing must never depend on
-a service. Do not add a `.github/workflows/` pipeline; the pre-commit hook is the gate.
+**Everything runs locally and the module-building path needs no hosted service** — modules generated with
+this server are one-off and local. `.github/workflows/ci.yml` (2026-10-03) runs only `npm ci && npm run verify`
+on push/PR to `master` as a gate on the server's own TypeScript (see TODO #1); nothing else may depend on a
+hosted service. The pre-commit hook runs the same gate locally.
 
 - `npm run verify` runs the full gate: build (tsc), lint (biome), test (vitest).
 - `npm run hooks:install` installs the pre-commit hook (once per clone). It runs the same
