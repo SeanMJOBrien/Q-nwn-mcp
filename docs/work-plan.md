@@ -30,7 +30,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | A3 | CLAUDE.md: move verification and playtest history | done | see `git log` ("A3:") |
 | A4 | CLAUDE.md: move layout, henchman, gear, testing history | done | see `git log` ("A4:"); CLAUDE.md now 907 lines |
 | A5 | CLAUDE.md: archive done TODOs; priority + acceptance for open ones | done | see `git log` ("A5:"); CLAUDE.md 448 lines; open TODOs renumbered #30-#40 |
-| B1 | #29 design document | todo | needs decisions D1-D3 |
+| B1 | #29 design document | done | `docs/module-projects.md`, decisions D1-D3 provisional (recommendations used); Salt Gate temp dir backed up to `adventures/The-Salt-Gate-Conspiracy/temp-backup/` |
 | B2 | `export_project` | todo | |
 | B3 | Load a module from its project | todo | |
 | B4 | Keep project in step; detect files changed on disk | todo | |
