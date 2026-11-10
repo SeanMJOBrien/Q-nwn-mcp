@@ -207,7 +207,7 @@ The rest are open.
     - **Merged 2026-11-09 (fifth time):** the working branch fast-forwarded into `master` and both were pushed: `de41f69` (analyze_walkmesh util,
       create_area default-tile fix), `deb7aca` (S1-S9, adventure composition tools, quest spawn/check runtime, forge and verify fixes, docs) and
       this TODO update. The working branch is 0 ahead of `master`. Only `graphify-out/` remains untracked and is deliberately not committed.
-    - **Committed 2026-11-09, not yet merged or pushed:** `9300a19` (TODOs 7, 11, 14, 17, 18, 19, 20), the spawn-when removal, `03623df` (phase_check scope enforcement, guided-workflow doc, TODOs 23-25) and this entry, on `systest-live-run-and-generalized-spec`, 6 ahead of `origin/master`. `master` is `edb8015`.
+    - **Committed 2026-11-09, not yet merged or pushed:** `9300a19` (TODOs 7, 11, 14, 17, 18, 19, 20), the spawn-when removal, `03623df` (phase_check scope enforcement, guided-workflow doc, TODOs 23-25), `16fa0a9` (adopt_module, audit_module, get_adventure_dir, focus guide, adventures/ folder) and this entry, on `systest-live-run-and-generalized-spec`, 8 ahead of `origin/master`. `master` is `edb8015`.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
