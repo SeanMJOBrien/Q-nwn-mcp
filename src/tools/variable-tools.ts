@@ -186,7 +186,7 @@ export function registerVariableTools(server: McpServer): void {
       try {
         entries = JSON.parse(variables) as VarTableEntry[];
       } catch {
-        return { content: [{ type: "text", text: "Invalid JSON for 'variables' parameter." }] };
+        return { isError: true, content: [{ type: "text", text: "Invalid JSON for 'variables' parameter." }] };
       }
 
       const result = resolveTarget(index, area, listName, tag, objIndex, resref, blueprintType);
@@ -243,7 +243,7 @@ export function registerVariableTools(server: McpServer): void {
       if (!all) {
         const exists = getVarTableEntries(result.obj).some(v => v.name.toLowerCase() === name!.toLowerCase());
         if (!exists) {
-          return { content: [{ type: "text", text: `Variable '${name}' not found on ${result.label}.` }] };
+          return { isError: true, content: [{ type: "text", text: `Variable '${name}' not found on ${result.label}.` }] };
         }
       }
 

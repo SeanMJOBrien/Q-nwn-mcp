@@ -73,7 +73,7 @@ export function registerCreatureTools(server: McpServer): void {
       }
 
       if (!creatureData) {
-        return { content: [{ type: "text", text: "Creature not found" }] };
+        return { isError: true, content: [{ type: "text", text: "Creature not found" }] };
       }
 
       const c = creatureData;
@@ -202,7 +202,7 @@ export function registerCreatureTools(server: McpServer): void {
       try {
         equipMap = JSON.parse(equipJson);
       } catch {
-        return { content: [{ type: "text", text: "Invalid JSON for equipment parameter." }] };
+        return { isError: true, content: [{ type: "text", text: "Invalid JSON for equipment parameter." }] };
       }
 
       // Find creature in GIT
@@ -211,7 +211,7 @@ export function registerCreatureTools(server: McpServer): void {
       const creature = creatureList.find(c => getFieldStr(c, "Tag") === tag);
       if (!creature) {
         const available = creatureList.map(c => getFieldStr(c, "Tag")).filter(Boolean).join(", ");
-        return { content: [{ type: "text", text: `Creature '${tag}' not found in ${area}. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Creature '${tag}' not found in ${area}. Available: ${available}` }] };
       }
 
       snapshotGitForUndo(gitDoc, area, "set_creature_equipment", `Set equipment on ${tag}`);
@@ -325,7 +325,7 @@ export function registerCreatureTools(server: McpServer): void {
       const creatureList = getFieldList(git, "Creature List");
       const creature = creatureList.find(c => getFieldStr(c, "Tag") === tag);
       if (!creature) {
-        return { content: [{ type: "text", text: `Creature '${tag}' not found in ${area}.` }] };
+        return { isError: true, content: [{ type: "text", text: `Creature '${tag}' not found in ${area}.` }] };
       }
 
       snapshotGitForUndo(gitDoc, area, "clear_creature_equipment", `Clear equipment on ${tag}`);

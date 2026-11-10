@@ -259,7 +259,7 @@ export function registerTilesetTools(server: McpServer): void {
 
       const areDoc = index.parsedGff.get(`${area}.are`);
       if (!areDoc) {
-        return { content: [{ type: "text", text: `Error: Area '${area}' not found. Available areas: ${[...index.areas.keys()].join(", ")}` }] };
+        return { isError: true, content: [{ type: "text", text: `Error: Area '${area}' not found. Available areas: ${[...index.areas.keys()].join(", ")}` }] };
       }
 
       const are = areDoc as GffObj;
@@ -303,7 +303,7 @@ export function registerTilesetTools(server: McpServer): void {
 
       const areDoc = index.parsedGff.get(`${area}.are`);
       if (!areDoc) {
-        return { content: [{ type: "text", text: `Error: Area '${area}' not found. Available areas: ${[...index.areas.keys()].join(", ")}` }] };
+        return { isError: true, content: [{ type: "text", text: `Error: Area '${area}' not found. Available areas: ${[...index.areas.keys()].join(", ")}` }] };
       }
 
       const are = areDoc as GffObj;

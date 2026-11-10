@@ -60,7 +60,7 @@ export function registerAnalysisTools(server: McpServer): void {
       const resmanOpts = await buildResmanOptions(index);
       const loaded = await loadAreaWalkGrid(area.toLowerCase(), index, resmanOpts);
       if (!loaded) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: `Area '${area}' not found in the loaded module` }) }] };
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ error: `Area '${area}' not found in the loaded module` }) }] };
       }
 
       const opt = (v: string | undefined) => (v === undefined ? undefined : toF(v));
@@ -914,7 +914,7 @@ export function registerAnalysisTools(server: McpServer): void {
         }
       }
       if (!start || !index.areas.has(start)) {
-        return { content: [{ type: "text", text: `Start area "${start || "(none)"}" not found in module.` }] };
+        return { isError: true, content: [{ type: "text", text: `Start area "${start || "(none)"}" not found in module.` }] };
       }
 
       const { graph, reachable, unreachable } = computeConnectivity(index, start);

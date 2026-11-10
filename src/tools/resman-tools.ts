@@ -38,7 +38,7 @@ export function registerResmanTools(server: McpServer): void {
         const doc = await resmanExtractToJson(resource, cacheDir, resman);
         return { content: [{ type: "text", text: JSON.stringify(present(doc as GffObj), null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Resource not found in resman: ${resource}\n${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `Resource not found in resman: ${resource}\n${e}` }] };
       }
     }
   );
@@ -68,7 +68,7 @@ export function registerResmanTools(server: McpServer): void {
           }],
         };
       } catch (e) {
-        return { content: [{ type: "text", text: `resman search failed: ${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `resman search failed: ${e}` }] };
       }
     }
   );
@@ -87,7 +87,7 @@ export function registerResmanTools(server: McpServer): void {
         const output = await resmanStats({ ...resman, detailed: detailed ?? false });
         return { content: [{ type: "text", text: output }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `resman stats failed: ${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `resman stats failed: ${e}` }] };
       }
     }
   );
@@ -119,7 +119,7 @@ export function registerResmanTools(server: McpServer): void {
           }],
         };
       } catch (e) {
-        return { content: [{ type: "text", text: `tlkify failed: ${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `tlkify failed: ${e}` }] };
       }
     }
   );

@@ -367,7 +367,7 @@ export function registerAdventureTools(server: McpServer): void {
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
       if (!areDoc) {
-        return { content: [{ type: "text", text: `Area not found: ${area}. Available: ${[...index.areas.keys()].join(", ")}` }] };
+        return { isError: true, content: [{ type: "text", text: `Area not found: ${area}. Available: ${[...index.areas.keys()].join(", ")}` }] };
       }
       const are = areDoc as GffObj;
       const areaWidth = getFieldNum(are, "Width");
@@ -386,7 +386,7 @@ export function registerAdventureTools(server: McpServer): void {
         // Explicit bounding box: x1,y1,x2,y2
         const parts = reg.split(",").map(Number);
         if (parts.length !== 4 || parts.some(isNaN)) {
-          return { content: [{ type: "text", text: "Invalid bounding box. Use 'x1,y1,x2,y2' format." }] };
+          return { isError: true, content: [{ type: "text", text: "Invalid bounding box. Use 'x1,y1,x2,y2' format." }] };
         }
         [x1, y1, x2, y2] = parts;
       } else {
@@ -421,7 +421,7 @@ export function registerAdventureTools(server: McpServer): void {
       if (clearR > 0) {
         const loaded = await loadAreaWalkGrid(area, index, resmanOpts);
         if (!loaded) {
-          return { content: [{ type: "text", text: `Walkmesh data unavailable for ${area}; cannot search with clearRadius.` }] };
+          return { isError: true, content: [{ type: "text", text: `Walkmesh data unavailable for ${area}; cannot search with clearRadius.` }] };
         }
         const spots = findOpenGround(loaded.walk, {
           radius: clearR,
@@ -557,14 +557,14 @@ export function registerAdventureTools(server: McpServer): void {
       const h = toI(heightStr);
 
       if (w < 4 || w > 32 || h < 4 || h > 32) {
-        return { content: [{ type: "text", text: "Width and height must be between 4 and 32." }] };
+        return { isError: true, content: [{ type: "text", text: "Width and height must be between 4 and 32." }] };
       }
 
       let styleObj: LayoutStyle;
       try {
         styleObj = JSON.parse(styleJson);
       } catch (e) {
-        return { content: [{ type: "text", text: `Invalid style JSON: ${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `Invalid style JSON: ${e}` }] };
       }
 
       const tc = tcStr ? toI(tcStr) : undefined;
@@ -574,7 +574,7 @@ export function registerAdventureTools(server: McpServer): void {
           td = JSON.parse(tdJson);
           if (!Array.isArray(td)) throw new Error("must be array");
         } catch (e) {
-          return { content: [{ type: "text", text: `Invalid transitionDirections JSON: ${e}` }] };
+          return { isError: true, content: [{ type: "text", text: `Invalid transitionDirections JSON: ${e}` }] };
         }
       }
 
@@ -620,14 +620,14 @@ export function registerAdventureTools(server: McpServer): void {
         if (!Array.isArray(crossers)) throw new Error("crossers must be an array");
         if (!Array.isArray(suggestedFeatures)) throw new Error("suggestedFeatures must be an array");
       } catch (e) {
-        return { content: [{ type: "text", text: `Invalid layout JSON: ${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `Invalid layout JSON: ${e}` }] };
       }
 
       const index = requireIndex();
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
       if (!areDoc) {
-        return { content: [{ type: "text", text: `Area not found: ${area}. Available: ${[...index.areas.keys()].join(", ")}` }] };
+        return { isError: true, content: [{ type: "text", text: `Area not found: ${area}. Available: ${[...index.areas.keys()].join(", ")}` }] };
       }
 
       const are = areDoc as GffObj;

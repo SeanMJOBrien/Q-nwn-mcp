@@ -43,8 +43,8 @@ export function registerPaintTools(server: McpServer): void {
     async ({ resref, name, width: widthStr, height: heightStr, tileset: tilesetResref, defaultTerrain }) => {
       const width = parseInt(widthStr, 10);
       const height = parseInt(heightStr, 10);
-      if (isNaN(width) || width < 1 || width > 32) return { content: [{ type: "text", text: "width must be 1-32" }] };
-      if (isNaN(height) || height < 1 || height > 32) return { content: [{ type: "text", text: "height must be 1-32" }] };
+      if (isNaN(width) || width < 1 || width > 32) return { isError: true, content: [{ type: "text", text: "width must be 1-32" }] };
+      if (isNaN(height) || height < 1 || height > 32) return { isError: true, content: [{ type: "text", text: "height must be 1-32" }] };
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
       const areKey = `${resrefLower}.are`;
@@ -267,18 +267,18 @@ export function registerPaintTools(server: McpServer): void {
       const areaResref = area.toLowerCase();
 
       if (!index.areas.has(areaResref)) {
-        return { content: [{ type: "text", text: `Area not found: ${areaResref}` }] };
+        return { isError: true, content: [{ type: "text", text: `Area not found: ${areaResref}` }] };
       }
 
       // Block deletion of module entry area
       const ifo = index.parsedGff.get("module.ifo");
       if (!ifo) {
-        return { content: [{ type: "text", text: "module.ifo not found" }] };
+        return { isError: true, content: [{ type: "text", text: "module.ifo not found" }] };
       }
       const ifoObj = ifo as GffObj;
       const entryArea = getFieldStr(ifoObj, "Mod_Entry_Area").toLowerCase();
       if (areaResref === entryArea) {
-        return { content: [{ type: "text", text: `Cannot delete the module entry area '${areaResref}'. Change Mod_Entry_Area first.` }] };
+        return { isError: true, content: [{ type: "text", text: `Cannot delete the module entry area '${areaResref}'. Change Mod_Entry_Area first.` }] };
       }
 
       const deletedArea = index.areas.get(areaResref)!;
@@ -344,14 +344,14 @@ export function registerPaintTools(server: McpServer): void {
         tiles = JSON.parse(tilesJson);
         if (!Array.isArray(tiles)) throw new Error("tiles must be an array");
       } catch (e) {
-        return { content: [{ type: "text", text: `Invalid tiles JSON: ${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `Invalid tiles JSON: ${e}` }] };
       }
 
       const index = requireIndex();
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
       if (!areDoc) {
-        return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+        return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
       }
 
       const are = areDoc as GffObj;
@@ -445,7 +445,7 @@ export function registerPaintTools(server: McpServer): void {
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
       if (!areDoc) {
-        return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+        return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
       }
 
       const are = areDoc as GffObj;
@@ -461,7 +461,7 @@ export function registerPaintTools(server: McpServer): void {
       const group = tileset.groups.find(g => g.name.toLowerCase() === feature.toLowerCase());
       if (!group) {
         const available = tileset.groups.map(g => `${g.name} (${g.columns}x${g.rows})`).join(", ");
-        return { content: [{ type: "text", text: `Group not found: ${feature}. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Group not found: ${feature}. Available: ${available}` }] };
       }
 
       const { columns: placedColumns, rows: placedRows } = rotatedGroupDimensions(group.columns, group.rows, rotation);
@@ -619,7 +619,7 @@ export function registerPaintTools(server: McpServer): void {
       const areDoc = index.parsedGff.get(areKey);
       const gitDoc = index.parsedGff.get(gitKey);
       if (!areDoc) {
-        return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+        return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
       }
 
       const are = areDoc as GffObj;

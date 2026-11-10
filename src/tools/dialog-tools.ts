@@ -16,7 +16,7 @@ export function registerDialogTools(server: McpServer): void {
       const index = requireIndex();
       const key = `${dialog.toLowerCase()}.dlg`;
       const doc = index.parsedGff.get(key);
-      if (!doc) return { content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
+      if (!doc) return { isError: true, content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
       return { content: [{ type: "text", text: JSON.stringify(doc, null, 2) }] };
     }
   );
@@ -33,7 +33,7 @@ export function registerDialogTools(server: McpServer): void {
       const index = requireIndex();
       const key = `${dialog.toLowerCase()}.dlg`;
       const doc = index.parsedGff.get(key);
-      if (!doc) return { content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
+      if (!doc) return { isError: true, content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
 
       const summary = index.dialogs.get(dialog.toLowerCase());
       const tree = flattenDialog(doc, maxDepth ?? 10);
@@ -168,7 +168,7 @@ export function registerDialogTools(server: McpServer): void {
       if (dialog) {
         const key = `${dialog.toLowerCase()}.dlg`;
         const doc = index.parsedGff.get(key);
-        if (!doc) return { content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
+        if (!doc) return { isError: true, content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
         results.push(...extractDialogScripts(dialog, doc));
       } else {
         for (const [resref] of index.dialogs) {

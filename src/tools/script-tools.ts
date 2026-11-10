@@ -18,7 +18,7 @@ export function registerScriptTools(server: McpServer): void {
       const index = requireIndex();
       const key = `${resref.toLowerCase()}.nss`;
       const entry = index.resources.get(key);
-      if (!entry) return { content: [{ type: "text", text: `Script source not found: ${resref}.nss` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Script source not found: ${resref}.nss` }] };
 
       const text = await readTextFile(entry.filePath);
       return { content: [{ type: "text", text }] };
@@ -34,13 +34,13 @@ export function registerScriptTools(server: McpServer): void {
       const index = requireIndex();
       const key = `${resref.toLowerCase()}.ncs`;
       const entry = index.resources.get(key);
-      if (!entry) return { content: [{ type: "text", text: `Compiled script not found: ${resref}.ncs` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Compiled script not found: ${resref}.ncs` }] };
 
       try {
         const text = await disassembleNcs(entry.filePath);
         return { content: [{ type: "text", text }] };
       } catch (e) {
-        return { content: [{ type: "text", text: `Disassembly failed: ${e}` }] };
+        return { isError: true, content: [{ type: "text", text: `Disassembly failed: ${e}` }] };
       }
     }
   );
@@ -57,7 +57,7 @@ export function registerScriptTools(server: McpServer): void {
       const index = requireIndex();
       const nssKey = `${resref.toLowerCase()}.nss`;
       const entry = index.resources.get(nssKey);
-      if (!entry) return { content: [{ type: "text", text: `Script source not found: ${resref}.nss` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Script source not found: ${resref}.nss` }] };
 
       const ncsPath = entry.filePath.replace(/\.nss$/i, ".ncs");
       const resman = await buildResmanOptions(index);

@@ -55,7 +55,7 @@ export function registerItemTools(server: McpServer): void {
       }
 
       if (!itemDoc) {
-        return { content: [{ type: "text", text: "Item not found" }] };
+        return { isError: true, content: [{ type: "text", text: "Item not found" }] };
       }
 
       const properties = getFieldList(itemDoc, "PropertiesList").map(p => ({
@@ -108,10 +108,10 @@ export function registerItemTools(server: McpServer): void {
       const index = requireIndex();
       const key = `${resref.toLowerCase()}.uti`;
       const doc = index.parsedGff.get(key);
-      if (!doc) return { content: [{ type: "text", text: `Item not found: ${resref}` }] };
+      if (!doc) return { isError: true, content: [{ type: "text", text: `Item not found: ${resref}` }] };
 
       const entry = index.resources.get(key);
-      if (!entry) return { content: [{ type: "text", text: `Item resource not found: ${key}` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Item resource not found: ${key}` }] };
 
       const obj = doc as GffObj;
 
@@ -190,16 +190,16 @@ export function registerItemTools(server: McpServer): void {
       const moduleIndex = requireIndex();
       const key = `${resref.toLowerCase()}.uti`;
       const doc = moduleIndex.parsedGff.get(key);
-      if (!doc) return { content: [{ type: "text", text: `Item not found: ${resref}` }] };
+      if (!doc) return { isError: true, content: [{ type: "text", text: `Item not found: ${resref}` }] };
 
       const entry = moduleIndex.resources.get(key);
-      if (!entry) return { content: [{ type: "text", text: `Item resource not found: ${key}` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Item resource not found: ${key}` }] };
 
       const obj = doc as GffObj;
       const propList = getFieldList(obj, "PropertiesList");
 
       if (removeIdx < 0 || removeIdx >= propList.length) {
-        return { content: [{ type: "text", text: `Index ${removeIdx} out of range (${propList.length} properties)` }] };
+        return { isError: true, content: [{ type: "text", text: `Index ${removeIdx} out of range (${propList.length} properties)` }] };
       }
 
       const removed = propList[removeIdx];
@@ -235,10 +235,10 @@ export function registerItemTools(server: McpServer): void {
       const index = requireIndex();
       const key = `${resref.toLowerCase()}.uti`;
       const doc = index.parsedGff.get(key);
-      if (!doc) return { content: [{ type: "text", text: `Item not found: ${resref}` }] };
+      if (!doc) return { isError: true, content: [{ type: "text", text: `Item not found: ${resref}` }] };
 
       const entry = index.resources.get(key);
-      if (!entry) return { content: [{ type: "text", text: `Item resource not found: ${key}` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Item resource not found: ${key}` }] };
 
       const obj = doc as GffObj;
       const prevCount = getFieldList(obj, "PropertiesList").length;

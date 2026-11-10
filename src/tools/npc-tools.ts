@@ -739,7 +739,7 @@ export function registerNpcTools(server: McpServer): void {
       try {
         equipMap = JSON.parse(equipJson);
       } catch {
-        return { content: [{ type: "text", text: "Invalid JSON for equipment parameter." }] };
+        return { isError: true, content: [{ type: "text", text: "Invalid JSON for equipment parameter." }] };
       }
 
       const classList = listOf(creature, "ClassList");

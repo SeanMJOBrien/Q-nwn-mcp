@@ -216,7 +216,7 @@ export function registerModuleTools(server: McpServer): void {
     { destructiveHint: true },
     async ({ name, filename }) => {
       if (!NWN_FOLDER_USER) {
-        return { content: [{ type: "text", text: "NWN_FOLDER_USER environment variable is not set. Cannot determine modules directory." }] };
+        return { isError: true, content: [{ type: "text", text: "NWN_FOLDER_USER environment variable is not set. Cannot determine modules directory." }] };
       }
 
       const safeName = filename.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();

@@ -30,7 +30,7 @@ export function registerAreaTools(server: McpServer): void {
       const areDoc = index.parsedGff.get(`${area}.are`);
       const gitDoc = index.parsedGff.get(`${area}.git`);
 
-      if (!areDoc) return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+      if (!areDoc) return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
 
       const are = areDoc as GffObj;
       const git = gitDoc as GffObj | undefined;
@@ -115,7 +115,7 @@ export function registerAreaTools(server: McpServer): void {
     async ({ area }) => {
       const index = requireIndex();
       const gitDoc = index.parsedGff.get(`${area}.git`);
-      if (!gitDoc) return { content: [{ type: "text", text: `Area GIT not found: ${area}` }] };
+      if (!gitDoc) return { isError: true, content: [{ type: "text", text: `Area GIT not found: ${area}` }] };
 
       const git = gitDoc as GffObj;
       const placeables = getFieldList(git, "Placeable List").map(p => {
@@ -157,7 +157,7 @@ export function registerAreaTools(server: McpServer): void {
     async ({ area }) => {
       const index = requireIndex();
       const gitDoc = index.parsedGff.get(`${area}.git`);
-      if (!gitDoc) return { content: [{ type: "text", text: `Area GIT not found: ${area}` }] };
+      if (!gitDoc) return { isError: true, content: [{ type: "text", text: `Area GIT not found: ${area}` }] };
 
       const git = gitDoc as GffObj;
       const itemList = getFieldList(git, "List");
@@ -187,7 +187,7 @@ export function registerAreaTools(server: McpServer): void {
     async ({ area }) => {
       const index = requireIndex();
       const gitDoc = index.parsedGff.get(`${area}.git`);
-      if (!gitDoc) return { content: [{ type: "text", text: `Area GIT not found: ${area}` }] };
+      if (!gitDoc) return { isError: true, content: [{ type: "text", text: `Area GIT not found: ${area}` }] };
 
       const git = gitDoc as GffObj;
       const doors = getFieldList(git, "Door List").map(d => ({
@@ -226,10 +226,10 @@ export function registerAreaTools(server: McpServer): void {
       const index = requireIndex();
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
-      if (!areDoc) return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+      if (!areDoc) return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
 
       const areEntry = index.resources.get(areKey);
-      if (!areEntry) return { content: [{ type: "text", text: `Area resource not found: ${areKey}` }] };
+      if (!areEntry) return { isError: true, content: [{ type: "text", text: `Area resource not found: ${areKey}` }] };
 
       const are = areDoc as GffObj;
       const changes: string[] = [];
@@ -294,10 +294,10 @@ export function registerAreaTools(server: McpServer): void {
     async (params) => {
       const index = requireIndex();
       const ifoDoc = index.parsedGff.get("module.ifo");
-      if (!ifoDoc) return { content: [{ type: "text", text: "Module IFO not found" }] };
+      if (!ifoDoc) return { isError: true, content: [{ type: "text", text: "Module IFO not found" }] };
 
       const ifoEntry = index.resources.get("module.ifo");
-      if (!ifoEntry) return { content: [{ type: "text", text: "Module IFO resource not found" }] };
+      if (!ifoEntry) return { isError: true, content: [{ type: "text", text: "Module IFO resource not found" }] };
 
       const ifo = ifoDoc as GffObj;
       const changes: string[] = [];
@@ -345,10 +345,10 @@ export function registerAreaTools(server: McpServer): void {
     async ({ description, name }) => {
       const index = requireIndex();
       const ifoDoc = index.parsedGff.get("module.ifo");
-      if (!ifoDoc) return { content: [{ type: "text", text: "Module IFO not found" }] };
+      if (!ifoDoc) return { isError: true, content: [{ type: "text", text: "Module IFO not found" }] };
 
       const ifoEntry = index.resources.get("module.ifo");
-      if (!ifoEntry) return { content: [{ type: "text", text: "Module IFO resource not found" }] };
+      if (!ifoEntry) return { isError: true, content: [{ type: "text", text: "Module IFO resource not found" }] };
 
       const ifo = ifoDoc as GffObj;
       const changes: string[] = [];

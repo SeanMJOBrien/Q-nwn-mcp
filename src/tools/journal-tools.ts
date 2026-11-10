@@ -234,7 +234,7 @@ export function registerJournalTools(server: McpServer): void {
       const result = findQuestByTag(categories, questTag);
       if (!result) {
         const available = categories.map(c => getFieldStr(c, "Tag")).filter(Boolean).join(", ");
-        return { content: [{ type: "text", text: `Quest '${questTag}' not found. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Quest '${questTag}' not found. Available: ${available}` }] };
       }
 
       const entryList = getFieldList(result.quest, "EntryList");
@@ -296,7 +296,7 @@ export function registerJournalTools(server: McpServer): void {
       const result = findQuestByTag(categories, tag);
       if (!result) {
         const available = categories.map(c => getFieldStr(c, "Tag")).filter(Boolean).join(", ");
-        return { content: [{ type: "text", text: `Quest '${tag}' not found. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Quest '${tag}' not found. Available: ${available}` }] };
       }
 
       if (name !== undefined) result.quest.Name = { type: "cexolocstring", value: { "0": name } };
@@ -347,14 +347,14 @@ export function registerJournalTools(server: McpServer): void {
       const categories = getCategories(jrl.doc);
       const result = findQuestByTag(categories, questTag);
       if (!result) {
-        return { content: [{ type: "text", text: `Quest '${questTag}' not found.` }] };
+        return { isError: true, content: [{ type: "text", text: `Quest '${questTag}' not found.` }] };
       }
 
       const entryList = getFieldList(result.quest, "EntryList");
       const entry = entryList.find(e => getFieldNum(e, "ID") === idN);
       if (!entry) {
         const ids = entryList.map(e => getFieldNum(e, "ID")).join(", ");
-        return { content: [{ type: "text", text: `Entry ID ${idN} not found in quest '${questTag}'. Available IDs: ${ids}` }] };
+        return { isError: true, content: [{ type: "text", text: `Entry ID ${idN} not found in quest '${questTag}'. Available IDs: ${ids}` }] };
       }
 
       if (text !== undefined) entry.Text = { type: "cexolocstring", value: { "0": text } };
@@ -399,7 +399,7 @@ export function registerJournalTools(server: McpServer): void {
       const result = findQuestByTag(categories, tag);
       if (!result) {
         const available = categories.map(c => getFieldStr(c, "Tag")).filter(Boolean).join(", ");
-        return { content: [{ type: "text", text: `Quest '${tag}' not found. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Quest '${tag}' not found. Available: ${available}` }] };
       }
 
       const name = getFieldLocStr(result.quest, "Name");
@@ -442,14 +442,14 @@ export function registerJournalTools(server: McpServer): void {
       const categories = getCategories(jrl.doc);
       const result = findQuestByTag(categories, questTag);
       if (!result) {
-        return { content: [{ type: "text", text: `Quest '${questTag}' not found.` }] };
+        return { isError: true, content: [{ type: "text", text: `Quest '${questTag}' not found.` }] };
       }
 
       const entryList = getFieldList(result.quest, "EntryList");
       const entryIdx = entryList.findIndex(e => getFieldNum(e, "ID") === idN);
       if (entryIdx < 0) {
         const ids = entryList.map(e => getFieldNum(e, "ID")).join(", ");
-        return { content: [{ type: "text", text: `Entry ID ${idN} not found in quest '${questTag}'. Available IDs: ${ids}` }] };
+        return { isError: true, content: [{ type: "text", text: `Entry ID ${idN} not found in quest '${questTag}'. Available IDs: ${ids}` }] };
       }
 
       const removed = entryList[entryIdx];

@@ -102,7 +102,7 @@ export function registerBlueprintTools(server: McpServer): void {
       const result = await buildCreatureBlueprint(index, params);
 
       if (!result.success) {
-        return { content: [{ type: "text", text: result.error ?? "create_creature_blueprint failed." }] };
+        return { isError: true, content: [{ type: "text", text: result.error ?? "create_creature_blueprint failed." }] };
       }
 
       const built = index.parsedGff.get(`${resref.toLowerCase()}.utc`) as GffObj | undefined;
@@ -153,7 +153,7 @@ export function registerBlueprintTools(server: McpServer): void {
       if (sourceResref) {
         const source = await resolveBlueprint(index, sourceResref, "ute", resmanOpts!);
         if (!source) {
-          return { content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.ute` }] };
+          return { isError: true, content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.ute` }] };
         }
         doc = source;
       } else {
@@ -256,7 +256,7 @@ export function registerBlueprintTools(server: McpServer): void {
       if (sourceResref) {
         const source = await resolveBlueprint(index, sourceResref, "utm", resmanOpts!);
         if (!source) {
-          return { content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.utm` }] };
+          return { isError: true, content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.utm` }] };
         }
         doc = source;
       } else {
@@ -414,7 +414,7 @@ export function registerBlueprintTools(server: McpServer): void {
         const resmanOpts = await buildResmanOptions(index);
         const source = await resolveBlueprint(index, sourceResref, "utt", resmanOpts);
         if (!source) {
-          return { content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.utt` }] };
+          return { isError: true, content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.utt` }] };
         }
         doc = source;
       } else {

@@ -15,7 +15,7 @@ export function registerEncounterTools(server: McpServer): void {
     async ({ area }) => {
       const index = requireIndex();
       const gitDoc = index.parsedGff.get(`${area}.git`);
-      if (!gitDoc) return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+      if (!gitDoc) return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
 
       const triggerList = getFieldList(gitDoc as GffObj, "TriggerList");
       const triggers = triggerList.map(t => ({
@@ -52,7 +52,7 @@ export function registerEncounterTools(server: McpServer): void {
     async ({ area }) => {
       const index = requireIndex();
       const gitDoc = index.parsedGff.get(`${area}.git`);
-      if (!gitDoc) return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+      if (!gitDoc) return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
 
       const encounterList = getFieldList(gitDoc as GffObj, "Encounter List");
       const encounters = encounterList.map(e => {
@@ -133,7 +133,7 @@ export function registerEncounterTools(server: McpServer): void {
     async ({ resref }) => {
       const index = requireIndex();
       const doc = index.parsedGff.get(`${resref}.utm`);
-      if (!doc) return { content: [{ type: "text", text: `Store not found: ${resref}` }] };
+      if (!doc) return { isError: true, content: [{ type: "text", text: `Store not found: ${resref}` }] };
 
       const obj = doc as GffObj;
 
@@ -182,7 +182,7 @@ export function registerEncounterTools(server: McpServer): void {
     async ({ area }) => {
       const index = requireIndex();
       const gitDoc = index.parsedGff.get(`${area}.git`);
-      if (!gitDoc) return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+      if (!gitDoc) return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
 
       const waypointList = getFieldList(gitDoc as GffObj, "WaypointList");
       const waypoints = waypointList.map(w => ({
@@ -211,7 +211,7 @@ export function registerEncounterTools(server: McpServer): void {
     async ({ area }) => {
       const index = requireIndex();
       const gitDoc = index.parsedGff.get(`${area}.git`);
-      if (!gitDoc) return { content: [{ type: "text", text: `Area not found: ${area}` }] };
+      if (!gitDoc) return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
 
       const soundList = getFieldList(gitDoc as GffObj, "SoundList");
       const sounds = soundList.map(s => ({

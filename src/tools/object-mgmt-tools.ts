@@ -52,7 +52,7 @@ export function registerObjectMgmtTools(server: McpServer): void {
       const door1 = doorList1.find(d => getFieldStr(d, "Tag") === door1Tag);
       if (!door1) {
         const available = doorList1.map(d => getFieldStr(d, "Tag")).filter(Boolean).join(", ");
-        return { content: [{ type: "text", text: `Door '${door1Tag}' not found in ${area1}. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Door '${door1Tag}' not found in ${area1}. Available: ${available}` }] };
       }
 
       // Find door2
@@ -61,7 +61,7 @@ export function registerObjectMgmtTools(server: McpServer): void {
       const door2 = doorList2.find(d => getFieldStr(d, "Tag") === door2Tag);
       if (!door2) {
         const available = doorList2.map(d => getFieldStr(d, "Tag")).filter(Boolean).join(", ");
-        return { content: [{ type: "text", text: `Door '${door2Tag}' not found in ${area2}. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Door '${door2Tag}' not found in ${area2}. Available: ${available}` }] };
       }
 
       // Snapshot for undo before linking
@@ -389,12 +389,12 @@ export function registerObjectMgmtTools(server: McpServer): void {
         targetIdx = list.findIndex(entry => getFieldStr(entry, "Tag") === tag);
         if (targetIdx < 0) {
           const available = list.map(e => getFieldStr(e, "Tag")).filter(Boolean).join(", ");
-          return { content: [{ type: "text", text: `Tag '${tag}' not found in ${listName}. Available: ${available}` }] };
+          return { isError: true, content: [{ type: "text", text: `Tag '${tag}' not found in ${listName}. Available: ${available}` }] };
         }
       } else {
         targetIdx = removeIndexN!;
         if (targetIdx < 0 || targetIdx >= list.length) {
-          return { content: [{ type: "text", text: `Index ${targetIdx} out of range (list has ${list.length} entries)` }] };
+          return { isError: true, content: [{ type: "text", text: `Index ${targetIdx} out of range (list has ${list.length} entries)` }] };
         }
       }
 
@@ -460,12 +460,12 @@ export function registerObjectMgmtTools(server: McpServer): void {
         targetIdx = list.findIndex(entry => getFieldStr(entry, "Tag") === tag);
         if (targetIdx < 0) {
           const available = list.map(e => getFieldStr(e, "Tag")).filter(Boolean).join(", ");
-          return { content: [{ type: "text", text: `Tag '${tag}' not found in ${listName}. Available: ${available}` }] };
+          return { isError: true, content: [{ type: "text", text: `Tag '${tag}' not found in ${listName}. Available: ${available}` }] };
         }
       } else {
         targetIdx = moveIndexN!;
         if (targetIdx < 0 || targetIdx >= list.length) {
-          return { content: [{ type: "text", text: `Index ${targetIdx} out of range (list has ${list.length} entries)` }] };
+          return { isError: true, content: [{ type: "text", text: `Index ${targetIdx} out of range (list has ${list.length} entries)` }] };
         }
       }
 

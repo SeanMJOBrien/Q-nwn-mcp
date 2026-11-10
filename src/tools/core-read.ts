@@ -101,7 +101,7 @@ export function registerCoreReadTools(server: McpServer): void {
       const index = requireIndex();
       const key = `${resref.toLowerCase()}.${type.toLowerCase()}`;
       const entry = index.resources.get(key);
-      if (!entry) return { content: [{ type: "text", text: `Resource not found: ${key}` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Resource not found: ${key}` }] };
 
       if (type.toLowerCase() === "nss") {
         const text = await readTextFile(entry.filePath);
@@ -113,7 +113,7 @@ export function registerCoreReadTools(server: McpServer): void {
           const text = await disassembleNcs(entry.filePath);
           return { content: [{ type: "text", text }] };
         } catch (e) {
-          return { content: [{ type: "text", text: `Disassembly failed: ${e}` }] };
+          return { isError: true, content: [{ type: "text", text: `Disassembly failed: ${e}` }] };
         }
       }
 
@@ -146,7 +146,7 @@ export function registerCoreReadTools(server: McpServer): void {
     async () => {
       const index = requireIndex();
       const ifo = index.parsedGff.get("module.ifo");
-      if (!ifo) return { content: [{ type: "text", text: "module.ifo not found" }] };
+      if (!ifo) return { isError: true, content: [{ type: "text", text: "module.ifo not found" }] };
 
       const obj = ifo as GffObj;
       const areaList = getFieldList(obj, "Mod_Area_list").map(a => getFieldStr(a, "Area_Name"));

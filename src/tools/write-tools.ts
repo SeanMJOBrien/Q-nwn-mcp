@@ -35,7 +35,7 @@ export function registerWriteTools(server: McpServer): void {
       // Get cached or parse fresh
       let doc = index.parsedGff.get(key);
       const entry = index.resources.get(key);
-      if (!entry) return { content: [{ type: "text", text: `Resource not found: ${key}` }] };
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Resource not found: ${key}` }] };
 
       if (!doc) {
         doc = await gffToJson(entry.filePath);
@@ -135,7 +135,7 @@ export function registerWriteTools(server: McpServer): void {
         // Clone from source
         const source = await resolveBlueprint(index, sourceResref, "uti", resmanOpts!);
         if (!source) {
-          return { content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.uti` }] };
+          return { isError: true, content: [{ type: "text", text: `Source blueprint not found: ${sourceResref}.uti` }] };
         }
         doc = source;
       } else {
@@ -275,7 +275,7 @@ export function registerWriteTools(server: McpServer): void {
 
       const sourceEntry = index.resources.get(sourceKey);
       if (!sourceEntry) {
-        return { content: [{ type: "text", text: `Source not found: ${sourceKey}` }] };
+        return { isError: true, content: [{ type: "text", text: `Source not found: ${sourceKey}` }] };
       }
 
       const newFilePath = path.join(index.tempDir, `${newResref.toLowerCase()}.${sourceType.toLowerCase()}`);
@@ -335,7 +335,7 @@ export function registerWriteTools(server: McpServer): void {
       const key = `${resref.toLowerCase()}.${resType.toLowerCase()}`;
       const entry = index.resources.get(key);
       if (!entry) {
-        return { content: [{ type: "text", text: `Resource not found: ${key}` }] };
+        return { isError: true, content: [{ type: "text", text: `Resource not found: ${key}` }] };
       }
 
       const absOutput = path.resolve(outputPath);

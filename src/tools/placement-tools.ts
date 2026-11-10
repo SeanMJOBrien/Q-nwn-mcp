@@ -150,7 +150,7 @@ export function registerPlacementTools(server: McpServer): void {
             }],
           };
         }
-        return { content: [{ type: "text", text: result.error ?? "Placement failed." }] };
+        return { isError: true, content: [{ type: "text", text: result.error ?? "Placement failed." }] };
       }
 
       return {
@@ -217,7 +217,7 @@ export function registerPlacementTools(server: McpServer): void {
       // Resolve blueprint
       const utp = await resolveBlueprint(index, blueprint, "utp", resmanOpts);
       if (!utp) {
-        return { content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utp` }] };
+        return { isError: true, content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utp` }] };
       }
 
       const obj = utp as GffObj;
@@ -433,7 +433,7 @@ export function registerPlacementTools(server: McpServer): void {
 
       const utd = await resolveBlueprint(index, blueprint, "utd", resmanOpts);
       if (!utd) {
-        return { content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utd` }] };
+        return { isError: true, content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utd` }] };
       }
 
       const obj = utd as GffObj;
@@ -524,7 +524,7 @@ export function registerPlacementTools(server: McpServer): void {
 
       const utt = await resolveBlueprint(index, blueprint, "utt", resmanOpts);
       if (!utt) {
-        return { content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utt` }] };
+        return { isError: true, content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utt` }] };
       }
 
       const obj = utt as GffObj;
@@ -611,7 +611,7 @@ export function registerPlacementTools(server: McpServer): void {
 
       const ute = await resolveBlueprint(index, blueprint, "ute", resmanOpts);
       if (!ute) {
-        return { content: [{ type: "text", text: `Blueprint not found: ${blueprint}.ute` }] };
+        return { isError: true, content: [{ type: "text", text: `Blueprint not found: ${blueprint}.ute` }] };
       }
 
       const obj = ute as GffObj;
@@ -686,7 +686,7 @@ export function registerPlacementTools(server: McpServer): void {
 
       const uts = await resolveBlueprint(index, blueprint, "uts", resmanOpts);
       if (!uts) {
-        return { content: [{ type: "text", text: `Blueprint not found: ${blueprint}.uts` }] };
+        return { isError: true, content: [{ type: "text", text: `Blueprint not found: ${blueprint}.uts` }] };
       }
 
       const obj = uts as GffObj;
@@ -760,7 +760,7 @@ export function registerPlacementTools(server: McpServer): void {
 
       const utm = await resolveBlueprint(index, blueprint, "utm", resmanOpts);
       if (!utm) {
-        return { content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utm` }] };
+        return { isError: true, content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utm` }] };
       }
 
       const obj = utm as GffObj;
@@ -831,7 +831,7 @@ export function registerPlacementTools(server: McpServer): void {
       try {
         itemsArr = JSON.parse(itemsJson);
       } catch {
-        return { content: [{ type: "text", text: "Invalid JSON for items parameter." }] };
+        return { isError: true, content: [{ type: "text", text: "Invalid JSON for items parameter." }] };
       }
 
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
@@ -841,7 +841,7 @@ export function registerPlacementTools(server: McpServer): void {
       const container = placeableList.find(p => getFieldStr(p, "Tag") === containerTag);
       if (!container) {
         const available = placeableList.map(p => getFieldStr(p, "Tag")).filter(Boolean).join(", ");
-        return { content: [{ type: "text", text: `Container '${containerTag}' not found. Available: ${available}` }] };
+        return { isError: true, content: [{ type: "text", text: `Container '${containerTag}' not found. Available: ${available}` }] };
       }
 
       snapshotGitForUndo(gitDoc, area, "add_items_to_container", `Add ${itemsArr.length} item(s) to ${containerTag}`);
@@ -932,7 +932,7 @@ export function registerPlacementTools(server: McpServer): void {
 
       const container = placeableList.find(p => getFieldStr(p, "Tag") === containerTag);
       if (!container) {
-        return { content: [{ type: "text", text: `Container '${containerTag}' not found in ${area}.` }] };
+        return { isError: true, content: [{ type: "text", text: `Container '${containerTag}' not found in ${area}.` }] };
       }
 
       const itemList = getFieldList(container, "ItemList");
@@ -947,7 +947,7 @@ export function registerPlacementTools(server: McpServer): void {
       if (indexStr !== undefined) {
         const removeIdx = toF(indexStr);
         if (removeIdx < 0 || removeIdx >= itemList.length) {
-          return { content: [{ type: "text", text: `Index ${removeIdx} out of range (${itemList.length} items)` }] };
+          return { isError: true, content: [{ type: "text", text: `Index ${removeIdx} out of range (${itemList.length} items)` }] };
         }
         itemList.splice(removeIdx, 1);
         removedCount = 1;

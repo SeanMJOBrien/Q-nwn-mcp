@@ -153,10 +153,10 @@ export function registerFactionTools(server: McpServer): void {
 
       // Validate faction IDs
       if (f1 < 0 || f1 >= factionList.length) {
-        return { content: [{ type: "text", text: `Invalid faction1 ID: ${f1}. Valid range: 0-${factionList.length - 1}` }] };
+        return { isError: true, content: [{ type: "text", text: `Invalid faction1 ID: ${f1}. Valid range: 0-${factionList.length - 1}` }] };
       }
       if (f2 < 0 || f2 >= factionList.length) {
-        return { content: [{ type: "text", text: `Invalid faction2 ID: ${f2}. Valid range: 0-${factionList.length - 1}` }] };
+        return { isError: true, content: [{ type: "text", text: `Invalid faction2 ID: ${f2}. Valid range: 0-${factionList.length - 1}` }] };
       }
 
       // Two real, compounding bugs found live (branch
