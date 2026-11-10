@@ -13,6 +13,7 @@ import path from "path";
 import { buildResmanOptions } from "../module-loader.js";
 import { compileScript } from "../nim-tools.js";
 import { markDirty } from "./dirty-state.js";
+import { afterWrite, beforeWrite } from "./project-sync.js";
 import type { ModuleIndex } from "../types/module.js";
 
 export interface WriteScriptResult {
@@ -39,8 +40,10 @@ export async function writeAndCompileScript(
   const ncsKey = `${resrefLower}.ncs`;
 
   const nssPath = path.join(index.tempDir, `${resrefLower}.nss`);
+  await beforeWrite(nssPath);
   await fsPromises.writeFile(nssPath, source, "utf-8");
   markDirty(nssPath);
+  await afterWrite(nssPath);
 
   const nssStat = await fsPromises.stat(nssPath);
   index.resources.set(nssKey, {
@@ -61,6 +64,7 @@ export async function writeAndCompileScript(
   result.compilerOutput = compResult.output;
 
   if (compResult.success) {
+    await afterWrite(ncsPath);
     const ncsStat = await fsPromises.stat(ncsPath);
     index.resources.set(ncsKey, {
       resref: resrefLower,

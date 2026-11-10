@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { nimtool } from "./config.js";
 import type { GffDocument } from "./types/gff.js";
 import { markDirty } from "./util/dirty-state.js";
+import { afterWrite, beforeWrite } from "./util/project-sync.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -147,6 +148,7 @@ export async function gffToJson(filePath: string): Promise<GffDocument> {
 
 /** Convert JSON back to a GFF binary file */
 export async function jsonToGff(jsonData: GffDocument, outPath: string): Promise<void> {
+  await beforeWrite(outPath);
   const jsonStr = JSON.stringify(jsonData);
   const tempJson = `${outPath}.tmp.json`;
   await fs.writeFile(tempJson, jsonStr, "utf-8");
@@ -159,6 +161,7 @@ export async function jsonToGff(jsonData: GffDocument, outPath: string): Promise
   // codebase — marking dirty here (rather than at each of the 30+ call
   // sites) is what makes the load_module dirty guard actually reliable.
   markDirty(outPath);
+  await afterWrite(outPath, jsonData);
 }
 
 // ─── TLK / 2DA ───────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ import { clearWokCache, setWokCacheDir } from "./util/walkmesh.js";
 import { clearTilesetCache } from "./util/tileset.js";
 import { clearUndoStack } from "./util/undo.js";
 import { isDirtyUnder, clearDirtyUnder } from "./util/dirty-state.js";
+import { setSyncIndexGetter, trackAll } from "./util/project-sync.js";
 import { acquireModuleLock, releaseModuleLock } from "./util/module-lock.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "./types/gff.js";
 import type { GffDocument, GffObj } from "./types/gff.js";
@@ -18,6 +19,7 @@ import type {
 } from "./types/module.js";
 
 let currentIndex: ModuleIndex | null = null;
+setSyncIndexGetter(() => currentIndex);
 
 export function getIndex(): ModuleIndex | null {
   return currentIndex;
@@ -399,6 +401,7 @@ export async function loadModule(modPath: string, opts: { force?: boolean } = {}
     loadWarnings,
   };
 
+  await trackAll(currentIndex);
   return currentIndex;
 }
 

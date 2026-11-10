@@ -104,6 +104,15 @@ export async function exportProject(index: ModuleIndex, projectDir: string): Pro
     }
     names.push(fileName);
   }
+  // Remove project files of resources that no longer exist in the module.
+  const keep = new Set(names.map((n) => path.join(projectDir, projectPath(n))));
+  for (const folder of await fs.readdir(path.join(projectDir, PROJECT_SRC)).catch(() => [] as string[])) {
+    const folderPath = path.join(projectDir, PROJECT_SRC, folder);
+    for (const f of await fs.readdir(folderPath).catch(() => [] as string[])) {
+      const full = path.join(folderPath, f);
+      if (!keep.has(full)) await fs.rm(full, { force: true });
+    }
+  }
   const manifest: ProjectManifest = { format: 1, moduleName: index.moduleName, exportedFrom: index.modPath, resources: names.sort() };
   await writeIfChanged(path.join(projectDir, PROJECT_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
   await writeIfChanged(path.join(projectDir, "nasher.cfg"), nasherConfig(index.moduleName));

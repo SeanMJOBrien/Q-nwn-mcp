@@ -56,6 +56,13 @@ A generated include that a person patched starts with `// hand-edited: <reason>`
 
 B2 `export_project` (round trip byte-identical after repack) · B3 load from project · B4 keep in step, detect external changes · B5 rewrite the repack/send rules in CLAUDE.md, `module-explorer`, 13 skills and the `feedback_send_module_after_repack` memory · B6 `adopt_module` writes the project; migrate Salt Gate (backup of its temp dir already at `adventures/The-Salt-Gate-Conspiracy/temp-backup/`).
 
+## Decisions from 2026-11-10 (B4)
+
+- **Flush:** every write, automatically; the project is never behind.
+- **No project yet:** the first write to a module loaded from a plain `.mod` creates the project (`adventures/<Title>/`) by exporting the whole module.
+- **Disk conflict:** a file changed outside the tools is imported into memory and the project. Because the tool that is writing already holds a stale copy, that one write fails with "imported the disk version, repeat the call"; the repeat then works on current data. (Continuing silently would drop the disk edit.)
+- **Hand edits:** `// hand-edited:` header, generators refuse unless `force`.
+
 ## Open questions
 
 - Size: a module's JSON can be tens of MB; confirm acceptable for a git-ignored folder (it is not committed to this repo).
