@@ -117,7 +117,7 @@ The rest are open.
 8. ~~**DONE — standalone typecheck script.**~~ `npm run typecheck` (`tsc --noEmit`)
    added and wired as its own stage in `scripts/verify.sh`, ahead of `build`, so
    CI (if added per #1) can fail fast on type errors alone.
-9. **TODO — stale parallel branches.** 8+ feature branches on origin
+9. **DONE 2026-11-09 — stale parallel branches (checked after `git fetch --prune`: only `master` and the working branch exist locally and on origin; nothing to delete).** 8+ feature branches on origin
    (`area-avenue-rotation`, `encounter-difficulty-checker`, `random-caster-abilities`,
    etc.) with no visible cleanup convention — raises cherry-pick/merge-conflict risk
    and makes auditing "what's actually in master" harder. **Convention now set (2026-11-07):** #15 tracks every
@@ -208,7 +208,7 @@ The rest are open.
     - **Merged 2026-11-09 (fifth time):** the working branch fast-forwarded into `master` and both were pushed: `de41f69` (analyze_walkmesh util,
       create_area default-tile fix), `deb7aca` (S1-S9, adventure composition tools, quest spawn/check runtime, forge and verify fixes, docs) and
       this TODO update. The working branch is 0 ahead of `master`. Only `graphify-out/` remains untracked and is deliberately not committed.
-    - **Committed 2026-11-09, not yet merged or pushed:** `9300a19` (TODOs 7, 11, 14, 17, 18, 19, 20), the spawn-when removal, `03623df` (phase_check scope enforcement, guided-workflow doc, TODOs 23-25), `16fa0a9` (adopt_module, audit_module, get_adventure_dir, focus guide, adventures/ folder) and this entry, `6e7a91e` (event counts, TODO 26) and the DM-area rule (audit row, Phase 7d, TODO 27), on `systest-live-run-and-generalized-spec`, 10 ahead of `origin/master`. `master` is `edb8015`.
+    - **Committed 2026-11-09, not yet merged or pushed:** `9300a19` (TODOs 7, 11, 14, 17, 18, 19, 20), the spawn-when removal, `03623df` (phase_check scope enforcement, guided-workflow doc, TODOs 23-25), `16fa0a9` (adopt_module, audit_module, get_adventure_dir, focus guide, adventures/ folder), `6e7a91e` (event counts, TODO 26), `f835583` (DM-area audit row, Phase 7d, TODO 27), `3709447` (DM area template), `7332cde` (S8) and this commit, on `systest-live-run-and-generalized-spec`, 13 ahead of `origin/master` (`edb8015`, unchanged since the last push). No other branch exists locally or on origin (checked 2026-11-09 after `git fetch --prune`).
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
@@ -217,7 +217,7 @@ The rest are open.
       (fully merged via the working branch).
     - **Uncommitted work in the working tree:** only `graphify-out/` (untracked, not for commit).
 
-16. **TODO (user-raised, 2026-11-08) — copy the quest-system fixes and additions into `~/git/Q-tfn-content-studio`.** This
+16. **PARTLY DONE 2026-11-09 — the bug list is verified against TFN's source and the port is planned; no studio code is changed yet (`docs/tfn-quest-findings.md`; the same plan is appended to the studio's `PROGRESS.md`). One correction below: only the two `i = 1` slot loops stop at 19; the `j = 0` loop covers 20.** Original request (user-raised, 2026-11-08) — copy the quest-system fixes and additions into `~/git/Q-tfn-content-studio`.** This
     project's quest system (`docs/quest-system.md`, `src/util/quest-{script,spec,builder}.ts`) was ported from TFN's
     `inc_quest.nss`/`dlg_q_*` and the studio's own courier/rescue/escort runtime, then fixed and extended. Bring the useful parts
     back. **Keep TFN's model, not ours:** TFN is a persistent world with per-player quest state (`SQLocalsPlayer`), NWNX
@@ -404,10 +404,11 @@ The rest are open.
     engine allows (`ActionMountObject`/`ActionDismountObject`, the mount appearance and `horse` feats, `GetIsMounted`), an NWScript include
     generator in the style of `create_companion_system`, a `build_*` helper, a `verify_*` check, and a skill. Related: #25.
 
-27. **TODO (user rule, 2026-11-09) — `create_dm_area` tool.** The area itself is the committed template `src/templates/dm_area.{are,git,gic}` (built by hand on The Salt Gate Conspiracy, 2026-11-09); the tool copies it into the module's resources, registers `dm_area` in `module.ifo`'s `Mod_Area_list`, and fills the chest. Phase 7d of `adventure-rewards` still describes building it from primitives, to be replaced by the tool; the books are made from primitives (the LLM has to pass the whole text through `create_item_blueprint`). One call should read `adventure.md` and `dm-guide.md` from
-    the adventure directory, split long text into volumes, create the area (disconnected), waypoint, chest and books, and verify them; also add a
-    `verify_*` rule so `phase_check` end for `rewards` fails without them. Open: how much book text the engine shows in an item description,
-    and whether a readable book needs an `OnActivate` script instead. The Salt Gate Conspiracy lacks both books and the area.
+27. **TODO (user rule, 2026-11-09) — `create_dm_area` tool.** Deliberately small: the DM area is **never rebuilt or redesigned**; the tool only (a) copies the committed
+    template `src/templates/dm_area.{are,git,gic}` into the module (registering `dm_area` in `module.ifo`'s `Mod_Area_list`, so the area stays exactly as is), and (b) creates the
+    book items (`baseItem` 74) from `adventure.md` and `dm-guide.md` in the adventure directory, split into volumes if long, and puts them in the chest `dm_chest`. If the area
+    exists already, only the books are replaced. Phase 7d of `adventure-rewards` describes the manual version until then. Open: how much text the engine shows in an item description
+    (volumes, or an `OnActivate` script). The Salt Gate Conspiracy has the area but no books and no DM guide yet.
 
 ## Design Intent
 
