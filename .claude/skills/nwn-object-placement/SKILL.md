@@ -23,9 +23,9 @@ Tile/orientation/height background is in the `nwn-tileset-conventions` skill.
      (east at 90, north at 180). A placeable's front compass direction is `180 − bearing`. The response shows `frontFacesCompass`.
    * They agree only at 90 and 270. If you must compute: chair at `(cx, cy)` facing a table at `(tx, ty)` →
      `bearing = atan2(ty − cy, tx − cx) + 90°` (that is exactly what `faceTowardX/Y` does).
-5. **Real designers are less strict than the defaults.** Only 57 % of real props have 1 m of walkable clearance (74 % at 0.5 m) and 34 %
-   sit within 1 m of another prop. So: `walkBuffer: 0.5` (or 0) for furniture against walls, `collisionRadius: 0.3–0.5` for
-   chairs at a table, keep the defaults for creatures and anything a player must walk past.
+5. **Defaults follow real designers, per kind.** Placeables and waypoints default to `walkBuffer` and `collisionRadius` 0.5 m, creatures to 1 m / 0.75 m. Only 57 % of real props have 1 m of walkable clearance (74 % at 0.5 m) and 34 %
+   sit within 1 m of another prop. Pass `walkBuffer: 0` for furniture hard against a wall, `collisionRadius: 0.3` for
+   chairs at a table, and raise both for large props and anything a player must walk past.
 6. **Height above the ground is `zOffset`.** An item on a table is `zOffset: 0.8` (check `probe_ground` for the floor first);
    a hanging lantern is a larger offset. Without it everything sits on the floor.
 7. **`place_sound` is the one exception to rules 1–4.** Ambient sounds don't block on walkability (audio sources don't need

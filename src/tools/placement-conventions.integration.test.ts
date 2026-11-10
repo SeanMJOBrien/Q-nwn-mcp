@@ -257,13 +257,13 @@ describe("place_placeable", () => {
     expect(text((await run({ x: "20", y: "20", faceTowardX: "20", faceTowardY: "20" })).result)).toMatch(/same point/);
   });
 
-  it("collisionRadius relaxes the default 1 m collision rule (real areas: 34% of props are closer than 1 m)", async () => {
+  it("collisionRadius relaxes the default 0.5 m collision rule (real areas: 16% of props are closer than 0.5 m)", async () => {
     const near = [placeable("table", 20, 20)];
-    const blocked = await run({ x: "20.5", y: "20" }, near);
+    const blocked = await run({ x: "20.3", y: "20" }, near);
     expect(text(blocked.result)).toContain("Placement blocked");
-    const allowed = await run({ x: "20.5", y: "20", collisionRadius: "0.3" }, [placeable("table", 20, 20)]);
+    const allowed = await run({ x: "20.3", y: "20", collisionRadius: "0.2" }, [placeable("table", 20, 20)]);
     expect(json(allowed.result).success).toBe(true);
-    const off = await run({ x: "20.5", y: "20", collisionRadius: "0" }, [placeable("table", 20, 20)]);
+    const off = await run({ x: "20.3", y: "20", collisionRadius: "0" }, [placeable("table", 20, 20)]);
     expect(json(off.result).success).toBe(true);
   });
 
@@ -273,7 +273,7 @@ describe("place_placeable", () => {
     const calls = vi.mocked(wm.checkPlacementWalkable).mock.calls;
     expect(calls.at(-1)![5]).toBe(0);
     await run({ x: "30", y: "30" });
-    expect(vi.mocked(wm.checkPlacementWalkable).mock.calls.at(-1)![5]).toBeUndefined();   // tool default (1 m) applies
+    expect(vi.mocked(wm.checkPlacementWalkable).mock.calls.at(-1)![5]).toBe(0.5);   // placeable default clearance
   });
 
   it("still refuses a position that is not walkable", async () => {

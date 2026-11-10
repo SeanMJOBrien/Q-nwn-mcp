@@ -574,6 +574,39 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).toContain("ability_score_base_exceeds_elite");
   });
 
+  it("flags natural AC on a PC-class creature, skill ranks over level + 3, and a CR far from the level", async () => {
+    const classes = twoDA(["PlayerClass", "PrimaryAbil"], [[4, { PlayerClass: "1", PrimaryAbil: "STR" }]]);
+    const mk = (extra: Record<string, unknown>) =>
+      makeCreature("nw_c2_default", {
+        Race: { type: "byte", value: 6 },
+        ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 4 }, ClassLevel: { type: "short", value: 3 } }] },
+        ...extra,
+      });
+    const codes = async (obj: ReturnType<typeof mk>) => {
+      const report = new Report("t", "utc");
+      await verifyCreature(report, makeIndex({ twodaTables: new Map([["classes", classes]]) }), obj);
+      return report.warnings.map((w) => w.code);
+    };
+    const bad = await codes(
+      mk({
+        NaturalAC: { type: "byte", value: 3 },
+        ChallengeRating: { type: "float", value: 9 },
+        SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 7 } }] },
+      }),
+    );
+    expect(bad).toContain("natural_ac_on_pc_class");
+    expect(bad).toContain("skill_rank_over_cap");
+    expect(bad).toContain("cr_level_mismatch");
+    const good = await codes(
+      mk({
+        NaturalAC: { type: "byte", value: 0 },
+        ChallengeRating: { type: "float", value: 3 },
+        SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 6 } }] },
+      }),
+    );
+    for (const c of ["natural_ac_on_pc_class", "skill_rank_over_cap", "cr_level_mismatch"]) expect(good).not.toContain(c);
+  });
+
   it("does not flag a primary ability above 15 once leveling/racial adjustment fully accounts for it", async () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 6 },

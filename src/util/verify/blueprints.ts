@@ -10,7 +10,7 @@ import { tableFromConstantColumn } from "../npc-stat-block.js";
 import { WEAPON_INVESTMENT_CLASS_IDS } from "../npc-weapon-preferences.js";
 import type { ResmanOptions } from "../../nim-tools.js";
 import type { GffObj } from "../../types/gff.js";
-import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
+import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
 import {
   checkResourceRef,
@@ -385,6 +385,44 @@ export async function verifyCreature(
           abilityField[primaryAbil],
           "rebuild with build_npc_stat_block at powerLevel 'elite' (or lower) and let leveling/racial adjustment " +
             "account for anything above 15",
+        );
+      }
+    }
+  }
+
+  // Caps the adventure skills state, checked here so a violation is caught after the fact (S8, 2026-11-09):
+  // humanoids (every class a PC class) take AC from gear, never NaturalAC; a skill rank never passes level + 3;
+  // and CR tracks total level for pure PC-class creatures (measured on 505 real blueprints: mean CR - level within +-0.3 per class).
+  {
+    const pcClassIds = classIds.filter((id) => twoDARow(index, "classes", id)?.PlayerClass !== "0");
+    const allPc = classIds.length > 0 && pcClassIds.length === classIds.length;
+    const naturalAc = getFieldNum(obj, "NaturalAC");
+    if (allPc && naturalAc > 0) {
+      report.warn(
+        "natural_ac_on_pc_class",
+        `NaturalAC is ${naturalAc} on a creature whose classes are all PC classes: humanoids get AC from the armour they wear, natural AC is for monsters`,
+        "NaturalAC",
+        "set NaturalAC to 0 and give the creature armour it is proficient with (forge_creature / equip_npc_by_role)",
+      );
+    }
+    if (effectiveLevel >= 1) {
+      const cap = effectiveLevel + 3;
+      const over = getFieldList(obj, "SkillList").filter((sk) => getFieldNum(sk, "Rank") > cap);
+      if (over.length > 0) {
+        report.warn(
+          "skill_rank_over_cap",
+          `${over.length} skill(s) have more ranks than the level ${effectiveLevel} cap of ${cap} (highest ${Math.max(...over.map((sk) => getFieldNum(sk, "Rank")))})`,
+          "SkillList",
+          "rebuild the skills with build_npc_stat_block (it caps ranks at level + 3)",
+        );
+      }
+      const cr = getFieldNum(obj, "ChallengeRating");
+      if (allPc && cr > 0 && Math.abs(cr - effectiveLevel) > 2) {
+        report.warn(
+          "cr_level_mismatch",
+          `ChallengeRating ${cr} is far from total level ${effectiveLevel}; pure PC-class creatures have CR close to their level`,
+          "ChallengeRating",
+          "set the CR to about the level (forge_creature does), or use a monster class if the creature is meant to be stronger than its level",
         );
       }
     }

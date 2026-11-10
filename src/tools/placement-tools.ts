@@ -174,7 +174,7 @@ export function registerPlacementTools(server: McpServer): void {
 
   server.tool(
     "place_placeable",
-    "Place a placeable in an area from a UTP blueprint. Appearance field comes from the blueprint (not defaulted to 0). By default strips event scripts and clears Useable/HasInventory — pass stripScripts='false' to keep blueprint defaults. Use add_items_to_container to enable inventory on placed containers. Enforces a collision check (default 1 m; collisionRadius to change, 0 disables) and a walkability check (the position and four points walkBuffer m away, default 1 m, must be walkable). Z is the exact ground height from the tile walkmesh plus zOffset (use zOffset to put a prop on a table). Facing: bearing is the RAW GFF Bearing in degrees, counter-clockwise, and the model's FRONT faces SOUTH at 0 (front compass = 180 - bearing), so prefer faceTowardX/faceTowardY, which turns the front toward a world point (chairs toward a table, bedrolls toward a fire).",
+    "Place a placeable in an area from a UTP blueprint. Appearance field comes from the blueprint (not defaulted to 0). By default strips event scripts and clears Useable/HasInventory — pass stripScripts='false' to keep blueprint defaults. Use add_items_to_container to enable inventory on placed containers. Enforces a collision check (default 0.5 m, the real-prop norm; collisionRadius to change, 0 disables) and a walkability check (the position and four points walkBuffer m away, default 0.5 m, must be walkable). Z is the exact ground height from the tile walkmesh plus zOffset (use zOffset to put a prop on a table). Facing: bearing is the RAW GFF Bearing in degrees, counter-clockwise, and the model's FRONT faces SOUTH at 0 (front compass = 180 - bearing), so prefer faceTowardX/faceTowardY, which turns the front toward a world point (chairs toward a table, bedrolls toward a fire).",
     {
       area: z.string().describe("Area resref"),
       blueprint: z.string().describe("UTP blueprint resref (module or base game)"),
@@ -183,10 +183,10 @@ export function registerPlacementTools(server: McpServer): void {
       z: optNumParam("Fallback Z, used only when no walkmesh ground height is available. Normally ignored: Z is the exact ground height from the tile walkmesh (see probe_ground)."),
       bearing: optNumParam("Raw GFF Bearing in degrees, counter-clockwise; the model front faces SOUTH at 0, EAST at 90, NORTH at 180 (default 0). Prefer faceTowardX/faceTowardY."),
       zOffset: optNumParam("Meters above the ground height (default 0). Ground height always comes from the walkmesh; the z parameter is only a fallback when no walkmesh is available."),
-      collisionRadius: optNumParam("Minimum distance to other creatures/placeables/doors in meters (default 1.0). Set to 0 to disable. Real areas: 34% of props sit within 1 m of another prop, 16% within 0.5 m."),
+      collisionRadius: optNumParam("Minimum distance to other creatures/placeables/doors in meters (default 0.5, since 16% of real props sit within 0.5 m of another and 34% within 1 m; raise it for large props). Set to 0 to disable."),
       faceTowardX: optNumParam("Face the world point (faceTowardX, faceTowardY) instead of using bearing"),
       faceTowardY: optNumParam("World Y of the point to face (give together with faceTowardX)"),
-      walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 1.0). 0 = only the position itself must be walkable. Real designers' props: only 57% have 1 m of clearance, 74% have 0.5 m."),
+      walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 0.5, which 74% of real props have; 1.0 only 57%). 0 = only the position itself must be walkable."),
       stripScripts: z.string().optional().describe("Strip all event scripts from the blueprint (default 'true'). Set to 'false' to keep blueprint scripts."),
     },
     { idempotentHint: true },
@@ -194,7 +194,7 @@ export function registerPlacementTools(server: McpServer): void {
       const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing), zOffsetN = toF(zOffset);
       const face = parseFaceToward(faceTowardX, faceTowardY);
       if ("error" in face) return { content: [{ type: "text", text: face.error }] };
-      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : undefined;
+      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : 0.5;
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
@@ -268,8 +268,8 @@ export function registerPlacementTools(server: McpServer): void {
       // Append to GIT Placeable List
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
 
-      // Collision detection — blocks placement (default 1 m; collisionRadius 0 disables)
-      const colRadius = collisionRadius !== undefined ? toF(collisionRadius) : 1.0;
+      // Collision detection — blocks placement (default 0.5 m; collisionRadius 0 disables)
+      const colRadius = collisionRadius !== undefined ? toF(collisionRadius) : 0.5;
       if (colRadius > 0) {
         const collision = checkCollision(git, xN, yN, colRadius);
         if (collision.collision) {
@@ -325,7 +325,7 @@ export function registerPlacementTools(server: McpServer): void {
       bearing: optNumParam("Compass facing in degrees: 0 = north, 90 = east, 180 = south, 270 = west (default 0)"),
       faceTowardX: optNumParam("Face the world point (faceTowardX, faceTowardY) instead of using bearing"),
       faceTowardY: optNumParam("World Y of the point to face (give together with faceTowardX)"),
-      walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 1.0). 0 = only the position itself must be walkable. Real designers' props: only 57% have 1 m of clearance, 74% have 0.5 m."),
+      walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 0.5; a waypoint is a marker, not a prop). 0 = only the position itself must be walkable."),
       mapNote: z.string().optional().describe("Map note text (enables map pin if provided)"),
       mapNoteEnabled: z.boolean().optional().describe("Show map note pin (default true if mapNote provided)"),
     },
@@ -334,7 +334,7 @@ export function registerPlacementTools(server: McpServer): void {
       const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing);
       const face = parseFaceToward(faceTowardX, faceTowardY);
       if ("error" in face) return { content: [{ type: "text", text: face.error }] };
-      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : undefined;
+      const walkBufferN = walkBuffer !== undefined ? toF(walkBuffer) : 0.5;
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
