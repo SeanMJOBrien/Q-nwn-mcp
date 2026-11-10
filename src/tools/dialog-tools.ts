@@ -60,17 +60,18 @@ export function registerDialogTools(server: McpServer): void {
 
   server.tool(
     "trace_dialog_path",
-    "Follow a specific conversation path by choosing PC reply indices at each step.",
+    "Follow a specific conversation path by choosing PC reply indices at each step. `root` picks which StartingList line the conversation opens with (default 0); the result lists every root with its condition script and parameters, because the engine opens the first root whose condition passes, not always the first. replyIndices are positions in the NPC line's reply list. Stops after 60 nodes (hub dialogs loop).",
     {
       dialog: z.string().describe("Dialog resref"),
       replyIndices: z.array(z.coerce.number()).describe("Sequence of PC reply indices to follow"),
+      root: z.coerce.number().optional().describe("Index into StartingList of the opening line to follow (default 0). See `roots` in the result."),
     },
     { readOnlyHint: true, idempotentHint: true },
-    async ({ dialog, replyIndices }) => {
+    async ({ dialog, replyIndices, root }) => {
       const index = requireIndex();
       const key = `${dialog.toLowerCase()}.dlg`;
       const doc = index.parsedGff.get(key);
-      if (!doc) return { content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
+      if (!doc) return { isError: true, content: [{ type: "text", text: `Dialog not found: ${dialog}` }] };
 
       const dlg = doc as GffObj;
       const entries = getFieldList(dlg, "EntryList");
@@ -84,12 +85,29 @@ export function registerDialogTools(server: McpServer): void {
         return { content: [{ type: "text", text: "Dialog has no starting entries" }] };
       }
 
-      let entryIdx = getFieldNum(startingList[0], "Index");
-      const _startActive = getFieldStr(startingList[0], "Active");
+      const rootIdx = root ?? 0;
+      if (rootIdx < 0 || rootIdx >= startingList.length) {
+        return { isError: true, content: [{ type: "text", text: `root ${rootIdx} is out of range (0-${startingList.length - 1})` }] };
+      }
+      const roots = startingList.map((l, i) => ({
+        root: i,
+        entry: getFieldNum(l, "Index"),
+        condition: getFieldStr(l, "Active") || null,
+        conditionParams: Object.fromEntries(
+          getFieldList(l, "ConditionParams").map((kv) => [getFieldStr(kv, "Key"), getFieldStr(kv, "Value")]),
+        ),
+        text: getFieldLocStr(entries[getFieldNum(l, "Index")] ?? {}, "Text").slice(0, 60),
+      }));
+      let entryIdx = getFieldNum(startingList[rootIdx], "Index");
+      let truncated = false;
 
       let replyChoiceIdx = 0;
 
       while (entryIdx >= 0 && entryIdx < entries.length) {
+        if (path.length >= 60) {
+          truncated = true;
+          break;
+        }
         const entry = entries[entryIdx];
         const entryText = getFieldLocStr(entry, "Text");
         const entryScript = getFieldStr(entry, "Script");
@@ -134,7 +152,7 @@ export function registerDialogTools(server: McpServer): void {
         entryIdx = getFieldNum(entryLinks[0], "Index");
       }
 
-      return { content: [{ type: "text", text: JSON.stringify(path, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ root: rootIdx, roots, path, ...(truncated ? { truncated: "stopped after 60 nodes" } : {}) }, null, 2) }] };
     }
   );
 

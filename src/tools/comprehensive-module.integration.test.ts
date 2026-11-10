@@ -573,6 +573,8 @@ describe("comprehensive module — every mockable nwn-mcp system, one shared mod
     expect(flatText).toContain("Well met, traveler.");
     const traced = await call("trace_dialog_path", { dialog: "dlg_hero", replyIndices: [0] });
     expect(traced).toBeTypeOf("object");
+    expect((traced as { roots: unknown[] }).roots.length).toBeGreaterThan(0);
+    expect((traced as { path: unknown[] }).path.length).toBeGreaterThan(0);
     const scripts = await call("find_dialog_scripts", {});
     expect(scripts).toBeDefined();
   });

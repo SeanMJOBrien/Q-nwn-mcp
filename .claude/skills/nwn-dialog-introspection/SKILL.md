@@ -24,14 +24,12 @@ available. `trace_dialog_path`'s output surfaces this value as `condition`
 on PC entries; it does **not** evaluate the script, it just reports its
 name.
 
-## `trace_dialog_path`'s real limitation: it ignores StartingList ordering
+## `trace_dialog_path` and StartingList ordering (fixed: pick the root)
 
 NWN evaluates `StartingList` **top to bottom**, firing the first entry
 whose `Active` condition returns TRUE. A dialog commonly has several
 starting greetings gated by different conditions — `trace_dialog_path`,
-however, **always starts from `StartingList[0]`** regardless of what that
-entry's condition is or whether a later entry would actually fire at
-runtime. For a dialog with conditional starting entries, the traced path
+takes a `root` argument (default 0) and returns every root with its condition script and parameters (`roots`), so you can trace the opening line that fires in the scenario you care about. It does not evaluate the condition: it follows the root you name. For a dialog with conditional starting entries, the traced path
 may not be the path a real player would ever see.
 
 **Real example** (a Frozen North quest-farmer NPC's `StartingList`, read via
@@ -49,12 +47,7 @@ index 1   Active: nw_d2_chrl       # (generic, used only if none of the
 index 0   Active: nw_d2_chrh       # quest-stage conditions matched)
 ```
 
-`trace_dialog_path` would always start at entry 49 (`m2q1scfarmsgk1`), even
-though at most quest stages that condition fails and the PC actually sees
-one of the later, lower-priority entries. **Before trusting a traced path,
-read `StartingList` via `get_dialog_tree` first** and reason about which
-entry's condition would actually be true for the scenario you care about —
-`trace_dialog_path` can't pick that for you.
+A default trace starts at entry 49 (`m2q1scfarmsgk1`), even though at most quest stages that condition fails and the PC actually sees one of the later, lower-priority entries. Read `roots` in the result, reason about which condition would be true for your scenario, and trace again with that `root`. The trace stops after 60 nodes because hub dialogs loop.
 
 The same "first Active entry on the list, top-to-bottom" rule applies to
 `RepliesList`/`EntriesList` branches mid-conversation, not just
