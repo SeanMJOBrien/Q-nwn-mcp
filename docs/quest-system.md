@@ -194,3 +194,7 @@ XP by TFN's formula (base 50/100/200/400 by tier, +10 % per quest level, scaled 
   script is compiled by `create_quest_system`.
 - `run_live_verification` returns `[QUEST]` lines, but the headless server has no player, so no stage can actually advance
   there: test quests in game.
+
+## Dialog return to a hub (2026-11-10)
+
+Quest answers do not end the conversation (user rule 2026-11-09). `build_quest` gives each NPC dialog a shared hub: one PC option "About: <quest name>" per subject that is still active for that NPC (the offer while it can be taken, the reminder line while the quest runs), and one `[Leave]`. Every quest line that would end the talk (accept, decline, thanks, reminder, missing item, check pass or fail) links to the hub options; each option shows by a `q_chk` condition on its link, so it follows quest state. Lines that end on purpose stay terminal: a fight starts (`check.else: "fight"`), the NPC walks off (rescue with leave, escort start). Hub options carry the quest's Comment prefix (`mcpq:<tag>:hub:`) and are removed by `remove_quest`; the shared `[Leave]` stays. A line with its own PC replies (the offer, a plea, a check intro, a deliver line with a `reply`) keeps them. A one-line `reply` on a deliver line still ends the talk after the reply.

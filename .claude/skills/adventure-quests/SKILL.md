@@ -182,3 +182,5 @@ Call `phase_check(phase: "quests", step: "end")` last. It checks this phase's se
 ## Run the quest without a player
 
 After `build_quest`, walk the quest on the real engine with a stand-in player: `run_live_verification` with `simulate` (see `docs/player-simulation.md`). One step per dialog line you built: `q_chk` conditions with `expect`, `q_act` actions with `expectStage` (and `expectGold` / `expectItem`). Use the `params` the build plan listed (`[target=1]`, `[quest=<tag> stage=2 op=at]`). Set `expectedCheckLines` to the step count plus the quest log lines plus one so `[SIM_DONE]` is reached. Fix every `[SIM_FAIL]` before the phase ends.
+
+Quest answers return to a hub, not to the end of the talk: `build_quest` adds "About: <quest>" options (offer while available, reminder while running) and `[Leave]` after every answer. Do not add your own `[Leave]` replies to quest lines.

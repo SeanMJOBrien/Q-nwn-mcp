@@ -83,6 +83,7 @@ export interface QuestBuildReport {
 }
 
 const COMMENT = (tag: string) => `mcpq:${tag}:`;
+const HUB_LEAVE = "mcpq:_hub:leave";
 
 // --- small helpers
 
@@ -547,6 +548,10 @@ export class QuestBuilder {
       created: boolean;
       npc: Participant;
       roots: Array<{ entry: number; cond: string; params?: ScriptParams; rank: number }>;
+      /** Entries that end the conversation on purpose (a fight starts, the NPC walks off). */
+      ends: Set<number>;
+      /** Hub subjects of this quest: reply text target entry and the condition that makes it show. */
+      subjects: Array<{ entry: number; key: string }>;
     }
   >();
 
@@ -577,6 +582,8 @@ export class QuestBuilder {
       created,
       npc,
       roots: [] as Array<{ entry: number; cond: string; params?: ScriptParams; rank: number }>,
+      ends: new Set<number>(),
+      subjects: [] as Array<{ entry: number; key: string }>,
     };
     this.dialogs.set(npc.label, d);
     return d;
@@ -650,6 +657,7 @@ export class QuestBuilder {
       this.linkRE(d, yes, acc);
       this.linkRE(d, no, dec);
       this.root(d, offer, 3, { target });
+      d.subjects.push({ entry: offer, key: `offer:${target}` });
       return;
     }
     if (s.do === "deliver") {
@@ -657,8 +665,10 @@ export class QuestBuilder {
       const count = String(s.count ?? 1);
       const advParams: ScriptParams = s.keep ? { target } : { target, take_item: item, take_count: count };
       const adv = this.entry(d, thanks, `${c}advance`, "q_act", advParams);
-      if (s.reply) this.linkER(d, adv, this.reply(d, s.reply, `${c}reply`));
-      this.leave(d, adv, `${c}leave`);
+      if (s.reply) {
+        this.linkER(d, adv, this.reply(d, s.reply, `${c}reply`));
+        this.leave(d, adv, `${c}leave`);
+      }
       this.root(d, adv, 1, { target, item, count });
       const lack = this.entry(d, s.missing ?? "You were to bring me something. Have you lost it?", `${c}missing`);
       this.root(d, lack, 1, { target, item, count, lacks: "1" });
@@ -668,6 +678,7 @@ export class QuestBuilder {
       const plea = this.entry(d, s.plea ?? "Please, get me out of here!", `${c}plea`);
       const free = this.reply(d, s.reply ?? "Hold still. I'll get you out.", `${c}free`);
       const adv = this.entry(d, thanks, `${c}advance`, "q_act", { target, leave: s.leave === false ? "0" : "1" });
+      if (s.leave !== false) d.ends.add(adv);
       this.linkER(d, plea, free);
       this.linkRE(d, free, adv);
       this.root(d, plea, 1, { target });
@@ -677,6 +688,7 @@ export class QuestBuilder {
       const plea = this.entry(d, s.plea ?? "Will you take me there? I'll stay close.", `${c}plea`);
       const go = this.reply(d, s.reply ?? "Come with me.", `${c}go`);
       const start = this.entry(d, "Lead the way.", `${c}start`, "q_act", { escort: target });
+      d.ends.add(start);
       this.linkER(d, plea, go);
       this.linkRE(d, go, start);
       this.root(d, plea, 1, { target, escort: "offer" });
@@ -709,6 +721,7 @@ export class QuestBuilder {
         Object.keys(failParams).length ? "q_act" : undefined,
         failParams,
       );
+      if (s.check.else === "fight") d.ends.add(fail);
       this.linkER(d, intro, tryIt);
       this.linkRE(d, tryIt, pass, "q_chk", { roll: key, roll_result: "pass" });
       this.linkRE(d, tryIt, fail, "q_chk", { roll: key, roll_result: "fail" });
@@ -755,12 +768,68 @@ export class QuestBuilder {
       } else if (!giverStages.has(n + 1)) {
         const rem = this.entry(d, stage.reminder ?? "Have you done what I asked?", `${c}reminder`);
         this.root(d, rem, 2, { quest: this.spec.tag, stage: String(n), op: "at" });
+        d.subjects.push({ entry: rem, key: `s${n}` });
       }
     }
   }
 
+
+  /**
+   * Dialog rule (user, 2026-11-09): an answer does not end the talk. Every quest line that would end it links back to a
+   * shared hub: one option per still-active subject of this NPC ("About <quest>": its reminder line while the quest is
+   * running, its offer while it can still be taken) and [Leave]. Options show by q_chk on the link, so they follow quest
+   * state; they are removed with their quest (Comment prefix mcpq:<tag>:).
+   */
+  private wireHub(d: NonNullable<ReturnType<QuestBuilder["dialogs"]["get"]>>): void {
+    const mine = COMMENT(this.spec.tag);
+    for (const sub of d.subjects) {
+      const r = this.reply(d, `About: ${this.spec.name}`, `${mine}hub:${sub.key}`);
+      this.linkRE(d, r, sub.entry);
+    }
+    const replies = getFieldList(d.dlg, "ReplyList");
+    let leaveIdx = replies.findIndex((r) => getFieldStr(r, "Comment") === HUB_LEAVE);
+    if (leaveIdx < 0) leaveIdx = this.reply(d, "[Leave]", HUB_LEAVE);
+    const hubOf = (comment: string): { idx: number; params?: ScriptParams } | undefined => {
+      const m = /^mcpq:(.+?):hub:(s(\d+)|offer:(\d+))$/.exec(comment);
+      if (!m) return undefined;
+      return { idx: -1, params: m[3] ? { quest: m[1], stage: m[3], op: "at" } : { target: m[4] } };
+    };
+    const hubReplies: Array<{ idx: number; params?: ScriptParams }> = [];
+    getFieldList(d.dlg, "ReplyList").forEach((r, idx) => {
+      const h = hubOf(getFieldStr(r, "Comment"));
+      if (h) hubReplies.push({ idx, params: h.params });
+    });
+    const entries = getFieldList(d.dlg, "EntryList");
+    entries.forEach((e, ei) => {
+      const comment = getFieldStr(e, "Comment");
+      if (!comment.startsWith("mcpq:") || d.ends.has(ei)) return;
+      const links = getFieldList(e, "RepliesList");
+      const isHub = (l: GffObj) => {
+        const c = getFieldStr(getFieldList(d.dlg, "ReplyList")[getFieldNum(l, "Index")], "Comment");
+        return c === HUB_LEAVE || !!hubOf(c);
+      };
+      if (links.some((l) => !isHub(l))) return; // has replies of its own (offer, plea, intro)
+      const linked = new Set(links.map((l) => getFieldNum(l, "Index")));
+      for (const h of hubReplies) {
+        if (linked.has(h.idx)) continue;
+        // the subject whose own line this is would only point back at itself
+        const target = getFieldList(getFieldList(d.dlg, "ReplyList")[h.idx], "EntriesList")[0];
+        if (target && getFieldNum(target, "Index") === ei) continue;
+        const l = makeLink(h.idx, "q_chk", h.params);
+        l.__struct_id = links.length;
+        links.push(l);
+      }
+      if (!linked.has(leaveIdx)) {
+        const l = makeLink(leaveIdx);
+        l.__struct_id = links.length;
+        links.push(l);
+      }
+    });
+  }
+
   private finishDialogs(): void {
     for (const d of this.dialogs.values()) {
+      this.wireHub(d);
       d.roots.sort((a, b) => a.rank - b.rank);
       const start = getFieldList(d.dlg, "StartingList");
       const links = d.roots.map((r) => makeLink(r.entry, r.cond, r.params));

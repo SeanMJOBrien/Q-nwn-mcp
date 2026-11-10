@@ -6,7 +6,7 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GffDocument, GffObj } from "../types/gff.js";
-import { getFieldList, getFieldNum, getFieldStr } from "../types/gff.js";
+import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 import { getScriptParams } from "../util/dialog-params.js";
 import { getVarTableEntries } from "../util/git-helpers.js";
@@ -200,6 +200,35 @@ describe("build_quest", () => {
       expect(vars(getFieldList(git, "Creature List")[1]).quest_event).toBeUndefined();
       expect(getFieldList(mockIndex.parsedGff.get(`${dlgRes}.dlg`) as unknown as GffObj, "EntryList").length).toBe(1);
       expect(getFieldList(mockIndex.parsedGff.get("module.jrl") as unknown as GffObj, "Categories")).toHaveLength(0);
+    } finally {
+      await done();
+    }
+  });
+
+  it("quest answers return to a hub: About <quest> for each active subject, plus [Leave]; removed with the quest", async () => {
+    const { c, done } = await client();
+    try {
+      json(await c.callTool({ name: "build_quest", arguments: { spec: SPEC } }));
+      const dlg = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
+      const entries = getFieldList(dlg, "EntryList");
+      const replies = getFieldList(dlg, "ReplyList");
+      const text = (n: GffObj) => getFieldLocStr(n, "Text");
+      const hubReplies = replies.filter((r) => /:hub:/.test(getFieldStr(r, "Comment")));
+      expect(hubReplies.map(text).every((t) => t.startsWith("About: "))).toBe(true);
+      expect(hubReplies.length).toBeGreaterThanOrEqual(2); // the offer and a reminder
+      expect(replies.filter((r) => getFieldStr(r, "Comment") === "mcpq:_hub:leave")).toHaveLength(1);
+      const accept = entries.find((e) => /s1:accept$/.test(getFieldStr(e, "Comment"))) as GffObj;
+      const links = getFieldList(accept, "RepliesList");
+      expect(links.length).toBeGreaterThanOrEqual(2);
+      const targets = links.map((l) => getFieldStr(replies[getFieldNum(l, "Index")], "Comment"));
+      expect(targets).toContain("mcpq:_hub:leave");
+      expect(targets.some((t) => /:hub:s1$/.test(t))).toBe(true); // reminder for the quest now running
+      const conds = links.filter((l) => getFieldStr(l, "Active") === "q_chk");
+      expect(conds.length).toBeGreaterThan(0);
+      // the explicit exit is still the only way out: no entry from this quest ends the talk by accident
+      json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_wolves_at_the_fold" } }));
+      const after = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
+      expect(getFieldList(after, "ReplyList").filter((r) => /:hub:/.test(getFieldStr(r, "Comment")))).toHaveLength(0);
     } finally {
       await done();
     }
