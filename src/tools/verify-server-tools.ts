@@ -24,8 +24,13 @@ import path from "path";
 import { promisify } from "util";
 import { z } from "zod";
 import { MCP_FOLDER_VERIFYSERVER } from "../config.js";
-import { requireIndex } from "../module-loader.js";
-import { erfPack } from "../nim-tools.js";
+import { buildResmanOptions, requireIndex } from "../module-loader.js";
+import { compileScript, erfPack, jsonToGff } from "../nim-tools.js";
+import type { GffDocument } from "../types/gff.js";
+import type { ModuleIndex } from "../types/module.js";
+import { getFieldStr } from "../types/gff.js";
+import { generateSimDriver, validateSimSpec, type SimSpec } from "../util/sim-driver.js";
+import { generateSimInclude, SIM_INCLUDE } from "../util/sim-script.js";
 import { optNumParam, toI } from "../util/params.js";
 import { parseLootLines, upsertSpawnLoot } from "../util/verify-server/loot.js";
 import {
@@ -191,6 +196,34 @@ async function patchNwnModuleEnv(envPath: string, moduleName: string): Promise<v
 
 const RAW_EXCERPT_MAX_CHARS = 20_000;
 
+/** Throwaway build with a simulation driver: the module's files, plus inc_sim and a_sim_run, OnModuleLoad pointed at the driver (which runs the original handler first). Nothing is written to the module itself. */
+async function buildSimulationMod(index: ModuleIndex, spec: SimSpec, outPath: string): Promise<{ compiled: boolean; output: string }> {
+  const staging = await fs.mkdtemp(path.join(os.tmpdir(), "nwn-mcp-sim-"));
+  try {
+    for (const e of await fs.readdir(index.tempDir, { withFileTypes: true })) {
+      if (e.isFile()) await fs.copyFile(path.join(index.tempDir, e.name), path.join(staging, e.name));
+    }
+    const ifo = structuredClone(index.parsedGff.get("module.ifo")) as GffDocument | undefined;
+    if (!ifo) return { compiled: false, output: "module.ifo is not loaded" };
+    const original = getFieldStr(ifo as never, "Mod_OnModLoad");
+    await fs.writeFile(path.join(staging, `${SIM_INCLUDE}.nss`), generateSimInclude());
+    await fs.writeFile(path.join(staging, "a_sim_run.nss"), generateSimDriver(spec, original || undefined));
+    const resman = await buildResmanOptions(index);
+    const comp = await compileScript(path.join(staging, "a_sim_run.nss"), path.join(staging, "a_sim_run.ncs"), {
+      resman: { ...resman, dirs: [...(resman.dirs ?? []), staging] },
+    });
+    if (!comp.success) return { compiled: false, output: comp.output };
+    (ifo as Record<string, unknown>).Mod_OnModLoad = { type: "resref", value: "a_sim_run" };
+    await jsonToGff(ifo, path.join(staging, "module.ifo"));
+    await fs.mkdir(path.dirname(outPath), { recursive: true });
+    await fs.rm(outPath, { force: true });
+    await erfPack(staging, outPath);
+    return { compiled: true, output: comp.output };
+  } finally {
+    await fs.rm(staging, { recursive: true, force: true });
+  }
+}
+
 export function registerVerifyServerTools(server: McpServer): void {
   server.tool(
     "run_live_verification",
@@ -224,13 +257,20 @@ export function registerVerifyServerTools(server: McpServer): void {
         .describe(
           `Case-insensitive substrings to flag as engine errors in the log. Default: ${JSON.stringify(DEFAULT_ERROR_PATTERNS)}.`,
         ),
+      simulate: z
+        .string()
+        .optional()
+        .describe(
+          'Player simulation (docs/player-simulation.md): JSON {"actor"?: "<stand-in blueprint>", "steps": [{"label"?, "npc": "<tag>", "script": "q_act", "params"?: {"quest":"..."}, "kind"?: "action"|"condition", "expect"?: true|false, "expectStage"?: [{"quest","stage"}], "expectGold"?, "expectItem"?: [{"tag","count"?}]}]}. ' +
+            "The throwaway build gets a driver that spawns a stand-in creature as the player (MCP_TEST_ACTOR) and runs each step's generated script on the NPC with those script parameters, like a dialog line would. Needs the module's quest/companion scripts regenerated with inc_sim (create_quest_system / create_companion_system). Result: simResults.",
+        ),
       recordLoot: z
         .boolean()
         .optional()
         .describe("Write the [CL_LOOT] lines (what forged creatures bought and will drop) into adventure.md's `## Spawn Loot` section when a module is loaded and adventure.md exists. Default true."),
     },
     { idempotentHint: true },
-    async ({ modulePath, expectedCheckLines, timeoutSeconds, errorPatterns, recordLoot }) => {
+    async ({ modulePath, expectedCheckLines, timeoutSeconds, errorPatterns, recordLoot, simulate }) => {
       const verifyServerDir = MCP_FOLDER_VERIFYSERVER;
       const composeFile = path.join(verifyServerDir, "docker-compose.yml");
       try {
@@ -248,7 +288,20 @@ export function registerVerifyServerTools(server: McpServer): void {
       }
 
       let resolvedModPath: string;
-      if (modulePath) {
+      if (simulate) {
+        let spec: SimSpec;
+        try {
+          spec = JSON.parse(simulate) as SimSpec;
+        } catch {
+          return { isError: true, content: [{ type: "text", text: "simulate is not valid JSON." }] };
+        }
+        const errs = validateSimSpec(spec);
+        if (errs.length) return { isError: true, content: [{ type: "text", text: `simulate: ${errs.join("; ")}` }] };
+        const throwaway = path.join(os.tmpdir(), "nwn-mcp-live-verify", `sim-${path.basename(requireIndex().modPath)}`);
+        const built = await buildSimulationMod(requireIndex(), spec, throwaway);
+        if (!built.compiled) return { isError: true, content: [{ type: "text", text: `The simulation driver did not compile (a quest or companion script may predate inc_sim; re-run create_quest_system / create_companion_system):\n${built.output}` }] };
+        resolvedModPath = throwaway;
+      } else if (modulePath) {
         resolvedModPath = path.resolve(modulePath);
       } else {
         const index = requireIndex();
@@ -322,6 +375,15 @@ export function registerVerifyServerTools(server: McpServer): void {
                 engineErrors: parsed.engineErrors,
                 specResults: parsed.specResults,
                 otherTaggedLines: parsed.otherTaggedLines,
+                ...(simulate
+                  ? {
+                      simResults: {
+                        ok: parsed.otherTaggedLines.filter((l) => l.includes("[SIM_OK]")),
+                        fail: parsed.otherTaggedLines.filter((l) => l.includes("[SIM_FAIL]")),
+                        done: parsed.otherTaggedLines.find((l) => l.includes("[SIM_DONE]")) ?? "no [SIM_DONE] line: the driver did not finish",
+                      },
+                    }
+                  : {}),
                 rawLogExcerpt,
                 ...(poll.timedOut && !poll.sawLoadingModule
                   ? {

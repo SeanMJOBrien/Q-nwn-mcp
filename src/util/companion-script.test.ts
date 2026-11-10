@@ -13,7 +13,8 @@ describe("generateCompanionScripts", () => {
     expect(src.inc_companion).toContain("GetFirstFactionMember(oPC, FALSE)");
     expect(src.inc_companion).toContain("GetAssociateType(oCreature) != ASSOCIATE_TYPE_HENCHMAN");
     expect(src.inc_companion).toContain("GetIsDead(oCreature)");
-    for (const s of Object.values(src)) {
+    for (const [name, s] of Object.entries(src)) {
+      if (name === "inc_sim") continue; // the test-actor hook stores one simulation result on the module
       expect(s).not.toMatch(/SetLocalInt\(GetModule\(\)/);
       expect(s).not.toContain("HC_HENCH_COUNT");
     }

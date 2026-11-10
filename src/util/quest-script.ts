@@ -1,4 +1,4 @@
-import { generateSimInclude, SIM_INCLUDE } from "./sim-script.js";
+import { generateSimInclude, SIM_INCLUDE, withSimResult } from "./sim-script.js";
 /**
  * Generator for the parameter-driven quest runtime written by `create_quest_system`.
  *
@@ -1360,6 +1360,6 @@ export const HEARTBEAT_WRAPPER = "q_mod_tick";
 /** Source for every shared quest script, keyed by resref, include first. */
 export function generateQuestScripts(): Record<string, string> {
   const out: Record<string, string> = { [SIM_INCLUDE]: generateSimInclude(), [QUEST_INCLUDE]: INCLUDE };
-  for (const name of QUEST_SCRIPTS) if (name !== QUEST_INCLUDE) out[name] = SCRIPTS[name];
+  for (const name of QUEST_SCRIPTS) if (name !== QUEST_INCLUDE) out[name] = withSimResult(SCRIPTS[name]);
   return out;
 }

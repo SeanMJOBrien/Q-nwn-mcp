@@ -1,4 +1,4 @@
-import { generateSimInclude, SIM_INCLUDE } from "./sim-script.js";
+import { generateSimInclude, SIM_INCLUDE, withSimResult } from "./sim-script.js";
 /**
  * Generator for the shared companion (henchman) scripts written by `create_companion_system`.
  *
@@ -171,7 +171,7 @@ void main()
 export function generateCompanionScripts(opts: CompanionScriptOptions = {}): Record<string, string> {
   const max = Math.max(1, Math.min(10, Math.floor(opts.maxCompanions ?? DEFAULT_MAX_COMPANIONS)));
   const out: Record<string, string> = { [SIM_INCLUDE]: generateSimInclude(), [COMPANION_INCLUDE]: include(max) };
-  for (const name of COMPANION_SCRIPTS) if (name !== COMPANION_INCLUDE) out[name] = SCRIPTS[name];
+  for (const name of COMPANION_SCRIPTS) if (name !== COMPANION_INCLUDE) out[name] = withSimResult(SCRIPTS[name]);
   return out;
 }
 
