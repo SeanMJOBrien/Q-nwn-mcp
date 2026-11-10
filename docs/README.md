@@ -2,6 +2,12 @@
 
 | Question | Read |
 |---|---|
+| Comprehensive two-tier test harness notes? | [testing-history.md](testing-history.md) — moved out of CLAUDE.md |
+| Gear appearance TODO, weapon preferences, equip_npc_by_role, build_npc_stat_block, creation order? | [gear-and-npc-generation-history.md](gear-and-npc-generation-history.md) — moved out of CLAUDE.md |
+| Companion findings, random and special abilities, simple-NPC tier, open TODOs (appearance randomisation, level-up after bake, quickbar)? | [henchmen-and-caster-history.md](henchmen-and-caster-history.md) — moved out of CLAUDE.md |
+| Building survey areas: 32x32 limit, packing, paint_tiles batching? | [survey-areas-notes.md](survey-areas-notes.md) — moved out of CLAUDE.md |
+| Area prefabs, flat-space reservation, rebuild one area, per-module git repo, tileset survey TODOs, tooling that prevents repeat mistakes? | [area-todos-and-tooling-history.md](area-todos-and-tooling-history.md) — moved out of CLAUDE.md |
+| Stamped-group rotation, entrance detection, avenue preservation, rotation-handedness saga? | [layout-rotation-history.md](layout-rotation-history.md) — moved out of CLAUDE.md |
 | Why does each `verify_*` check exist, how does live verification work, what did the playtest rounds find? | [verification-history.md](verification-history.md) — moved out of CLAUDE.md |
 | What went wrong before, and which tool-call pitfalls exist (GFF edit order, field names, rotation, doors, gear)? | [pitfalls.md](pitfalls.md) — full record moved out of CLAUDE.md |
 | Where does an object go, which way does it face, what is its Z? Why do tiles rotate the way they do? What is a tileset's height step? | [object-placement-and-tilesets.md](object-placement-and-tilesets.md) — verified spatial conventions, with the real-data evidence and the tools' resulting behaviour |
