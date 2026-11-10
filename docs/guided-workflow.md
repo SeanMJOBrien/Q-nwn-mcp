@@ -28,7 +28,7 @@ Order matters because each phase reads what earlier ones wrote into `adventure.m
 | 6 | `challenges` (`/adventure-challenges`) | **Hostile creatures, encounters, traps, set pieces** | Quests | `forge_creature`, `compose_encounter`, `place_creature`, `add_skill_check`, `get_balance_report` | `verify_creature/encounter/trigger` |
 | 7 | `affordances` (`/adventure-affordances`) | **Items and economy**: stores, container loot, starting gold, level adjustment | Challenges | `create_store_blueprint`, `place_store`, `add_items_to_container` | `verify_store/item/placeable` |
 | 8 | `polish` (`/adventure-polish`) | **Consistency pass**: gaps, references, connectivity, quest completability | all above | `validate_module`, `verify_all` | everything |
-| 9 | `rewards` (`/adventure-rewards`) | **Rewards and hand-off**: XP, end items, module description, DM guide | Polish | `create_reward_system`, `set_module_description` | everything |
+| 9 | `rewards` (`/adventure-rewards`) | **Rewards and hand-off**: XP, end items, module description, DM guide, the DM area with the story and DM-guide books (Phase 7d) | Polish | `create_reward_system`, `set_module_description` | everything |
 
 Two things sit outside the nine and are used across them: **scripts** (`write_script`, `compile_script`, `nwn-logic-debug`) and
 **live checks** (`run_live_verification`, `create_systest_instrumentation`).

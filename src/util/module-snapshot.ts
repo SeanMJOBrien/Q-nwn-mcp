@@ -53,7 +53,21 @@ export interface QuestSnap {
   entries: number;
   hasEnd: boolean;
 }
+/** The DM area every module must have: disconnected, with a chest holding the story book and the DM guide book. */
+export interface DmAreaSnap {
+  resref: string;
+  disconnected: boolean;
+  hasWaypoint: boolean;
+  chest: boolean;
+  storyBook: boolean;
+  guideBook: boolean;
+}
+/** BASE_ITEM_BOOK in baseitems.2da. */
+export const BOOK_BASE_ITEM = 74;
+const DM_AREA = /(^|[^a-z])dm([^a-z]|$)|dungeon.?master/i;
+
 export interface ModuleSnapshot {
+  dmArea?: DmAreaSnap;
   title: string;
   description: string;
   entryArea: string;
@@ -162,7 +176,28 @@ export function gatherSnapshot(index: ModuleIndex): ModuleSnapshot {
   let unreachableAreas: string[] = [];
   if (entryArea && index.areas.has(entryArea)) unreachableAreas = computeConnectivity(index, entryArea).unreachable;
 
+  let dmArea: DmAreaSnap | undefined;
+  for (const [resref, summary] of index.areas) {
+    if (!DM_AREA.test(resref) && !DM_AREA.test(summary.name || "")) continue;
+    const git = (index.parsedGff.get(`${resref}.git`) ?? {}) as GffObj;
+    const books = getFieldList(git, "Placeable List")
+      .filter((p) => getFieldNum(p, "HasInventory") === 1)
+      .flatMap((p) => getFieldList(p, "ItemList"))
+      .filter((i) => getFieldNum(i, "BaseItem") === BOOK_BASE_ITEM)
+      .map((i) => `${getFieldStr(i, "Tag")} ${getFieldLocStr(i, "LocalizedName")}`);
+    dmArea = {
+      resref,
+      disconnected: unreachableAreas.includes(resref) || (entryArea !== "" && resref !== entryArea && !areas.some((a) => a.resref !== resref && a.transitionsTo.includes(resref))),
+      hasWaypoint: getFieldList(git, "WaypointList").length > 0,
+      chest: getFieldList(git, "Placeable List").some((p) => getFieldNum(p, "HasInventory") === 1),
+      storyBook: books.some((b) => /story/i.test(b)),
+      guideBook: books.some((b) => /guide/i.test(b)),
+    };
+    break;
+  }
+
   return {
+    dmArea,
     title: index.moduleName,
     description: getFieldLocStr(ifo, "Mod_Description"),
     entryArea,

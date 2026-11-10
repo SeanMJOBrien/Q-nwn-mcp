@@ -183,6 +183,22 @@ export function buildAudit(input: AuditInput): AuditRow[] {
     rows.push(row({ category: "Rewards and hand-off", phase: "rewards", focus: "items", state: n === 3 ? "done" : n === 0 ? "missing" : "partial", summary: `${n} of 3 hand-off items present`, findings }));
   }
 
+  // DM area and books (rule 2026-11-09: every module has a disconnected DM area with a chest holding the story book and the DM guide book)
+  {
+    const d = s.dmArea;
+    const findings: string[] = [];
+    if (!d) findings.push("no DM area (resref or name containing \"dm\"): create one with no transitions into it");
+    else {
+      if (!d.disconnected) findings.push(`${d.resref} is reachable by players: remove every transition into it`);
+      if (!d.hasWaypoint) findings.push(`${d.resref} has no waypoint for the DM to jump to`);
+      if (!d.chest) findings.push(`${d.resref} has no chest placeable holding the books`);
+      if (!d.storyBook) findings.push("no story book (a book item tagged/named \"story\") in the DM area chest");
+      if (!d.guideBook) findings.push("no DM guide book (a book item tagged/named \"guide\") in the DM area chest");
+    }
+    const ok = !!d && d.disconnected && d.hasWaypoint && d.chest && d.storyBook && d.guideBook;
+    rows.push(row({ category: "DM area and books", focus: "items", state: ok ? "done" : !d ? "missing" : "partial", summary: ok ? `${d?.resref}: story book and DM guide book in a chest` : d ? "DM area incomplete" : "no DM area", findings }));
+  }
+
   return rows;
 }
 

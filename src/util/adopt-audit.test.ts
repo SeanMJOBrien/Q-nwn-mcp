@@ -180,12 +180,23 @@ describe("buildAudit", () => {
         description: "A story.",
         hasRewardSystem: true,
         itemBlueprints: 2,
+        dmArea: { resref: "dm_area", disconnected: true, hasWaypoint: true, chest: true, storyBook: true, guideBook: true },
       }),
       verify,
       story,
       dmGuideExists: true,
     });
     for (const r of rows) expect(["done", "not_applicable"], r.category).toContain(r.state);
+  });
+  it("the DM area rule: missing, then partial with each defect named, then done", () => {
+    const dm = (over = {}) => buildAudit({ snapshot: snap({ dmArea: { resref: "dm_area", disconnected: true, hasWaypoint: true, chest: true, storyBook: true, guideBook: true, ...over } }), verify, story, dmGuideExists: true }).find((r) => r.category === "DM area and books");
+    const none = buildAudit({ snapshot: snap({}), verify, story, dmGuideExists: true }).find((r) => r.category === "DM area and books");
+    expect(none?.state).toBe("missing");
+    expect(dm()?.state).toBe("done");
+    const bad = dm({ disconnected: false, guideBook: false });
+    expect(bad?.state).toBe("partial");
+    expect(bad?.findings.join(" ")).toMatch(/reachable by players/);
+    expect(bad?.findings.join(" ")).toMatch(/DM guide book/);
   });
 });
 

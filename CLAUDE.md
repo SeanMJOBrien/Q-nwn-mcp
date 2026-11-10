@@ -9,6 +9,7 @@ MCP (Model Context Protocol) server for Neverwinter Nights Enhanced Edition modu
   `git fetch --prune` and `git rev-list --count origin/master..<branch>` for each branch and update the entry.
   A branch leaves the list only once it is merged (count 0) or deliberately deleted.
 - **Per-module files go in `adventures/<Title-With-Dashes>/`** (git-ignored; user rule 2026-11-09). Every LLM-built module keeps its story (`adventure.md`), DM guide (`dm-guide.md`), `adventure-status.json`, `project-scope.json` and any other file specific to it there, e.g. `adventures/The-Salt-Gate-Conspiracy/`. `get_adventure_dir` gives the path; skills never write these into the temp dir.
+- **Every module has a DM area and two books** (user rule 2026-11-09). A disconnected DM area the DM can teleport to (a `DM_AREA` waypoint; no transition leads in or out), holding a chest placeable with two book items (`baseItem` 74): the full story that the module is based on (`adventure.md`) and the DM guide (`dm-guide.md`). Built by `/adventure-rewards` Phase 7d; `audit_module` has a "DM area and books" row. TODO #27 tracks a one-call `create_dm_area` tool.
 - **Do NOT auto-export HTML reports** after creating or painting areas. Only export reports when the user explicitly asks for one.
 - **Always repack after creating/painting test areas** so the user can see them in the toolset. Mention that you repacked.
 - **MCP server restart required after code changes.** After editing TypeScript source and running `npm run build`, the MCP server must be restarted for new/changed tools to become available. Ask the user to restart before attempting to use newly added tools.
@@ -207,7 +208,7 @@ The rest are open.
     - **Merged 2026-11-09 (fifth time):** the working branch fast-forwarded into `master` and both were pushed: `de41f69` (analyze_walkmesh util,
       create_area default-tile fix), `deb7aca` (S1-S9, adventure composition tools, quest spawn/check runtime, forge and verify fixes, docs) and
       this TODO update. The working branch is 0 ahead of `master`. Only `graphify-out/` remains untracked and is deliberately not committed.
-    - **Committed 2026-11-09, not yet merged or pushed:** `9300a19` (TODOs 7, 11, 14, 17, 18, 19, 20), the spawn-when removal, `03623df` (phase_check scope enforcement, guided-workflow doc, TODOs 23-25), `16fa0a9` (adopt_module, audit_module, get_adventure_dir, focus guide, adventures/ folder) and this entry, on `systest-live-run-and-generalized-spec`, 8 ahead of `origin/master`. `master` is `edb8015`.
+    - **Committed 2026-11-09, not yet merged or pushed:** `9300a19` (TODOs 7, 11, 14, 17, 18, 19, 20), the spawn-when removal, `03623df` (phase_check scope enforcement, guided-workflow doc, TODOs 23-25), `16fa0a9` (adopt_module, audit_module, get_adventure_dir, focus guide, adventures/ folder) and this entry, `6e7a91e` (event counts, TODO 26) and the DM-area rule (audit row, Phase 7d, TODO 27), on `systest-live-run-and-generalized-spec`, 10 ahead of `origin/master`. `master` is `edb8015`.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
@@ -402,6 +403,12 @@ The rest are open.
     follow/stay, speed, no mounting indoors or where the tileset forbids it, a quest or store that hands one out). Needs design first: what the
     engine allows (`ActionMountObject`/`ActionDismountObject`, the mount appearance and `horse` feats, `GetIsMounted`), an NWScript include
     generator in the style of `create_companion_system`, a `build_*` helper, a `verify_*` check, and a skill. Related: #25.
+
+27. **TODO (user rule, 2026-11-09) — `create_dm_area` tool.** Phase 7d of `adventure-rewards` builds the DM area, chest and the story/DM-guide books from
+    primitives (the LLM has to pass the whole text through `create_item_blueprint`). One call should read `adventure.md` and `dm-guide.md` from
+    the adventure directory, split long text into volumes, create the area (disconnected), waypoint, chest and books, and verify them; also add a
+    `verify_*` rule so `phase_check` end for `rewards` fails without them. Open: how much book text the engine shows in an item description,
+    and whether a readable book needs an `OnActivate` script instead. The Salt Gate Conspiracy lacks both books and the area.
 
 ## Design Intent
 
