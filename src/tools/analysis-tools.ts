@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { buildResmanOptions, indexAreaCreatures, requireIndex } from "../module-loader.js";
+import { buildResmanOptions, currentScriptUsages, indexAreaCreatures, requireIndex } from "../module-loader.js";
 import type { FlatDialogNode } from "../types/dialog.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
@@ -109,7 +109,7 @@ export function registerAnalysisTools(server: McpServer): void {
       const edges: Array<{ from: string; to: string; relationship: string }> = [];
 
       // Build edges from script references
-      for (const [scriptResref, usages] of index.scripts) {
+      for (const [scriptResref, usages] of currentScriptUsages(index)) {
         for (const usage of usages) {
           const toFile = `${scriptResref}.nss`;
           const hasSource = index.resources.has(toFile);
@@ -175,7 +175,7 @@ export function registerAnalysisTools(server: McpServer): void {
       const referenced = new Set<string>();
 
       // Scripts referenced in GFF
-      for (const scriptResref of index.scripts.keys()) {
+      for (const scriptResref of currentScriptUsages(index).keys()) {
         referenced.add(`${scriptResref}.nss`);
         referenced.add(`${scriptResref}.ncs`);
       }
@@ -413,7 +413,7 @@ export function registerAnalysisTools(server: McpServer): void {
       // never module resources — reporting them is a false positive. A freshly
       // created module references ~10 of them from its own template, so without
       // this filter validate_module fails every module it has just built.
-      for (const [scriptResref, usages] of index.scripts) {
+      for (const [scriptResref, usages] of currentScriptUsages(index)) {
         if (isBaseGameScript(scriptResref)) continue;
         const hasSource = index.resources.has(`${scriptResref}.nss`);
         const hasCompiled = index.resources.has(`${scriptResref}.ncs`);

@@ -43,8 +43,8 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | D2 | #28: `add_dialog_node` | done | new NPC answers return to the hub; `end: true` opts out; test added; MCP restart needed |
 | D3 | State-dependent main lines | done | `addReturnLinks` re-enters via `[Anything else?]` for state-changing answers (copies the start list); no `greeting` field added: `offer` / `reminder` already are the per-state greetings (decision in `docs/quest-system.md`); skills updated |
 | E1 | `trace_dialog_path` root choice | done | `root` param, `roots` listing with conditions, 60-node cap; skill updated; MCP restart needed |
-| E2 | `list_script_references`: triggers, refresh | in progress | reading the tool |
-| E3 | `resolve_blueprint` raw output | todo | |
+| E2 | `list_script_references`: triggers, refresh | done | `currentScriptUsages` (fresh per call) in list_script_references, find_orphans, get_dependency_graph; `SCRIPT_FIELDS` gained the trigger/encounter/placeable fields; test added; MCP restart needed |
+| E3 | `resolve_blueprint` raw output | in progress | |
 | E4 | Stale-script registry: remaining generators | todo | |
 | E5 | `create_faction` limitation surfaced | todo | |
 | E6 | Uniform `isError` | todo | |

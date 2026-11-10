@@ -69,6 +69,9 @@ export const SCRIPT_FIELDS = new Set([
   "Mod_OnPlrDying", "Mod_OnPlrEqItm", "Mod_OnPlrLvlUp",
   "Mod_OnPlrRest", "Mod_OnPlrUnEqItm", "Mod_OnSpawnBtnDn",
   "Mod_OnUnAqreItem", "Mod_OnUsrDefined",
+  // Instance and blueprint fields the older list missed: triggers (ScriptOnEnter/ScriptOnExit), encounters (OnEntered),
+  // placeables and doors (OnClosed, OnInvDisturbed, OnMeleeAttacked).
+  "ScriptOnEnter", "ScriptOnExit", "OnEntered", "OnClosed", "OnInvDisturbed", "OnMeleeAttacked",
   "Script", "Active", "EndConverAbort", "EndConversation",
 ]);
 

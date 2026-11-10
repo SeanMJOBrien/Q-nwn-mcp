@@ -50,7 +50,8 @@ vi.mock("../nim-tools.js", () => ({
 let mockIndex: ModuleIndex;
 let tempDir: string;
 
-vi.mock("../module-loader.js", () => ({
+vi.mock("../module-loader.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../module-loader.js")>()),
   requireIndex: () => mockIndex,
   buildResmanOptions: async () => ({ root: undefined, userDir: undefined, erfs: undefined, dirs: [mockIndex.tempDir] }),
 }));
@@ -146,4 +147,25 @@ describe("compile_script registers the compiled .ncs in index.resources", () => 
       await cleanup();
     }
   });
+
+  it("list_script_references reads the documents as they are now, including trigger and door fields", async () => {
+    const { registerScriptTools } = await import("./script-tools.js");
+    const { client, cleanup } = await createTestClient(registerScriptTools);
+    try {
+      mockIndex.parsedGff.set("area1.git", {
+        TriggerList: { type: "list", value: [{ Tag: { type: "cexostring", value: "t1" }, ScriptOnEnter: { type: "resref", value: "a_trig_enter" }, ScriptOnExit: { type: "resref", value: "a_trig_exit" } }] },
+        "Door List": { type: "list", value: [{ Tag: { type: "cexostring", value: "d1" }, OnClosed: { type: "resref", value: "a_door_closed" } }] },
+      } as never);
+      const all = json(await client.callTool({ name: "list_script_references", arguments: {} }));
+      expect(Object.keys(all)).toEqual(expect.arrayContaining(["a_trig_enter", "a_trig_exit", "a_door_closed"]));
+      // an edit after load shows up with no reload
+      (mockIndex.parsedGff.get("area1.git") as never as { TriggerList: { value: Array<Record<string, unknown>> } }).TriggerList.value[0].ScriptOnEnter = { type: "resref", value: "a_trig_new" };
+      const one = json(await client.callTool({ name: "list_script_references", arguments: { resref: "a_trig_new" } }));
+      expect(one).toHaveLength(1);
+      expect(json(await client.callTool({ name: "list_script_references", arguments: { resref: "a_trig_enter" } }))).toHaveLength(0);
+    } finally {
+      await cleanup();
+    }
+  });
 });
+

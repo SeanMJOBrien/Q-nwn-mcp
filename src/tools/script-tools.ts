@@ -2,7 +2,7 @@ import { z } from "zod";
 import path from "path";
 import fsPromises from "fs/promises";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { requireIndex, buildResmanOptions } from "../module-loader.js";
+import { buildResmanOptions, currentScriptUsages, requireIndex } from "../module-loader.js";
 import { readTextFile, disassembleNcs, compileScript } from "../nim-tools.js";
 import { writeAndCompileScript } from "../util/script-writer.js";
 import type { VariableRef } from "../types/script.js";
@@ -188,13 +188,13 @@ export function registerScriptTools(server: McpServer): void {
       const index = requireIndex();
 
       if (resref) {
-        const usages = index.scripts.get(resref.toLowerCase()) || [];
+        const usages = currentScriptUsages(index).get(resref.toLowerCase()) ?? [];
         return { content: [{ type: "text", text: JSON.stringify(usages, null, 2) }] };
       }
 
       // Return all script references grouped by script
       const grouped: Record<string, Array<{ resourceFile: string; gffPath: string; usageType: string }>> = {};
-      for (const [scriptName, usages] of index.scripts) {
+      for (const [scriptName, usages] of currentScriptUsages(index)) {
         grouped[scriptName] = usages.map(u => ({
           resourceFile: u.resourceFile,
           gffPath: u.gffPath,

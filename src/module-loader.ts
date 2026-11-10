@@ -405,6 +405,17 @@ export async function loadModule(modPath: string, opts: { force?: boolean } = {}
   return currentIndex;
 }
 
+/**
+ * Script references built from the documents as they are now. The map on the index is built once at load and goes stale
+ * as soon as a tool edits a dialog, trigger or area; list_script_references and find_orphans read this instead.
+ */
+export function currentScriptUsages(index: ModuleIndex): Map<string, ScriptUsage[]> {
+  const scripts = new Map<string, ScriptUsage[]>();
+  const tags = new Map<string, TagLocation[]>();
+  for (const [key, doc] of index.parsedGff) indexGffDocument(key, doc, tags, scripts);
+  return scripts;
+}
+
 function indexGffDocument(
   resourceFile: string,
   doc: GffDocument,
