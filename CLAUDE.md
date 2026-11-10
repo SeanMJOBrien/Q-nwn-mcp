@@ -367,7 +367,7 @@ The rest are open.
     Before any code: write `docs/adventure-composition.md` answering the bullets above with the current pipeline's real limits, then
     split the work into tools and skill changes the same way S1-S9 were.
 
-22. **TODO (2026-11-08) — skill, code and doc disagreements found while updating the docs, not yet fixed.** Full text:
+22. **MOSTLY DONE 2026-11-09 — skill, code and doc disagreements found while updating the docs.** Status per bullet: stale role tables — the Stat Scaling section already says `forge_creature` derives class, feats, gear and spells, left as guidance; area budgets — measured under #18, and each biome `area-*` skill now says when to use the corpus median and when `suggest_area_size`; declared skips — done under #20; generic type-0 doors — left explicit on purpose (no verified default door model; the tool names the fix); stale generated scripts — built: `verify_all` warns `generated_script_stale` for `inc_cre_level`, `cf_spawn` and `inc_companion` that differ from what the generator writes (`util/stale-scripts.ts`; add the other generators, e.g. the quest runtime and `inc_random_abil`, to its registry). Original text: Full text:
     `docs/generation-rules-reference.md` §9 item 6.
     - **Role/stat/gear tables are stale as tool inputs.** §2.3's "Combat Role Templates", "Stat Scaling" and "Gear-by-class pools" describe a
       hand-built stat block; `forge_creature` now derives class, feats, gear and spells. Either trim them to what a model still decides
@@ -388,7 +388,7 @@ The rest are open.
     output, or a `## Test Goal` section in `adventure.md`), whether a run with no stated goal is refused or only warned, and how each check
     maps back to an objective so a green run that never exercised the objective is reported as such.
 
-24. **TODO (user-raised, 2026-11-09) — explore the stories created versus how this tool and its skills and tools create them.** Compare what
+24. **DONE 2026-11-09 (findings written; no tool or skill changed yet) — explore the stories created versus how this tool and its skills and tools create them. The findings and the suggested order of work are in `docs/story-vs-pipeline.md`.** Original request: Compare what
     the generated adventures actually contain (premise, beats, NPC motives, quests, encounters, pacing; e.g. The Hollow Communion, The Salt
     Gate Conspiracy) with what the pipeline does to produce them (`/adventure-plot` through `/adventure-rewards`, `plan_adventure_shape`,
     `verify_story`). Look for where the process flattens or drops the story (motive added after the fact, areas that don't carry beats, quests

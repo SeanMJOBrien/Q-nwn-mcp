@@ -16,6 +16,7 @@
 | How are an adventure's size, events, encounter kinds, multi-part encounters and story threads planned and checked? | [adventure-composition.md](adventure-composition.md) |
 | How do quests work, and what can a `build_quest` spec say (stage kinds, templates, `q_chk`/`q_act` parameters, whole-party credit)? | [quest-system.md](quest-system.md) |
 | How does the parametrized PQJ quest system work? | [pqj-quest-system.md](pqj-quest-system.md) |
+| Where does the pipeline flatten or drop the story it was meant to tell? | [story-vs-pipeline.md](story-vs-pipeline.md) |
 | Which bugs in TFN's quest scripts are confirmed, and what is the plan to port our quest fixes to the content studio? | [tfn-quest-findings.md](tfn-quest-findings.md) |
 | What happened when random caster abilities ran on a real headless server? | [random-abilities-runtime-findings.md](random-abilities-runtime-findings.md) |
 | How does the Special-Abilities caster system (the project-wide default) work, and how does a DM actually see/use the abilities in-game? | [special-abilities-system.md](special-abilities-system.md) |

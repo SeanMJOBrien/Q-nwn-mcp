@@ -36,7 +36,8 @@ import {
   verifyWaypoint,
 } from "../util/verify/blueprints.js";
 import type { VerifyResult } from "../util/verify/common.js";
-import { listOf, Report } from "../util/verify/common.js";
+import { listOf, loadScriptSources, Report } from "../util/verify/common.js";
+import { findStaleGenerated } from "../util/stale-scripts.js";
 import { verifyDialog } from "../util/verify/dialog.js";
 import { verifyFaction, verifyJournal, verifyModuleInfo } from "../util/verify/journal.js";
 import { verifyJournalPartyFlags, verifyPartyQuestState, verifyPartyRewards } from "../util/verify/scripts.js";
@@ -226,6 +227,16 @@ export async function collectVerifyResults(
     if (doc) {
       const report = new Report("repute", "fac");
       verifyFaction(report, index, doc);
+      results.push(report.result());
+    }
+  }
+
+  // Generated scripts that no longer match what the generators write (older or hand-edited copies).
+  {
+    const stale = findStaleGenerated(await loadScriptSources(index));
+    if (stale.length > 0) {
+      const report = new Report("generated scripts", "nss");
+      for (const f of stale) report.warn("generated_script_stale", f.message, f.resref, `re-run ${f.tool}, then recompile the scripts that include it`);
       results.push(report.result());
     }
   }

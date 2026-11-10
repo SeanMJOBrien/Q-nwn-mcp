@@ -98,3 +98,5 @@ paint_group(area: "...", feature: "?", x: "0", y: "0")
 Two further things the corpus build surfaced:
 
 Placing groups (display names, mismatch warnings): see the **nwn-tileset-conventions** skill, "Placing groups with paint_group".
+
+**Which size?** These medians describe a whole exploration map; for an area built around a few events, use `suggest_area_size`.
