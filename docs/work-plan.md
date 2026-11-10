@@ -26,7 +26,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | Id | Package | State | Commit / Notes |
 |----|---------|-------|----------------|
 | A1 | CLAUDE.md: fix contradictions in place | done | see `git log` ("A1:") |
-| A2 | CLAUDE.md: move pitfalls to `docs/pitfalls.md` | todo | |
+| A2 | CLAUDE.md: move pitfalls to `docs/pitfalls.md` | done | see `git log` ("A2:") |
 | A3 | CLAUDE.md: move verification and playtest history | todo | |
 | A4 | CLAUDE.md: move layout, henchman, gear, testing history | todo | |
 | A5 | CLAUDE.md: archive done TODOs; priority + acceptance for open ones | todo | |

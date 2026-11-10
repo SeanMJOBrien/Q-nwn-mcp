@@ -2,6 +2,7 @@
 
 | Question | Read |
 |---|---|
+| What went wrong before, and which tool-call pitfalls exist (GFF edit order, field names, rotation, doors, gear)? | [pitfalls.md](pitfalls.md) — full record moved out of CLAUDE.md |
 | Where does an object go, which way does it face, what is its Z? Why do tiles rotate the way they do? What is a tileset's height step? | [object-placement-and-tilesets.md](object-placement-and-tilesets.md) — verified spatial conventions, with the real-data evidence and the tools' resulting behaviour |
 | What does the area generation pipeline do, step by step, in plain language? | [AREA_GENERATION_PIPELINE.md](AREA_GENERATION_PIPELINE.md) |
 | What does each of the 9 `/create-adventure` phases decide, in what order, and what takes priority when things compete (budget, space, attention)? | [MODULE_CREATION_PIPELINE.md](MODULE_CREATION_PIPELINE.md) |
