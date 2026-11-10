@@ -257,6 +257,10 @@ export function registerVerifyServerTools(server: McpServer): void {
         .describe(
           `Case-insensitive substrings to flag as engine errors in the log. Default: ${JSON.stringify(DEFAULT_ERROR_PATTERNS)}.`,
         ),
+      goal: z
+        .string()
+        .optional()
+        .describe("What this run is for and what counts as a pass (TODO #23). Printed in the result; a run without one gets a warning. With simulate, the verdict says whether every step passed and the driver finished."),
       simulate: z
         .string()
         .optional()
@@ -270,7 +274,7 @@ export function registerVerifyServerTools(server: McpServer): void {
         .describe("Write the [CL_LOOT] lines (what forged creatures bought and will drop) into adventure.md's `## Spawn Loot` section when a module is loaded and adventure.md exists. Default true."),
     },
     { idempotentHint: true },
-    async ({ modulePath, expectedCheckLines, timeoutSeconds, errorPatterns, recordLoot, simulate }) => {
+    async ({ modulePath, expectedCheckLines, timeoutSeconds, errorPatterns, recordLoot, simulate, goal }) => {
       const verifyServerDir = MCP_FOLDER_VERIFYSERVER;
       const composeFile = path.join(verifyServerDir, "docker-compose.yml");
       try {
@@ -368,6 +372,16 @@ export function registerVerifyServerTools(server: McpServer): void {
             type: "text",
             text: JSON.stringify(
               {
+                goal: goal ?? null,
+                ...(goal ? {} : { warning: "No goal given: say what this run is meant to show and what counts as a pass, so a green run that never exercised it is not read as a pass (TODO #23)." }),
+                ...(simulate
+                  ? {
+                      verdict:
+                        parsed.otherTaggedLines.some((l) => l.includes("[SIM_DONE]")) && !parsed.otherTaggedLines.some((l) => l.includes("[SIM_FAIL]")) && parsed.engineErrors.length === 0
+                          ? "pass: every simulated step passed and the driver finished"
+                          : "not a pass: a step failed, the driver did not finish, or the engine logged an error",
+                    }
+                  : {}),
                 loaded: poll.sawLoadingModule,
                 ...(lootRecorded ? { lootRecorded } : {}),
                 timedOut: poll.timedOut,

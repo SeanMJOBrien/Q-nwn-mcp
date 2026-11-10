@@ -248,7 +248,7 @@ if it doesn't, the fixture itself has a bug, fix it before moving on.
    (they were each individually verified in Phase 4, but a full pass catches
    cross-fixture issues, e.g. accidental tag collisions).
 2. (Not needed: `run_live_verification` builds its own throwaway `.mod`.)
-3. `run_live_verification({ expectedCheckLines: "<N>" })` where `N` is the
+3. (State the goal: pass `goal` with what the run must show and what counts as a pass; a run with no goal gets a warning.) `run_live_verification({ expectedCheckLines: "<N>" })` where `N` is the
    number of grep-able lines you actually expect — at minimum one
    `[SYSTEST_DAMAGE]`/`[SYSTEST_DEATH]` pair from the combat fixtures once they
    fight, one `[SPEC_OK]`/`[SPEC_FAIL]` from fixture #8's encounter-design
