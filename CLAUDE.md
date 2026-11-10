@@ -398,6 +398,11 @@ The rest are open.
     or native fields), how it fits `build_quest`/`create_dialog` and the Story Graph (a beat can be a cutscene), what the engine allows during a
     conversation (camera, `ActionPlayAnimation`, `ActionJumpToLocation`, fades, `SetCutsceneMode`) and what a headless run can verify. Related: #21, #24.
 
+26. **TODO (user-raised, 2026-11-09) — add horse scripts.** Mounts: scripts and tooling so a module can offer a horse (mount/dismount,
+    follow/stay, speed, no mounting indoors or where the tileset forbids it, a quest or store that hands one out). Needs design first: what the
+    engine allows (`ActionMountObject`/`ActionDismountObject`, the mount appearance and `horse` feats, `GetIsMounted`), an NWScript include
+    generator in the style of `create_companion_system`, a `build_*` helper, a `verify_*` check, and a skill. Related: #25.
+
 ## Design Intent
 
 This MCP serves two purposes:

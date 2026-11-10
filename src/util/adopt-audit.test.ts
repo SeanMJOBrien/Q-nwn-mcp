@@ -23,6 +23,7 @@ function area(over: Partial<AreaSnap> = {}): AreaSnap {
     waypoints: 0,
     doors: 0,
     triggers: 0,
+    events: { fights: 0, usables: 0, triggers: 0, talkers: 0, total: 0 },
     stores: 0,
     transitionsTo: [],
     ...over,
@@ -46,8 +47,8 @@ function snap(over: Partial<ModuleSnapshot> = {}): ModuleSnapshot {
     ...over,
   };
 }
-const orc = { tag: "orc", name: "Orc", level: 3, hostile: true, conversation: "", area: "gate" };
-const mira = { tag: "mira", name: "Mira", level: 1, hostile: false, conversation: "mira_dlg", area: "gate" };
+const orc = { tag: "orc", name: "Orc", level: 3, hostile: true, conversation: "", area: "gate", x: 0, y: 0 };
+const mira = { tag: "mira", name: "Mira", level: 1, hostile: false, conversation: "mira_dlg", area: "gate", x: 0, y: 0 };
 
 describe("slugTitle", () => {
   it("dashes the title", () => {
@@ -185,5 +186,14 @@ describe("buildAudit", () => {
       dmGuideExists: true,
     });
     for (const r of rows) expect(["done", "not_applicable"], r.category).toContain(r.state);
+  });
+});
+
+describe("countFights", () => {
+  it("groups hostiles standing together into one fight", async () => {
+    const { countFights } = await import("./module-snapshot.js");
+    expect(countFights([])).toBe(0);
+    expect(countFights([{ x: 0, y: 0 }, { x: 5, y: 0 }, { x: 10, y: 5 }])).toBe(1);
+    expect(countFights([{ x: 0, y: 0 }, { x: 100, y: 0 }])).toBe(2);
   });
 });

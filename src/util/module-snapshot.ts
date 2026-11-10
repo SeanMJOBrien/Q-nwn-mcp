@@ -13,7 +13,23 @@ export interface CreatureSnap {
   hostile: boolean;
   conversation: string;
   area: string;
+  x: number;
+  y: number;
 }
+/**
+ * Something that happens in an area, as opposed to something that stands in it. A fight is a group of hostiles
+ * within FIGHT_RADIUS metres of each other (one event however many creatures); a usable is a placeable the player
+ * can use that does something (inventory, a script or a dialog); a trigger counts when it runs a script on enter;
+ * a talker is a friendly creature with a dialog. Props, sounds, doors and idle creatures are scenery.
+ */
+export interface AreaEvents {
+  fights: number;
+  usables: number;
+  triggers: number;
+  talkers: number;
+  total: number;
+}
+export const FIGHT_RADIUS = 12;
 export interface AreaSnap {
   resref: string;
   name: string;
@@ -27,6 +43,7 @@ export interface AreaSnap {
   waypoints: number;
   doors: number;
   triggers: number;
+  events: AreaEvents;
   stores: number;
   transitionsTo: string[];
 }
@@ -55,6 +72,16 @@ export interface ModuleSnapshot {
 /** Hostile faction id in a stock module's faction table. */
 export const HOSTILE_FACTION = 1;
 
+/** Groups hostiles that stand within FIGHT_RADIUS of each other (single linkage) and returns the group count. */
+export function countFights(hostiles: { x: number; y: number }[]): number {
+  const parent = hostiles.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < hostiles.length; i++)
+    for (let j = i + 1; j < hostiles.length; j++)
+      if (Math.hypot(hostiles[i].x - hostiles[j].x, hostiles[i].y - hostiles[j].y) <= FIGHT_RADIUS) parent[find(i)] = find(j);
+  return new Set(hostiles.map((_, i) => find(i))).size;
+}
+
 export function gatherSnapshot(index: ModuleIndex): ModuleSnapshot {
   const ifo = (index.parsedGff.get("module.ifo") ?? {}) as GffObj;
   const entryArea = (getFieldStr(ifo, "Mod_Entry_Area") || [...index.areas.keys()][0] || "").toLowerCase();
@@ -70,7 +97,18 @@ export function gatherSnapshot(index: ModuleIndex): ModuleSnapshot {
       hostile: getFieldNum(c, "FactionID") === HOSTILE_FACTION,
       conversation: getFieldStr(c, "Conversation"),
       area: resref,
+      x: getFieldNum(c, "XPosition"),
+      y: getFieldNum(c, "YPosition"),
     }));
+    const usables = getFieldList(git, "Placeable List").filter(
+      (p) =>
+        getFieldNum(p, "Useable") === 1 &&
+        (getFieldNum(p, "HasInventory") === 1 || getFieldStr(p, "OnUsed") !== "" || getFieldStr(p, "Conversation") !== ""),
+    ).length;
+    const eventTriggers = getFieldList(git, "TriggerList").filter((t) => getFieldStr(t, "ScriptOnEnter") !== "").length;
+    const talkers = creatures.filter((c) => !c.hostile && c.conversation !== "").length;
+    const fights = countFights(creatures.filter((c) => c.hostile));
+    const events: AreaEvents = { fights, usables, triggers: eventTriggers, talkers, total: fights + usables + eventTriggers + talkers };
     areas.push({
       resref,
       name: summary.name || resref,
@@ -84,6 +122,7 @@ export function gatherSnapshot(index: ModuleIndex): ModuleSnapshot {
       waypoints: getFieldList(git, "WaypointList").length,
       doors: getFieldList(git, "Door List").length,
       triggers: getFieldList(git, "TriggerList").length,
+      events,
       stores: getFieldList(git, "StoreList").length,
       transitionsTo: [...new Set(buildAreaTransitions(index, resref, tagToArea).map((t) => t.targetArea))],
     });

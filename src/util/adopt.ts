@@ -60,7 +60,7 @@ export function buildAdoptedAdventure(snapshot: ModuleSnapshot, existing: string
   }
   out.push("", "### Locations");
   snapshot.areas.forEach((a, i) => {
-    const events = a.creatures.filter((c) => c.hostile).length + a.triggers;
+    const ev = a.events;
     out.push(
       "",
       `#### ${i + 1}. ${a.name}`,
@@ -68,7 +68,7 @@ export function buildAdoptedAdventure(snapshot: ModuleSnapshot, existing: string
       `- **Type:** ${a.isInterior ? "interior" : "exterior"}`,
       `- **Environment:** tileset ${a.tileset}`,
       `- **Scale:** ${scale(a)} (${a.width}x${a.height} tiles)`,
-      `- **Events:** ${Math.max(1, events)}`,
+      `- **Events:** ${Math.max(1, ev.total)} (${ev.fights} fights, ${ev.usables} usable props, ${ev.triggers} script triggers, ${ev.talkers} talkers)`,
       `- **Description:** ${a.placeables} props, ${a.sounds} sounds, ${a.creatures.length} creatures, ${a.doors} doors, ${a.triggers} triggers`,
       "- **Role in Story:** (not recorded)",
     );
