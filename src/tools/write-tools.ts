@@ -45,7 +45,7 @@ export function registerWriteTools(server: McpServer): void {
       const result = setGffByPath(doc, fieldPath, value, gffType);
 
       if ("error" in result) {
-        return { content: [{ type: "text", text: `Error: ${result.error}` }] };
+        return { isError: true, content: [{ type: "text", text: `Error: ${result.error}` }] };
       }
 
       // Write back to binary
@@ -64,6 +64,78 @@ export function registerWriteTools(server: McpServer): void {
         }],
       };
     }
+  );
+
+  server.tool(
+    "bulk_modify_list",
+    "Set the same fields on every struct of one list that matches a filter, in a single call (the pattern behind faction flips and store-field renames). " +
+      "`listPath` is the list's name in the resource (e.g. 'Creature List' in an area .git, 'StoreList', 'ItemList'). `where` is a JSON object of scalar fields that must equal the given values (omit to match every struct). " +
+      "`set` is a JSON object of field -> new value; values are coerced to the field's real GFF type like modify_gff_field, and a field that does not exist needs its type in `gffTypes`. dryRun lists what would change. " +
+      "Only flat scalar fields; use a typed tool for lists, structs and localised strings.",
+    {
+      resource: z.string().describe("Resource resref (e.g., 'saltmerehbr')"),
+      type: z.string().describe("Resource extension (e.g., 'git', 'utm')"),
+      listPath: z.string().describe("Dot-path to the list, e.g. 'Creature List'"),
+      where: z.string().optional().describe('JSON object of field filters, e.g. {"FactionID":2}'),
+      set: z.string().describe('JSON object of fields to set, e.g. {"FactionID":4}'),
+      gffTypes: z.string().optional().describe('JSON object field -> GFF type, only for fields that do not exist yet, e.g. {"MyFlag":"byte"}'),
+      dryRun: z.boolean().optional().describe("Report only, change nothing"),
+    },
+    { destructiveHint: true },
+    async ({ resource, type, listPath, where, set, gffTypes, dryRun }) => {
+      const index = requireIndex();
+      const key = `${resource.toLowerCase()}.${type.toLowerCase()}`;
+      const entry = index.resources.get(key);
+      if (!entry) return { isError: true, content: [{ type: "text", text: `Resource not found: ${key}` }] };
+      let whereObj: Record<string, unknown> = {};
+      let setObj: Record<string, unknown>;
+      let typeObj: Record<string, string> = {};
+      try {
+        if (where) whereObj = JSON.parse(where);
+        setObj = JSON.parse(set);
+        if (gffTypes) typeObj = JSON.parse(gffTypes);
+      } catch (e) {
+        return { isError: true, content: [{ type: "text", text: `where, set and gffTypes must be JSON objects: ${e}` }] };
+      }
+      if (Object.keys(setObj).length === 0) return { isError: true, content: [{ type: "text", text: "set must name at least one field" }] };
+      let doc = index.parsedGff.get(key);
+      if (!doc) {
+        doc = await gffToJson(entry.filePath);
+        index.parsedGff.set(key, doc);
+      }
+      // Walk the path to the list's struct array (the field "Creature List", or "Creature List.3.ItemList").
+      const listAt = (root: unknown): Array<Record<string, { value?: unknown }>> | undefined => {
+        let cur: unknown = root;
+        for (const part of listPath.split(".")) {
+          if (Array.isArray(cur)) cur = cur[Number.parseInt(part, 10)];
+          else cur = (cur as Record<string, { value?: unknown }> | undefined)?.[part]?.value;
+          if (cur === undefined || cur === null) return undefined;
+        }
+        return Array.isArray(cur) ? (cur as Array<Record<string, { value?: unknown }>>) : undefined;
+      };
+      if (!listAt(doc)) {
+        return { isError: true, content: [{ type: "text", text: `${listPath} is not a list in ${key}` }] };
+      }
+      // Edit a copy and commit it only when every change applied, so a failure half way leaves the module untouched.
+      const work = JSON.parse(JSON.stringify(doc)) as typeof doc;
+      const changes: Array<{ index: number; field: string; from: unknown; to: unknown }> = [];
+      const structs = listAt(work) as Array<Record<string, { value?: unknown }>>;
+      for (let i = 0; i < structs.length; i++) {
+        const st = structs[i];
+        const ok = Object.entries(whereObj).every(([f, v]) => String(st[f]?.value) === String(v));
+        if (!ok) continue;
+        for (const [f, v] of Object.entries(setObj)) {
+          const r = setGffByPath(work, `${listPath}.${i}.${f}`, v, typeObj[f]);
+          if ("error" in r) return { isError: true, content: [{ type: "text", text: `Stopped at ${listPath}.${i}.${f}: ${r.error}. Nothing was changed.` }] };
+          changes.push({ index: i, field: f, from: r.previousValue, to: v });
+        }
+      }
+      if (!dryRun && changes.length > 0) {
+        await jsonToGff(work, entry.filePath);
+        index.parsedGff.set(key, work);
+      }
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, resource: key, listPath, dryRun: !!dryRun, matched: new Set(changes.map((c) => c.index)).size, of: structs.length, changes: changes.slice(0, 60), ...(changes.length > 60 ? { truncated: changes.length - 60 } : {}) }, null, 2) }] };
+    },
   );
 
   server.tool(

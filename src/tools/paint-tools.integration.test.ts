@@ -203,3 +203,32 @@ describe("paint_group rotation", () => {
     }
   });
 });
+
+describe("clear_footprint", () => {
+  beforeEach(() => {
+    tempDir = path.join(os.tmpdir(), `nwn-mcp-clear-test-${Date.now()}-${Math.random()}`);
+    mockIndex = createMockIndex();
+  });
+
+  it("overwrites a rectangle, including tiles a previous group left behind, and refuses a rectangle outside the area", async () => {
+    const are = makeAreaDoc(4, 4) as GffObj;
+    mockIndex.parsedGff.set("testarea.are", are);
+    mockIndex.resources.set("testarea.are", { resref: "testarea", extension: "are", filePath: path.join(tempDir, "testarea.are"), sizeBytes: 1 });
+    const { client, cleanup } = await createTestClient();
+    try {
+      await client.callTool({ name: "paint_group", arguments: { area: "testarea", feature: "TestGroup_2x1", x: "1", y: "1" } });
+      expect(tileAt(are, 4, 2, 1).id).toBe(20);
+      const r = parseResult((await client.callTool({ name: "clear_footprint", arguments: { area: "testarea", x: "1", y: "1", width: "2", height: "1", tileId: "5" } })) as never);
+      expect(r.success).toBe(true);
+      expect(r.cleared).toBe(2);
+      expect(tileAt(are, 4, 1, 1).id).toBe(5);
+      expect(tileAt(are, 4, 2, 1).id).toBe(5);
+      expect(tileAt(are, 4, 0, 0).id).toBe(-1); // outside the rectangle: untouched
+      const bad = (await client.callTool({ name: "clear_footprint", arguments: { area: "testarea", x: "3", y: "3", width: "2", height: "2", tileId: "5" } })) as { isError?: boolean };
+      expect(bad.isError).toBe(true);
+    } finally {
+      await cleanup();
+    }
+  });
+});
+

@@ -419,6 +419,67 @@ export function registerPaintTools(server: McpServer): void {
     },
   );
 
+  // ─── clear_footprint ───────────────────────────────────────────────────
+
+  server.tool(
+    "clear_footprint",
+    "Overwrite a rectangle of tiles with one background tile (default: the tileset's plain default fill) so nothing from an earlier " +
+      "paint_group is left behind under the holes or outside the footprint of a new group. Run it over the union of every footprint " +
+      "ever painted at an origin, then paint the group. Tile IDs only, no solving: check the edges with verify_area afterwards.",
+    {
+      area: z.string().describe("Area resref"),
+      x: z.string().describe("West-most tile column of the rectangle (0-based)"),
+      y: z.string().describe("South-most tile row of the rectangle (0-based)"),
+      width: z.string().describe("Rectangle width in tiles"),
+      height: z.string().describe("Rectangle height in tiles"),
+      tileId: z.string().optional().describe("Tile ID to write (default: the tileset's default tile for the area's default terrain, as create_area picks it)"),
+      orientation: z.string().optional().describe("Tile orientation 0-3 (default 0)"),
+    },
+    { destructiveHint: true, idempotentHint: true },
+    async ({ area, x, y, width, height, tileId, orientation }) => {
+      const index = requireIndex();
+      const areKey = `${area.toLowerCase()}.are`;
+      const are = index.parsedGff.get(areKey) as GffObj | undefined;
+      if (!are) return { isError: true, content: [{ type: "text", text: `Area not found: ${area}` }] };
+      const aw = getFieldNum(are, "Width");
+      const ah = getFieldNum(are, "Height");
+      const x0 = Number.parseInt(x, 10);
+      const y0 = Number.parseInt(y, 10);
+      const w = Number.parseInt(width, 10);
+      const h = Number.parseInt(height, 10);
+      if ([x0, y0, w, h].some(Number.isNaN) || w < 1 || h < 1 || x0 < 0 || y0 < 0 || x0 + w > aw || y0 + h > ah) {
+        return { isError: true, content: [{ type: "text", text: `The rectangle must lie inside the ${aw}x${ah} area (x ${x}, y ${y}, ${width}x${height} given).` }] };
+      }
+      let fill: number;
+      let ori = orientation !== undefined ? Number.parseInt(orientation, 10) : 0;
+      if (tileId !== undefined) {
+        fill = Number.parseInt(tileId, 10);
+        if (Number.isNaN(fill)) return { isError: true, content: [{ type: "text", text: "tileId must be a number" }] };
+      } else {
+        const tileset = await getTilesetInfo(getFieldStr(are, "Tileset").toLowerCase(), await buildResmanOptions(index), index);
+        const def = findDefaultTile(tileset);
+        if (!def) return { isError: true, content: [{ type: "text", text: "No default tile found for this tileset; pass tileId" }] };
+        fill = def.tileId;
+        ori = orientation !== undefined ? ori : def.orientation;
+      }
+      const tileList = getFieldList(are, "Tile_List");
+      let n = 0;
+      for (let ty = y0; ty < y0 + h; ty++) {
+        for (let tx = x0; tx < x0 + w; tx++) {
+          const entry = tileList[ty * aw + tx] as GffObj | undefined;
+          if (!entry) continue;
+          setFieldNum(entry, "Tile_ID", fill, "int");
+          setFieldNum(entry, "Tile_Orientation", ori, "int");
+          setFieldNum(entry, "Tile_Height", 0, "int");
+          n++;
+        }
+      }
+      const areEntry = index.resources.get(areKey);
+      if (areEntry) await jsonToGff(are as GffDocument, areEntry.filePath);
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: true, area, cleared: n, tileId: fill, orientation: ori }, null, 2) }] };
+    },
+  );
+
   // ─── paint_group ───────────────────────────────────────────────────────
 
   server.tool(

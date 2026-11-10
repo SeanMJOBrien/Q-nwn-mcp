@@ -662,6 +662,22 @@ export async function verifyCreature(
 
   // ─── Equipment ──────────────────────────────────────────────────────────
   const equipList = listOf(obj, "Equip_ItemList");
+  // A creature that fights in gear but leaves no lootable corpse drops its items as a loose bag, unlike every other mook
+  // (Salt Gate: the Grayward guards). Companions are not meant to be lootable, and LOOT_INTENTIONAL marks a deliberate choice.
+  if (
+    equipList.length > 0 &&
+    getFieldNum(obj, "Lootable") === 0 &&
+    listOf(obj, "ClassList").length > 0 &&
+    getFieldStr(obj, "ScriptDialogue") !== "x0_ch_hen_conv" &&
+    !getVarTableEntries(obj).some((v) => v.name.toUpperCase() === "LOOT_INTENTIONAL")
+  ) {
+    report.warn(
+      "lootable_flag_off",
+      "Creature carries equipped gear but Lootable is 0, so its items drop as a loose bag instead of a lootable body",
+      "Lootable",
+      "set Lootable to 1 (create_creature_blueprint lootable: true), or add a LOOT_INTENTIONAL local (varTable) if that is deliberate",
+    );
+  }
   for (const [i, item] of equipList.entries()) {
     // FIXED: this used to read "EquippedRes", a field name no real equipped
     // item struct carries (confirmed against every equipped-item struct this

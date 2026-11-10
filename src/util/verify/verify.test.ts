@@ -184,6 +184,22 @@ describe("verifyCreature", () => {
     }
   });
 
+  it("warns when a geared creature is not lootable, unless a companion or marked LOOT_INTENTIONAL", async () => {
+    const gear = { Equip_ItemList: { type: "list", value: [{ __struct_id: 16, TemplateResRef: { type: "resref", value: "nw_wswss001" }, BaseItem: { type: "int", value: 1 } }] } };
+    const codes = async (extra: Record<string, unknown>, dialogue?: string) => {
+      const report = new Report("t", "utc");
+      const obj = makeCreature("nw_c2_default", { ...gear, ...extra });
+      if (dialogue) obj.ScriptDialogue = { type: "resref", value: dialogue };
+      await verifyCreature(report, makeIndex(), obj);
+      return report.warnings.map((w) => w.code);
+    };
+    expect(await codes({ Lootable: { type: "byte", value: 0 } })).toContain("lootable_flag_off");
+    expect(await codes({ Lootable: { type: "byte", value: 1 } })).not.toContain("lootable_flag_off");
+    expect(await codes({ Lootable: { type: "byte", value: 0 } }, "x0_ch_hen_conv")).not.toContain("lootable_flag_off");
+    const marked = { Lootable: { type: "byte", value: 0 }, VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "LOOT_INTENTIONAL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 1 } }] } };
+    expect(await codes(marked)).not.toContain("lootable_flag_off");
+  });
+
   it("does not flag a matching Appearance_Type/Race pair", async () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 1 },

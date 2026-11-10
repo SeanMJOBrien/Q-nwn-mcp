@@ -145,3 +145,11 @@ Base tools operate on **instanced content placed in areas** (GIT contents),
 dialogs, journals, factions, blueprints, and scripts. Deep 2DA/ruleset
 authoring and palette-level tileset changes are out of scope for editing
 (read-only inspection via `list_2da_tables`/`search_2da` is fine).
+
+## Small repair tools
+
+- `move_store_item(item, resref | area+tag, toCategory?)` puts a store item in the right tab (default: its baseitems `StorePanel`); fixes `store_item_miscategorized`.
+- `clear_footprint(area, x, y, width, height, tileId?)` overwrites a rectangle with one tile before repainting a group there, so nothing from an earlier `paint_group` is left behind.
+- `bulk_modify_list(resource, type, listPath, where?, set, dryRun?)` sets the same scalar fields on every matching struct of one list (a faction flip across `Creature List`); edits a copy and commits only if every change applied.
+- `verify_creature` warns `lootable_flag_off` for a geared, class-based creature with `Lootable` 0 and no `LOOT_INTENTIONAL`.
+
