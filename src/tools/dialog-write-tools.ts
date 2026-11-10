@@ -16,6 +16,7 @@ import { jsonToGff } from "../nim-tools.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldStr, setField } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
+import { addReturnLinks, dialogShape, entryLabel } from "../util/dialog-hub.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -35,6 +36,8 @@ export interface InputNode {
   /** Native journal advance: the node sets this journal tag to `questEntry` when it plays (no script needed). */
   quest?: string;
   questEntry?: number;
+  /** NPC line that deliberately ends the conversation (a fight starts, a cutscene takes over); skipped by the return-to-hub rule. */
+  end?: boolean;
   children?: InputNode[];
 }
 
@@ -69,6 +72,7 @@ export function parseParamsArg(raw: string | undefined, name: string): ScriptPar
 }
 
 export interface NodeExtras {
+  end?: boolean;
   params?: ScriptParams;
   quest?: string;
   questEntry?: number;
@@ -102,7 +106,7 @@ export function makeEntry(text: string, script?: string, extras?: NodeExtras): G
     ActionParams: paramList(extras?.params),
     Animation: { type: "dword", value: 0 },
     AnimLoop: { type: "byte", value: 1 },
-    Comment: { type: "cexostring", value: "" },
+    Comment: { type: "cexostring", value: extras?.end ? "end" : "" },
     Delay: { type: "dword", value: 4294967295 },
     ...questFields(extras),
     RepliesList: { type: "list", value: [] },
@@ -242,11 +246,17 @@ export function registerDialogWriteTools(server: McpServer): void {
       nodes: z
         .string()
         .describe(
-          "JSON array of dialog tree nodes: [{ speaker: 'npc'|'pc', text: string, script?: string, params?: {key: value}, condition?: string, conditionParams?: {key: value}, quest?: string, questEntry?: number, children?: [...] }]. params are the script's ActionParams and conditionParams the condition's ConditionParams (read with GetScriptParam); quest + questEntry advance that journal stage natively when the node plays.",
+          "JSON array of dialog tree nodes: [{ speaker: 'npc'|'pc', text: string, script?: string, params?: {key: value}, condition?: string, conditionParams?: {key: value}, quest?: string, questEntry?: number, children?: [...] }]. params are the script's ActionParams and conditionParams the condition's ConditionParams (read with GetScriptParam); quest + questEntry advance that journal stage natively when the node plays. end: true on an NPC line ends the conversation there on purpose (every other branch returns to the main dialog).",
+        ),
+      returnToHub: z
+        .boolean()
+        .optional()
+        .describe(
+          "Dialog rule (default true): every NPC answer that would end the conversation instead returns to the main dialog (the first NPC line's PC options), and an exit reply (\"[Leave.]\") is added when none exists, so the conversation only ends when the player leaves. Pass false only for a deliberately linear dialog.",
         ),
     },
     { destructiveHint: true },
-    async ({ resref, nodes }) => {
+    async ({ resref, nodes, returnToHub }) => {
       const index = requireIndex();
       const resrefLower = resref.toLowerCase();
       const key = `${resrefLower}.dlg`;
@@ -284,6 +294,7 @@ export function registerDialogWriteTools(server: McpServer): void {
       }
 
       const doc = buildDialogDocument(parsed);
+      const hub = returnToHub === false ? undefined : addReturnLinks(doc as unknown as GffObj);
       const sizeBytes = await writeDialogDocument(index, resrefLower, doc);
       const entryList = getFieldList(doc, "EntryList");
       const replyList = getFieldList(doc, "ReplyList");
@@ -300,7 +311,60 @@ export function registerDialogWriteTools(server: McpServer): void {
                 entries: entryList.length,
                 replies: replyList.length,
                 startingNodes: startingList.length,
+                returnsToHub: hub ? { linked: hub.linked.length, exitsAdded: hub.exitsAdded, terminal: hub.terminal.length } : false,
                 sizeBytes,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+  );
+
+  // ─── add_dialog_return_links ──────────────────────────────────────────
+
+  server.tool(
+    "add_dialog_return_links",
+    "Apply the dialog rule to an existing dialog: every NPC answer that ends the conversation returns to the main dialog (the root line's PC options) instead, and an exit reply is added when the root has none, so the conversation ends only when the player picks the exit. Links keep the hub's conditions (a one-shot option hides itself). Entries listed in endEntries, or marked end, stay terminal on purpose (a fight starts, a recruit joins). dryRun lists what would change.",
+    {
+      dialog: z.string().describe("Dialog resref"),
+      endEntries: z.string().optional().describe("JSON array of NPC entry indices that must keep ending the conversation, e.g. [4,7]"),
+      dryRun: z.boolean().optional().describe("Report only, change nothing"),
+    },
+    { destructiveHint: true },
+    async ({ dialog, endEntries, dryRun }) => {
+      const index = requireIndex();
+      const key = `${dialog.toLowerCase()}.dlg`;
+      const doc = index.parsedGff.get(key) as GffDocument | undefined;
+      if (!doc) return { content: [{ type: "text", text: `Dialog not found: ${key}` }], isError: true };
+      let ends: number[] = [];
+      if (endEntries) {
+        try {
+          ends = (JSON.parse(endEntries) as unknown[]).map((n) => Number(n));
+        } catch {
+          return { content: [{ type: "text", text: "endEntries must be a JSON array of numbers" }], isError: true };
+        }
+      }
+      const before = dialogShape(doc as unknown as GffObj);
+      const work = dryRun ? (JSON.parse(JSON.stringify(doc)) as GffDocument) : doc;
+      const r = addReturnLinks(work as unknown as GffObj, { endEntries: ends });
+      if (!dryRun && (r.linked.length > 0 || r.exitsAdded > 0)) await writeDialogDocument(index, dialog, doc);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                dialog: dialog.toLowerCase(),
+                dryRun: !!dryRun,
+                returnedToHub: r.linked.map((i) => ({ entry: i, text: entryLabel(doc as unknown as GffObj, i) })),
+                exitRepliesAdded: r.exitsAdded,
+                keptTerminal: r.terminal,
+                noMainDialog: r.noHub,
+                deadEndsBefore: before.deadEnds.length,
               },
               null,
               2,

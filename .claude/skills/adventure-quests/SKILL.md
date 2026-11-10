@@ -59,7 +59,7 @@ explore, use, deliver, rescue, escort) and with which NPC, creature, item, place
 `build_quest` writes everything a quest needs: the journal, the giver's (and other NPCs') dialog lines merged into their
 existing conversations, stage variables on every object involved, event wiring, quest items, placed kill targets and
 rewards. It writes the quest scripts itself the first time. **Don't write quest scripts, journal entries or quest dialog
-nodes by hand.** The full field reference is `docs/quest-system.md`; this phase covers what to decide.
+nodes by hand.** After `build_quest`, run `verify_dialog` on each touched dialog; a `dialog_branch_ends` warning means an answer ends the talk instead of returning to the NPC's options (`add_dialog_return_links`). The full field reference is `docs/quest-system.md`; this phase covers what to decide.
 
 **1. Write a short spec per quest.** Only `name`, `giver` and each stage's `do` and `journal` are required:
 

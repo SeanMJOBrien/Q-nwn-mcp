@@ -1709,6 +1709,29 @@ describe("verifyDoor", () => {
 
 // ─── Dialog ───────────────────────────────────────────────────────────────
 
+describe("verifyDialog return-to-hub rule", () => {
+  const doc = (answerReplies: number[]) =>
+    ({
+      StartingList: { type: "list", value: [makeLink(0)] },
+      EntryList: {
+        type: "list",
+        value: [makeNode("Hello", "RepliesList", [0, 1]), makeNode("An answer", "RepliesList", answerReplies)],
+      },
+      ReplyList: { type: "list", value: [makeNode("Ask", "EntriesList", [1]), makeNode("Leave", "EntriesList", [])] },
+    }) as unknown as GffObj;
+  it("warns when an answer ends the conversation", () => {
+    const report = new Report("t", "dlg");
+    verifyDialog(report, makeIndex(), doc([]));
+    expect(report.warnings.map((w) => w.code)).toContain("dialog_branch_ends");
+  });
+  it("is quiet when the answer returns to the main options", () => {
+    const report = new Report("t", "dlg");
+    verifyDialog(report, makeIndex(), doc([0, 1]));
+    expect(report.warnings.map((w) => w.code)).not.toContain("dialog_branch_ends");
+    expect(report.warnings.map((w) => w.code)).not.toContain("dialog_no_exit_reply");
+  });
+});
+
 describe("verifyDialog", () => {
   it("passes a well-formed two-node conversation", () => {
     const doc = {

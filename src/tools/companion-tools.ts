@@ -32,6 +32,7 @@ import { verifyCreature } from "../util/verify/blueprints.js";
 import { Report, twoDARow } from "../util/verify/common.js";
 import type { GearRole } from "../util/wealth.js";
 import { forgeCreature, writeCreatureLevelSystem } from "./creature-forge-tools.js";
+import { addReturnLinks } from "../util/dialog-hub.js";
 import { buildDialogDocument, validateTree, writeDialogDocument } from "./dialog-write-tools.js";
 import { resolveCreatureTarget } from "./npc-tools.js";
 
@@ -137,7 +138,9 @@ export async function createCompanionDialog(
   const tree = buildCompanionDialogTree(text);
   const treeErr = validateTree(tree, "npc");
   if (treeErr) return { ok: false, error: treeErr };
-  const sizeBytes = await writeDialogDocument(index, dialog, buildDialogDocument(tree));
+  const companionDoc = buildDialogDocument(tree);
+  addReturnLinks(companionDoc as unknown as GffObj); // branches return to the menu until the player leaves
+  const sizeBytes = await writeDialogDocument(index, dialog, companionDoc);
   const wired = await wireConversation(index, creature, dialog);
 
   const warnings: string[] = [];

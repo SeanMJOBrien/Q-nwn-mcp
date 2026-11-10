@@ -152,7 +152,7 @@ describe("dialog tools", () => {
     expect(created.success).toBe(true);
     const doc = mockIndex.parsedGff.get("dlg_a.dlg") as GffObj;
     expect(list(doc, "EntryList")).toHaveLength(2);
-    expect(list(doc, "ReplyList")).toHaveLength(1);
+    expect(list(doc, "ReplyList")).toHaveLength(2); // the PC option plus the exit reply the return-to-hub rule adds
     const v = await call("verify_dialog", { resref: "dlg_a" });
     expect(errorCodes(v)).toEqual([]);
   });

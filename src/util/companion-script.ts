@@ -177,6 +177,8 @@ export interface DialogNode {
   text: string;
   script?: string;
   condition?: string;
+  /** Ends the conversation on purpose (skipped by the return-to-hub rule). */
+  end?: boolean;
   children?: DialogNode[];
 }
 
@@ -217,7 +219,7 @@ export function buildCompanionDialogTree(t: CompanionDialogText): DialogNode[] {
   const join: DialogNode = {
     speaker: "pc",
     text: t.askToJoin ?? "Will you travel with me?",
-    children: [{ speaker: "npc", text: t.accept ?? "I'll come with you.", script: "a_hen_join" }],
+    children: [{ speaker: "npc", text: t.accept ?? "I'll come with you.", script: "a_hen_join", end: true }],
   };
   return [
     {
@@ -238,7 +240,7 @@ export function buildCompanionDialogTree(t: CompanionDialogText): DialogNode[] {
         {
           speaker: "pc",
           text: "We should part ways.",
-          children: [{ speaker: "npc", text: t.farewell ?? "Until next time.", script: "a_hen_leave" }],
+          children: [{ speaker: "npc", text: t.farewell ?? "Until next time.", script: "a_hen_leave", end: true }],
         },
         { speaker: "pc", text: "Never mind." },
       ],

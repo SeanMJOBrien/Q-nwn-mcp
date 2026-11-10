@@ -9,6 +9,7 @@
 import type { GffObj } from "../../types/gff.js";
 import { getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
+import { dialogShape, entryLabel } from "../dialog-hub.js";
 import { checkScriptRef, hasField, listOf, type Report } from "./common.js";
 
 /** Fields every entry/reply struct must carry or the engine won't load the DLG. */
@@ -135,6 +136,28 @@ export function verifyDialog(report: Report, index: ModuleIndex, doc: GffObj): v
       "dialog_all_roots_conditional",
       "Every StartingList root has an Active condition — if all evaluate false the conversation opens with no text. Add an unconditional fallback root last",
       "StartingList",
+    );
+  }
+
+  // ─── Dialog rule: branches return to the main dialog ────────────────────
+  // An NPC answer with no replies ends the conversation. The rule is that only the exit option does, so a
+  // dead-end answer is reported unless it is marked as ending on purpose (Comment "end").
+  const shape = dialogShape(doc);
+  if (shape.deadEnds.length > 0) {
+    const sample = shape.deadEnds.slice(0, 3).map((i) => `#${i} "${entryLabel(doc, i)}"`).join(", ");
+    report.warn(
+      "dialog_branch_ends",
+      `${shape.deadEnds.length} NPC answer(s) end the conversation instead of returning to the main dialog (${sample}${shape.deadEnds.length > 3 ? ", ..." : ""})`,
+      "EntryList",
+      "add_dialog_return_links (pass endEntries for lines that should really end it)",
+    );
+  }
+  if (shape.rootsWithoutExit.length > 0) {
+    report.warn(
+      "dialog_no_exit_reply",
+      `${shape.rootsWithoutExit.length} main dialog line(s) offer options but no exit reply, so the player can never leave by choice`,
+      "StartingList",
+      "add_dialog_return_links adds a \"[Leave.]\" reply",
     );
   }
 }

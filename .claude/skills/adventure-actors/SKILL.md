@@ -218,6 +218,7 @@ For each key NPC, create a simple greeting dialog using `create_dialog`.
 - 1-3 PC response options (curious, friendly, dismissive)
 - Optional NPC follow-up lines with personality flavor
 - Keep it short: 2-4 exchanges maximum
+- **Return to the main dialog.** An answer never ends the talk: `create_dialog` links each answer back to the greeting's options and adds a `[Leave.]` reply, so the player chats until choosing to leave. Mark a line that really must end it (a fight starts) `end: true`.
 
 **Dialog content rules:**
 - **Flavor/personality ONLY** — no quest logic, no `AddJournalQuestEntry`, no scripts. That's `/adventure-quests`'s job.

@@ -88,3 +88,7 @@ to pick in the first place.
    `trace_dialog_path` to have picked correctly.
 3. `find_dialog_scripts` before any rename/removal of a script this dialog
    might reference.
+
+## Reading for the return-to-hub rule
+
+When tracing a conversation, note any NPC answer with no replies of its own: it ends the talk. Under the project's dialog rule only the exit reply should, so report such answers (`verify_dialog` lists them as `dialog_branch_ends`) and suggest `add_dialog_return_links`.
