@@ -376,10 +376,19 @@ export function registerVerifyServerTools(server: McpServer): void {
                 ...(goal ? {} : { warning: "No goal given: say what this run is meant to show and what counts as a pass, so a green run that never exercised it is not read as a pass (TODO #23)." }),
                 ...(simulate
                   ? {
-                      verdict:
-                        parsed.otherTaggedLines.some((l) => l.includes("[SIM_DONE]")) && !parsed.otherTaggedLines.some((l) => l.includes("[SIM_FAIL]")) && parsed.engineErrors.length === 0
-                          ? "pass: every simulated step passed and the driver finished"
-                          : "not a pass: a step failed, the driver did not finish, or the engine logged an error",
+                      verdict: (() => {
+                        let steps = 0;
+                        try {
+                          steps = (JSON.parse(simulate) as SimSpec).steps.length;
+                        } catch {
+                          /* validated earlier */
+                        }
+                        const okN = parsed.otherTaggedLines.filter((l) => l.includes("[SIM_OK]")).length;
+                        const failN = parsed.otherTaggedLines.filter((l) => l.includes("[SIM_FAIL]")).length;
+                        return okN === steps && failN === 0 && parsed.engineErrors.length === 0
+                          ? `pass: all ${steps} simulated steps passed, no engine error`
+                          : `not a pass: ${okN} of ${steps} steps passed, ${failN} failed, ${parsed.engineErrors.length} engine error(s)${okN + failN < steps ? " (some steps did not run: raise expectedCheckLines or timeoutSeconds)" : ""}`;
+                      })(),
                     }
                   : {}),
                 loaded: poll.sawLoadingModule,
