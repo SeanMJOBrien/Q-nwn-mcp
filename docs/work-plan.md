@@ -45,8 +45,8 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | E1 | `trace_dialog_path` root choice | done | `root` param, `roots` listing with conditions, 60-node cap; skill updated; MCP restart needed |
 | E2 | `list_script_references`: triggers, refresh | done | `currentScriptUsages` (fresh per call) in list_script_references, find_orphans, get_dependency_graph; `SCRIPT_FIELDS` gained the trigger/encounter/placeable fields; test added; MCP restart needed |
 | E3 | `resolve_blueprint` raw output | done | `raw: true`; description says it summarises by default; MCP restart needed |
-| E4 | Stale-script registry: remaining generators | in progress | |
-| E5 | `create_faction` limitation surfaced | todo | |
+| E4 | Stale-script registry: remaining generators | done | quest runtime (all scripts), inc_sim, inc_random_abil (cast chance read back), inc_spec_ability, inc_spec_check, inc_spec_assert added; `inc_reward` left out (class-item tiers are baked in and cannot be read back); hand-edited files skipped. Older modules will now report stale quest scripts until `create_quest_system` is re-run (inc_sim); MCP restart needed |
+| E5 | `create_faction` limitation surfaced | in progress | |
 | E6 | Uniform `isError` | todo | |
 | E7 | Seeded generation | todo | |
 | F1 | Creature and caster tools: decision table | todo | needs decision D4 |

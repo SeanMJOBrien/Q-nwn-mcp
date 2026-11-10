@@ -9,6 +9,12 @@
 
 import { COMPANION_INCLUDE, DEFAULT_MAX_COMPANIONS, generateCompanionScripts } from "./companion-script.js";
 import { hasHandEditedHeader } from "./hand-edited.js";
+import { generateQuestScripts } from "./quest-script.js";
+import { generateRandomAbilitiesInclude } from "./random-abilities-script.js";
+import { generateSimInclude, SIM_INCLUDE } from "./sim-script.js";
+import { generateSpecAbilityInclude } from "./spec-ability-script.js";
+import { generateSpecAssertInclude } from "./spec-assert-script.js";
+import { generateSpecCheckInclude } from "./spec-check-script.js";
 import { generateCreatureLevelInclude, generateCreatureLevelWrapper } from "./creature-level-script.js";
 
 export interface StaleFinding {
@@ -46,6 +52,23 @@ export const GENERATED_SCRIPTS: GeneratedScript[] = [
       return generateCompanionScripts({ maxCompanions: max })[COMPANION_INCLUDE];
     },
   },
+  {
+    resref: "inc_random_abil",
+    tool: "create_random_abilities_system",
+    regenerate: (existing) => {
+      const chance = /int RA_CAST_CHANCE_PERCENT = (\d+);/.exec(existing)?.[1];
+      return chance === undefined ? undefined : generateRandomAbilitiesInclude({ castChancePercent: Number(chance) });
+    },
+  },
+  { resref: "inc_spec_ability", tool: "create_spec_ability_system", regenerate: () => generateSpecAbilityInclude() },
+  { resref: "inc_spec_check", tool: "create_spec_verification", regenerate: () => generateSpecCheckInclude() },
+  { resref: "inc_spec_assert", tool: "create_spec_assertions", regenerate: () => generateSpecAssertInclude() },
+  { resref: SIM_INCLUDE, tool: "create_quest_system (or create_companion_system)", regenerate: () => generateSimInclude() },
+  // The quest runtime: inc_quest and every entry script (q_chk, q_act, ...) come from one generator with no settings.
+  ...Object.keys(generateQuestScripts())
+    .filter((name) => name !== SIM_INCLUDE)
+    .map((name) => ({ resref: name, tool: "create_quest_system", regenerate: () => generateQuestScripts()[name] })),
+  // inc_reward is not listed: its class-item tiers are baked into the code and cannot be read back from the file.
 ];
 
 /** `sources` maps a script resref to its source text. Only scripts the module actually has are checked. */
