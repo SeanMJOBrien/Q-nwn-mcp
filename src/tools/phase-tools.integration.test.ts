@@ -152,4 +152,28 @@ describe("set_project_scope", () => {
       await close();
     }
   });
+  it("one_feature skips every phase and clears stale Scope/Skip lines; whole_adventure resumes", async () => {
+    mockIndex.moduleName = "Demo";
+    await fs.writeFile(path.join(tempDir, "adventure.md"), "# Adventure: Demo\n\n## Module\n- **Title:** Demo\n\n## Plot\np\n");
+    const { c, close } = await client();
+    try {
+      await c.callTool({ name: "set_project_scope", arguments: { kind: "some_phases", scope: "only quests", phases: '["quests"]' } });
+      expect(await fs.readFile(path.join(tempDir, "adventure.md"), "utf8")).toContain("Skip phases");
+      const one = body(await c.callTool({ name: "set_project_scope", arguments: { kind: "one_feature", scope: "just a shop" } }));
+      expect(one.ok).toBe(true);
+      const md = await fs.readFile(path.join(tempDir, "adventure.md"), "utf8");
+      expect(md).not.toContain("Skip phases");
+      expect(md).not.toContain("**Scope:**");
+      for (const step of ["start", "end"] as const) {
+        const r = body(await c.callTool({ name: "phase_check", arguments: { phase: "plot", step } }));
+        expect(r.skipped).toBe(true);
+        expect(r.kind).toBe("one_feature");
+      }
+      await c.callTool({ name: "set_project_scope", arguments: { kind: "whole_adventure", scope: "everything" } });
+      const back = body(await c.callTool({ name: "phase_check", arguments: { phase: "areas", step: "start" } }));
+      expect(back.skipped).toBeUndefined();
+    } finally {
+      await close();
+    }
+  });
 });

@@ -12,6 +12,7 @@
 | How should any creature be built, levelled up or down, and changed in appearance from one declarative spec? *(spawn-time levelling built: `forge_creature`, `create_creature_level_system`; rest is design)* | [creature-forge-spec.md](creature-forge-spec.md) |
 | How do I build creatures and companions with the forge, and what does it do step by step (logic flow, in-game checks, locals)? | [creature-forge-manual.md](creature-forge-manual.md) |
 | How do `phase_check`, `suggest_area_size`, `place_tile_doors`, `build_companion`, the generic `q_check`/`add_skill_check`, quest spawning and `skill-lint` work? How do I rework an existing module? | [adventure-tooling-reference.md](adventure-tooling-reference.md) |
+| How should a session start, which category of help maps to which phase and skill, and how is an existing incomplete module audited? | [guided-workflow.md](guided-workflow.md) *(design; scope tool built)* |
 | How are an adventure's size, events, encounter kinds, multi-part encounters and story threads planned and checked? | [adventure-composition.md](adventure-composition.md) |
 | How do quests work, and what can a `build_quest` spec say (stage kinds, templates, `q_chk`/`q_act` parameters, whole-party credit)? | [quest-system.md](quest-system.md) |
 | How does the parametrized PQJ quest system work? | [pqj-quest-system.md](pqj-quest-system.md) |

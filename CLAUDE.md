@@ -322,7 +322,7 @@ The rest are open.
     - Verify: `verify_coop_rules` should accept it (per-PC tries), and add a unit test per ability/save/skill branch that the
       generated script compiles.
 
-20. **DONE 2026-11-09 — ask the purpose of the work first.** `set_project_scope(kind, scope, phases?)` records it (`project-scope.json`, plus `Scope:`/`Skip phases:` in `## Module` for pipeline kinds); `/create-adventure` and `module-explorer` call it. Earlier status: Built: `/create-adventure` pre-flight step 0 asks the scope (whole adventure, some phases, one feature, NWScript only) and records `Scope:` and `Skip phases:` in `## Module`; `phase_check` returns `skipped` for a declared skip and later phases don't require its section; `module-explorer` asks first. Not done: a `set_project_scope` tool (the skill step is enough so far). Original request: The server and `/create-adventure` assume a whole module is
+20. **MOSTLY DONE 2026-11-09 — ask the purpose of the work first.** Live-tested on The Salt Gate Conspiracy: record/read, bad phases and empty scope refused, `some_phases` skips, `one_feature` skips every phase and clears the stale `Scope:`/`Skip phases:` lines, `whole_adventure` resumes. **Still to build** (plan in `docs/guided-workflow.md`): the `focus` field and per-focus guide, the shared intake step, `audit_module`, and the adopt step (a hand-built module has no `adventure.md`, so pipeline phases stop at `phase_check start`). `set_project_scope(kind, scope, phases?)` records it (`project-scope.json`, plus `Scope:`/`Skip phases:` in `## Module` for pipeline kinds); `/create-adventure` and `module-explorer` call it. Earlier status: Built: `/create-adventure` pre-flight step 0 asks the scope (whole adventure, some phases, one feature, NWScript only) and records `Scope:` and `Skip phases:` in `## Module`; `phase_check` returns `skipped` for a declared skip and later phases don't require its section; `module-explorer` asks first. Not done: a `set_project_scope` tool (the skill step is enough so far). Original request: The server and `/create-adventure` assume a whole module is
     wanted. Add an opening question (in `/create-adventure` and as the first thing a session on this MCP does) about scope, so effort goes
     where the user's goal is: only one or two aspects of a module (areas, NPCs, quests, encounters, loot, dialog)? NWScript only? one larger
     feature (a quest system, a companion, a store, a set piece)? or only certain phases of an adventure project? The answer picks the
@@ -379,6 +379,24 @@ The rest are open.
       spellbook, pools holding concealment spells). Add a `verify_*` check that compares a module's generated includes with the current generator
       output (and names the tool to re-run), so a stale module is reported instead of discovered in play.
 
+23. **TODO (user-raised, 2026-11-09) — check the goal and objectives of every test run.** Each test run (a `run_live_verification`, a systest, a
+    playtest, a generated-module build) should state what it is for and what counts as pass before it starts, and the report should be judged
+    against that, not just "no errors". Open design points: where the goal is recorded (the `set_project_scope` record, a header in the run's
+    output, or a `## Test Goal` section in `adventure.md`), whether a run with no stated goal is refused or only warned, and how each check
+    maps back to an objective so a green run that never exercised the objective is reported as such.
+
+24. **TODO (user-raised, 2026-11-09) — explore the stories created versus how this tool and its skills and tools create them.** Compare what
+    the generated adventures actually contain (premise, beats, NPC motives, quests, encounters, pacing; e.g. The Hollow Communion, The Salt
+    Gate Conspiracy) with what the pipeline does to produce them (`/adventure-plot` through `/adventure-rewards`, `plan_adventure_shape`,
+    `verify_story`). Look for where the process flattens or drops the story (motive added after the fact, areas that don't carry beats, quests
+    that don't follow the plot) and write the findings in a doc under `docs/` before changing any skill or tool. Related: #21.
+
+25. **TODO (user-raised, 2026-11-09) — cutscenes that continue as the player selects dialog options.** A cutscene should advance one beat per
+    choice (the player sets the pace of the storytelling) instead of playing as one timed sequence, and every line lands in the player's dialog
+    history. Needs design first: how a cutscene is specified (beats with camera/actor actions per dialog node, run from the node's action script
+    or native fields), how it fits `build_quest`/`create_dialog` and the Story Graph (a beat can be a cutscene), what the engine allows during a
+    conversation (camera, `ActionPlayAnimation`, `ActionJumpToLocation`, fades, `SetCutsceneMode`) and what a headless run can verify. Related: #21, #24.
+
 ## Design Intent
 
 This MCP serves two purposes:
@@ -386,6 +404,15 @@ This MCP serves two purposes:
 **(a) AI-assisted human module design** — A human author works with an AI assistant to build, modify, and extend NWN modules via natural language. The human stays in creative control.
 
 **(b) AI-driven creative module building** — A small, proof-of-concept tool for building one-shot adventures for yourself and friends. Spoiler-free by design, so the DM can be surprised too. An LLM autonomously designs and constructs module content based on high-level goals: generating quests, writing dialogue, designing areas, placing objects, building story. This is orchestrated via the `/create-adventure` skill and its sub-skill agents.
+
+### How a session starts (user intent, 2026-11-09)
+
+The first thing a session on this MCP does is **ask the user what they are trying to accomplish**, then the LLM drives that goal to completion
+with the tools and skills, teaching as it goes (the user may not know how to build or equip a creature, script behaviour, fill story gaps,
+design an area with encounters, or add quests, journal entries, dialog and rewards, or may only want a script bug found). Most sessions are on a
+module that is **already built but incomplete**: the order is **adopt** (write `adventure.md` from what the module contains), then **review the
+module as built so far**, then let the user say how to fill each gap with the LLM's guidance. `set_project_scope` records the answer; the plan,
+phase/category table and audit are in `docs/guided-workflow.md`. TODO #20 tracks the remaining build (`focus`, intake, `audit_module`, adopt).
 
 ### Spatial Awareness
 

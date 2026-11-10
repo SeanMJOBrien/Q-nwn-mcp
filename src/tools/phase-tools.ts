@@ -15,6 +15,7 @@ import { requireIndex } from "../module-loader.js";
 import type { GffObj } from "../types/gff.js";
 import { getFieldStr } from "../types/gff.js";
 import {
+  clearScopeFields,
   filterForPhase,
   mergeStatus,
   missingSections,
@@ -25,6 +26,7 @@ import {
   type PhaseEntry,
   requiredFor,
   SCOPE_KINDS,
+  scopeSkipsPipeline,
   setScopeFields,
   skipFromRun,
   stopMessage,
@@ -101,6 +103,14 @@ export function registerPhaseTools(server: McpServer): void {
         const md = (await readIfExists(adventurePath)) ?? `# Adventure: ${index.moduleName}\n`;
         await fs.writeFile(adventurePath, setScopeFields(md, scope.trim(), skip));
         wroteAdventure = true;
+      } else {
+        // Switching away from a pipeline scope: drop the old Scope/Skip lines so phase_check can't follow them.
+        const adventurePath = path.join(index.tempDir, "adventure.md");
+        const md = await readIfExists(adventurePath);
+        if (md !== null && clearScopeFields(md) !== md) {
+          await fs.writeFile(adventurePath, clearScopeFields(md));
+          wroteAdventure = true;
+        }
       }
       const record = { kind, scope: scope.trim(), run: kind === "some_phases" ? run : undefined, skip, usesAdventurePipeline: usesPipeline };
       await fs.writeFile(scopePath, JSON.stringify(record, null, 2));
@@ -128,6 +138,25 @@ export function registerPhaseTools(server: McpServer): void {
     async ({ phase, step, warnings, errors, coop }) => {
       const index = requireIndex();
       const adventurePath = path.join(index.tempDir, "adventure.md");
+      // One feature / NWScript only: the adventure pipeline is not in use, so no phase runs.
+      const recordedRaw = await readIfExists(path.join(index.tempDir, "project-scope.json"));
+      let recorded: unknown;
+      try {
+        recorded = recordedRaw ? JSON.parse(recordedRaw) : undefined;
+      } catch {
+        recorded = undefined;
+      }
+      if (scopeSkipsPipeline(recorded)) {
+        return text({
+          ok: true,
+          phase,
+          step,
+          skipped: true,
+          scope: recorded.scope,
+          kind: recorded.kind,
+          message: `Phase ${phase} is skipped: the recorded scope is ${recorded.kind} ("${recorded.scope}"), which does not use the adventure pipeline. Do nothing. To run the pipeline, call set_project_scope with whole_adventure or some_phases.`,
+        });
+      }
       const md = await readIfExists(adventurePath);
       if (md === null) {
         return text({ ok: false, phase, step, error: `No adventure.md in ${index.tempDir}. Run /adventure-plot first.` }, true);

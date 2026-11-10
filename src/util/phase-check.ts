@@ -173,3 +173,22 @@ function fieldLines(scope: string, skip: Phase[]): string[] {
   if (skip.length) out.push(`- **Skip phases:** ${skip.join(", ")}`);
   return out;
 }
+
+/** Removes the `Scope:` and `Skip phases:` lines from `## Module` (used when the scope stops being a pipeline scope). */
+export function clearScopeFields(markdown: string): string {
+  return markdown
+    .split("\n")
+    .filter((l) => !/^[-*]\s*\*\*(Scope|Skip phases):\*\*/i.test(l))
+    .join("\n");
+}
+
+/** True when the recorded project-scope.json says the adventure pipeline is not in use (one feature, NWScript only). */
+export function scopeSkipsPipeline(record: unknown): record is { kind: ScopeKind; scope: string } {
+  if (!record || typeof record !== "object") return false;
+  const r = record as { kind?: unknown; usesAdventurePipeline?: unknown };
+  return (
+    typeof r.kind === "string" &&
+    (SCOPE_KINDS as readonly string[]).includes(r.kind) &&
+    r.usesAdventurePipeline === false
+  );
+}
