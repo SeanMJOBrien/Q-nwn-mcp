@@ -1,6 +1,19 @@
 # Changelog
 
-## [Unreleased] — 2026-11-08
+## [1.4.0] — 2026-11-10
+
+Module projects, a player stand-in for live tests, the dialog rule, adopt/audit, and a round of defect fixes. Work plan: [docs/work-plan.md](docs/work-plan.md).
+
+- **Modules are projects.** `export_project` writes the loaded module as nasher-style JSON under `adventures/<Title>/`; `load_module` accepts that directory; every write (and delete) updates the project automatically; a file changed outside the tools is imported and the write refused once; `repack_module` only builds the `.mod` when asked; `run_live_verification` builds its own throwaway `.mod`. A `// hand-edited:` header stops generators overwriting a patched script. Design: [docs/module-projects.md](docs/module-projects.md).
+- **Player simulation.** Generated quest and companion scripts take a stand-in player (`inc_sim`, `MCP_TEST_ACTOR`); `run_live_verification` takes `simulate` (steps with script, parameters and expectations), `goal` and returns a `verdict`. Checked on the real engine on Salt Gate. [docs/player-simulation.md](docs/player-simulation.md).
+- **Dialog rule (branches return to the main dialog).** `create_dialog`, the companion dialog, `add_dialog_return_links`, `add_dialog_node` (`end: true` opts out), `build_quest` (a hub of "About: <quest>" options plus `[Leave]`), state-changing answers re-enter through "[Anything else?]"; `verify_dialog` warns on dead ends and missing exits.
+- **Adopt, audit, focus.** `adopt_module`, `audit_module` (with `fillIn`: the unrecorded story fields), `set_project_scope`, `get_adventure_dir`; every module has a DM area with two books (`create_dm_area`).
+- New tools: `build_key_npc`, `move_store_item`, `clear_footprint`, `bulk_modify_list`; `trace_dialog_path` takes a `root`; `resolve_blueprint` takes `raw`; `adventure_generate_layout` takes `style.seed` and returns the seed.
+- Defects fixed: script references read current documents and cover trigger/door fields; the stale-script check covers the quest runtime and the ability/spec includes; failures set `isError` (101 returns); `Math.random` only in `util/rng.ts`; custom factions warn `custom_faction_unreliable`; `lootable_flag_off` check.
+- Creature tools: `forge_creature` is the supported path; the older builders and the Random/Special Abilities paths are marked deprecated (still working). [docs/creature-tools.md](docs/creature-tools.md).
+- Docs: CLAUDE.md cut from 4,080 to about 450 lines; history moved to `docs/pitfalls.md`, `verification-history.md`, `todo-archive.md` and others (index in `docs/README.md`).
+
+## [1.4.0] (also) — 2026-11-08
 
 - `build_companion`: one call builds, forges, places and wires a companion (replaces five calls).
 - `add_skill_check` + `q_check`/`q_check_evt`: one parameter-driven skill/ability/save check for dialogs, traps, doors and clues.
