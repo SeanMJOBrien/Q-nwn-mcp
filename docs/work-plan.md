@@ -54,7 +54,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | F3 | Small missing tools | todo | |
 | G1 | Follow-ups for `story-vs-pipeline.md`; adopt fill step | todo | |
 | G2 | Release: CHANGELOG, version | todo | |
-| B7 | Review plain-`fs` writers: route them through the project sync (TODO #41) | in progress | step 1: list the writers | user-requested 2026-11-10; after B5 |
+| B7 | Review plain-`fs` writers: route them through the project sync (TODO #41) | done | `afterRemove` added; `adventure-tools`, `bulk-tools`, `object-mgmt-tools`, `write-tools` (clone), `paint-tools` (delete_area), `quest-tools` (dry-run include), `dm-area-tools`, `moonglow-tools` now sync; probe scripts are ignored by the sync; `project-sync-guard.test.ts` fails on a new raw-fs writer. MCP restart needed. Not covered: tools that remove resources by other means than the ones above (none found) |
 | M1-M4 | Salt Gate module track (see below) | done | All four done 2026-11-10. Oswin's quest rebuilt with the hub builder from a spec reconstructed out of the module (dry run matched every line, slot and reward); `dlg_oswin` passes `verify_dialog`; simulation of its accept steps 3 of 3. `audit_module`: 9 of 11 rows done; open: story fields `(not recorded)` and the player-facing module description (the user's to supply). Not play-tested by a person; `.mod` not built (rule). `temp-backup/` can be deleted. Remaining stale warnings: forged-creature stat-formula warnings (196) |
 | H | Content features (#21/#24, #25, #26) | not planned in detail | design first, one at a time |
 

@@ -1,4 +1,6 @@
+import { markDirty } from "../util/dirty-state.js";
 import { resrefError } from "../util/resref.js";
+import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
 import { z } from "zod";
 import path from "path";
 import fs from "fs/promises";
@@ -291,7 +293,10 @@ export function registerWriteTools(server: McpServer): void {
         index.parsedGff.set(newKey, doc);
       } else {
         // Binary copy
+        await beforeWrite(newFilePath);
         await fs.copyFile(sourceEntry.filePath, newFilePath);
+        markDirty(newFilePath);
+        await afterWrite(newFilePath);
       }
 
       const stat = await fs.stat(newFilePath);

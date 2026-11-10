@@ -14,6 +14,7 @@
  * - adventure_list_features: List solver-compatible feature groups for a tileset + terrain
  */
 
+import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
 import { z } from "zod";
 import path from "path";
 import fsPromises from "fs/promises";
@@ -106,8 +107,10 @@ export function registerAdventureTools(server: McpServer): void {
       // Helper: write + compile a script, register both .nss and .ncs in index.resources
       async function writeScript(resref: string, source: string): Promise<{ success: boolean; output?: string }> {
         const nssPath = path.join(index.tempDir, `${resref}.nss`);
+        await beforeWrite(nssPath);
         await fsPromises.writeFile(nssPath, source, "utf-8");
         markDirty(nssPath);
+        await afterWrite(nssPath);
         const nssStat = await fsPromises.stat(nssPath);
         index.resources.set(`${resref}.nss`, { resref, extension: "nss", filePath: nssPath, sizeBytes: nssStat.size });
         const ncsPath = nssPath.replace(/\.nss$/i, ".ncs");

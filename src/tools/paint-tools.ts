@@ -9,6 +9,7 @@
  * - set_area_properties: Modify area lighting, music, weather, etc.
  */
 
+import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
 import { z } from "zod";
 import path from "path";
 import fs from "fs/promises";
@@ -304,6 +305,7 @@ export function registerPaintTools(server: McpServer): void {
         const entry = index.resources.get(key);
         if (entry) {
           await fs.unlink(entry.filePath).catch(() => {});
+          await afterRemove(entry.filePath);
           index.resources.delete(key);
           index.parsedGff.delete(key);
         }

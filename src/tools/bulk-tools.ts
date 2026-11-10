@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex } from "../module-loader.js";
 import { jsonToGff, readTextFile } from "../nim-tools.js";
@@ -87,8 +88,10 @@ export function registerBulkTools(server: McpServer): void {
             const source = await readTextFile(entry.filePath);
             if (source.includes(`"${oldTag}"`)) {
               const newSource = source.replaceAll(`"${oldTag}"`, `"${newTag}"`);
+              await beforeWrite(entry.filePath);
               await fs.writeFile(entry.filePath, newSource, "utf-8");
               markDirty(entry.filePath);
+              await afterWrite(entry.filePath);
               scriptChanged++;
             }
           } catch { /* skip */ }

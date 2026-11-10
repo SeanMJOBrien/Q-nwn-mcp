@@ -1,3 +1,4 @@
+import path from "path";
 import { SIM_INCLUDE } from "../util/sim-script.js";
 /**
  * Quest tools: the parameter-driven, whole-party quest system (docs/quest-system.md).
@@ -7,6 +8,7 @@ import { SIM_INCLUDE } from "../util/sim-script.js";
  *   remove_quest         undo build_quest for one tag
  */
 
+import { afterRemove } from "../util/project-sync.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
@@ -131,6 +133,7 @@ export function registerQuestTools(server: McpServer): void {
             report.notes.push("the quest runtime will be written on the real build");
             return { content: [{ type: "text", text: JSON.stringify({ success: true, ...report }, null, 2) }] };
           } finally {
+            await afterRemove(path.join(index.tempDir, `${QUEST_INCLUDE}.nss`));
             index.resources.delete(`${QUEST_INCLUDE}.nss`);
           }
         }

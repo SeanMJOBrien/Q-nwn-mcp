@@ -54,9 +54,14 @@ export async function projectDirFor(index: ModuleIndex): Promise<string> {
   return ensureAdventureDir(index);
 }
 
+/** Probe scripts (`_<tool>_probe`) exist only to prove a generated include compiles; they never belong in the project. */
+function isProbe(file: string): boolean {
+  return /^_[a-z]+_probe\./i.test(path.basename(file));
+}
+
 export async function beforeWrite(file: string): Promise<void> {
   const index = getIndex();
-  if (!index || !inside(index, file)) return;
+  if (!index || !inside(index, file) || isProbe(file)) return;
   const known = stats.get(file);
   if (!known) return;
   let now: { size: number; mtimeMs: number };
@@ -82,7 +87,7 @@ export async function beforeWrite(file: string): Promise<void> {
 
 export async function afterWrite(file: string, doc?: GffDocument): Promise<void> {
   const index = getIndex();
-  if (!index || !inside(index, file)) return;
+  if (!index || !inside(index, file) || isProbe(file)) return;
   await trackFile(file);
   try {
     await flushResource(index, file, doc);
@@ -113,5 +118,25 @@ async function flushResource(index: ModuleIndex, file: string, doc?: GffDocument
     manifest.resources.push(key);
     manifest.resources.sort();
     await fs.writeFile(path.join(dir, PROJECT_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
+  }
+}
+
+/** A resource was deleted from the module: delete it from the project and its manifest too. */
+export async function afterRemove(file: string): Promise<void> {
+  const index = getIndex();
+  if (!index || !inside(index, file) || isProbe(file)) return;
+  stats.delete(file);
+  try {
+    const dir = await projectDirFor(index);
+    if (!(await isProjectDir(dir))) return;
+    const key = path.basename(file).toLowerCase();
+    await fs.rm(path.join(dir, projectPath(key)), { force: true });
+    const manifest = await readManifest(dir);
+    if (manifest.resources.includes(key)) {
+      manifest.resources = manifest.resources.filter((r) => r !== key);
+      await fs.writeFile(path.join(dir, PROJECT_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`);
+    }
+  } catch (e) {
+    console.error(`project sync failed removing ${file}: ${e}`);
   }
 }

@@ -8,6 +8,7 @@
  * - move_object: Move an object to a new position in an area
  */
 
+import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
 import { z } from "zod";
 import path from "path";
 import fsPromises from "fs/promises";
@@ -203,8 +204,10 @@ export function registerObjectMgmtTools(server: McpServer): void {
       ].join("\n");
 
       const nssPath = path.join(index.tempDir, `${scriptResref}.nss`);
+      await beforeWrite(nssPath);
       await fsPromises.writeFile(nssPath, scriptSource, "utf-8");
       markDirty(nssPath);
+      await afterWrite(nssPath);
 
       const nssStat = await fsPromises.stat(nssPath);
       index.resources.set(`${scriptResref}.nss`, {

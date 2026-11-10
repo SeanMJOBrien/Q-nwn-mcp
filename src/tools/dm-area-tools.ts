@@ -14,6 +14,7 @@ import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldStr, setField } from "../types/gff.js";
 import { adventureFile } from "../util/adventure-dir.js";
 import { DM_AREA_RESREF, DM_CHEST_TAG, bookBlueprint, bookSpecs } from "../util/dm-books.js";
+import { afterWrite } from "../util/project-sync.js";
 import { getGitDoc, writeBackGit } from "../util/git-helpers.js";
 
 const TEMPLATES_DIR = path.join(import.meta.dirname, "..", "templates");
@@ -67,6 +68,7 @@ export function registerDmAreaTools(server: McpServer): void {
           const stat = await fs.stat(target);
           index.resources.set(`${DM_AREA_RESREF}.${ext}`, { resref: DM_AREA_RESREF, extension: ext, filePath: target, sizeBytes: stat.size });
           index.parsedGff.set(`${DM_AREA_RESREF}.${ext}`, doc);
+          await afterWrite(target, doc);
         }
         index.areas.set(DM_AREA_RESREF, {
           resref: DM_AREA_RESREF,
