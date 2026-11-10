@@ -15,6 +15,7 @@
  * in-process static checks.
  */
 
+import { adventureFile } from "../util/adventure-dir.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { execFile } from "child_process";
 import fs from "fs/promises";
@@ -296,7 +297,7 @@ export function registerVerifyServerTools(server: McpServer): void {
       const loot = parseLootLines(parsed.otherTaggedLines);
       if (recordLoot !== false && loot.length > 0) {
         try {
-          const adventurePath = path.join(requireIndex().tempDir, "adventure.md");
+          const adventurePath = await adventureFile(requireIndex(), "story");
           const md = await fs.readFile(adventurePath, "utf8");
           await fs.writeFile(adventurePath, upsertSpawnLoot(md, loot));
           lootRecorded = `${loot.length} creature(s) written to adventure.md ## Spawn Loot`;

@@ -9,6 +9,9 @@ import type { ModuleIndex } from "../types/module.js";
 
 let mockIndex: ModuleIndex;
 let tempDir: string;
+let advBase: string;
+/** The module is named "Demo", so its adventure directory is <advBase>/Demo. */
+const advDir = () => path.join(advBase, "Demo");
 
 vi.mock("../module-loader.js", () => ({
   requireIndex: () => mockIndex,
@@ -33,8 +36,11 @@ function body(r: unknown): Record<string, unknown> {
 beforeEach(async () => {
   tempDir = path.join(os.tmpdir(), `nwn-mcp-phase-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   await fs.mkdir(tempDir, { recursive: true });
+  advBase = path.join(tempDir, "adventures");
+  process.env.MCP_FOLDER_ADVENTURES = advBase;
   mockIndex = {
     tempDir,
+    moduleName: "Demo",
     resources: new Map(),
     parsedGff: new Map(),
     areas: new Map(),
@@ -42,6 +48,7 @@ beforeEach(async () => {
   } as unknown as ModuleIndex;
 });
 afterEach(async () => {
+  delete process.env.MCP_FOLDER_ADVENTURES;
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 
@@ -77,7 +84,7 @@ describe("phase_check", () => {
       expect(r.status).toBe("success");
       const r2 = body(await c.callTool({ name: "phase_check", arguments: { phase: "environment", step: "end", errors: '["boom"]' } }));
       expect(r2.status).toBe("partial");
-      const file = JSON.parse(await fs.readFile(path.join(tempDir, "adventure-status.json"), "utf8"));
+      const file = JSON.parse(await fs.readFile(path.join(advDir(), "adventure-status.json"), "utf8"));
       expect(file.phases.plot.status).toBe("success");
       expect(file.phases.environment.errors).toContain("boom");
     } finally {
@@ -96,7 +103,7 @@ describe("phase_check", () => {
       expect(a.skipped).toBe(true);
       const e = body(await c.callTool({ name: "phase_check", arguments: { phase: "areas", step: "end" } }));
       expect(e.skipped).toBe(true);
-      const file = JSON.parse(await fs.readFile(path.join(tempDir, "adventure-status.json"), "utf8"));
+      const file = JSON.parse(await fs.readFile(path.join(advDir(), "adventure-status.json"), "utf8"));
       expect(file.phases.areas.status).toBe("skipped");
       const env = body(await c.callTool({ name: "phase_check", arguments: { phase: "environment", step: "start" } }));
       expect(env.ok).toBe(true);
@@ -145,7 +152,7 @@ describe("set_project_scope", () => {
     try {
       const r = body(await c.callTool({ name: "set_project_scope", arguments: { kind: "nwscript_only", scope: "fix my scripts" } }));
       expect(r.wroteAdventure).toBe(false);
-      await expect(fs.access(path.join(tempDir, "adventure.md"))).rejects.toThrow();
+      await expect(fs.access(path.join(advDir(), "adventure.md"))).rejects.toThrow();
       const bad = await c.callTool({ name: "set_project_scope", arguments: { kind: "some_phases", scope: "x", phases: '["nope"]' } });
       expect(bad.isError).toBe(true);
     } finally {
@@ -158,10 +165,10 @@ describe("set_project_scope", () => {
     const { c, close } = await client();
     try {
       await c.callTool({ name: "set_project_scope", arguments: { kind: "some_phases", scope: "only quests", phases: '["quests"]' } });
-      expect(await fs.readFile(path.join(tempDir, "adventure.md"), "utf8")).toContain("Skip phases");
+      expect(await fs.readFile(path.join(advDir(), "adventure.md"), "utf8")).toContain("Skip phases");
       const one = body(await c.callTool({ name: "set_project_scope", arguments: { kind: "one_feature", scope: "just a shop" } }));
       expect(one.ok).toBe(true);
-      const md = await fs.readFile(path.join(tempDir, "adventure.md"), "utf8");
+      const md = await fs.readFile(path.join(advDir(), "adventure.md"), "utf8");
       expect(md).not.toContain("Skip phases");
       expect(md).not.toContain("**Scope:**");
       for (const step of ["start", "end"] as const) {

@@ -23,11 +23,11 @@ The create-adventure pipeline is a **white-glove, spoiler-free experience**. The
 
 Before starting the pipeline, resolve these with the user:
 
-0. **Purpose and scope — ask first.** Ask what the user wants help with, so effort goes where their goal is (use AskUserQuestion; allow "Other"): **a whole adventure** (the full pipeline, default); **only some phases** of an adventure (which ones: plot, areas, environment, actors, quests, challenges, affordances, polish, rewards); **one feature** (a quest, a companion, a store, a set piece, an encounter chain) added to a module that already exists; or **NWScript only** (no areas or content). Only "a whole adventure" and "some phases" use this pipeline.
+0. **Purpose and scope — ask first.** Ask what the user is trying to accomplish, so effort goes where their goal is, and drive that goal to completion (use AskUserQuestion; allow "Other"). A module that already exists is not a blank start: `adopt_module`, then `audit_module`, show the user what is done and missing, and let them pick the gaps. The options: **a whole adventure** (the full pipeline, default); **only some phases** of an adventure (which ones: plot, areas, environment, actors, quests, challenges, affordances, polish, rewards); **one feature** (a quest, a companion, a store, a set piece, an encounter chain) added to a module that already exists; or **NWScript only** (no areas or content). Only "a whole adventure" and "some phases" use this pipeline.
    - *One feature:* skip this skill; use the matching tool directly (`build_quest`, `build_companion`, `compose_encounter`, `add_skill_check`, …) with `module-explorer`.
    - *NWScript only:* use `nwn-logic-debug` and `write_script`; build no areas.
    - *Some phases:* record the phases to leave out as `Skip phases:` in `## Module` (below). `phase_check` then reports those phases as skipped and later phases don't require their sections. Say plainly which earlier content the later phases will lack (a quests phase without areas has nowhere to put anything).
-   - Always record the answer with `set_project_scope(kind, scope, phases)` (`kind` is whole_adventure, some_phases, one_feature or nwscript_only; `phases` is the JSON list of phases to run for some_phases). It writes `Scope:` and `Skip phases:` into `## Module` for you and saves `project-scope.json`; call it with no arguments to read the scope back.
+   - Always record the answer with `set_project_scope(kind, scope, phases, focus)` (`focus` — creatures, scripting, story, areas_encounters, quests_dialog, debug or items — returns the skills and first calls for that kind of help) (`kind` is whole_adventure, some_phases, one_feature or nwscript_only; `phases` is the JSON list of phases to run for some_phases). It writes `Scope:` and `Skip phases:` into `## Module` for you and saves `project-scope.json`; call it with no arguments to read the scope back.
 
 1. **Level range required.** The user's prompt must include a level range (e.g., "level 3-5", "for 5th level characters"). If missing, ask for one before proceeding — every downstream skill (challenges, affordances, rewards) depends on it.
 
@@ -45,7 +45,7 @@ Before starting the pipeline, resolve these with the user:
    - If the user doesn't like it, propose a different title. Keep iterating until they're happy.
    - Once the user confirms the title:
      - The module filename is the **adventure title exactly as written** — spaces, case, and all (e.g., "The Harvest of Bones" → filename `The Harvest of Bones`, which NWN saves as `The Harvest of Bones.mod`).
-     - Write the initial `adventure.md` to the MCP temp directory (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp`) with just the heading and `## Module` section:
+     - Write the initial `adventure.md` to the adventure directory (call `get_adventure_dir` once the module exists; it is `adventures/<Title-With-Dashes>/`, git-ignored, and holds this module's story, DM guide and status) with just the heading and `## Module` section:
        ```markdown
        # Adventure: [Title]
 
@@ -179,7 +179,7 @@ The orchestrator has access to tools for correcting mistakes made by sub-skills 
 
 ## Sub-Skill Status Sidecar
 
-Each sub-skill writes its completion status to `adventure-status.json` in the MCP temp directory (same location as `adventure.md`). The orchestrator reads this before launching the next phase.
+Each sub-skill writes its completion status to `adventure-status.json` in the adventure directory (same location as `adventure.md`). The orchestrator reads this before launching the next phase.
 
 **Format:**
 ```json
@@ -251,7 +251,7 @@ Then ask:
 
 > *"Would you like a copy of the DM guide saved to your reports folder? It's written for running this as a tabletop session — full spoilers, naturally."*
 
-`/adventure-rewards` always writes `dm-guide.md` to the MCP temp directory as part of
+`/adventure-rewards` always writes `dm-guide.md` to the adventure directory as part of
 finishing the module (see its Phase 7c) — this is the file to offer, not the raw
 `adventure.md` build log. If the user says yes and `MCP_FOLDER_USERREPORTS` is set, copy
 `dm-guide.md` to `$MCP_FOLDER_USERREPORTS/<AdventureTitle> - DM Guide.md`, where
@@ -259,7 +259,7 @@ finishing the module (see its Phase 7c) — this is the file to offer, not the r
 `The Bones Beneath - DM Guide.md`).
 
 If `MCP_FOLDER_USERREPORTS` is not set, tell the user the env var isn't configured and
-give them the temp directory path so they can copy it manually.
+give them the adventure directory path so they can copy it manually.
 
 The module's in-toolset description (`Mod_Description`) is already set by this point —
 `/adventure-rewards` Phase 7b does this automatically, with no spoilers. No further

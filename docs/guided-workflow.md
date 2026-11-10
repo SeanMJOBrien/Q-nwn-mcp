@@ -1,8 +1,9 @@
 # Guided workflow — phases, categories and how a session starts
 
-Status: design (2026-11-09). Built today: `set_project_scope`, `phase_check` (with declared skips; the non-pipeline kinds
-`one_feature` and `nwscript_only` skip every phase). Not built: the `focus` field, the intake step, the "existing module audit"
-(§4) as one call, and the "adopt an existing module" step (§5).
+Status (2026-11-09): built, with unit and integration tests; live-tested on The Salt Gate Conspiracy after the MCP restart: `set_project_scope` (with `focus` and the per-focus guide),
+`phase_check` (declared skips and the non-pipeline kinds), `get_adventure_dir`, `adopt_module`, `audit_module`. Still design: cutscenes (TODO #25) and tying the scope record to a test goal (TODO #23).
+
+**Module files.** Everything specific to one LLM-built module lives in `adventures/<Title-With-Dashes>/` (git-ignored; `MCP_FOLDER_ADVENTURES` overrides the base): `adventure.md` (the story), `dm-guide.md`, `adventure-status.json`, `project-scope.json`. e.g. "The Salt Gate Conspiracy" → `adventures/The-Salt-Gate-Conspiracy/`. `get_adventure_dir` returns the path; files an older run left in the temp dir are moved there on first use. The temp dir keeps only the extracted `.mod`.
 
 **Intent (user, 2026-11-09):** the session opens by asking what the user is trying to accomplish; the LLM then drives that goal to
 completion with the tools and skills. For an existing module the order is **adopt, then review the module as built, then the user chooses
@@ -90,7 +91,7 @@ Options, recommended first:
 2. **Use focus only.** Skip the pipeline: `one_feature` with a focus, tools called directly. Works today, no story check.
 3. **Relax `phase_check start`** when the scope says `adopted`. Weakest: the later phases then read sections that don't describe the module.
 
-## 6. Build order
+## 6. Build order (all built 2026-11-09 except the live test with a hand-built module)
 
 For an existing module the user-facing order is: adopt (§5.1) → review as built (§4) → user picks gaps → guided fill. Build order for the tools:
 

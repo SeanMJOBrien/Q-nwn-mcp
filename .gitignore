@@ -39,3 +39,6 @@ adventure-status.json
 
 # swamp CLI audit output — a harness side effect, never source.
 .swamp/
+
+# Per-module story, DM guide and status written by the adventure pipeline (one folder per title).
+adventures/

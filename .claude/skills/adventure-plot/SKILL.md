@@ -11,11 +11,11 @@ Sub-skill of `/create-adventure`. Takes a creative prompt (theme, level range, t
 ## Prerequisites
 
 - The module should already be loaded (created by the `/create-adventure` orchestrator during pre-flight).
-- `adventure.md` already exists in the MCP temp directory with the `# Adventure: [Title]` heading and `## Module` section. This skill appends the `## Plot` section to it.
+- `adventure.md` already exists in the adventure directory (`get_adventure_dir`) with the `# Adventure: [Title]` heading and `## Module` section. This skill appends the `## Plot` section to it.
 
 ## File Location
 
-`adventure.md` is in the **MCP temp directory**: `$MCP_FOLDER_TEMP` (defaults to `$TEMP/nwn-mcp` or `/tmp/nwn-mcp`). Read the existing file first, then rewrite it with the full content (preserving the existing heading and module section).
+`adventure.md` is in the module's **adventure directory**: call `get_adventure_dir` for the path (`adventures/<Title-With-Dashes>/`, git-ignored, holding the story, DM guide and status). Read the existing file first, then rewrite it with the full content (preserving the existing heading and module section).
 
 ## Workflow
 

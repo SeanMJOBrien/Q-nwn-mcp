@@ -12,6 +12,8 @@ import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { requireIndex } from "../module-loader.js";
+import { ADVENTURE_FILES, ensureAdventureDir } from "../util/adventure-dir.js";
+import { defaultFocus, FOCUS, guideFor, type Focus } from "../util/focus.js";
 import type { GffObj } from "../types/gff.js";
 import { getFieldStr } from "../types/gff.js";
 import {
@@ -47,8 +49,8 @@ async function readIfExists(file: string): Promise<string | null> {
   }
 }
 
-async function recordStatus(tempDir: string, phase: Phase, entry: PhaseEntry): Promise<string> {
-  const statusPath = path.join(tempDir, "adventure-status.json");
+async function recordStatus(dir: string, phase: Phase, entry: PhaseEntry): Promise<string> {
+  const statusPath = path.join(dir, ADVENTURE_FILES.status);
   let existing: unknown;
   const raw = await readIfExists(statusPath);
   if (raw) {
@@ -70,14 +72,20 @@ export function registerPhaseTools(server: McpServer): void {
       kind: z.enum(SCOPE_KINDS).optional().describe("whole_adventure | some_phases | one_feature | nwscript_only"),
       scope: z.string().optional().describe("One line, the user's own words: what they asked for"),
       phases: z.string().optional().describe("JSON array of phases to run (some_phases only), e.g. [\"quests\",\"challenges\"]"),
+      focus: z.enum(FOCUS).optional().describe("What help is wanted: creatures | scripting | story | areas_encounters | quests_dialog | debug | items. Returns that focus's guide (skills, first calls, what to ask)."),
     },
     { idempotentHint: true },
-    async ({ kind, scope, phases }) => {
+    async ({ kind, scope, phases, focus }) => {
       const index = requireIndex();
-      const scopePath = path.join(index.tempDir, "project-scope.json");
+      const dir = await ensureAdventureDir(index);
+      const scopePath = path.join(dir, ADVENTURE_FILES.scope);
       if (!kind) {
         const raw = await readIfExists(scopePath);
-        return text(raw ? JSON.parse(raw) : { recorded: false, message: "No scope recorded. Ask the user what they want, then call set_project_scope." });
+        if (raw) {
+          const rec = JSON.parse(raw) as { focus?: Focus };
+          return text({ ...rec, ...(rec.focus ? { guide: guideFor(rec.focus) } : {}), adventureDir: dir });
+        }
+        return text({ recorded: false, adventureDir: dir, message: "No scope recorded. Ask the user what they are trying to accomplish (for an existing module, adopt_module then audit_module first), then call set_project_scope." });
       }
       if (!scope?.trim()) return text({ ok: false, error: "scope is required: one line in the user's words." }, true);
       let run: Phase[] = [];
@@ -99,20 +107,21 @@ export function registerPhaseTools(server: McpServer): void {
       const usesPipeline = kind === "whole_adventure" || kind === "some_phases";
       let wroteAdventure = false;
       if (usesPipeline) {
-        const adventurePath = path.join(index.tempDir, "adventure.md");
+        const adventurePath = path.join(dir, ADVENTURE_FILES.story);
         const md = (await readIfExists(adventurePath)) ?? `# Adventure: ${index.moduleName}\n`;
         await fs.writeFile(adventurePath, setScopeFields(md, scope.trim(), skip));
         wroteAdventure = true;
       } else {
         // Switching away from a pipeline scope: drop the old Scope/Skip lines so phase_check can't follow them.
-        const adventurePath = path.join(index.tempDir, "adventure.md");
+        const adventurePath = path.join(dir, ADVENTURE_FILES.story);
         const md = await readIfExists(adventurePath);
         if (md !== null && clearScopeFields(md) !== md) {
           await fs.writeFile(adventurePath, clearScopeFields(md));
           wroteAdventure = true;
         }
       }
-      const record = { kind, scope: scope.trim(), run: kind === "some_phases" ? run : undefined, skip, usesAdventurePipeline: usesPipeline };
+      const chosenFocus: Focus | undefined = focus ?? defaultFocus(kind);
+      const record = { kind, scope: scope.trim(), run: kind === "some_phases" ? run : undefined, skip, usesAdventurePipeline: usesPipeline, ...(chosenFocus ? { focus: chosenFocus } : {}) };
       await fs.writeFile(scopePath, JSON.stringify(record, null, 2));
       const next =
         kind === "nwscript_only"
@@ -120,7 +129,7 @@ export function registerPhaseTools(server: McpServer): void {
           : kind === "one_feature"
             ? "No adventure.md pipeline: build just that feature with the matching tool (build_quest, build_companion, compose_encounter, create_store_blueprint...) in the existing module."
             : `Run the pipeline; phase_check skips ${skip.length ? skip.join(", ") : "nothing"}.`;
-      return text({ ok: true, ...record, wroteAdventure, next });
+      return text({ ok: true, ...record, wroteAdventure, adventureDir: dir, next, ...(chosenFocus ? { guide: guideFor(chosenFocus) } : {}) });
     },
   );
 
@@ -137,9 +146,10 @@ export function registerPhaseTools(server: McpServer): void {
     { idempotentHint: true },
     async ({ phase, step, warnings, errors, coop }) => {
       const index = requireIndex();
-      const adventurePath = path.join(index.tempDir, "adventure.md");
+      const dir = await ensureAdventureDir(index);
+      const adventurePath = path.join(dir, ADVENTURE_FILES.story);
       // One feature / NWScript only: the adventure pipeline is not in use, so no phase runs.
-      const recordedRaw = await readIfExists(path.join(index.tempDir, "project-scope.json"));
+      const recordedRaw = await readIfExists(path.join(dir, ADVENTURE_FILES.scope));
       let recorded: unknown;
       try {
         recorded = recordedRaw ? JSON.parse(recordedRaw) : undefined;
@@ -159,7 +169,7 @@ export function registerPhaseTools(server: McpServer): void {
       }
       const md = await readIfExists(adventurePath);
       if (md === null) {
-        return text({ ok: false, phase, step, error: `No adventure.md in ${index.tempDir}. Run /adventure-plot first.` }, true);
+        return text({ ok: false, phase, step, error: `No adventure.md in ${dir}. Run /adventure-plot first (new adventure), or adopt_module (existing module).` }, true);
       }
 
       const { scope, skip } = parseScope(md);
@@ -167,7 +177,7 @@ export function registerPhaseTools(server: McpServer): void {
 
       // A phase the user chose to skip: nothing to check or run; record it so the status file shows why.
       if (skip.includes(p)) {
-        if (step === "end") await recordStatus(index.tempDir, p, { status: "skipped", warnings: [], errors: [] });
+        if (step === "end") await recordStatus(dir, p, { status: "skipped", warnings: [], errors: [] });
         return text({ ok: true, phase, step, skipped: true, scope, message: `Phase ${p} is skipped by the declared scope (Skip phases in ## Module). Do nothing and move on.` });
       }
 
@@ -225,7 +235,7 @@ export function registerPhaseTools(server: McpServer): void {
       }
 
       const status = errorList.length === 0 ? "success" : "partial";
-      const statusPath = await recordStatus(index.tempDir, p, { status, warnings: warningList, errors: errorList });
+      const statusPath = await recordStatus(dir, p, { status, warnings: warningList, errors: errorList });
 
       return text(
         {

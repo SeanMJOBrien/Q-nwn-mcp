@@ -2,6 +2,7 @@
  * plan_adventure_shape and verify_story — the planning side of /adventure-plot (docs/adventure-composition.md).
  */
 
+import { adventureFile } from "../util/adventure-dir.js";
 import fs from "fs/promises";
 import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -39,9 +40,9 @@ export function registerAdventurePlanTools(server: McpServer): void {
       const index = requireIndex();
       let md: string;
       try {
-        md = await fs.readFile(path.join(index.tempDir, "adventure.md"), "utf8");
+        md = await fs.readFile(await adventureFile(index, "story"), "utf8");
       } catch {
-        return { content: [{ type: "text", text: `No adventure.md in ${index.tempDir}.` }], isError: true };
+        return { content: [{ type: "text", text: `No adventure.md for this module (see get_adventure_dir).` }], isError: true };
       }
       const graph = parseStoryGraph(md);
       const findings = verifyStory(graph, new Set(index.areas.keys()));

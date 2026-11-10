@@ -12,6 +12,10 @@ assumes the opposite — an existing quest system, possibly with its own
 persistence layer and its own builder conventions, that you need to
 understand correctly before touching it.
 
+## Scope first
+
+If `set_project_scope` (no arguments) says no scope is recorded, ask what the user wants from the quests, then record it with `focus: "quests_dialog"`. `audit_module` shows the quest state at a glance.
+
 ## Adding new quests
 
 Use `quest-params` instead of hand-cloning a `_pqj_*`/`q0NN_*`-style

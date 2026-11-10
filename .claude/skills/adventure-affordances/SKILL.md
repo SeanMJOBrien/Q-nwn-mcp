@@ -10,7 +10,7 @@ Sub-skill of `/create-adventure`. Reads all prior sections of `adventure.md`, th
 
 ## Prerequisites
 
-- `adventure.md` must exist in the MCP temp directory (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp` or `/tmp/nwn-mcp`) and contain completed `## Plot`, `## Areas`, `## Environment`, `## Actors`, `## Quests`, and `## Challenges` sections.
+- `adventure.md` must exist in the adventure directory (`get_adventure_dir`, i.e. `adventures/<Title-With-Dashes>/`) and contain completed `## Plot`, `## Areas`, `## Environment`, `## Actors`, `## Quests`, and `## Challenges` sections.
 - A module must be loaded. If none is loaded, call `load_module` using the module name from `adventure.md`.
 
 ## Workflow

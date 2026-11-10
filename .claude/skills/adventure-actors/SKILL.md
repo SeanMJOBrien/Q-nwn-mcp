@@ -10,7 +10,7 @@ Sub-skill of `/create-adventure`. Reads the plot, areas, and environment section
 
 ## Prerequisites
 
-- `adventure.md` must exist in the MCP temp directory (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp` or `/tmp/nwn-mcp`) and contain completed `## Plot`, `## Areas`, and `## Environment` sections.
+- `adventure.md` must exist in the adventure directory (`get_adventure_dir`, i.e. `adventures/<Title-With-Dashes>/`) and contain completed `## Plot`, `## Areas`, and `## Environment` sections.
 - A module must be loaded. If none is loaded, call `load_module` using the module name from `adventure.md`.
 
 ## Creature forge

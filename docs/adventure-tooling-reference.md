@@ -176,7 +176,9 @@ the same check at the end of `plot` and `polish` (unknown areas are ignored at `
 phase would have written (`parseScope`, `requiredFor` in `src/util/phase-check.ts`). `/create-adventure` asks for the scope first (pre-flight step 0);
 `module-explorer` asks it at the start of a session. One feature or NWScript only: don't use the pipeline.
 
-`set_project_scope(kind, scope, phases?)` records the answer: `kind` is `whole_adventure`, `some_phases` (`phases` = the JSON list to run; the rest become `Skip phases`), `one_feature` or `nwscript_only`. It always writes `project-scope.json` in the temp dir, and for the two pipeline kinds it writes `Scope:`/`Skip phases:` into `## Module` (`setScopeFields`). With no arguments it reads the recorded scope back.
+`set_project_scope(kind, scope, phases?, focus?)` records the answer: `kind` is `whole_adventure`, `some_phases` (`phases` = the JSON list to run; the rest become `Skip phases`), `one_feature` or `nwscript_only`; `focus` (creatures, scripting, story, areas_encounters, quests_dialog, debug, items; `nwscript_only` implies scripting) returns that focus's guide (skills, first calls, what to ask). It writes `project-scope.json` in the module's adventure directory, and for the two pipeline kinds `Scope:`/`Skip phases:` into `## Module` (`setScopeFields`); a non-pipeline kind removes old `Scope:`/`Skip phases:` lines, and `phase_check` then returns `skipped` for every phase. With no arguments it reads the recorded scope (and guide) back.
+
+The adventure directory is `adventures/<Title-With-Dashes>/` (git-ignored; `MCP_FOLDER_ADVENTURES` overrides the base): `get_adventure_dir` returns it and moves over any story file an older run left in the temp dir. For a built but incomplete module: `adopt_module` writes `adventure.md` from the module (sections with no content are left out, so `phase_check start` names them as gaps; unknowns are `(not recorded)`), then `audit_module` returns done/partial/missing per category with the phase and focus that fills it. See `docs/guided-workflow.md`.
 
 ## 14. Spawn on event stages (encounter chains)
 

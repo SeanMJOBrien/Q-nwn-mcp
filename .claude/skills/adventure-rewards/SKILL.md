@@ -10,7 +10,7 @@ Sub-skill of `/create-adventure`. Reads all sections of `adventure.md`, then ass
 
 ## Prerequisites
 
-- `adventure.md` must exist in the MCP temp directory (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp` or `/tmp/nwn-mcp`) and contain completed `## Plot`, `## Areas`, `## Environment`, `## Actors`, `## Quests`, `## Challenges`, `## Affordances`, and `## Polish` sections.
+- `adventure.md` must exist in the adventure directory (`get_adventure_dir`, i.e. `adventures/<Title-With-Dashes>/`) and contain completed `## Plot`, `## Areas`, `## Environment`, `## Actors`, `## Quests`, `## Challenges`, `## Affordances`, and `## Polish` sections.
 - A module must be loaded. If none is loaded, call `load_module` using the module name from `adventure.md`.
 
 ## Workflow
@@ -470,7 +470,7 @@ Append a `## Rewards` section to `adventure.md`:
 ### Delivery
 
 - **Module description set:** [the exact text passed to set_module_description]
-- **DM guide written:** `dm-guide.md` in the MCP temp directory
+- **DM guide written:** `dm-guide.md` in the adventure directory (`get_adventure_dir`)
 ```
 
 ---
@@ -520,9 +520,8 @@ Record the exact text written in the `## Rewards` section's `### Delivery` subse
 Generate a companion document for a human who wants to **run this module as a
 tabletop session** — a real spoilers-included reference a DM reads before and during
 play, distinct from `adventure.md` (which is an internal build log, not meant to be
-read for enjoyment or run from). Write it to `dm-guide.md` in the same MCP temp
-directory as `adventure.md` (`$MCP_FOLDER_TEMP`, defaults to `$TEMP/nwn-mcp`) — a
-sidecar file, never packed into the `.mod`.
+read for enjoyment or run from). Write it to `dm-guide.md` in the same adventure
+directory as `adventure.md` (`get_adventure_dir`) — a sidecar file, never packed into the `.mod`.
 
 **This step has full spoiler access and should use it.** Everything below is written
 assuming the reader is the DM, not a player — unlike every other phase's user-facing
