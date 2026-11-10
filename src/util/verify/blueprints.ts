@@ -274,6 +274,13 @@ export async function verifyCreature(
   const faction = getFieldNum(obj, "FactionID");
   if (faction < 0) {
     report.error("invalid_faction", `FactionID ${faction} is negative`, "FactionID");
+  } else if (faction > 4 && faction < 4294967295) {
+    report.warn(
+      "custom_faction_unreliable",
+      `FactionID ${faction} is a custom faction. Live engine tests show a faction added with create_faction never takes part in reputation lookups (GetReputation, GetIsEnemy), so it will not be hostile or friendly to anyone as its .fac says`,
+      "FactionID",
+      "use a standard faction: 1 Hostile, 2 Commoner, 3 Merchant, 4 Defender (PC 0 only for the player's own side)",
+    );
   }
 
   // ─── Classes ────────────────────────────────────────────────────────────

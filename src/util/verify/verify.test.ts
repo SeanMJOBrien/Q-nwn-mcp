@@ -175,6 +175,15 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).toContain("appearance_race_mismatch");
   });
 
+  it("warns when a creature is in a custom faction, which never takes part in reputation checks", async () => {
+    for (const [id, expected] of [[5, true], [4, false], [1, false]] as const) {
+      const obj = makeCreature("nw_c2_default", { FactionID: { type: "word", value: id } });
+      const report = new Report("t", "utc");
+      await verifyCreature(report, makeIndex(), obj);
+      expect(report.warnings.map((w) => w.code).includes("custom_faction_unreliable"), `faction ${id}`).toBe(expected);
+    }
+  });
+
   it("does not flag a matching Appearance_Type/Race pair", async () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 1 },

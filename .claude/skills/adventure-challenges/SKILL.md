@@ -613,7 +613,7 @@ Pick for **appearance only** — stats, class, feats, spells, and equipment are 
 - **ALL hostile creatures use faction 1 (Hostile).** No exceptions.
 - Always set `faction="1"` in `create_creature_blueprint`.
 - Standard NWN factions: 0=PC, 1=Hostile, 2=Commoner, 3=Merchant, 4=Defender.
-- **No custom factions.** Out of scope for a one-shot module.
+- **No custom factions.** Out of scope for a one-shot module, and a custom faction (`create_faction`) never takes part in live reputation checks (engine limitation, confirmed): its creatures will not behave as hostile or friendly. `verify_creature` warns `custom_faction_unreliable`.
 - Ambient creatures (non-hostile) were placed by `/adventure-actors` with faction 2 — don't touch them.
 
 ---

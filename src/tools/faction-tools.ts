@@ -35,7 +35,9 @@ export function registerFactionTools(server: McpServer): void {
   server.tool(
     "create_faction",
     "Add a new faction to the module's .fac file with bilateral reputation entries (both directions) for all " +
-      "existing factions.",
+      "existing factions. LIMITATION (confirmed on the live engine): a faction added this way never takes part in reputation " +
+      "lookups, so creatures in it will not be hostile or friendly as its .fac data says (GetReputation/GetIsEnemy ignore it). " +
+      "For ordinary friend/foe use the standard factions (1 Hostile, 2 Commoner, 3 Merchant, 4 Defender); verify_creature warns custom_faction_unreliable.",
     {
       name: z.string().describe("Faction display name"),
       parentId: optNumParam("Parent faction ID (default 4294967295 = no parent)"),
@@ -132,7 +134,7 @@ export function registerFactionTools(server: McpServer): void {
     "set_faction_reputation",
     "Modify reputation between two factions, in BOTH directions (NWN's reputation table is directional per " +
       "(FactionID1, FactionID2) pair — setting only one direction leaves the engine reading a friendly 100 default " +
-      "for the other, confirmed live). Creates either entry if it doesn't already exist.",
+      "for the other, confirmed live). Creates either entry if it doesn't already exist. Only the standard factions (0-4) take part in live reputation checks; entries for a custom faction (5+) have no effect in play.",
     {
       faction1: numParam("First faction ID"),
       faction2: numParam("Second faction ID"),
