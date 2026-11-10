@@ -2,6 +2,8 @@
 
 | Question | Read |
 |---|---|
+| How do skill-check puzzles and per-player rewards work in co-op? | [coop-skill-checks-and-rewards.md](coop-skill-checks-and-rewards.md) |
+| What is open, in what order, with what acceptance test? Full history of every numbered TODO? | [todo-archive.md](todo-archive.md) and [work-plan.md](work-plan.md) |
 | Comprehensive two-tier test harness notes? | [testing-history.md](testing-history.md) — moved out of CLAUDE.md |
 | Gear appearance TODO, weapon preferences, equip_npc_by_role, build_npc_stat_block, creation order? | [gear-and-npc-generation-history.md](gear-and-npc-generation-history.md) — moved out of CLAUDE.md |
 | Companion findings, random and special abilities, simple-NPC tier, open TODOs (appearance randomisation, level-up after bake, quickbar)? | [henchmen-and-caster-history.md](henchmen-and-caster-history.md) — moved out of CLAUDE.md |
