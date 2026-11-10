@@ -412,3 +412,6 @@ Three things the checker cannot tell you, which matter when reading its findings
 ## Finish
 
 Call `phase_check(phase: "polish", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.
+
+- **Story consequences (`verify_journal`).** Fix `journal_advance_on_enter` (advance on the discovery, not on walking in), `payoff_item_no_consumer` (the journal names an item that no line takes), `item_consumed_then_needed` (a scene uses an item up that a later scene needs) and `stance_change_group` (convert the whole group, not one creature).
+

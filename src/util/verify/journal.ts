@@ -9,6 +9,7 @@ import type { ModuleIndex } from "../../types/module.js";
 import { flattenDialog } from "../dialog-walker.js";
 import { collectQuestVarAwards } from "../quest-vars.js";
 import { checkScriptRef, listOf, loadScriptSources, type Report } from "./common.js";
+import { findStoryDefects } from "./story-consequences.js";
 
 export async function verifyJournal(report: Report, index: ModuleIndex, doc: GffObj): Promise<void> {
   const categories = listOf(doc, "Categories");
@@ -24,7 +25,9 @@ export async function verifyJournal(report: Report, index: ModuleIndex, doc: Gff
   // mechanism, confirmed via nwscript-docs/AddJournalQuestEntry.md) — a quest
   // advanced only by a native field would otherwise read as "never awarded",
   // same false-positive class already documented for PQJ-wrapped quests.
-  const scriptedAwards = collectScriptedJournalAwards(await loadScriptSources(index));
+  const allSources = await loadScriptSources(index);
+  for (const d of findStoryDefects(index, allSources, doc)) report.warn(d.code, d.message, d.field ?? "Categories", d.fix);
+  const scriptedAwards = collectScriptedJournalAwards(allSources);
   mergeNativeFieldAwards(scriptedAwards, index);
   // The parameter-driven quest system advances through questK = "<stage>_<tag>" variables (build_quest), not script text.
   for (const [tag, byStage] of collectQuestVarAwards(index)) {

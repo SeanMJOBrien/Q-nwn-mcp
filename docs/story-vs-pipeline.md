@@ -40,3 +40,8 @@ the story is, and checking that what was built still says it.
 2. Findings 1, 2, 7 and 8 as `phase_check` / `audit_module` requirements (the story record must say who, why and where).
 3. Finding 6 is done in the tools; its quest-builder half is open (TODO #28).
 4. Findings 9 and 10 as plot-template additions.
+
+## Status (2026-11-10)
+
+Findings 3 (payoff, item used up), 4 (journal timing) and 5 (consequence) are `verify_journal` warnings (`util/verify/story-consequences.ts`, TODO #42-#44). The checks are heuristics: they read script text and dialog parameters. 3b, 7, 8, 9, 10 and the story-record requirements (1, 2) are still open (TODO #45-#50).
+
