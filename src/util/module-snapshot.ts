@@ -198,11 +198,12 @@ export function gatherSnapshot(index: ModuleIndex): ModuleSnapshot {
 
   return {
     dmArea,
+    // The DM area is outside the story: it stays out of the area list, the reachability check and the adopted story.
     title: index.moduleName,
     description: getFieldLocStr(ifo, "Mod_Description"),
     entryArea,
-    areas,
-    unreachableAreas,
+    areas: dmArea ? areas.filter((a) => a.resref !== dmArea.resref) : areas,
+    unreachableAreas: dmArea ? unreachableAreas.filter((r) => r !== dmArea.resref) : unreachableAreas,
     quests,
     dialogCount: index.dialogs.size,
     itemBlueprints,

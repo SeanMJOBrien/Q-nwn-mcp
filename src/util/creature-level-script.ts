@@ -398,7 +398,7 @@ void CL_GearWeapon(object oCreature)
 {
     if (!GetIsObjectValid(oCreature)) return;
     if (CL_WantsWeapon(oCreature))
-        CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 1, CL_GearLeft(oCreature, 35), 0), INVENTORY_SLOT_RIGHTHAND, 0));
+        CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 1, CL_GearLeft(oCreature, 45), 0), INVENTORY_SLOT_RIGHTHAND, 0));
     // The off-hand choice depends on the equipped weapon, so wait for the equip action.
     DelayCommand(1.0, CL_GearOffhand(oCreature));
 }
@@ -412,7 +412,7 @@ void CL_Gear(object oCreature)
     SetLocalInt(oCreature, "MCP_GEAR_TOTAL",
         FloatToInt(IntToFloat(CL_Wealth(nLevel)) * CL_RoleShare(GetLocalString(oCreature, "MCP_GEAR_ROLE")) * fWealth));
     SetLocalInt(oCreature, "MCP_GEAR_SPENT", 0);
-    CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, INVENTORY_SLOT_CHEST, 0, CL_GearLeft(oCreature, 30), 0), INVENTORY_SLOT_CHEST, 0));
+    CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, INVENTORY_SLOT_CHEST, 0, CL_GearLeft(oCreature, 20), 0), INVENTORY_SLOT_CHEST, 0));
     DelayCommand(0.1, CL_GearWeapon(oCreature));
 }
 
