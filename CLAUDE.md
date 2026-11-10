@@ -41,6 +41,7 @@ S1-S9 (skill-prompt reduction) and #1, #4, #6-#11, #13, #14, #17, #18, #24, #27 
 - **#30 area prefabs** (`docs/area-prefabs-spec.md`; text in `docs/area-todos-and-tooling-history.md`) — P6. **#31 reserve flat space for multi-tile features** — P6. **#32 rebuild one area in place** — P5. **#33 per-tileset survey pass** (`docs/survey-areas-notes.md`) — P6. All four: design first.
 - **#34 randomise head/hair/skin colour for PC-race NPCs** (port GvE3's verified ranges; text in `docs/henchmen-and-caster-history.md`) — P5. **#35 randomised gear appearance** (`docs/gear-and-npc-generation-history.md`) — P6. **#36 re-bake a spell pool after a live level-up** — P5; **#37 auto-fill the DM quickbar** (three unknowns, `docs/henchmen-and-caster-history.md`) — P6.
 - **#38 commit the verify server's simplification (`~/nwn-mcp-verify-server`) — P4**, next time it is used. **#39 encounter composer: does "CR 6" mean whole-fight EL or the boss's own CR? — P4**, ask the user. **#40 Hollow Communion open questions (armor AC premise, Elowen's 2nd-level slot) — P5**, `docs/verification-history.md`.
+- **#41 plain-`fs` writers and the project sync — done 2026-11-10 (B7).** Guarded by `src/tools/project-sync-guard.test.ts`: a new raw-fs write to the temp dir must call `util/project-sync` or be listed there with its reason.
 
 ## Design Intent
 
