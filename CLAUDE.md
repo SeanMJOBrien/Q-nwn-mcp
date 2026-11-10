@@ -209,7 +209,7 @@ The rest are open.
     - **Merged 2026-11-09 (fifth time):** the working branch fast-forwarded into `master` and both were pushed: `de41f69` (analyze_walkmesh util,
       create_area default-tile fix), `deb7aca` (S1-S9, adventure composition tools, quest spawn/check runtime, forge and verify fixes, docs) and
       this TODO update. The working branch is 0 ahead of `master`. Only `graphify-out/` remains untracked and is deliberately not committed.
-    - **Committed 2026-11-09, not yet merged or pushed:** `9300a19` (TODOs 7, 11, 14, 17, 18, 19, 20), the spawn-when removal, `03623df` (phase_check scope enforcement, guided-workflow doc, TODOs 23-25), `16fa0a9` (adopt_module, audit_module, get_adventure_dir, focus guide, adventures/ folder), `6e7a91e` (event counts, TODO 26), `f835583` (DM-area audit row, Phase 7d, TODO 27), `3709447` (DM area template), `7332cde` (S8) and this commit, on `systest-live-run-and-generalized-spec`, 13 ahead of `origin/master` (`edb8015`, unchanged since the last push). No other branch exists locally or on origin (checked 2026-11-09 after `git fetch --prune`).
+    - **Merged 2026-11-09 (sixth time):** the working branch fast-forwarded into `master` and both were pushed (`master` = `f0fa838`): adopt/audit/focus, the adventures/ folder, scope enforcement, S8, the DM area template, TODOs 26-28 and the Salt Gate fixes. The working branch is 0 ahead of `master`.
     - **Deleted 2026-11-07** (local and `origin/`, all fully merged): `area-design-survey-and-verification`,
       `companion-spell-timing-fix`, `comprehensive-system-test`, `encounter-difficulty-checker`, `live-verify-automation`,
       `loot-intentional-checker`, `random-caster-abilities`, `runtime-verification-system`, `salt-gate-verification-fixes`,
