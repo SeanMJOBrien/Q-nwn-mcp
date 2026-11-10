@@ -55,7 +55,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | G1 | Follow-ups for `story-vs-pipeline.md`; adopt fill step | todo | |
 | G2 | Release: CHANGELOG, version | todo | |
 | B7 | Review plain-`fs` writers: route them through the project sync (TODO #41) | todo | user-requested 2026-11-10; after B5 |
-| M1-M4 | Salt Gate module track (see below) | todo | needs an MCP restart first |
+| M1-M4 | Salt Gate module track (see below) | in progress | M1, M3, M4 done; M2 done except Oswin (needs the D1 `build_quest` after an MCP restart: rebuild with the Spec stored in adventure.md). Done: dlg_yorrin, gorrukh, dessa, three companion dialogs (ends marked), dlg_brynna (direct JSON edit + reload, new `c_qsalt_new`); `dm-guide.md` and DM books written (derived from module content, gaps marked); `inc_cre_level` regenerated identical to the hand patch (header removed); leftover blueprints and dialogs removed; `verify_all` shippable, 0 errors. Not done: play-test, `audit_module`, run_live_verification, hand-written Salt Gate scripts still on `GetPCSpeaker` |
 | H | Content features (#21/#24, #25, #26) | not planned in detail | design first, one at a time |
 
 ## Decisions needed from the user

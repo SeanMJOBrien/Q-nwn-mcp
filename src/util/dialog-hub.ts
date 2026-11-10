@@ -136,6 +136,8 @@ export function addReturnLinks(doc: GffObj, options: ReturnLinkOptions = {}): Re
       const entry = entries[e];
       if (getFieldList(entry, "RepliesList").length > 0) continue;
       if (getFieldStr(entry, "Comment") === END_MARK || forcedEnd.has(e)) {
+        // Record the intent in the dialog so verify_dialog (and the next run) know this answer ends the talk on purpose.
+        if (getFieldStr(entry, "Comment") !== END_MARK && !only) (entry as Record<string, unknown>).Comment = { type: "cexostring", value: END_MARK };
         result.terminal.push(e);
         continue;
       }

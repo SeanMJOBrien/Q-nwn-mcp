@@ -95,5 +95,12 @@ describe("addReturnLinks", () => {
     const pity = entries.findIndex((e) => getFieldLocStr(e, "Text") === "Pity.");
     expect(getFieldList(entries[pity], "RepliesList").map((l) => getFieldNum(l, "Index"))).not.toContain(reenterIdx);
   });
-});
 
+  it("records a forced end in the dialog so it is not reported again", () => {
+    const d = doc();
+    addReturnLinks(d, { endEntries: [1] });
+    const entries = getFieldList(d, "EntryList");
+    expect(getFieldStr(entries[1], "Comment")).toBe("end");
+    expect(dialogShape(d).deadEnds).toEqual([]);
+  });
+});
