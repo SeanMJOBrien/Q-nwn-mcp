@@ -29,11 +29,11 @@ S1-S9 (skill-prompt reduction) and #1, #4, #6-#11, #13, #14, #17, #18, #24, #27 
 - **#5 inline-only capability gaps — P4.** Acceptance: each gap named in the tool description or skill of the tool it limits.
 - **#12 tileset rules beyond flat tiles — P4.** Acceptance: `paint_tiles`/`paint_group`/solver place height-transition tiles; oracle still passes.
 - **#16 port the quest fixes to the TFN content studio — P4** (`~/git/Q-tfn-content-studio`, studio rules apply). Plan: `docs/tfn-quest-findings.md`. Acceptance: studio tests green with the listed fixes and generator additions.
-- **#19 generic check: live test with a real player — P2** (work-plan C). Acceptance: a recorded run where a PC (or the C1 stand-in) passes and fails a `q_check`.
+- **#19 generic check: live test — P2.** Quest and companion scripts are now simulation-checked (`docs/player-simulation.md`); still open: one simulation step per `q_check`/`q_roll` with a stand-in that has the skill.
 - **#20 guided workflow: live run on a hand-built module — P2** (M1-M2). Acceptance: `adopt_module` + `audit_module` run on Salt Gate with the MCP restarted.
 - **#21 adventure composition, open parts — P5.** Outcome-dependent chains, `verify_encounter_chain`, rival-party shape, tone/theme check, recurring-NPC checks, import format for the user's own material (`docs/adventure-composition.md`).
 - **#22 stale generated scripts, remaining generators — P3** (E4). Acceptance: `generated_script_stale` covers the quest runtime, `inc_random_abil`, `inc_spec_ability`, `inc_reward`, `inc_spec_check`, `inc_spec_assert`.
-- **#23 state the goal of every test run — P2** (C3). Acceptance: `run_live_verification` takes `goal`, prints it with pass criteria, warns when absent.
+- **#23 state the goal of every test run — mostly done** (C3): `run_live_verification` takes `goal`, warns when absent, gives a `verdict` with `simulate`. Open: other test runs (systest skill, tests) still do not carry a goal.
 - **#25 cutscenes advancing per dialog choice — P6.** Design first; acceptance: design doc, then a spec shape and one verified example.
 - **#26 horse scripts — P6.** Design first (`ActionMountObject`, mount feats, indoor restrictions), generator in the style of `create_companion_system`, `verify_*`, skill.
 - **#28 dialogs return to the main dialog — P1** (D1-D3, M2). Open: `build_quest` merged lines, `add_dialog_node`, state-dependent main lines, Salt Gate dialogs. Acceptance: `verify_dialog` has no `dialog_branch_ends` on any generated dialog.

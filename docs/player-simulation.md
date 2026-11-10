@@ -42,3 +42,22 @@ Measured on the real engine with a throwaway module (one commoner giver, `build_
 - The module's own `.mod` and project were not touched: the driver exists only in the throwaway build.
 
 Limits: a module built before `inc_sim` needs `create_quest_system` / `create_companion_system` re-run. `inc_reward` still loops on real PCs only. Dialog flow (condition gating on the dialog engine, node order) is not exercised; steps call the scripts a node would call.
+
+## C3: what is checked how (2026-11-10)
+
+Runs: a throwaway two-stage quest module (above) and The Salt Gate Conspiracy (project loaded with `load_module`, `create_quest_system` and `create_companion_system` re-run so the scripts carry `inc_sim`). Salt Gate run: 13 of 13 steps passed, no engine errors.
+
+| Feature | Status |
+|---|---|
+| Quest accept, advance, eligibility conditions (`q_chk`, `q_act` talk stages) | checked by simulation (both modules; Oswin's "A Merchant's Worry": offer eligible, accepted, stage 1, hand-in not yet eligible) |
+| Quest hand-in with gold reward | checked by simulation (throwaway module: stage 2, 50 gold) |
+| Companion recruit, `c_hen_free` / `c_hen_mine`, party of 3, dismiss (`a_hen_join`, `a_hen_leave`) | checked by simulation (Rurik, Wren, Fenn) |
+| Companion levelling and gear at spawn (`inc_cre_level`) | checked live by the existing `[SPEC_OK]` lines (this run: Rurik, Wren, Fenn level 10, gear, Wren's cleric slots and domains) |
+| Skill checks (`q_roll`, `q_check`, `add_skill_check`) | not checked yet; steps can call them, none written. Next: one step per check with a stand-in that has the skill |
+| Explore, trigger, use, kill stages | not checkable with the driver: they depend on `GetEnteringObject`, `GetLastUsedBy`, `GetLastKiller` events |
+| Escort, spawn-on-accept, hostile flip, give/take items (`q_act` options) | possible with steps (`expectItem`), not run |
+| Dialog flow: node order, which root is shown, return-to-hub | not checkable: needs the dialog engine and a real conversation; `verify_dialog` covers the static shape |
+| Rewards (`inc_reward`) | not checkable: loops on real PCs only |
+| Hand-written Salt Gate scripts (`a_qsalt_*`, `c_qret_*`) | not run: they call `GetPCSpeaker()` directly |
+
+Test goals (TODO #23): `run_live_verification` takes `goal`. Without it the result carries a warning; with `simulate` the result carries a `verdict` (every step passed, `[SIM_DONE]` seen, no engine error). Takes effect after the next MCP restart.
