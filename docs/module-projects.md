@@ -1,6 +1,6 @@
 # Modules as projects (TODO #29, work-plan B1)
 
-Status: design. **Decisions D1-D3 below are the recommended answers and are provisional until the user confirms them.** No code is written for this yet (B2-B6).
+Status: design. **Decisions D1-D3 below were approved by the user on 2026-11-10.** No code is written for this yet (B2-B6).
 
 ## Problem
 
@@ -24,7 +24,7 @@ adventures/<Title-With-Dashes>/
     are/<resref>.are.json   git/<resref>.git.json   gic/<resref>.gic.json
     utc/ uti/ utp/ utd/ utt/ utw/ uts/ ute/ utm/    blueprints, one JSON file each
     dlg/ jrl/ fac/ ifo/                              dialogs, journal, factions, module info
-    nss/<resref>.nss                                 scripts (the .ncs are build output, not stored)
+    nss/<resref>.nss   ncs/<resref>.ncs              scripts and their compiled form (kept so the project packs without a compiler)
 ```
 
 Each GFF resource is the `nwn_gff` JSON form (`-k json -p`, pretty, stable key order) so diffs show which field changed. Non-GFF resources (2DA, TLK, models) are stored as-is under `src/other/`.
