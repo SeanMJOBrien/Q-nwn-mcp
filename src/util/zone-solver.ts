@@ -30,6 +30,7 @@
  * was designed for) over rotated alternatives with matching corners.
  */
 
+import { random } from "./rng.js";
 import type { TilesetInfo, TileCorners, TileCrossers } from "./tileset.js";
 import type { TilePlacement } from "./tile-solver.js";
 import { getRotatedCorners, getRotatedCrossers } from "./tileset.js";
@@ -348,7 +349,7 @@ export function findTileByCorners(
   });
   if (natural.length > 0) pool = natural;
 
-  const roll = seedKey !== undefined ? seededRandom(hashSeed(seedKey)) : Math.random();
+  const roll = seedKey !== undefined ? seededRandom(hashSeed(seedKey)) : random();
   return pool[Math.floor(roll * pool.length)];
 }
 

@@ -13,6 +13,7 @@
  * Supports: dungeon, cave, dwelling, forest, rural, city, plains, desert, castle, tundra
  */
 
+import { freshSeed, random, withSeed } from "./rng.js";
 import type { TilesetInfo } from "./tileset.js";
 import { getTileDoorWorldPositions, rotatedGroupDimensions, rotateGroupTileIndex, getGroupEntrances } from "./tileset.js";
 import type { TerrainZone, CrosserPath } from "./zone-solver.js";
@@ -24,6 +25,8 @@ export interface LayoutStyle {
   type: "dungeon" | "cave" | "dwelling"
       | "forest" | "rural" | "city" | "plains" | "desert" | "castle" | "tundra";
   rooms?: number;          // number of rooms/clearings (default 3)
+  /** Seed for the layout's randomness: the same seed, tileset, size and style give the same layout (default: a fresh seed, returned in the result). */
+  seed?: number | string;
   clearings?: number;      // alias for rooms (backward compat)
   corridorStyle?: "straight" | "zigzag";
   preferredFeatures?: string[];  // group names to prefer (e.g., ["Farm 1 2x2", "Barn 1 2x2"])
@@ -95,6 +98,8 @@ export interface LayoutResult {
   transitionPoints: TransitionPoint[];
   suggestedFeatures: SuggestedFeature[];
   layoutDescription: string;
+  /** The seed that produced this layout; pass it as style.seed to repeat it. */
+  seed: number | string;
 }
 
 interface Room {
@@ -223,14 +228,14 @@ const STYLE_PRESETS: Record<string, StyleConfig> = {
 
 // ─── Main entry point ────────────────────────────────────────────────────────
 
-export function generateLayout(
+function generateLayoutUnseeded(
   tileset: TilesetInfo,
   width: number,
   height: number,
   style: LayoutStyle,
   transitionCount?: number,
   transitionDirections?: string[],
-): LayoutResult {
+): Omit<LayoutResult, "seed"> {
   const validPairs = computeValidPairs(tileset);
   const basePreset = STYLE_PRESETS[style.type] ?? STYLE_PRESETS.dungeon;
   // safeMode: zero out every knob that introduces a non-uniform corner
@@ -308,15 +313,15 @@ export function generateLayout(
       const obsTerrain = findTerrainByName(tileset, [kw]);
       if (!obsTerrain || obsTerrain === adjTarget || !canAdjoin(obsTerrain, adjTarget, validPairs)) continue;
       for (const room of rooms) {
-        if (Math.random() >= config.obstacleChance) continue;
+        if (random() >= config.obstacleChance) continue;
         const innerW = room.w - 2, innerH = room.h - 2;
         if (innerW < 1 || innerH < 1) continue;
         const [minObs, maxObs] = config.obstacleSize;
-        const obsW = Math.min(innerW, minObs + Math.floor(Math.random() * (maxObs - minObs + 1)));
-        const obsH = Math.min(innerH, minObs + Math.floor(Math.random() * (maxObs - minObs + 1)));
+        const obsW = Math.min(innerW, minObs + Math.floor(random() * (maxObs - minObs + 1)));
+        const obsH = Math.min(innerH, minObs + Math.floor(random() * (maxObs - minObs + 1)));
         const slackX = innerW - obsW, slackY = innerH - obsH;
-        const ox = room.x + 1 + (slackX > 0 ? Math.floor(Math.random() * (slackX + 1)) : 0);
-        const oy = room.y + 1 + (slackY > 0 ? Math.floor(Math.random() * (slackY + 1)) : 0);
+        const ox = room.x + 1 + (slackX > 0 ? Math.floor(random() * (slackX + 1)) : 0);
+        const oy = room.y + 1 + (slackY > 0 ? Math.floor(random() * (slackY + 1)) : 0);
         const tiles: Array<{ x: number; y: number }> = [];
         for (let x = ox; x < ox + obsW; x++) {
           for (let y = oy; y < oy + obsH; y++) {
@@ -463,7 +468,7 @@ export function generateLayout(
   // ── 8. Secondary crosser (stream/river) — interior only ──────────────────
   // Exterior styles use terrain corridors, so crossers would cut into wall
   // terrain and cause invalid tiles. Only interior styles get secondary crossers.
-  if (!isExterior && config.secondaryCrosserKeywords.length > 0 && Math.random() < config.secondaryCrosserChance) {
+  if (!isExterior && config.secondaryCrosserKeywords.length > 0 && random() < config.secondaryCrosserChance) {
     const streamCrosser = findCrosserType(tileset, config.secondaryCrosserKeywords);
     if (streamCrosser && streamCrosser !== crosserType && rooms.length >= 2) {
       const roadTiles = new Set<string>();
@@ -551,17 +556,17 @@ function bspPartition(x: number, y: number, w: number, h: number,
   if (targetRooms <= 1 || (!canSplitH && !canSplitW)) {
     const [minM, maxM] = config.marginRange;
     // Always enforce minimum margin of 2 for room separation — never collapse to 1
-    const margin = Math.max(2, minM + Math.floor(Math.random() * (maxM - minM + 1)));
+    const margin = Math.max(2, minM + Math.floor(random() * (maxM - minM + 1)));
     const availW = Math.max(3, w - margin * 2);
     const availH = Math.max(3, h - margin * 2);
     const sizeFrac = config.roomSizeRange[0] +
-      Math.random() * (config.roomSizeRange[1] - config.roomSizeRange[0]);
+      random() * (config.roomSizeRange[1] - config.roomSizeRange[0]);
     const roomW = Math.max(3, Math.min(availW, Math.round(availW * sizeFrac)));
     const roomH = Math.max(3, Math.min(availH, Math.round(availH * sizeFrac)));
     const slackW = Math.max(0, availW - roomW);
     const slackH = Math.max(0, availH - roomH);
-    const offsetX = slackW > 0 ? Math.floor(Math.random() * (slackW + 1)) : 0;
-    const offsetY = slackH > 0 ? Math.floor(Math.random() * (slackH + 1)) : 0;
+    const offsetX = slackW > 0 ? Math.floor(random() * (slackW + 1)) : 0;
+    const offsetY = slackH > 0 ? Math.floor(random() * (slackH + 1)) : 0;
     const rx = x + Math.min(margin + offsetX, Math.max(0, w - roomW));
     const ry = y + Math.min(margin + offsetY, Math.max(0, h - roomH));
     return [{ x: rx, y: ry, w: Math.min(roomW, w - (rx - x)), h: Math.min(roomH, h - (ry - y)), name: "" }];
@@ -573,7 +578,7 @@ function bspPartition(x: number, y: number, w: number, h: number,
   if (splitHorizontal) {
     const mid = Math.floor(h / 2);
     const vr = Math.floor(h * config.splitVariance);
-    const offset = vr > 0 ? Math.floor(Math.random() * (vr * 2 + 1)) - vr : 0;
+    const offset = vr > 0 ? Math.floor(random() * (vr * 2 + 1)) - vr : 0;
     const splitAt = Math.max(minLeaf, Math.min(h - minLeaf, mid + offset));
     const topRooms = Math.ceil(targetRooms / 2);
     const bottomRooms = targetRooms - topRooms;
@@ -582,7 +587,7 @@ function bspPartition(x: number, y: number, w: number, h: number,
   } else {
     const mid = Math.floor(w / 2);
     const vr = Math.floor(w * config.splitVariance);
-    const offset = vr > 0 ? Math.floor(Math.random() * (vr * 2 + 1)) - vr : 0;
+    const offset = vr > 0 ? Math.floor(random() * (vr * 2 + 1)) - vr : 0;
     const splitAt = Math.max(minLeaf, Math.min(w - minLeaf, mid + offset));
     const leftRooms = Math.ceil(targetRooms / 2);
     const rightRooms = targetRooms - leftRooms;
@@ -620,7 +625,7 @@ function attemptLShapeMerge(rooms: Room[], config: StyleConfig): Room[][] {
   const used = new Set<number>();
   for (let i = 0; i < rooms.length - 1; i++) {
     if (used.has(i)) continue;
-    if (Math.random() < config.nonRectChance && !used.has(i + 1) && areAdjacentRooms(rooms[i], rooms[i + 1])) {
+    if (random() < config.nonRectChance && !used.has(i + 1) && areAdjacentRooms(rooms[i], rooms[i + 1])) {
       groups.push([rooms[i], rooms[i + 1]]);
       used.add(i);
       used.add(i + 1);
@@ -668,8 +673,8 @@ function computeCorridorPath(
     const x1 = Math.max(a.x, b.x);
     const xMin = Math.min(x0, x1), xMax = Math.max(x0, x1);
     const wallStartX = xMin + 1, wallEndX = xMax - 1, wallSpanX = wallEndX - wallStartX + 1;
-    if (corridorStyle !== "zigzag" && wallSpanX >= 3 && Math.random() < sCurveChance) {
-      const offsetDir = Math.random() < 0.5 ? 1 : -1;
+    if (corridorStyle !== "zigzag" && wallSpanX >= 3 && random() < sCurveChance) {
+      const offsetDir = random() < 0.5 ? 1 : -1;
       const bendStart = wallStartX + Math.max(1, Math.floor(wallSpanX / 3));
       const bendEnd = wallStartX + Math.min(wallSpanX - 1, Math.floor(2 * wallSpanX / 3));
       if (bendStart < bendEnd) {
@@ -690,8 +695,8 @@ function computeCorridorPath(
     const y0 = Math.min(aTop, bTop), y1 = Math.max(a.y, b.y);
     const yMin = Math.min(y0, y1), yMax = Math.max(y0, y1);
     const wallStartY = yMin + 1, wallEndY = yMax - 1, wallSpanY = wallEndY - wallStartY + 1;
-    if (corridorStyle !== "zigzag" && wallSpanY >= 3 && Math.random() < sCurveChance) {
-      const offsetDir = Math.random() < 0.5 ? 1 : -1;
+    if (corridorStyle !== "zigzag" && wallSpanY >= 3 && random() < sCurveChance) {
+      const offsetDir = random() < 0.5 ? 1 : -1;
       const bendStart = wallStartY + Math.max(1, Math.floor(wallSpanY / 3));
       const bendEnd = wallStartY + Math.min(wallSpanY - 1, Math.floor(2 * wallSpanY / 3));
       if (bendStart < bendEnd) {
@@ -869,7 +874,7 @@ function connectRoomsWinding(a: Room, b: Room, crosserType: string, curvature: n
     const startX = Math.min(aCx, bCx), endX = Math.max(aCx, bCx);
     const y = aCx < bCx ? aCy : bCy;
     const span = endX - startX + 1;
-    const offsetDir = Math.random() < 0.5 ? curvature : -curvature;
+    const offsetDir = random() < 0.5 ? curvature : -curvature;
     const bendStart = startX + Math.max(1, Math.floor(span / 3));
     const bendEnd = startX + Math.min(span - 2, Math.floor(2 * span / 3));
     for (let x = startX; x <= endX; x++) {
@@ -890,7 +895,7 @@ function connectRoomsWinding(a: Room, b: Room, crosserType: string, curvature: n
     const startY = Math.min(aCy, bCy), endY = Math.max(aCy, bCy);
     const x = aCy < bCy ? aCx : bCx;
     const span = endY - startY + 1;
-    const offsetDir = Math.random() < 0.5 ? curvature : -curvature;
+    const offsetDir = random() < 0.5 ? curvature : -curvature;
     const bendStart = startY + Math.max(1, Math.floor(span / 3));
     const bendEnd = startY + Math.min(span - 2, Math.floor(2 * span / 3));
     for (let y = startY; y <= endY; y++) {
@@ -1043,8 +1048,8 @@ function packFeatures(
       for (let attempt = 0; attempt < 20 && !bestMatch; attempt++) {
         const maxFx = room.x + room.w - group.columns;
         const maxFy = room.y + room.h - group.rows;
-        const fx0 = room.x + Math.floor(Math.random() * (maxFx - room.x + 1));
-        const fy0 = room.y + Math.floor(Math.random() * (maxFy - room.y + 1));
+        const fx0 = room.x + Math.floor(random() * (maxFx - room.x + 1));
+        const fy0 = room.y + Math.floor(random() * (maxFy - room.y + 1));
 
         for (const rotation of candidateRotations) {
           const { columns: pc, rows: pr } = rotatedGroupDimensions(group.columns, group.rows, rotation);
@@ -1526,4 +1531,18 @@ function findCrosserType(tileset: TilesetInfo, keywords: string[]): string | nul
 
 function canAdjoin(terrainA: string, terrainB: string, validPairs: Set<string>): boolean {
   return terrainA === terrainB || validPairs.has(`${terrainA}|${terrainB}`);
+}
+
+/** Generates a layout; seeded by style.seed, or by a fresh seed that is returned so the layout can be repeated. */
+export function generateLayout(
+  tileset: TilesetInfo,
+  width: number,
+  height: number,
+  style: LayoutStyle,
+  transitionCount?: number,
+  transitionDirections?: string[],
+): LayoutResult {
+  const seed = style.seed ?? freshSeed();
+  const result = withSeed(seed, () => generateLayoutUnseeded(tileset, width, height, style, transitionCount, transitionDirections));
+  return { ...result, seed };
 }

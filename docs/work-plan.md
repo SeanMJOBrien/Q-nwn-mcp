@@ -48,7 +48,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | E4 | Stale-script registry: remaining generators | done | quest runtime (all scripts), inc_sim, inc_random_abil (cast chance read back), inc_spec_ability, inc_spec_check, inc_spec_assert added; `inc_reward` left out (class-item tiers are baked in and cannot be read back); hand-edited files skipped. Older modules will now report stale quest scripts until `create_quest_system` is re-run (inc_sim); MCP restart needed |
 | E5 | `create_faction` limitation surfaced | done | tool descriptions (create_faction, set_faction_reputation), `verify_creature` warning `custom_faction_unreliable`, adventure-challenges skill; MCP restart needed |
 | E6 | Uniform `isError` | done | `util/tool-result.ts` `errorResult`; 101 single-line failure returns in 21 tool files now set `isError`; `is-error-guard.test.ts` fails on a new one. Not covered: failures returned across several lines or as `{ success: false }` JSON (the guard looks only at one-line text returns); MCP restart needed |
-| E7 | Seeded generation | in progress | measuring Math.random |
+| E7 | Seeded generation | done | `util/rng.ts` (`random`, `withSeed`, `freshSeed`); layout generator uses it (23 calls), `style.seed` on `adventure_generate_layout`, result carries `seed`; zone solver and the encounter-composer resref suffix use it; `rng.test.ts` fails on any other `Math.random(`. The forge had no `Math.random` to replace. MCP restart needed |
 | F1 | Creature and caster tools: decision table | todo | needs decision D4 |
 | F2 | Deprecation notes; `build_key_npc` | todo | |
 | F3 | Small missing tools | todo | |

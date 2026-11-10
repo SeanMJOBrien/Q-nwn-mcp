@@ -199,3 +199,18 @@ describe("generateLayout with avenue: true", () => {
     }
   });
 });
+
+describe("generateLayout seed", () => {
+  it("the same seed gives the same layout; the result records the seed; no seed gives a recorded fresh one", () => {
+    const tileset = makeRuralTileset();
+    const style: LayoutStyle = { type: "rural", rooms: 3, seed: 12345 };
+    const a = generateLayout(tileset, 18, 18, style);
+    const b = generateLayout(tileset, 18, 18, style);
+    expect(JSON.stringify({ ...a, layoutDescription: "" })).toEqual(JSON.stringify({ ...b, layoutDescription: "" }));
+    expect(a.seed).toBe(12345);
+    const free = generateLayout(tileset, 18, 18, { type: "rural", rooms: 3 });
+    expect(typeof free.seed).toBe("number");
+    const again = generateLayout(tileset, 18, 18, { type: "rural", rooms: 3, seed: free.seed });
+    expect(JSON.stringify(again.zones)).toEqual(JSON.stringify(free.zones));
+  });
+});

@@ -36,6 +36,7 @@
  *   party-size adjustment formula is applied.
  */
 
+import { random } from "../util/rng.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
@@ -57,7 +58,7 @@ import { Report } from "../util/verify/common.js";
 
 /** Keep resref within NWN's 16-char limit — see this project's own documented bug class for what happens when a generator doesn't. */
 function shortResref(role: string): string {
-  const suffix = Math.random().toString(36).slice(2, 8);
+  const suffix = random().toString(36).slice(2, 8);
   return `ce_${role.slice(0, 3)}_${suffix}`.slice(0, 16);
 }
 

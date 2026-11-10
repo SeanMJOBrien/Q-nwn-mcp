@@ -400,3 +400,5 @@ The solver prioritizes preserving crossers over exact corner matching. At a Pit/
 ## Finish
 
 Call `phase_check(phase: "areas", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.
+
+A layout is repeatable: `adventure_generate_layout` returns the `seed` it used; pass it back as `style.seed` to get the same layout again (useful when one room is wrong and the rest is right).
