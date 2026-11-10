@@ -23,6 +23,7 @@
 | Can a module be run to verify behaviour the static `verify_*` tools cannot see? | [runtime-verification-spec.md](runtime-verification-spec.md) |
 | What is the full test plan and its test cases? | [TEST_PLAN.md](TEST_PLAN.md) |
 | Which module exercises companions and the verification gate end to end? | [siege-module-spec.md](siege-module-spec.md) |
+| What is planned next, in what order, and where does a new session resume? | [work-plan.md](work-plan.md) |
 | What did the most complex real `/create-adventure` build teach us? | [six-fold-trial-build-notes.md](six-fold-trial-build-notes.md) |
 | Can the TFN random-NPC / adventurer system be reused here? | [tfndev-random-npc-system-findings.md](tfndev-random-npc-system-findings.md) |
 | What do real hand-built modules contain (actors, areas, balance, dialogs, encounters, items, placeables, scripts, stores)? | [tfn-corpus-survey/](tfn-corpus-survey/) — start with `PROGRESS.md` |

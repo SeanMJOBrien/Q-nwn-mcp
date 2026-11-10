@@ -15,6 +15,7 @@ MCP (Model Context Protocol) server for Neverwinter Nights Enhanced Edition modu
 - **Do NOT auto-export HTML reports** after creating or painting areas. Only export reports when the user explicitly asks for one.
 - **Always repack after creating/painting test areas** so the user can see them in the toolset. Mention that you repacked.
 - **MCP server restart required after code changes.** After editing TypeScript source and running `npm run build`, the MCP server must be restarted for new/changed tools to become available. Ask the user to restart before attempting to use newly added tools.
+- **Work plan:** `docs/work-plan.md` lists every issue from the 2026-11-09 evaluation as small packages with a Status table. A new session reads its "How to resume" section first, does the next package, and ends with its checkpoint.
 - **Reference docs:** `docs/README.md` maps each question to a document; `docs/adventure-tooling-reference.md` explains `phase_check`, `suggest_area_size`, `place_tile_doors`, `build_companion`, `q_check`/`add_skill_check`, quest `spawn` and `skill-lint`, and the recipe for reworking an existing module. Keep it current when those tools change.
 - **Keep skills in sync with tools.** When adding, renaming, or changing tool parameters/behavior, immediately update the `.claude/skills/` SKILL.md files that reference those tools. The LLM follows skill instructions, not tool schemas — if a skill doesn't mention a parameter, the LLM won't use it.
 
@@ -217,6 +218,7 @@ The rest are open.
       `spatial-conventions-and-variable-tools`, `weapon-preference-variety`, `moonglow-run-plugin` (its unique commit had
       been cherry-picked; every moonglow file in `master` was checked identical before deleting), and `area-avenue-rotation`
       (fully merged via the working branch).
+    - **Not pushed (2026-11-09):** `master` on origin is `657f83b`; the working branch is 5 commits ahead (`1e340ea` dialog rule, `f4d0a8f` `create_dm_area`, `4914238` TODOs 22 and 24, `8f36b5d` module-project rule, and the work plan `docs/work-plan.md`). Push when the user asks.
     - **Uncommitted work in the working tree:** only `graphify-out/` (untracked, not for commit).
 
 16. **PARTLY DONE 2026-11-09 — the bug list is verified against TFN's source and the port is planned; no studio code is changed yet (`docs/tfn-quest-findings.md`; the same plan is appended to the studio's `PROGRESS.md`). One correction below: only the two `i = 1` slot loops stop at 19; the `j = 0` loop covers 20.** Original request (user-raised, 2026-11-08) — copy the quest-system fixes and additions into `~/git/Q-tfn-content-studio`.** This
