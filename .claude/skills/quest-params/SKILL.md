@@ -149,7 +149,7 @@ struct-list case originally flagged.
    init (or set the scalar `VarTable` entries directly if they already
    exist on that blueprint) and point the instance's event field at the
    shared `PQJ_TrigSet`/`PQJ_DeathSet`/`PQJ_ItemSet`.
-5. `repack_module`.
+5. Edits are saved to the module project; build the `.mod` only when the user asks.
 6. **Verify like `quest-explorer` teaches**: don't trust `verify_journal`/
    `verify_quest_completability` blindly on a module that also has legacy
    `AddPersistentJournalQuestEntry`-wrapped content elsewhere — but a

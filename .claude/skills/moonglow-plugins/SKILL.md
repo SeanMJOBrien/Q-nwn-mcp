@@ -13,7 +13,7 @@ Setup: `MOONGLOW_BIN` = the `mg` executable (default `mg` on PATH), `MOONGLOW_PL
 1. `load_module`, then `moonglow_list_plugins` — note the command ids.
 2. `moonglow_run_plugin` **without** `dryRun` first. It reports the resources it would edit and logs warnings (for example "height guessed"). Nothing changes.
 3. Read the result, then run again with `dryRun:false`. All edits apply together or not at all.
-4. `repack_module`. After a real run GFF content is refreshed (`get_resource` sees it) but `list_creatures`, `get_area_*` and other summaries are stale until `repack_module` then `load_module` with `force:true`.
+4. Edits are saved to the project. After a real run GFF content is refreshed (`get_resource` sees it) but `list_creatures`, `get_area_*` and other summaries are stale until `load_module` on the project directory with `force:true`.
 
 ## Answering the plugin's menus
 

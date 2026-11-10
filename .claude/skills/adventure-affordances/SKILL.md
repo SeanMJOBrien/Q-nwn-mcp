@@ -533,7 +533,7 @@ This data is used by downstream skill:
 
 ### Phase 14: Repack
 
-Call `repack_module()` to save all changes.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 
@@ -595,7 +595,7 @@ Use base game item costs. If a store's total affordable inventory exceeds starti
 - **Browse wares on all greetings.** If `/adventure-quests` added multiple condition-gated root entries to the NPC's dialog, add the "browse wares" reply to each greeting entry so it's always accessible.
 - **Module script conflicts.** Always check `get_module_info` for an existing `Mod_OnClientEntr` script before writing a new one. Extend, don't replace.
 - **Gold is generous, not excessive.** The player should be able to buy core gear (weapon + armor + potions) but not everything in the store. This creates meaningful choices.
-- **Repack after all changes.** Call `repack_module` at the end so the user can see changes in the toolset.
+- **Do not build the .mod.** Edits are saved to the module project as they happen; call `repack_module` only when the user asks for the `.mod` (`/create-adventure` offers it at the end).
 
 ## Finish
 

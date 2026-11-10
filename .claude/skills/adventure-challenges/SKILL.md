@@ -448,7 +448,7 @@ This data is used by downstream skills:
 
 ### Phase 10: Repack
 
-Call `repack_module()` to save all changes.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 
@@ -640,7 +640,7 @@ Differentiate similar creatures with a numeric suffix: `hos_gobwar`, `hos_gobmag
 - **Group roles for variety.** Every group of 3+ should have at least 2 different roles. Most enemies use melee (sword + shield), but include variety.
 - **Equipment only on humanoids.** Non-humanoid creatures (spiders, undead skeletons, beasts) use `naturalAC` instead of armor and rely on claws/bites, not weapons.
 - **Verify item resrefs resolve.** If `resman_search` doesn't find an expected item, try alternate resref patterns or substitute a similar item.
-- **Repack after all changes.** Call `repack_module` at the end so the user can see changes in the toolset.
+- **Do not build the .mod.** Edits are saved to the module project as they happen; call `repack_module` only when the user asks for the `.mod` (`/create-adventure` offers it at the end).
 - **No quest logic.** Don't modify dialogs, journal entries, or quest state. That's `/adventure-quests`'s job (already done).
 - **Quest targets stay.** A creature or captive a quest stage names (`## Quests` → stage `kill`/`rescue`/`escort` targets)
   was placed by `build_quest` with quest variables on it: don't move, replace, re-forge or delete it, and don't place a second

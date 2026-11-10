@@ -618,11 +618,11 @@ Every module has a **disconnected DM area** the DM can teleport to (waypoint `DM
 
 1. Write the DM guide first (Phase 7c), so `dm-guide.md` exists.
 2. `create_dm_area()` copies the template into the module (once), reads both files from the adventure directory, makes the books (volumes of about 6,000 characters when long) and puts them in the chest, replacing earlier books. Pass `story` / `guide` only to override the files.
-3. `repack_module`, then `audit_module`: the "DM area and books" row must be done.
+3. `audit_module`: the "DM area and books" row must be done.
 
 ### Phase 8: Repack
 
-Call `repack_module()` to save all changes.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 
@@ -650,7 +650,7 @@ Call `repack_module()` to save all changes.
 - **Reward power curve:** Boss reward > mid-adventure reward > creature drops > store items. This creates a clear progression of loot quality.
 - **Module description is mandatory (Phase 7b).** Every delivered module gets a real `Mod_Description` — target level, party size, henchmen count, estimated playtime, and at most one vague atmospheric hook. Never a plot spoiler.
 - **DM guide is mandatory (Phase 7c).** Every delivered module gets a `dm-guide.md` sidecar — full spoilers, written for a human running the module at a tabletop. Unlike every other deliverable in this pipeline, this one is spoilers-on by design.
-- **Repack after all changes.** Call `repack_module` at the end so the user can see changes in the toolset.
+- **Do not build the .mod.** Edits are saved to the module project as they happen; call `repack_module` only when the user asks for the `.mod` (`/create-adventure` offers it at the end).
 
 ## Finish
 

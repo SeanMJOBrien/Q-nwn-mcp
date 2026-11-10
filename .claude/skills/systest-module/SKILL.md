@@ -242,12 +242,12 @@ if it doesn't, the fixture itself has a bug, fix it before moving on.
 | 11 | `systest_dialog_npc_a` | gallery | Any class/role — this fixture is about the dialog mechanism, not stats. `scripts: {"ScriptSpawn":"a_syst_dlg_strt"}`. Place a few meters from #12, close enough for `ActionStartConversation` to resolve without the mobile-NPC "run to target" behavior needing much room. The initiator. |
 | 12 | `systest_dialog_npc_b` | gallery | Any class/role. `conversation: "systest_dlg"` (so it has a default conversation to be started with no PC ever connecting). No script override needed — it's the listener; #11 drives the conversation. |
 
-### Phase 5: Static check, repack, run live
+### Phase 5: Static check, run live
 
 1. `verify_all({})` — should come back `shippable: true` for every fixture above
    (they were each individually verified in Phase 4, but a full pass catches
    cross-fixture issues, e.g. accidental tag collisions).
-2. `repack_module({})`.
+2. (Not needed: `run_live_verification` builds its own throwaway `.mod`.)
 3. `run_live_verification({ expectedCheckLines: "<N>" })` where `N` is the
    number of grep-able lines you actually expect — at minimum one
    `[SYSTEST_DAMAGE]`/`[SYSTEST_DEATH]` pair from the combat fixtures once they

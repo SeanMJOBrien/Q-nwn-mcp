@@ -225,7 +225,7 @@ Append an `## Environment` section to `adventure.md` with this structure per are
 
 This data is used by downstream skills to select from existing environment objects for quest purposes.
 
-Repack the module with `repack_module`.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 
@@ -352,7 +352,7 @@ When placing placeables, group related objects together (within 2-4m of each oth
 - **Waypoint facing matters.** Entrance waypoints face into the area. Landmark waypoints face toward the landmark from the player's approach. Use `faceTowardX/Y` (or a compass `bearing`: 0 = north, 90 = east) — waypoints and creatures use compass degrees, placeables use a different raw angle.
 - **Group name → waypoint label.** Strip dimension suffixes: `"Lodge_2x2"` → `"Lodge"`, `"Temple_3x2"` → `"Temple"`.
 - **Hazards and clues that roll:** a stuck door, a falling-stone floor, a letter with a seal are checks, not scripts: `add_skill_check(area, tag, kind, check)` with a skill, ability or save and a DC or `difficulty`. A trap's trigger rolls for each player who steps on it; a placeable can check on use or, with `event: "disarm"`, when its trap is disarmed. A clue that moves a quest is a `search` stage in `/adventure-quests`, not this.
-- **Repack after placing.** Call `repack_module` at the end so the user can see changes in the toolset.
+- **Do not build the .mod.** Edits are saved to the module project as they happen; call `repack_module` only when the user asks for the `.mod` (`/create-adventure` offers it at the end).
 
 ## Finish
 

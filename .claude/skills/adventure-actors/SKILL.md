@@ -418,7 +418,7 @@ Scripts `a_hen_join` / `a_hen_leave` / `a_hen_stay` / `a_hen_follow`; conditions
 
 This data is used by downstream skills to select actors for quest roles (`/adventure-quests`) and to know which areas already have creature presence (`/adventure-challenges`).
 
-Repack the module with `repack_module`.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 
@@ -510,7 +510,7 @@ Clone each type once with `create_creature_blueprint`, setting `faction=2`.
 - **Do NOT auto-export HTML reports.**
 - **Dialog resref must be created before the creature blueprint** that references it (or create them in the right order: dialog first, then blueprint with `conversation` field).
 - **No quest logic in dialogs.** NPCs can hint at the situation but do NOT assign quests, give journal entries, or run scripts. That's `/adventure-quests`'s job.
-- **Repack after placing.** Call `repack_module` at the end so the user can see changes in the toolset.
+- **Do not build the .mod.** Edits are saved to the module project as they happen; call `repack_module` only when the user asks for the `.mod` (`/create-adventure` offers it at the end).
 - **Ambient creatures don't get dialogs.** Only key NPCs from the plot get `create_dialog` calls.
 - **Max 16 character resrefs.** NWN has a 16-char limit on resref identifiers.
 - **All blueprint edits must precede `place_creature`.** Placement snapshots the `.utc` into

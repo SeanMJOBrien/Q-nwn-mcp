@@ -19,13 +19,13 @@ import { adventureFile } from "../util/adventure-dir.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { execFile } from "child_process";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
 import { promisify } from "util";
 import { z } from "zod";
 import { MCP_FOLDER_VERIFYSERVER } from "../config.js";
 import { requireIndex } from "../module-loader.js";
 import { erfPack } from "../nim-tools.js";
-import { clearDirtyUnder } from "../util/dirty-state.js";
 import { optNumParam, toI } from "../util/params.js";
 import { parseLootLines, upsertSpawnLoot } from "../util/verify-server/loot.js";
 import {
@@ -212,7 +212,7 @@ export function registerVerifyServerTools(server: McpServer): void {
       modulePath: z
         .string()
         .optional()
-        .describe("Explicit .mod path to test. Default: repack the currently-loaded module and use it."),
+        .describe("Explicit .mod path to test. Default: build a throwaway .mod from the currently-loaded module (the module's own .mod is not touched)."),
       expectedCheckLines: optNumParam(
         "Short-circuit polling once this many bracket-tagged log lines ([SPEC_OK]/[SPEC_FAIL]/[TAG_*]) appear, " +
           "without waiting out the stability window. Omit if the module carries no such instrumentation.",
@@ -252,9 +252,12 @@ export function registerVerifyServerTools(server: McpServer): void {
         resolvedModPath = path.resolve(modulePath);
       } else {
         const index = requireIndex();
-        await erfPack(index.tempDir, index.modPath);
-        clearDirtyUnder(index.tempDir);
-        resolvedModPath = index.modPath;
+        // A throwaway build (never the user's .mod, never sent): the module project and the original .mod stay as they are.
+        const throwaway = path.join(os.tmpdir(), "nwn-mcp-live-verify", path.basename(index.modPath));
+        await fs.mkdir(path.dirname(throwaway), { recursive: true });
+        await fs.rm(throwaway, { force: true });
+        await erfPack(index.tempDir, throwaway);
+        resolvedModPath = throwaway;
       }
 
       const moduleName = path.basename(resolvedModPath, ".mod");

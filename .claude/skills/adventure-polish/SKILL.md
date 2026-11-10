@@ -306,7 +306,7 @@ Append a `## Polish` section to `adventure.md`:
 
 ### Phase 11: Repack
 
-Call `repack_module()` to save all changes.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 
@@ -325,7 +325,7 @@ Never skip Blocking or Breaking issues. Minor issues can be documented without f
 
 ## Final Gate: `verify_all`
 
-**This is the last thing the phase does, after every fix and after `repack_module`.**
+**This is the last thing the phase does, after every fix.**
 
 ```
 verify_all(checkWalkable: true)
@@ -398,7 +398,7 @@ Three things the checker cannot tell you, which matter when reading its findings
 ## Important Notes
 
 - **Do NOT auto-export HTML reports.**
-- **Repack after all changes.** Call `repack_module` at the end, then run `verify_all`.
+- **Do not build the .mod.** Edits are saved to the module project as they happen; call `repack_module` only when the user asks for the `.mod` (`/create-adventure` offers it at the end).
 - **Don't rebuild what works.** If a dialog is functional but not perfect, note it — don't rewrite it.
 - **Filter base-game false positives** from `validate_module`. Scripts and items from the base game BIFs (`nw_*`, `x0_*`, `x2_*`) that appear as "missing" are resolved at runtime and are NOT errors.
 - **Trace, don't assume.** Use `flatten_dialog`, `get_area_creatures`, `get_area_doors` to verify — don't assume prior skills did everything correctly.

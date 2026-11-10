@@ -243,7 +243,7 @@ Example after phase 3: `✦ ✦ ✦ ✧ ✧ ✧ ✧ ✧ ✧   World dressed...`
 
 ## Final Delivery
 
-When all sub-skills complete and the module is repacked, deliver a spoiler-free completion message:
+When all sub-skills complete, offer to build the `.mod` (`repack_module`; the user may decline and ask for more changes, then build nothing) and deliver a spoiler-free completion message:
 
 > *"Your adventure **'[Title]'** is ready! No spoilers from me — go discover what awaits. Have fun!"*
 

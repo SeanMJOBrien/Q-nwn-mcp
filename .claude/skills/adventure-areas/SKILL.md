@@ -322,7 +322,7 @@ Append an `## Areas` section to `adventure.md` with:
 
 This data is used by downstream skills (`/adventure-environment`, `/adventure-actors`, `/adventure-quests`, `/adventure-challenges`, `/adventure-affordances`) to place content correctly.
 
-Repack the module with `repack_module`.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 
@@ -393,7 +393,7 @@ The solver prioritizes preserving crossers over exact corner matching. At a Pit/
 - **Setting the module entry position needs care.** `modify_gff_field` cannot write float
   fields (`Mod_Entry_X/Y/Z`) — the value arrives as a string and `nwn_gff` rejects it,
   leaving the in-memory document dirty so later writes of `module.ifo` also fail. If it
-  happens: `repack_module` then `load_module` to re-read from disk. Prefer choosing an
+  happens: `load_module` on the module project directory (with `force: true`) to re-read it. Prefer choosing an
   entry area whose default position is already walkable, verified with
   `adventure_find_walkable` on a bounding box around it.
 

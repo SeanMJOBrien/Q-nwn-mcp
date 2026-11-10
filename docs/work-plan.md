@@ -34,7 +34,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | B2 | `export_project` | done | `src/util/project.ts`, `src/tools/project-tools.ts`; MCP restart needed. Real round trip (pack back to a .mod, compare) is not run: no nim tools in this shell, it goes into B3 as a gated live test |
 | B3 | Load a module from its project | done | `packProject` + `load_module` on a directory; MCP restart needed. Checked with the real nim tools (`NIM_FOLDER_NWTOOLS=../nwn-tools/linux/neverwinter`): `project.live.test.ts`, and the Salt Gate backup exported, packed and loaded gives the same counts (220 resources, 6 areas, 65 creatures, 0 warnings). JSON-equal, not byte-identical |
 | B4 | Keep project in step; detect files changed on disk | done | `src/util/project-sync.ts`, hooks in `jsonToGff` and `writeAndCompileScript`; MCP restart needed. Checked with real nim tools on a Salt Gate copy. Not covered: tools that write files with plain `fs` (not `jsonToGff`/script writer) reach the project only on the next `export_project`; removed resources are pruned by `export_project` only |
-| B5 | Change the repack/send rules everywhere | todo | |
+| B5 | Change the repack/send rules everywhere | done | CLAUDE.md, 14 skills, `repack_module` description, memory; `run_live_verification` now packs a throwaway .mod in the temp area instead of overwriting the loaded module's .mod. MCP restart needed |
 | B6 | `adopt_module` writes the project; migrate Salt Gate | todo | |
 | C1 | Player simulation: spike | todo | |
 | C2 | Player simulation: harness | todo | depends on C1 result |
@@ -54,6 +54,7 @@ before starting a long tool call or test run. Mark the package `in progress` whe
 | F3 | Small missing tools | todo | |
 | G1 | Follow-ups for `story-vs-pipeline.md`; adopt fill step | todo | |
 | G2 | Release: CHANGELOG, version | todo | |
+| B7 | Review plain-`fs` writers: route them through the project sync (TODO #41) | todo | user-requested 2026-11-10; after B5 |
 | M1-M4 | Salt Gate module track (see below) | todo | needs an MCP restart first |
 | H | Content features (#21/#24, #25, #26) | not planned in detail | design first, one at a time |
 

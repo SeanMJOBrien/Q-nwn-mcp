@@ -100,7 +100,7 @@ Reach for these instead of manually cross-referencing GFF fields:
      `.uti`/`.dlg`/`.nss`/etc. to the user, or round-tripping it through an
      external tool. It reads from the in-memory index, not the packed
      `.mod` directly, so it reflects edits already made this session even
-     before the next `repack_module`.
+     before the project is next built.
    - For local variables (VarTable entries) on a creature, placed object, or
      blueprint, use `get_object_variables`/`set_object_variables`/
      `remove_object_variable` instead of `modify_gff_field` — VarTable is a
@@ -111,12 +111,13 @@ Reach for these instead of manually cross-referencing GFF fields:
      is a separate copy from its blueprint's (see the "separate copy"
      pitfall in this project's CLAUDE.md), so pick the one that actually
      matters for the edit at hand.
-2. **Always call `repack_module` after edits so the user can see them in
-   the toolset** — edits are held in the in-memory index until repacked.
-   Mention that you repacked.
+2. **Edits are saved to the module project automatically** (`adventures/<Title>/`, see
+   `docs/module-projects.md`). Do not build the `.mod` with `repack_module` after each
+   edit; build it only when the user asks, and when the work looks complete offer to
+   build it. Send the `.mod` to the user only after they accept the build.
 3. If something goes wrong, `undo_last_change` / `undo_history` roll back
-   in-memory edits made this session — they do not un-repack an already
-   written `.mod` file.
+   in-memory edits made this session — they do not undo an already
+   built `.mod` file.
 4. Re-run `validate_module` after a nontrivial edit before calling the task
    done.
 

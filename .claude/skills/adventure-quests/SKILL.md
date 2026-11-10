@@ -154,7 +154,7 @@ fits the plot. Each block includes the quest's spec, so later phases rebuild the
 
 ### Phase 5: Repack
 
-Call `repack_module()` to save all changes.
+Edits are saved to the module project as they happen; do not build the `.mod` (`repack_module`) unless the user asks.
 
 ---
 

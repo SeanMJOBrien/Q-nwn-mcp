@@ -166,7 +166,7 @@ quest.
 2. For each stage transition, `clone_resource` the matching `_pqj_*` template (condition vs. award vs. finish vs. item-triggered) into a new resref following the module's naming convention, then edit the cloned source to replace the placeholder `qTag`/`qState`/`qItem`/`iGold` literals (`write_script` with the edited source, or the module's own edit tooling).
 3. Wire the scripts into an NPC's dialog with `add_dialog_node`/`edit_dialog_node` — condition script on the StartingList root entry, action script on the PC reply that advances state. Follow `module-explorer`'s StartingList-ordering rule: higher/later quest stages before earlier ones, unconditioned/default entry last.
 4. If the module's `OnClientEnter` calls `RebuildJournalQuestEntries` (or the equivalent for whatever wrapper is in use), no extra step is needed for persistence — otherwise flag that gap to the user, since new quests would not survive relogin.
-5. `repack_module`, then re-run Step 1's manual verification (not just `verify_journal`) on the new tag.
+5. Re-run Step 1's manual verification (not just `verify_journal`) on the new tag.
 
 ## Fixing/auditing existing quests
 

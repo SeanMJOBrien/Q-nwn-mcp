@@ -66,7 +66,7 @@ export function registerWriteTools(server: McpServer): void {
 
   server.tool(
     "repack_module",
-    "Repack the extracted module files into a .mod file.",
+    "Build the .mod file from the loaded module. Edits are already saved to the module project as they happen, so call this only when the user asks for the .mod (or accepts the offer to build it); do not call it after each edit and do not send the file unless the user accepts.",
     {
       outputPath: z.string().optional().describe("Output path for the .mod file. Defaults to original location."),
     },
