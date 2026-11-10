@@ -614,13 +614,11 @@ was written, and its path.
 
 ### Phase 7d: The DM area and its two books (mandatory for every module)
 
-Every module has a **disconnected DM area** the DM can teleport to, holding a **chest** with two **book items**: the full story (the basis of the module) and the DM guide. Players never reach it: no door, trigger or portal leads in or out. `audit_module` reports "DM area and books" until all of it exists.
+Every module has a **disconnected DM area** the DM can teleport to (waypoint `DM_AREA`), holding a **chest** (`dm_chest`, "DM Chest") with two **book items**: the full story (the basis of the module, from `adventure.md`) and the DM guide (`dm-guide.md`, written in Phase 7c). The area is a fixed template (2x2 City Exterior, no wind or sound, always daytime) that is never redesigned; only the books change. Players never reach it: nothing links to it. `audit_module` reports "DM area and books" until all of it exists.
 
-1. The area is a **fixed template**, not designed per module: 2x2 `tcn01` (City Exterior), no wind, no music or ambient sound, always daytime, with a `DM_AREA` waypoint and a chest tagged `dm_chest` named "DM Chest". The files are `src/templates/dm_area.are`, `.git`, `.gic` in the MCP repo (until `create_dm_area` exists, copy them into the module's temp dir, add `dm_area` to `module.ifo`'s `Mod_Area_list`, then `repack_module`; a module that already has `dm_area` keeps it). Never link it to another area.
-2. Only the chest's contents change per module.
-3. Books are item blueprints with `baseItem` 74 (Book). Put the whole text in `description` (read the file, keep headings, no summary): `create_item_blueprint` resref `dm_book_story`, tag `dm_book_story`, name "<Title>: The Story" (text = `adventure.md`), and resref `dm_book_guide`, tag `dm_book_guide`, name "<Title>: DM Guide" (text = `dm-guide.md`, written in Phase 7c). If a text is over about 6,000 characters, split at a paragraph break into volumes `dm_book_story_1`, `dm_book_story_2` ... (names "(Volume 1 of N)"), keeping "story" / "guide" in each tag.
-4. `add_items_to_container` with `containerTag` `dm_chest` and every book resref, then `get_area_placeables` to confirm the books are inside.
-5. `phase_check` end for `rewards`, and `audit_module`: the "DM area and books" row must be done.
+1. Write the DM guide first (Phase 7c), so `dm-guide.md` exists.
+2. `create_dm_area()` copies the template into the module (once), reads both files from the adventure directory, makes the books (volumes of about 6,000 characters when long) and puts them in the chest, replacing earlier books. Pass `story` / `guide` only to override the files.
+3. `repack_module`, then `audit_module`: the "DM area and books" row must be done.
 
 ### Phase 8: Repack
 
