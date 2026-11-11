@@ -200,6 +200,19 @@ describe("verifyCreature", () => {
     expect(await codes(marked)).not.toContain("lootable_flag_off");
   });
 
+  it("a forged creature's CR is compared with its MCP_LEVEL target, not its level-1 build", async () => {
+    const vars = (n: number) => ({ type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "MCP_LEVEL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: n } }] });
+    const level1 = (extra: Record<string, unknown>) => makeCreature("nw_c2_default", { ChallengeRating: { type: "float", value: 6 }, ...extra });
+    const run = async (obj: GffObj) => {
+      const report = new Report("t", "utc");
+      await verifyCreature(report, makeIndex(), obj);
+      return report.warnings.map((w) => w.code);
+    };
+    // makeCreature's class list is level 3; a CR of 6 is far from 3 unless the creature is forged to level 6
+    expect(await run(level1({}))).toContain("cr_level_mismatch");
+    expect(await run(level1({ VarTable: vars(6) }))).not.toContain("cr_level_mismatch");
+  });
+
   it("does not flag a matching Appearance_Type/Race pair", async () => {
     const obj = makeCreature("nw_c2_default", {
       Race: { type: "byte", value: 1 },

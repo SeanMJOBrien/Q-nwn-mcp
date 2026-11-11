@@ -41,6 +41,7 @@ export function registerKeyNpcTools(server: McpServer): void {
       gender: numParam("0 male, 1 female"),
       faction: z.enum(["hostile", "commoner", "merchant", "defender"]).optional().describe("Standard faction (default hostile for a boss; use commoner for a friendly NPC)"),
       gearRole: z.enum(["pc", "elite", "standard", "mook"]).optional().describe("Gear budget role (default elite)"),
+      lootable: z.boolean().optional().describe("Leave a lootable body (default true: its gear drops as a corpse like any other fighter; false drops a loose bag)"),
       conversation: z.string().optional().describe("Dialog resref to attach (build it with create_dialog)"),
       tag: z.string().optional().describe("Tag (default: resref)"),
       bearing: optNumParam("Compass facing in degrees (0 north, 90 east); default 0"),
@@ -89,6 +90,7 @@ export function registerKeyNpcTools(server: McpServer): void {
         race,
         appearance: race,
         gender: toI(args.gender, 0),
+        lootable: args.lootable ?? true,
         ...(args.conversation ? { conversation: args.conversation } : {}),
       });
       if (!built.success) return fail(`blueprint: ${built.error}`);

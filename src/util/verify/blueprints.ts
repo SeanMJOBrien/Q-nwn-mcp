@@ -337,6 +337,10 @@ export async function verifyCreature(
     (v) => v.name.toLowerCase() === "hench_level" && v.type === "int",
   );
   const effectiveLevel = Math.max(totalLevel, typeof henchLevelEntry?.value === "number" ? henchLevelEntry.value : 0);
+  // A forged creature is a level-1 build that levels itself at spawn (MCP_LEVEL = its absolute target level). Its CR is set to that
+  // target, so the CR check compares against it; the stat formulas above and below still use the level-1 data actually stored.
+  const forgeLevel = getVarTableEntries(obj).find((v) => v.name.toUpperCase() === "MCP_LEVEL" && typeof v.value === "number")?.value as number | undefined;
+  const crLevel = Math.max(effectiveLevel, forgeLevel ?? 0);
 
   // User-specified rule: a stat may exceed 15 (the Elite Array's own ceiling) only
   // via racial adjustment or the real level-based ability increase — never from
@@ -424,10 +428,10 @@ export async function verifyCreature(
         );
       }
       const cr = getFieldNum(obj, "ChallengeRating");
-      if (allPc && cr > 0 && Math.abs(cr - effectiveLevel) > 2) {
+      if (allPc && cr > 0 && Math.abs(cr - crLevel) > 2) {
         report.warn(
           "cr_level_mismatch",
-          `ChallengeRating ${cr} is far from total level ${effectiveLevel}; pure PC-class creatures have CR close to their level`,
+          `ChallengeRating ${cr} is far from total level ${crLevel}; pure PC-class creatures have CR close to their level`,
           "ChallengeRating",
           "set the CR to about the level (forge_creature does), or use a monster class if the creature is meant to be stronger than its level",
         );
