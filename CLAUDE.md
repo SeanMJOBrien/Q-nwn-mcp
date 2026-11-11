@@ -31,7 +31,7 @@ S1-S9 (skill-prompt reduction) and #1, #4, #6-#11, #13, #14, #17, #18, #24, #27 
 - **#16 port the quest fixes to the TFN content studio — P4** (`~/git/Q-tfn-content-studio`, studio rules apply). Plan: `docs/tfn-quest-findings.md`. Acceptance: studio tests green with the listed fixes and generator additions.
 - **#19 generic check: live test — P2.** Quest and companion scripts are now simulation-checked (`docs/player-simulation.md`); still open: one simulation step per `q_check`/`q_roll` with a stand-in that has the skill.
 - **#20 guided workflow: live run on a hand-built module — P2** (M1-M2). Acceptance: `adopt_module` + `audit_module` run on Salt Gate with the MCP restarted.
-- **#21 adventure composition, open parts — P5.** Outcome-dependent chains, `verify_encounter_chain`, rival-party shape, tone/theme check, recurring-NPC checks, import format for the user's own material (`docs/adventure-composition.md`).
+- **#21 adventure composition, open parts — P5.** (Outcome-dependent spawns and `verify_encounter_chain` done 2026-11-10.) Rival-party shape, tone/theme check, recurring-NPC checks, import format for the user's own material (`docs/adventure-composition.md`).
 - **#22 stale generated scripts, remaining generators — P3** (E4). Acceptance: `generated_script_stale` covers the quest runtime, `inc_random_abil`, `inc_spec_ability`, `inc_reward`, `inc_spec_check`, `inc_spec_assert`.
 - **#23 state the goal of every test run — mostly done** (C3): `run_live_verification` takes `goal`, warns when absent, gives a `verdict` with `simulate`. Open: other test runs (systest skill, tests) still do not carry a goal.
 - **#25 cutscenes advancing per dialog choice — P6.** Design first; acceptance: design doc, then a spec shape and one verified example.

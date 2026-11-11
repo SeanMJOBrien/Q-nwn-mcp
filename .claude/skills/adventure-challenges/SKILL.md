@@ -654,3 +654,6 @@ Differentiate similar creatures with a numeric suffix: `hos_gobwar`, `hos_gobmag
 ## Finish
 
 Call `phase_check(phase: "challenges", step: "end")` last. It checks this phase's section was appended, runs the verifiers that belong to the phase and writes the entry to `adventure-status.json` (`partial` with the error list if anything is left). Fix its errors and call it again; never report success past errors.
+
+A multi-part encounter can react to the first part: give the stage's `spawn` a `flag: {var, ifSet, ifUnset}` (a module variable set by a dialog line's `set_var`, e.g. an alarm) to change the count of the second part, 0 to skip it. Run `verify_encounter_chain` after building a chain.
+

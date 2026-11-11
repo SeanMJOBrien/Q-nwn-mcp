@@ -51,10 +51,8 @@ Built. A `spawn` on an event stage (kill, pickup, explore, trigger, use, search)
 3. Stage 3 `kill` the main force (its death script is on the blueprint, which the spawned copies inherit).
 
 The spawn can also hang on an `explore` or `trigger` stage (entering a place brings the reinforcements) or on a `search` (opening the
-chest sounds an alarm). Not done: the second part changing with the outcome of the first (an alarm raised, a patrol missing, a prisoner who
-talks). The module local `QS_SPAWN_<key>` and the stage variables are the hooks: a `chain` that reads "if the lookout was killed within N
-rounds, spawn fewer" needs a small `QuestSpawn` variant that reads a flag. Also not done: a `verify_encounter_chain` check (every stage
-reachable, every spawn waypoint present); `verify_quest_completability` already reads the quest variables.
+chest sounds an alarm). Built 2026-11-10: the second part changing with the outcome of the first. A spawn takes `flag: {var, ifSet, ifUnset}`: a module variable (set by a dialog line's `set_var`, e.g. `alarm` when the lookout got away) picks the count; 0 skips the spawn (the patrol never arrives). Checked on the real engine (count 3 when set, skipped when unset, plain count with no flag). Not done: an outcome other than a variable (a time limit, a kill within N rounds), and a prisoner who talks (a dialog line that sets the variable does it by hand). The module local `QS_SPAWN_<key>` and the stage variables are the hooks: a `chain` that reads "if the lookout was killed within N
+rounds, spawn fewer" needs a small `QuestSpawn` variant that reads a flag. `verify_encounter_chain` (also in `verify_all`) now checks every spawn has a waypoint, a blueprint and a triggering stage, that spawn keys are unique, and that a spawned group advances a stage.
 
 ## Building from a rich story
 
@@ -83,5 +81,5 @@ reading); there is no import format.
 ## What is built and what is not
 
 Built: `plan_adventure_shape`, `verify_story`, `phase_check` story check and declared skips (TODO #20), spawn on event stages, the plot skill's
-intake, shape and graph steps, the challenges skill's kinds note. Open: outcome-dependent chains, `verify_encounter_chain`, a rival-party shape,
+intake, shape and graph steps, the challenges skill's kinds note. Open: a rival-party shape,
 theme checking, recurring-NPC checks, and tuning every number above against real builds.
