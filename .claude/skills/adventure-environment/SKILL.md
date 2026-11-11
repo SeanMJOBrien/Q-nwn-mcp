@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads the plot and areas from adven
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Environment
 
 Sub-skill of `/create-adventure`. Reads the plot and areas sections of `adventure.md`, then dresses each area with placeables (furniture, lights, containers, decor), ambient sound objects, and waypoints with map notes. Focus is ambience — picks should be thematic to the plot but not plot pivot points. Downstream skills (`/adventure-actors`, `/adventure-quests`, `/adventure-challenges`, `/adventure-affordances`) will select from the placed environment for their purposes.

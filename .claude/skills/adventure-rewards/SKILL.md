@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads all sections from adventure.m
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Rewards
 
 Sub-skill of `/create-adventure`. Reads all sections of `adventure.md`, then assigns quest XP rewards and places notable reward items throughout the adventure. Monster XP is automatic from kills — this skill handles **quest-completion XP** and **placed loot rewards** (magic items, unique treasure). It also sets the module's real, player-facing `Mod_Description` and writes a full-spoiler `dm-guide.md` for anyone who wants to run the finished module as a tabletop session. This is the final content skill before the adventure is complete.

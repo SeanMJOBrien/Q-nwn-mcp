@@ -1,5 +1,7 @@
 # docs/ — which document answers which question
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` named in these documents are the adventure's title-based files (`<Title-With-Dashes>.md` etc., since 2026-11-11); `get_adventure_dir` returns the real paths.
+
 | Question | Read |
 |---|---|
 | What does a typical level-7 fighter or a CR-5 undead look like (HP, AC, gear), to use as a template? | [creature-catalog.md](creature-catalog.md) — generated; `list_creature_samples` |

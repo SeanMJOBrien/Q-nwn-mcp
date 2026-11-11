@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads the plot, areas, environment,
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Affordances
 
 Sub-skill of `/create-adventure`. Reads all prior sections of `adventure.md`, then populates the module with items, stores, and resources that help the player address challenges. Merchant stores are attached to existing NPCs via dialog modification. Useful items are placed in containers. A module start script gives starting gold and adjusts player level. Downstream skill (`/adventure-rewards`) uses affordance data to balance quest XP and end-of-adventure rewards.

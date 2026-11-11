@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads the plot document from advent
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Areas
 
 Sub-skill of `/create-adventure`. Reads the plot section of `adventure.md`, builds all areas required by the plot, and appends an areas summary back to `adventure.md`.

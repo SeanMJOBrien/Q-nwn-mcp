@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads the plot, areas, environment,
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Quests
 
 Sub-skill of `/create-adventure`. Reads all prior sections of `adventure.md`, then builds each quest in the plot with `build_quest` from a short spec: journal, quest lines merged into the NPC dialogs `/adventure-actors` created, stage wiring on the objects involved, quest items and rewards. No quest scripts are written by hand. Downstream skills (`/adventure-challenges`, `/adventure-affordances`, `/adventure-rewards`) layer combat, loot, and XP on top.

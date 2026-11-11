@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Generates a structured adventure do
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Plot
 
 Sub-skill of `/create-adventure`. Takes a creative prompt (theme, level range, tone) and generates a complete structured adventure document at `adventure.md`. All downstream skills read from this file.

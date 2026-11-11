@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads the plot, areas, environment,
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Challenges
 
 Sub-skill of `/create-adventure`. Reads all prior sections of `adventure.md`, then places hostile creatures with tactical combat roles and traps as a layer on top of existing content. **All hostile creatures use faction 1 (Hostile).** Creatures are selected by appearance (thematic fit), then independently given stats, classes, feats, spells, and equipment to create tactical diversity. Downstream skills (`/adventure-affordances`, `/adventure-rewards`) use challenge data to stock loot and assign XP.

@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads the plot, areas, environment,
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Polish
 
 Sub-skill of `/create-adventure`. Reads all sections of `adventure.md` and systematically audits the built module for inconsistencies, broken references, and gameplay blockers. **Fixes problems as it finds them.** This is a cross-cutting pass — every prior skill's output is treated as a source of potential issues. Downstream skill (`/adventure-rewards`) uses the corrected module state to assign final XP and loot values.

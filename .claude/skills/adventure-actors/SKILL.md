@@ -4,6 +4,8 @@ description: Sub-skill of /create-adventure. Reads the plot, areas, and environm
 allowed-tools: Bash(echo *), Read, Grep, Glob
 ---
 
+> **File names:** `adventure.md`, `dm-guide.md`, `adventure-status.json` and `project-scope.json` in this skill are the adventure's title-based files (`<Title-With-Dashes>.md`, `<Title>-dm-guide.md`, `<Title>-status.json`, `<Title>-scope.json`); `get_adventure_dir` returns the real paths.
+
 # Actors
 
 Sub-skill of `/create-adventure`. Reads the plot, areas, and environment sections of `adventure.md`, then places key NPCs with simple greeting dialogs and ambient creatures appropriate to each area's theme. All actors use **Commoner faction (ID 2)** — no custom factions for a one-shot module. Downstream skills (`/adventure-quests`, `/adventure-challenges`) will select from the placed actors for quest roles and hostile encounters.
