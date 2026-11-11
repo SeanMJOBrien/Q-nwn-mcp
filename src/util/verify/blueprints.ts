@@ -636,6 +636,22 @@ export async function verifyCreature(
     }
   }
 
+  // A spell-ability list written at one class level goes stale when the creature levels up for real afterwards (a live LevelUpHenchman pass
+  // never touches SpecAbilityList): the new slots and spell levels are never filled (TODO #36). Creatures forged with forge_creature re-level
+  // in play through CL_ReLevel (inc_cre_level), which keeps their spells and adds the new ones; anything else needs the pool re-baked.
+  {
+    const bakedLevel = Math.max(0, ...listOf(obj, "SpecAbilityList").map((e) => getFieldNum(e, "SpellCasterLevel")));
+    const classLevel = Math.max(0, ...classList.map((cls) => getFieldNum(cls, "ClassLevel")));
+    if (bakedLevel > 0 && classLevel > bakedLevel) {
+      report.warn(
+        "spell_pool_stale",
+        `Its spell-ability list was written at caster level ${bakedLevel} but its class level is now ${classLevel}: the spells for the new slots are missing`,
+        "SpecAbilityList",
+        "re-run bake_spec_ability_pool (or level_creature, which re-bakes), or rebuild the creature with forge_creature, which levels itself and keeps its spells",
+      );
+    }
+  }
+
   // ─── Scripts ────────────────────────────────────────────────────────────
   for (const field of CREATURE_SCRIPT_FIELDS) {
     if (!hasField(obj, field)) {

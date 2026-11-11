@@ -1174,6 +1174,32 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).toContain("caster_no_spells");
   });
 
+  it("warns when a spell-ability list was written at a lower caster level than the creature now has (#36)", async () => {
+    const make = (classLevel: number, casterLevel: number) =>
+      makeCreature("nw_c2_default", {
+        ClassList: {
+          type: "list",
+          value: [{ __struct_id: 2, Class: { type: "int", value: 9 }, ClassLevel: { type: "short", value: classLevel } }],
+        },
+        FeatList: { type: "list", value: [{ __struct_id: 1, Feat: { type: "word", value: 45 } }] },
+        SpecAbilityList: {
+          type: "list",
+          value: [
+            { __struct_id: 0, Spell: { type: "word", value: 24 }, SpellCasterLevel: { type: "byte", value: casterLevel }, SpellFlags: { type: "byte", value: 1 } },
+          ],
+        },
+      });
+    const index = makeIndex({
+      twodaTables: new Map([["classes", twoDA(["SpellCaster", "MinCastingLevel"], [[9, { SpellCaster: "1", MinCastingLevel: "1" }]])]]),
+    });
+    const stale = new Report("t", "utc");
+    await verifyCreature(stale, index, make(7, 5));
+    expect(stale.warnings.map((w) => w.code)).toContain("spell_pool_stale");
+    const fresh = new Report("t", "utc");
+    await verifyCreature(fresh, index, make(5, 5));
+    expect(fresh.warnings.map((w) => w.code)).not.toContain("spell_pool_stale");
+  });
+
   it("does not flag a caster with a SpecAbilityList spell selection", async () => {
     const obj = makeCreature("nw_c2_default", {
       ClassList: {
