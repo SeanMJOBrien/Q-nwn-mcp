@@ -55,6 +55,17 @@ describe("pc appearance", () => {
     expect(pickPcLook(6, 0, "x")?.SoundSetFile).toBeUndefined(); // no voices given: voice left alone
   });
 
+  it("gives a normal body most of the time and the big body now and then", () => {
+    const seen = new Map<number, number>();
+    for (let i = 0; i < 2000; i++) {
+      const p = pickPcLook(6, 0, `p${i}`)?.Phenotype ?? -1;
+      seen.set(p, (seen.get(p) ?? 0) + 1);
+    }
+    expect([...seen.keys()].sort()).toEqual([0, 2]);
+    expect(seen.get(0)).toBeGreaterThan(seen.get(2) ?? 0);
+    expect(seen.get(2) ?? 0).toBeGreaterThan(20);
+  });
+
   it("draws common colours more often than rare ones", () => {
     const counts = new Map<number, number>();
     for (let i = 0; i < 2000; i++) {

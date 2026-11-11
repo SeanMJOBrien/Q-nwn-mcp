@@ -15,6 +15,7 @@ function applyLook(obj: GffObj, look: PcLook): void {
   setField(obj, "Appearance_Head", "byte", look.Appearance_Head);
   setField(obj, "Color_Skin", "byte", look.Color_Skin);
   setField(obj, "Color_Hair", "byte", look.Color_Hair);
+  setField(obj, "Phenotype", "int", look.Phenotype);
   if (look.SoundSetFile !== undefined) setField(obj, "SoundSetFile", "word", look.SoundSetFile);
 }
 

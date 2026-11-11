@@ -21,6 +21,7 @@ interface ColorPools {
 interface PcAppearanceData {
   raceLetter: Record<string, string>;
   heads: Record<string, number[]>;
+  phenotype?: Record<string, number>;
   colors: Record<string, ColorPools>;
 }
 
@@ -36,6 +37,8 @@ export interface PcLook {
   Appearance_Head: number;
   Color_Skin: number;
   Color_Hair: number;
+  /** 0 normal or 2 big, at the rate hand-built creatures use them. */
+  Phenotype: number;
   SoundSetFile?: number;
 }
 
@@ -99,6 +102,7 @@ export function pickPcLook(appearance: number, gender: 0 | 1, seed: string, voic
     Appearance_Head: heads[Math.floor(rnd() * heads.length)],
     Color_Skin: weighted(poolFor(appearance, gender, "skin"), rnd()) ?? 1,
     Color_Hair: weighted(poolFor(appearance, gender, "hair"), rnd()) ?? 1,
+    Phenotype: weighted(Object.entries(data().phenotype ?? { 0: 1 }).map(([k, w]) => [Number(k), w] as [number, number]), rnd()) ?? 0,
   };
   const v = voices?.[gender];
   if (v && v.length > 0) look.SoundSetFile = v[Math.floor(rnd() * v.length)];
