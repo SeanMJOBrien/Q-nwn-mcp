@@ -65,4 +65,15 @@ describe("buildCompanionDialogTree", () => {
     expect(full).not.toContain("a_hen_join");
     expect(full).toContain("I served the temple.");
   });
+
+  it("a_hen_lvlup brings every companion up to the player's level, chaining the module's own handler", () => {
+    const plain = generateCompanionScripts().a_hen_lvlup;
+    expect(plain).toContain('#include "inc_cre_level"');
+    expect(plain).toContain("GetPCLevellingUp()");
+    expect(plain).toContain("CL_ReLevel(oCompanion, nLevel)");
+    expect(plain).not.toContain("ExecuteScript(");
+    const chained = generateCompanionScripts({ originalLevelUp: "a_old" }).a_hen_lvlup;
+    expect(chained).toContain('ExecuteScript("a_old", OBJECT_SELF);');
+  });
 });
+

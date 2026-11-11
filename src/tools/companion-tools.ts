@@ -10,6 +10,7 @@ import { SIM_INCLUDE } from "../util/sim-script.js";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { jsonToGff } from "../nim-tools.js";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
 import type { GffObj } from "../types/gff.js";
 import { getFieldList, getFieldStr, setField } from "../types/gff.js";
@@ -17,6 +18,7 @@ import type { ModuleIndex } from "../types/module.js";
 import {
   buildCompanionDialogTree,
   COMPANION_INCLUDE,
+  COMPANION_LEVELUP,
   COMPANION_SCRIPTS,
   type CompanionDialogText,
   DEFAULT_MAX_COMPANIONS,
@@ -48,7 +50,13 @@ export async function writeCompanionSystem(
   index: ModuleIndex,
   maxCompanions = DEFAULT_MAX_COMPANIONS,
 ): Promise<CompanionSystemResult> {
-  const sources = generateCompanionScripts({ maxCompanions });
+  // a_hen_lvlup includes inc_cre_level: make sure the creature level system is there first.
+  if (!index.resources.has("inc_cre_level.nss")) await writeCreatureLevelSystem(index);
+  // The OnPlayerLevelUp handler: keep the module's own one and chain it.
+  const ifo = index.parsedGff.get("module.ifo") as GffObj | undefined;
+  const current = ifo ? getFieldStr(ifo, "Mod_OnPlrLvlUp") : "";
+  const originalLevelUp = current && current.toLowerCase() !== COMPANION_LEVELUP ? current : undefined;
+  const sources = generateCompanionScripts({ maxCompanions, originalLevelUp });
   const scripts: CompanionSystemResult["scripts"] = [];
   for (const [resref, source] of Object.entries(sources)) {
     const isInclude = resref === COMPANION_INCLUDE || resref === SIM_INCLUDE;
@@ -59,7 +67,13 @@ export async function writeCompanionSystem(
       ...(isInclude || r.compiled ? {} : { compilerOutput: r.compilerOutput }),
     });
   }
-  return { scripts, compiled: scripts.every((s) => s.compiled !== false), maxCompanions };
+  const compiled = scripts.every((s) => s.compiled !== false);
+  const ifoEntry = index.resources.get("module.ifo");
+  if (compiled && ifo && ifoEntry && current.toLowerCase() !== COMPANION_LEVELUP) {
+    setField(ifo, "Mod_OnPlrLvlUp", "resref", COMPANION_LEVELUP);
+    await jsonToGff(ifo as never, ifoEntry.filePath);
+  }
+  return { scripts, compiled, maxCompanions };
 }
 
 /** Set `Conversation` on a creature blueprint and on every placed copy of it (matched by TemplateResRef). */

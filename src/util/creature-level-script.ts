@@ -60,6 +60,7 @@ export function generateCreatureLevelInclude(options: CreatureLevelOptions = {})
 //   MCP_SA_DOMAIN (string)   JSON {"<class>": {"<spell level>": [domain spell ids]}}; one fills a slot per level
 //   MCP_DOMAINS (string)     JSON {"<class>": [domain1, domain2]} (domains.2da rows), checked in game
 //   MCP_SCHOOL (string)      JSON {"<class>": school} (spellschools.2da row), checked in game
+// A companion keeps level with its master through CL_ReLevel (called by a_hen_lvlup when a player gains a level).
 // At spawn it: levels up with LevelUpHenchman, buys gear from the module's stores,
 // rebuilds once (ObjectToJson/JsonToObject, state kept) to write spell abilities at
 // the right caster level and slot count, then verifies and logs [SPEC_OK]/[SPEC_FAIL].
@@ -759,6 +760,7 @@ void CL_Finish(object oCreature)
     }
     json jEntries = CL_SpellEntries(oCreature);
     SetLocalInt(oCreature, "MCP_CL_VERIFY", 1);
+    object oMaster = GetMaster(oCreature); // a companion re-levelled in play: its master must be kept
     json jObj = ObjectToJson(oCreature, TRUE);
     json jList = JsonObject();
     jList = JsonObjectSet(jList, "type", JsonString("list"));
@@ -773,6 +775,7 @@ void CL_Finish(object oCreature)
         return;
     }
     DestroyObject(oCreature);
+    if (GetIsObjectValid(oMaster) && GetMaster(oNew) != oMaster) DelayCommand(0.5, AddHenchman(oMaster, oNew));
 }
 
 // ---- levelling ----
@@ -805,6 +808,21 @@ void CL_LevelStep(object oCreature, int nTarget)
     SetLocalInt(oCreature, "MCP_LEVEL_TARGET", GetLocalInt(oCreature, "MCP_LEVEL_TARGET") > 0
         ? GetLocalInt(oCreature, "MCP_LEVEL_TARGET") : nTarget);
     DelayCommand(0.2, CL_Gear(oCreature));
+}
+
+// Levels a creature that is already in play up to nTarget: a companion whose master has gained a level. Levels it, shops again with the
+// larger allowance, rewrites its spell abilities (a rebuild that keeps the master) and verifies. Does nothing at or above the target.
+void CL_ReLevel(object oCreature, int nTarget)
+{
+    if (!GetIsObjectValid(oCreature) || GetHitDice(oCreature) >= nTarget) return;
+    if (GetLocalInt(oCreature, "MCP_RELEVEL_BUSY") == nTarget) return;
+    SetLocalInt(oCreature, "MCP_RELEVEL_BUSY", nTarget);
+    DeleteLocalInt(oCreature, "MCP_LEVEL_DONE");
+    DeleteLocalString(oCreature, "MCP_GEAR_LOG");
+    SetLocalInt(oCreature, "MCP_LEVEL", nTarget);
+    SetLocalInt(oCreature, "MCP_LEVEL_TARGET", nTarget);
+    CL_Log(GetTag(oCreature) + " re-levelling " + IntToString(GetHitDice(oCreature)) + " -> " + IntToString(nTarget));
+    CL_LevelStep(oCreature, nTarget);
 }
 
 // Call from the creature's OnSpawn wrapper after the original spawn script.

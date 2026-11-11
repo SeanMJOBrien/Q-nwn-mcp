@@ -15,6 +15,8 @@ import { generateSimInclude, SIM_INCLUDE, withSimResult } from "./sim-script.js"
  */
 
 export const COMPANION_INCLUDE = "inc_companion";
+/** OnPlayerLevelUp handler: every companion of the player levels up with them. Needs inc_cre_level (create_creature_level_system). */
+export const COMPANION_LEVELUP = "a_hen_lvlup";
 
 /** Every script resref the system writes, in write order (include first). */
 export const COMPANION_SCRIPTS = [
@@ -26,11 +28,14 @@ export const COMPANION_SCRIPTS = [
   "a_hen_leave",
   "a_hen_stay",
   "a_hen_follow",
+  COMPANION_LEVELUP,
 ] as const;
 
 export const DEFAULT_MAX_COMPANIONS = 3;
 
 export interface CompanionScriptOptions {
+  /** The module's own OnPlayerLevelUp script, run first (a_hen_lvlup chains it). */
+  originalLevelUp?: string;
   /** Companions allowed in the whole party at once (all PCs combined). */
   maxCompanions?: number;
 }
@@ -167,11 +172,33 @@ void main()
 `,
 };
 
+/** OnPlayerLevelUp: run the module's own handler, then bring every companion of the player up to the player's level. */
+function levelUpScript(original?: string): string {
+  return `// a_hen_lvlup: OnPlayerLevelUp. Every companion of the player levels up with them (inc_cre_level: CL_ReLevel).
+#include "inc_cre_level"
+${original ? "" : "// (no earlier handler to chain)\n"}
+void main()
+{
+${original ? `    ExecuteScript("${original}", OBJECT_SELF);\n` : ""}    object oPC = GetPCLevellingUp();
+    if (!GetIsObjectValid(oPC)) return;
+    int nLevel = GetHitDice(oPC);
+    int i;
+    for (i = 1; i <= 10; i++)
+    {
+        object oCompanion = GetAssociate(ASSOCIATE_TYPE_HENCHMAN, oPC, i);
+        if (!GetIsObjectValid(oCompanion)) break;
+        DelayCommand(1.0 * i, CL_ReLevel(oCompanion, nLevel));
+    }
+}
+`;
+}
+
 /** Source for every companion script, keyed by resref, include first. */
 export function generateCompanionScripts(opts: CompanionScriptOptions = {}): Record<string, string> {
   const max = Math.max(1, Math.min(10, Math.floor(opts.maxCompanions ?? DEFAULT_MAX_COMPANIONS)));
   const out: Record<string, string> = { [SIM_INCLUDE]: generateSimInclude(), [COMPANION_INCLUDE]: include(max) };
-  for (const name of COMPANION_SCRIPTS) if (name !== COMPANION_INCLUDE) out[name] = withSimResult(SCRIPTS[name]);
+  for (const name of COMPANION_SCRIPTS) if (name !== COMPANION_INCLUDE && name !== COMPANION_LEVELUP) out[name] = withSimResult(SCRIPTS[name]);
+  out[COMPANION_LEVELUP] = levelUpScript(opts.originalLevelUp);
   return out;
 }
 

@@ -8,6 +8,7 @@ import os from "os";
 import path from "path";
 import { NIM_FOLDER_NWTOOLS, NWN_FOLDER_DATA, NWN_FOLDER_USER } from "../config.js";
 import { compileScript } from "../nim-tools.js";
+import { generateCreatureLevelInclude, generateCreatureLevelWrapper } from "./creature-level-script.js";
 import { COMPANION_SCRIPTS, generateCompanionScripts } from "./companion-script.js";
 import { generateQuestScripts, QUEST_SCRIPTS } from "./quest-script.js";
 
@@ -15,7 +16,7 @@ describe.skipIf(!NWN_FOLDER_DATA || !NIM_FOLDER_NWTOOLS)("generated quest script
   it("every entry-point script compiles against the real compiler", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "nwn-mcp-questcomp-"));
     try {
-      const scripts = { ...generateQuestScripts(), ...generateCompanionScripts() };
+      const scripts: Record<string, string> = { ...generateQuestScripts(), ...generateCompanionScripts({ originalLevelUp: "a_old_lvlup" }), inc_cre_level: generateCreatureLevelInclude(), cf_spawn: generateCreatureLevelWrapper() };
       for (const [name, src] of Object.entries(scripts)) await fs.writeFile(path.join(dir, `${name}.nss`), src);
       const override = path.resolve(import.meta.dirname, "../nwscript-override");
       const failures: string[] = [];
