@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { degToRad, buildMinimalUtc, getGitDoc, updateAreaCounts, mergeVarTable, getVarTableEntries, removeVarTableEntry, clearVarTable } from "./git-helpers.js";
+import { degToRad, ensurePcBodyFields, buildMinimalUtc, getGitDoc, updateAreaCounts, mergeVarTable, getVarTableEntries, removeVarTableEntry, clearVarTable } from "./git-helpers.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 
@@ -358,5 +358,17 @@ describe("buildMinimalUtc script fields", () => {
   it("includes StartingPackage so LevelUpHenchman has something to key off", () => {
     const doc = buildMinimalUtc() as GffObj;
     expect(doc.StartingPackage).toBeDefined();
+  });
+});
+
+describe("ensurePcBodyFields", () => {
+  it("adds the head, body-part and colour fields a player model needs, and keeps the ones already there", () => {
+    const npc = { Appearance_Type: { type: "word", value: 273 }, Color_Skin: { type: "byte", value: 5 } } as GffObj;
+    ensurePcBodyFields(npc);
+    for (const k of ["Appearance_Head", "ArmorPart_RFoot", "BodyPart_Torso", "BodyPart_Pelvis", "BodyPart_RHand", "Color_Hair", "Color_Tattoo1"]) {
+      expect(npc[k]).toBeDefined();
+    }
+    expect((npc.Color_Skin as { value: number }).value).toBe(5); // not overwritten
+    expect((npc.Appearance_Type as { value: number }).value).toBe(273); // not a body field
   });
 });

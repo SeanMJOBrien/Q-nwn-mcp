@@ -14,7 +14,7 @@ import fs from "fs/promises";
 
 import { buildResmanOptions } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
-import { resolveBlueprint, buildMinimalUtc, mergeVarTable } from "./git-helpers.js";
+import { resolveBlueprint, buildMinimalUtc, ensurePcBodyFields, mergeVarTable } from "./git-helpers.js";
 import type { VarTableEntry } from "./git-helpers.js";
 import { getFieldNum, setField } from "../types/gff.js";
 import { isPcRaceNpc, pcVoicesFrom, pickPcLook } from "./pc-appearance.js";
@@ -186,6 +186,15 @@ export async function buildCreatureBlueprint(
   // A standard-race humanoid looks like a varied player character: a head that exists for its race and gender, colours as hand-built
   // creatures use them, and (unless a voice was given) a player voice of its gender. Seeded by the resref: the same build, the same look.
   if (appearanceLook !== "keep") {
+    // A player-race creature on a fixed NPC model (a clone of a shopkeeper or soldier) takes the player model of its race and gender.
+    {
+      const race0 = getFieldNum(obj, "Race");
+      const gen0 = getFieldNum(obj, "Gender");
+      if (race0 >= 0 && race0 <= 6 && (gen0 === 0 || gen0 === 1) && getFieldNum(obj, "Appearance_Type") !== race0) {
+        setField(obj, "Appearance_Type", "word", race0);
+        ensurePcBodyFields(obj);
+      }
+    }
     const app = getFieldNum(obj, "Appearance_Type");
     const gen = getFieldNum(obj, "Gender");
     if (isPcRaceNpc(app, getFieldNum(obj, "Race"), gen)) {

@@ -209,6 +209,20 @@ export function buildMinimalUtm(): GffDocument {
   };
 }
 
+/**
+ * Give a creature the part-assembly fields a standard-race player model needs (head, body parts, colours), copied from the verified
+ * defaults in buildMinimalUtc where it has none. A creature on a fixed NPC model carries none of them; set to a player model without
+ * them it renders invisible.
+ */
+export function ensurePcBodyFields(obj: GffObj): void {
+  const defaults = buildMinimalUtc() as GffObj;
+  for (const key of Object.keys(defaults)) {
+    if (/^(Appearance_Head|ArmorPart_|BodyPart_|Color_)/.test(key) && !(key in obj)) {
+      obj[key] = JSON.parse(JSON.stringify(defaults[key]));
+    }
+  }
+}
+
 /** Build a minimal UTC creature document from scratch. */
 export function buildMinimalUtc(): GffDocument {
   return {

@@ -6,7 +6,7 @@ import { requireIndex } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldNum, getFieldStr, setField } from "../types/gff.js";
-import { mergeVarTable, writeBackGit } from "../util/git-helpers.js";
+import { ensurePcBodyFields, mergeVarTable, writeBackGit } from "../util/git-helpers.js";
 import { writeCreatureLevelSystem } from "./creature-forge-tools.js";
 import { markDirty } from "../util/dirty-state.js";
 import { isPcRaceNpc, type PcLook, pcVoicesFrom, pickPcLook } from "../util/pc-appearance.js";
@@ -35,6 +35,19 @@ function applyLook(obj: GffObj, look: PcLook, scale = false, fixedScale = false)
   if (look.SoundSetFile !== undefined) setField(obj, "SoundSetFile", "word", look.SoundSetFile);
 }
 
+/** A creature of a player race (0-6) with a gender but on a fixed NPC model (a shopkeeper, a soldier, ...): it can wear the player model of its race. */
+function isNpcModelOfPcRace(obj: GffObj): boolean {
+  const race = getFieldNum(obj, "Race");
+  const gender = getFieldNum(obj, "Gender");
+  return race >= 0 && race <= 6 && (gender === 0 || gender === 1) && getFieldNum(obj, "Appearance_Type") !== race;
+}
+
+/** Switch the creature to the player model of its race and give it the fields that model needs. */
+function usePcModel(obj: GffObj): void {
+  setField(obj, "Appearance_Type", "word", getFieldNum(obj, "Race"));
+  ensurePcBodyFields(obj);
+}
+
 function tagMatches(tag: string, want: string | undefined): boolean {
   if (!want) return true;
   return want.endsWith("*") ? tag.toLowerCase().startsWith(want.slice(0, -1).toLowerCase()) : tag.toLowerCase() === want.toLowerCase();
@@ -50,12 +63,15 @@ export function registerAppearanceTools(server: McpServer): void {
       tag: z.string().optional().describe("Creature tag, or a prefix ending in * (default: every standard-race NPC)"),
       voice: z.boolean().optional().describe("Also give a player voice set of the creature's gender (default true)"),
       blueprints: z.boolean().optional().describe("Also update the creature blueprints of the matched copies (default true)"),
+      pcModel: z.boolean().optional().describe("Switch a creature of a player race that wears a fixed NPC model (a soldier, a shopkeeper, a commoner) to the player model of its race and gender, so it gets a real head, colours and visible armour (default true). Monsters and races outside 0-6 are never touched."),
       scale: z.boolean().optional().describe("Also give each a slight size change, 5 % smaller to 5 % larger (default true). Done at spawn by the level system's cf_spawn wrapper (written if missing; the creature's own spawn script still runs first); each placed copy gets its own fixed size, a blueprint draws one at each spawn."),
     },
     { destructiveHint: true },
-    async ({ area, tag, voice, blueprints, scale }) => {
+    async ({ area, tag, voice, blueprints, scale, pcModel }) => {
       const index = requireIndex();
       const wantScale = scale !== false;
+      const wantPcModel = pcModel !== false;
+      let converted = 0;
       if (wantScale && !index.resources.has(`${SCALE_WRAPPER}.ncs`)) {
         const sys = await writeCreatureLevelSystem(index);
         if (!sys.compiled) return errorResult(`the level system (cf_spawn) failed to compile: ${sys.compilerOutput}`);
@@ -76,6 +92,10 @@ export function registerAppearanceTools(server: McpServer): void {
         getFieldList(doc, "Creature List").forEach((c, i) => {
           const ctag = getFieldStr(c, "Tag");
           if (!tagMatches(ctag, tag)) return;
+          if (wantPcModel && isNpcModelOfPcRace(c)) {
+            usePcModel(c);
+            converted++;
+          }
           const app = getFieldNum(c, "Appearance_Type");
           const race = getFieldNum(c, "Race");
           const gender = getFieldNum(c, "Gender");
@@ -104,6 +124,7 @@ export function registerAppearanceTools(server: McpServer): void {
           const entry = index.resources.get(key);
           const bp = index.parsedGff.get(key) as GffObj | undefined;
           if (!entry || !bp) continue;
+          if (wantPcModel && isNpcModelOfPcRace(bp)) usePcModel(bp);
           const app = getFieldNum(bp, "Appearance_Type");
           const gender = getFieldNum(bp, "Gender");
           if (!isPcRaceNpc(app, getFieldNum(bp, "Race"), gender)) continue;
@@ -122,6 +143,7 @@ export function registerAppearanceTools(server: McpServer): void {
               {
                 success: true,
                 placedChanged: changed,
+                switchedToPlayerModel: converted,
                 blueprintsChanged,
                 differentLooks: heads.size,
                 voice: voice !== false,
