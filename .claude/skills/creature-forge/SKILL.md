@@ -17,3 +17,7 @@ Use this instead of hand-building stat blocks, gear and spell wiring. You supply
 6. Animals, outsiders and other monster-class creatures are not forged. Choosing a ready-made monster from the default or custom palette (`list_blueprints`, `resman_search`, `place_creature`) is the right approach for them; don't build them from scratch.
 
 One call for a combat-capable key NPC or boss that is not a companion: `build_key_npc` (blueprint, forge, placement, `verify_creature`); `build_companion` is its recruitable twin. Use `forge_creature` directly for creatures you place yourself or for changes after the build. Details of every creature tool and which are deprecated: `docs/creature-tools.md`.
+
+## Looks
+
+Standard-race humanoids get a varied player look (head, skin, hair, voice of their gender) when the blueprint is made; `randomize_npc_appearance` does it for an existing module's placed copies (docs/npc-appearance.md).

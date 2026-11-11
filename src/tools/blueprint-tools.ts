@@ -67,9 +67,10 @@ export function registerBlueprintTools(server: McpServer): void {
       soundset: optNumParam("Voice set — soundset.2da row. Companions should use a TYPE 0 (PC voiceset) row matching the creature's gender; TYPE 3 NPC sets are sparse and leave the creature intermittently mute."),
       startingPackage: optNumParam("packages.2da row. Determines the picks LevelUpHenchman() makes when levelling this creature at runtime."),
       varTable: z.string().optional().describe('JSON array of local variables to set on the blueprint, merged by name: [{"name":"HENCH_LEVEL","type":"int","value":5}]. type is one of int|float|string.'),
+      appearanceLook: z.enum(["random", "keep"]).optional().describe("random (default): a standard-race humanoid (appearance and race 0-6 the same, gender 0 or 1) gets a varied player look: a head that exists for its race and gender, skin and hair colours as hand-built creatures use them, and, unless soundset is given, a player voice of its gender (seeded by the resref). keep: leave the model fields as the source or defaults have them."),
     },
     { destructiveHint: true },
-    async ({ resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation, str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment, inventory, lootable, henchman, scripts, soundset, startingPackage, varTable }) => {
+    async ({ resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation, str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment, inventory, lootable, henchman, scripts, soundset, startingPackage, varTable, appearanceLook }) => {
       { const bad = resrefError(resref); if (bad) return bad; }
       const index = requireIndex();
 
@@ -97,6 +98,7 @@ export function registerBlueprintTools(server: McpServer): void {
         inventory: inventory ? JSON.parse(inventory) : undefined,
         scripts: scripts ? JSON.parse(scripts) : undefined,
         varTable: varTable ? JSON.parse(varTable) : undefined,
+        appearanceLook,
       };
 
       const result = await buildCreatureBlueprint(index, params);

@@ -16,7 +16,8 @@ import { buildResmanOptions } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
 import { resolveBlueprint, buildMinimalUtc, mergeVarTable } from "./git-helpers.js";
 import type { VarTableEntry } from "./git-helpers.js";
-import { setField } from "../types/gff.js";
+import { getFieldNum, setField } from "../types/gff.js";
+import { isPcRaceNpc, pcVoicesFrom, pickPcLook } from "./pc-appearance.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { EQUIP_SLOT_MAP } from "./equip-slots.js";
 import type { ModuleIndex } from "../types/module.js";
@@ -99,6 +100,8 @@ export interface CreatureBuildParams {
   soundset?: number;
   startingPackage?: number;
   varTable?: VarTableEntry[];
+  /** "random" (default): a standard-race humanoid gets a player look (head, skin and hair colour, voice of its gender); "keep": leave the model fields as they are. */
+  appearanceLook?: "random" | "keep";
 }
 
 export interface CreatureBuildResult {
@@ -126,7 +129,7 @@ export async function buildCreatureBlueprint(
   const {
     resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation,
     str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment,
-    inventory, lootable, henchman, scripts, soundset, startingPackage, varTable,
+    inventory, lootable, henchman, scripts, soundset, startingPackage, varTable, appearanceLook,
   } = params;
 
   const resrefLower = resref.toLowerCase();
@@ -179,6 +182,22 @@ export async function buildCreatureBlueprint(
   if (lootable !== undefined) setField(obj, "Lootable", "byte", lootable ? 1 : 0);
   if (soundset !== undefined) setField(obj, "SoundSetFile", "word", soundset);
   if (startingPackage !== undefined) setField(obj, "StartingPackage", "byte", startingPackage);
+
+  // A standard-race humanoid looks like a varied player character: a head that exists for its race and gender, colours as hand-built
+  // creatures use them, and (unless a voice was given) a player voice of its gender. Seeded by the resref: the same build, the same look.
+  if (appearanceLook !== "keep") {
+    const app = getFieldNum(obj, "Appearance_Type");
+    const gen = getFieldNum(obj, "Gender");
+    if (isPcRaceNpc(app, getFieldNum(obj, "Race"), gen)) {
+      const look = pickPcLook(app, gen as 0 | 1, resrefLower, soundset === undefined ? pcVoicesFrom(index.twodaTables.get("soundset")?.rows) : undefined);
+      if (look) {
+        setField(obj, "Appearance_Head", "byte", look.Appearance_Head);
+        setField(obj, "Color_Skin", "byte", look.Color_Skin);
+        setField(obj, "Color_Hair", "byte", look.Color_Hair);
+        if (look.SoundSetFile !== undefined) setField(obj, "SoundSetFile", "word", look.SoundSetFile);
+      }
+    }
+  }
 
   const scriptWarnings: string[] = [];
   const scriptSet: Record<string, string> = {

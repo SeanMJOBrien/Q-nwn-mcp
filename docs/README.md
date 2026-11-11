@@ -7,6 +7,7 @@
 | What does a typical level-7 fighter or a CR-5 undead look like (HP, AC, gear), to use as a template? | [creature-catalog.md](creature-catalog.md) — generated; `list_creature_samples` |
 | What treasure (value, tier, properties) fits a party of level N, taken from a hand-built world's items? | [treasure-catalog.md](treasure-catalog.md) — generated; `list_treasure_samples`, `import_treasure_item` |
 | How do I make containers and rewards give random level-appropriate treasure (weights by area CR)? | [treasure-system.md](treasure-system.md) — `create_treasure_system` |
+| How do NPCs get varied player-character looks (head, skin, hair, voice by gender)? | [npc-appearance.md](npc-appearance.md) — automatic in `create_creature_blueprint`; `randomize_npc_appearance` for an existing module |
 | Which creature tool do I use? Which ones are deprecated? | [creature-tools.md](creature-tools.md) |
 | Can quests, companions and checks be tested without a player? | [player-simulation.md](player-simulation.md) |
 | How will a module be stored as a project and built on request (design, TODO #29)? | [module-projects.md](module-projects.md) |
