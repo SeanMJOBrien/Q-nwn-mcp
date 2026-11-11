@@ -7,6 +7,7 @@ import { compileScript } from "../nim-tools.js";
 import {
   addToPool,
   emptyPool,
+  generateTreasureDeathScript,
   generateTreasureInclude,
   generateTreasureOpenScript,
   kindOfGroup,
@@ -43,6 +44,14 @@ describe("treasure include", () => {
     expect(src).toContain("(68.0 + atan((nCR - nMid) * 0.6)) / 158.0");
   });
 
+  it("ports the boss-tier table and the creature drop chance", () => {
+    const src = generateTreasureInclude(emptyPool());
+    expect(src).toContain("int TR_BossTier(int nCR, int bSemiboss)");
+    expect(src).toContain("if (nCR == 13) return Random(100) < 80 ? 5 : 4;");
+    expect(src).toContain("30.0 * pow(2.0, (nMonsterCR - nAreaCR) / 2.0)");
+    expect(generateTreasureDeathScript()).toContain('"nw_c2_default7"');
+  });
+
   it("splits a large pool across several string constants", () => {
     const pool = emptyPool();
     for (let i = 0; i < 1500; i++) addToPool(pool, 4, 1 + (i % 5), `long_item_resref_${i}`);
@@ -60,10 +69,15 @@ describe.skipIf(!NWN_FOLDER_DATA || !NIM_FOLDER_NWTOOLS)("generated treasure scr
       for (let i = 0; i < 1500; i++) addToPool(pool, i % 9, 1 + (i % 5), `item_${i}`);
       await fs.writeFile(path.join(dir, `${TREASURE_INCLUDE}.nss`), generateTreasureInclude(pool));
       await fs.writeFile(path.join(dir, "a_trs_open.nss"), generateTreasureOpenScript());
-      const r = await compileScript(path.join(dir, "a_trs_open.nss"), path.join(dir, "a_trs_open.ncs"), {
-        resman: { root: NWN_FOLDER_DATA, userDir: NWN_FOLDER_USER || undefined, dirs: [dir, path.resolve(import.meta.dirname, "../nwscript-override")] },
-      });
-      expect(r.success ? "" : r.output.slice(-400)).toBe("");
+      await fs.writeFile(path.join(dir, "a_trs_death.nss"), generateTreasureDeathScript());
+      const failures: string[] = [];
+      for (const name of ["a_trs_open", "a_trs_death"]) {
+        const r = await compileScript(path.join(dir, `${name}.nss`), path.join(dir, `${name}.ncs`), {
+          resman: { root: NWN_FOLDER_DATA, userDir: NWN_FOLDER_USER || undefined, dirs: [dir, path.resolve(import.meta.dirname, "../nwscript-override")] },
+        });
+        if (!r.success) failures.push(`${name}: ${r.output.slice(-400)}`);
+      }
+      expect(failures).toEqual([]);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }

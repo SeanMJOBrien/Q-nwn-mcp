@@ -18,9 +18,11 @@ import {
   addToPool,
   emptyPool,
   generateTreasureInclude,
+  generateTreasureDeathScript,
   generateTreasureOpenScript,
   kindOfGroup,
   poolSize,
+  TREASURE_DEATH_SCRIPT,
   TREASURE_INCLUDE,
   TREASURE_OPEN_SCRIPT,
 } from "../util/treasure-script.js";
@@ -298,7 +300,7 @@ export function registerTreasureCatalogTools(server: McpServer): void {
     "create_treasure_system",
     "Write the random-treasure include (inc_treasure) and a container OnOpen script (a_trs_open) into the module: The Frozen North's loot selection, ported. A random item is picked by kind (potions most common, then jewels, scrolls, melee, ranged, apparel, armour, ...) and value tier, and the tier weights follow the area's challenge rating (tier 1 always, tier 2 grows with the CR, tiers 3, 4 and 5 start to appear around CR 7, 10 and 13). " +
       "The pool is baked from the item blueprints already in the module (hand-made, or imported with import_treasure_item) plus any base-game resrefs you list; plot items and free items are left out. " +
-      "Usage in scripts: TR_Fill(oContainer, nCR, fQuantity, nMask, fQuality, nGuaranteed), TR_AddItem, TR_RollItem. Zero-code: set a container's OnOpen to a_trs_open and put locals on it, its area or the module: TR_CR (int, default 1), TR_QUANTITY (float, 1.0 usual, 1.75 medium, 3.0 rich), TR_QUALITY (float, 0.0 usual, -0.2 better, 0.4 worse, -0.7 boss), TR_MASK (int kinds), TR_GUARANTEED (int). Re-run it after adding items to refresh the pool.",
+      "Usage in scripts: TR_Fill(oContainer, nCR, fQuantity, nMask, fQuality, nGuaranteed), TR_AddItem, TR_RollItem. Creatures: set ScriptDeath to a_trs_death for a drop chance by monster and area rating and, with local TR_BOSS 1 (boss) or 2 (semi-boss), one guaranteed item of the boss tier. Zero-code: set a container's OnOpen to a_trs_open and put locals on it, its area or the module: TR_CR (int, default 1), TR_QUANTITY (float, 1.0 usual, 1.75 medium, 3.0 rich), TR_QUALITY (float, 0.0 usual, -0.2 better, 0.4 worse, -0.7 boss), TR_MASK (int kinds), TR_GUARANTEED (int). Re-run it after adding items to refresh the pool.",
     {
       extraItems: z.string().optional().describe('JSON array of base-game item resrefs to add to the pool, e.g. ["nw_wswls001","nw_it_mpotion020"]'),
       includeModuleItems: z.boolean().optional().describe("Add every non-plot item blueprint in the module to the pool (default true)"),
@@ -350,16 +352,17 @@ export function registerTreasureCatalogTools(server: McpServer): void {
       if (poolSize(pool) === 0) return errorResult("The pool is empty: no item blueprints in the module and no extraItems. Import some with import_treasure_item or list base-game resrefs in extraItems.");
       const inc = await writeAndCompileScript(index, TREASURE_INCLUDE, generateTreasureInclude(pool), false);
       const open = await writeAndCompileScript(index, TREASURE_OPEN_SCRIPT, generateTreasureOpenScript(), true);
-      const ok = open.compiled === true;
+      const death = await writeAndCompileScript(index, TREASURE_DEATH_SCRIPT, generateTreasureDeathScript(), true);
+      const ok = open.compiled === true && death.compiled === true;
       return text({
         success: ok,
-        written: [inc.written, open.written],
+        written: [inc.written, open.written, death.written],
         compiles: ok,
-        ...(ok ? {} : { compilerOutput: open.compilerOutput }),
+        ...(ok ? {} : { compilerOutput: `${open.compilerOutput ?? ""} ${death.compilerOutput ?? ""}`.trim() }),
         poolItems: poolSize(pool),
         byKind: counts,
         skipped: skipped.slice(0, 10),
-        usage: "container OnOpen = a_trs_open, with TR_CR / TR_QUANTITY / TR_QUALITY locals; or TR_Fill(oContainer, nCR, ...) in any script that #includes inc_treasure",
+        usage: "container OnOpen = a_trs_open, with TR_CR / TR_QUANTITY / TR_QUALITY locals; creature ScriptDeath = a_trs_death (local TR_BOSS 1 boss / 2 semi-boss adds a guaranteed item of the boss tier; TR_ORIG_DEATH names the death script to run first); or TR_Fill / TR_DropOnDeath in any script that #includes inc_treasure",
       });
     },
   );

@@ -14,6 +14,7 @@
 
 export const TREASURE_INCLUDE = "inc_treasure";
 export const TREASURE_OPEN_SCRIPT = "a_trs_open";
+export const TREASURE_DEATH_SCRIPT = "a_trs_death";
 
 /** Loot kinds, in the source world's order. The pool is keyed by these numbers. */
 export const TREASURE_KINDS = [
@@ -316,6 +317,103 @@ void TR_FillOnce(object oContainer)
     int nMask = GetLocalInt(oContainer, "TR_MASK");
     if (nMask <= 0) nMask = TR_ANY;
     TR_Fill(oContainer, TR_AreaCR(oContainer), fQuantity, nMask, GetLocalFloat(oContainer, "TR_QUALITY"), GetLocalInt(oContainer, "TR_GUARANTEED"));
+}
+
+// --- Creature drops and boss rewards
+
+// Tier of the item a boss kill guarantees, by area challenge rating (semi-bosses count as 70 % of it): tier 2 below CR 3, tier 3 from
+// CR 3 (15 % at CR 3 rising to 80 % at CR 5), tier 4 from CR 6 (10 % rising to 70 % at CR 9), tier 5 from CR 10 (5 % rising to 80 % at CR 13).
+int TR_BossTier(int nCR, int bSemiboss)
+{
+    if (bSemiboss) nCR = FloatToInt(nCR * 0.7 + 0.5);
+    if (nCR < 3) return 2;
+    if (nCR == 3) return Random(100) < 15 ? 3 : 2;
+    if (nCR == 4) return Random(100) < 50 ? 3 : 2;
+    if (nCR == 5) return Random(100) < 80 ? 3 : 2;
+    if (nCR == 6) return Random(100) < 10 ? 4 : 3;
+    if (nCR == 7) return Random(100) < 25 ? 4 : 3;
+    if (nCR == 8) return Random(100) < 50 ? 4 : 3;
+    if (nCR == 9) return Random(100) < 70 ? 4 : 3;
+    if (nCR == 10) return Random(100) < 5 ? 5 : 4;
+    if (nCR == 11) return Random(100) < 15 ? 5 : 4;
+    if (nCR == 12) return Random(100) < 40 ? 5 : 4;
+    if (nCR == 13) return Random(100) < 80 ? 5 : 4;
+    return 5;
+}
+
+// One item of exactly this tier (a kind picked by weight among those with items at the tier); falls back to the nearest tier below,
+// then above, when the pool has nothing at it. Returns "" when the pool is empty for the mask.
+string TR_RollItemOfTier(int nTier, int nMask = 511)
+{
+    int nTry;
+    for (nTry = 0; nTry <= 4; nTry++)
+    {
+        int nT = nTier - nTry;
+        if (nT < 1) nT = nTier + (nTry - nTier + 1);
+        if (nT < 1 || nT > 5) continue;
+        int nTotal = 0;
+        int nKind;
+        for (nKind = 0; nKind <= 8; nKind++)
+            if ((nMask & (1 << nKind)) && JsonGetLength(TR_List(nKind, nT)) > 0) nTotal += TR_KindWeight(nKind);
+        if (nTotal <= 0) continue;
+        int nRoll = Random(nTotal);
+        for (nKind = 0; nKind <= 8; nKind++)
+        {
+            if (!(nMask & (1 << nKind)) || JsonGetLength(TR_List(nKind, nT)) <= 0) continue;
+            nRoll -= TR_KindWeight(nKind);
+            if (nRoll < 0)
+            {
+                json jList = TR_List(nKind, nT);
+                return JsonGetString(JsonArrayGet(jList, Random(JsonGetLength(jList))));
+            }
+        }
+    }
+    return "";
+}
+
+// Percent chance that a creature of challenge rating nMonsterCR drops treasure in an area of nAreaCR: 30, doubled for every two ratings
+// above the area, halved for every two below, never above 100.
+int TR_DropChance(int nMonsterCR, int nAreaCR)
+{
+    float fChance = 30.0 * pow(2.0, (nMonsterCR - nAreaCR) / 2.0);
+    return fChance > 100.0 ? 100 : FloatToInt(fChance);
+}
+
+// Treasure for a creature that has just died, put in its own inventory (the lootable body). Locals on the creature: TR_BOSS (1 boss,
+// 2 semi-boss: one item of the boss tier is guaranteed on top), TR_CR (area rating override), TR_QUANTITY, TR_QUALITY, TR_MASK.
+void TR_DropOnDeath(object oCreature)
+{
+    if (!GetIsObjectValid(oCreature) || GetLocalInt(oCreature, "TR_DROPPED")) return;
+    SetLocalInt(oCreature, "TR_DROPPED", 1);
+    int nAreaCR = TR_AreaCR(oCreature);
+    int nBoss = GetLocalInt(oCreature, "TR_BOSS");
+    int nMask = GetLocalInt(oCreature, "TR_MASK");
+    if (nMask <= 0) nMask = TR_ANY;
+    if (nBoss > 0)
+    {
+        string sBoss = TR_RollItemOfTier(TR_BossTier(nAreaCR, nBoss == 2), nMask);
+        if (sBoss != "") CreateItemOnObject(sBoss, oCreature);
+    }
+    if (Random(100) >= TR_DropChance(FloatToInt(GetChallengeRating(oCreature)), nAreaCR)) return;
+    float fQuantity = GetLocalFloat(oCreature, "TR_QUANTITY");
+    if (fQuantity <= 0.0) fQuantity = 1.0;
+    // The chance roll above already decided there is loot: the one/two/three-item rolls then decide how much, at least one.
+    TR_Fill(oCreature, nAreaCR, fQuantity, nMask, GetLocalFloat(oCreature, "TR_QUALITY"), 1);
+}
+`;
+}
+
+/** Creature OnDeath script: runs the creature's own death script (TR_ORIG_DEATH, default nw_c2_default7), then drops treasure (see TR_DropOnDeath). */
+export function generateTreasureDeathScript(): string {
+  return `// ${TREASURE_DEATH_SCRIPT}: creature OnDeath. Runs the original death script, then drops random treasure by challenge rating.
+#include "${TREASURE_INCLUDE}"
+
+void main()
+{
+    string sOriginal = GetLocalString(OBJECT_SELF, "TR_ORIG_DEATH");
+    if (sOriginal == "") sOriginal = "nw_c2_default7";
+    ExecuteScript(sOriginal, OBJECT_SELF);
+    TR_DropOnDeath(OBJECT_SELF);
 }
 `;
 }
