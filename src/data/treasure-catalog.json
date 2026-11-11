@@ -239,7 +239,7 @@
      "count": 2
     },
     {
-     "name": "prop88",
+     "name": "ItemCostReduction",
      "count": 1
     },
     {
@@ -432,7 +432,7 @@
    "enchanted": 0.43,
    "properties": [
     {
-     "name": "prop90",
+     "name": "ArmorType",
      "count": 14
     },
     {
@@ -486,7 +486,7 @@
      "count": 36
     },
     {
-     "name": "prop90",
+     "name": "ArmorType",
      "count": 34
     },
     {
@@ -536,7 +536,7 @@
      "count": 33
     },
     {
-     "name": "prop90",
+     "name": "ArmorType",
      "count": 31
     },
     {
@@ -2556,7 +2556,7 @@
      "count": 1
     },
     {
-     "name": "prop88",
+     "name": "ItemCostReduction",
      "count": 1
     }
    ],
@@ -2700,7 +2700,7 @@
      "count": 3
     },
     {
-     "name": "OnHitCastSpell",
+     "name": "ItemCostReduction",
      "count": 1
     }
    ],

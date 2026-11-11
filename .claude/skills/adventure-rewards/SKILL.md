@@ -271,6 +271,7 @@ digits — for longswords `002` is +1, `010` is +2, `012` is +3.
 **Item Sourcing:**
 1. **Prefer base game items** — use `resman_search` to find existing magic items
 2. **Take a treasure sample from the catalog** when a hand-built item of the right value would do: `list_treasure_samples(level: <party level>, group: "weapon" | "armor" | "ring" | ..., property?: "damage" ...)` returns the categories and, when the per-item copies exist, named samples nearest that level (one reward is at most about a third of a level's wealth; the result's `level` already applies that). Then `import_treasure_item(sample, resref, name, description)` writes it into the module under your own resref and name, with its value, base item, look and properties. Give it a name and description that fit the story; never ship the source's name. If the call says the catalog or the samples are missing, fall through to 3.
+   For *random* rewards (a chest that rolls its own treasure by area level) import or make the items, then `create_treasure_system` once and set the chest's OnOpen to `a_trs_open` with locals `TR_CR` / `TR_QUANTITY` / `TR_QUALITY` (docs/treasure-system.md); tiers follow the area's challenge rating like the source world's loot.
 3. **Create custom enchanted items** when no base game item fits the theme — use `create_item_blueprint` with `sourceResref` and `properties`:
    ```
    create_item_blueprint(

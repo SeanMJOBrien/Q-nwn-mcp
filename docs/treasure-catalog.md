@@ -17,9 +17,9 @@ Value tiers (gp): T1 under 175, T2 175+, T3 2,000+, T4 7,000+, T5 16,000+. Level
 | amulet | T5 | 2 | 17763-19309-20854 | 11-11 | 100% | +3..+3 | Armor, DamageResist, UseLimitationClass | amulet |
 | armor | T1 | 34 | 1-18-161 | 1-2 | 0% | - |  | armor |
 | armor | T2 | 31 | 191-900-1987 | 2-5 | 6% | +1..+1 | UseLimitationClass, DamageResist, SingleBonusSpellOfLevel | armor |
-| armor | T3 | 23 | 2386-4884-6912 | 5-8 | 43% | +1..+2 | prop90, Armor, Skill | armor |
-| armor | T4 | 47 | 7005-10322-15726 | 8-10 | 77% | +1..+3 | Armor, prop90, UseLimitationClass | armor |
-| armor | T5 | 41 | 16492-19861-32301 | 11-13 | 80% | +1..+4 | Armor, prop90, DamageResist | armor |
+| armor | T3 | 23 | 2386-4884-6912 | 5-8 | 43% | +1..+2 | ArmorType, Armor, Skill | armor |
+| armor | T4 | 47 | 7005-10322-15726 | 8-10 | 77% | +1..+3 | Armor, ArmorType, UseLimitationClass | armor |
+| armor | T5 | 41 | 16492-19861-32301 | 11-13 | 80% | +1..+4 | Armor, ArmorType, DamageResist | armor |
 | belt | T1 | 2 | 2-9-16 | 1-1 | 0% | - |  | belt |
 | belt | T2 | 3 | 462-674-1218 | 3-4 | 0% | - | ImprovedSavingThrows, Light, Skill | belt |
 | belt | T3 | 10 | 2266-2738-4382 | 5-7 | 0% | - | ImprovedSavingThrows, ArmorDamageType, Ability | belt |
