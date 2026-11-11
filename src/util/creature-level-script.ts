@@ -60,7 +60,8 @@ export function generateCreatureLevelInclude(options: CreatureLevelOptions = {})
 //   MCP_SA_DOMAIN (string)   JSON {"<class>": {"<spell level>": [domain spell ids]}}; one fills a slot per level
 //   MCP_DOMAINS (string)     JSON {"<class>": [domain1, domain2]} (domains.2da rows), checked in game
 //   MCP_SCHOOL (string)      JSON {"<class>": school} (spellschools.2da row), checked in game
-// A companion keeps level with its master through CL_ReLevel (called by a_hen_lvlup when a player gains a level).
+// A companion keeps level with its master through CL_ReLevel (called by a_hen_lvlup when a player gains a level):
+// it keeps its gear and its spells and adds the spells its new slots allow.
 // At spawn it: levels up with LevelUpHenchman, buys gear from the module's stores,
 // rebuilds once (ObjectToJson/JsonToObject, state kept) to write spell abilities at
 // the right caster level and slot count, then verifies and logs [SPEC_OK]/[SPEC_FAIL].
@@ -502,9 +503,26 @@ json CL_SpellEntries(object oCreature)
             // Pinned spells first (those on this class's list at this spell level), then the
             // pool from a random start, skipping duplicates, until nDistinct spells are chosen.
             json jChosen = JsonArray();
-            // The domain slot: one of this level's domain spells, before anything else.
+            // A creature that already has spell abilities (a companion re-levelled in play) keeps those spells; new slots and
+            // new spell levels are filled with new picks below.
+            int nHave = GetSpellAbilityCount(oCreature);
+            int nHeld;
+            for (nHeld = 0; nHeld < nHave && JsonGetLength(jChosen) < nDistinct; nHeld++)
+            {
+                int nKept = GetSpellAbilitySpell(oCreature, nHeld);
+                if (CL_SpellLevel(jDom, sColumn, nKept) == nSpellLevel && JsonGetType(JsonFind(jChosen, JsonInt(nKept))) == JSON_TYPE_NULL)
+                    jChosen = JsonArrayInsert(jChosen, JsonInt(nKept));
+            }
+            // The domain slot: one of this level's domain spells, before anything else (unless a kept spell already is one).
             json jDomIds = JsonObjectGet(jDom, IntToString(nSpellLevel));
-            if (JsonGetType(jDomIds) == JSON_TYPE_ARRAY && JsonGetLength(jDomIds) > 0)
+            int bHasDomain = FALSE;
+            if (JsonGetType(jDomIds) == JSON_TYPE_ARRAY)
+            {
+                int nD;
+                for (nD = 0; nD < JsonGetLength(jDomIds); nD++)
+                    if (JsonGetType(JsonFind(jChosen, JsonArrayGet(jDomIds, nD))) != JSON_TYPE_NULL) bHasDomain = TRUE;
+            }
+            if (!bHasDomain && JsonGetType(jDomIds) == JSON_TYPE_ARRAY && JsonGetLength(jDomIds) > 0)
                 jChosen = JsonArrayInsert(jChosen, JsonArrayGet(jDomIds, Random(JsonGetLength(jDomIds))));
             int p = 0;
             string sPin = CL_Token(sPinned, 0);
@@ -807,18 +825,20 @@ void CL_LevelStep(object oCreature, int nTarget)
     }
     SetLocalInt(oCreature, "MCP_LEVEL_TARGET", GetLocalInt(oCreature, "MCP_LEVEL_TARGET") > 0
         ? GetLocalInt(oCreature, "MCP_LEVEL_TARGET") : nTarget);
-    DelayCommand(0.2, CL_Gear(oCreature));
+    // A creature levelling in play (CL_ReLevel) keeps the gear it has: no shopping, straight to the spell abilities.
+    if (GetLocalInt(oCreature, "MCP_RELEVEL_BUSY") > 0) DelayCommand(0.2, CL_Finish(oCreature));
+    else DelayCommand(0.2, CL_Gear(oCreature));
 }
 
-// Levels a creature that is already in play up to nTarget: a companion whose master has gained a level. Levels it, shops again with the
-// larger allowance, rewrites its spell abilities (a rebuild that keeps the master) and verifies. Does nothing at or above the target.
+// Levels a creature that is already in play up to nTarget: a companion whose master has gained a level. Levels it, keeps its gear (no
+// shopping), keeps the spells it has and adds the new ones its slot totals call for, rewrites its spell abilities (a rebuild that keeps
+// the master) and verifies. Does nothing at or above the target.
 void CL_ReLevel(object oCreature, int nTarget)
 {
     if (!GetIsObjectValid(oCreature) || GetHitDice(oCreature) >= nTarget) return;
     if (GetLocalInt(oCreature, "MCP_RELEVEL_BUSY") == nTarget) return;
     SetLocalInt(oCreature, "MCP_RELEVEL_BUSY", nTarget);
     DeleteLocalInt(oCreature, "MCP_LEVEL_DONE");
-    DeleteLocalString(oCreature, "MCP_GEAR_LOG");
     SetLocalInt(oCreature, "MCP_LEVEL", nTarget);
     SetLocalInt(oCreature, "MCP_LEVEL_TARGET", nTarget);
     CL_Log(GetTag(oCreature) + " re-levelling " + IntToString(GetHitDice(oCreature)) + " -> " + IntToString(nTarget));

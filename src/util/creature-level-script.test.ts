@@ -220,4 +220,15 @@ describe("wizard school", () => {
     expect(src).toContain('"cl_school_" + IntToString(nClass)');
     expect(src).toContain('"cl_school_opposition_" + IntToString(nClass)');
   });
+
+  it("re-levelling keeps gear and spells: no shopping, kept spells first, master re-added after the rebuild", () => {
+    const src = generateCreatureLevelInclude();
+    expect(src).toContain("void CL_ReLevel(object oCreature, int nTarget)");
+    expect(src).toContain('if (GetLocalInt(oCreature, "MCP_RELEVEL_BUSY") > 0) DelayCommand(0.2, CL_Finish(oCreature));');
+    expect(src).toContain("GetSpellAbilityCount(oCreature)");
+    expect(src).toContain("AddHenchman(oMaster, oNew)");
+    // the kept spells are collected before the domain slot and the random picks
+    expect(src.indexOf("GetSpellAbilitySpell(oCreature, nHeld)")).toBeLessThan(src.indexOf("int nOffset = Random(nPoolSize);"));
+  });
 });
+
