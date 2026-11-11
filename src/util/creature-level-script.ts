@@ -759,7 +759,7 @@ void CL_Verify(object oCreature)
             "cl_gear_no_gold", IntToString(GetLocalInt(oCreature, "MCP_GOLD_BEFORE")),
             IntToString(GetLocalInt(oCreature, "MCP_GOLD_AFTER_GEAR")));
         CL_Log(GetTag(oCreature) + " lvl=" + IntToString(GetHitDice(oCreature)) + " chest=" + GetResRef(oChest)
-            + " ac=" + IntToString(GetAC(oCreature)) + " rh=" + GetResRef(oHand)
+            + " hp=" + IntToString(GetMaxHitPoints(oCreature)) + " ac=" + IntToString(GetAC(oCreature)) + " rh=" + GetResRef(oHand)
             + " lh=" + GetResRef(GetItemInSlot(INVENTORY_SLOT_LEFTHAND, oCreature))
             + " spent=" + IntToString(GetLocalInt(oCreature, "MCP_GEAR_SPENT")) + "/" + IntToString(GetLocalInt(oCreature, "MCP_GEAR_TOTAL")));
     }
