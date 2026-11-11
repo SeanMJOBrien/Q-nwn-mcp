@@ -66,6 +66,14 @@ describe("treasure catalog", () => {
     expect(s.props.map((p) => p.name)).toEqual(["Enhancement", "Damage"]);
   });
 
+  it("resolves a name stored as a string reference through the lookups", () => {
+    const doc = item(1, 1648, [], { LocalizedName: { type: "cexolocstring", id: 14423, value: {} } as never });
+    const s = summarizeItem(doc, "sword1", { ...look, strref: (n) => (n === 14423 ? "Longsword +1" : undefined) });
+    expect(s.name).toBe("Longsword +1");
+    // no table entry: falls back to the tag
+    expect(summarizeItem(doc, "sword1", look).name).toBe("T");
+  });
+
   it("aggregates by kind and tier, leaves out plot and free items, and ranks by level", () => {
     const items = [
       summarizeItem(item(1, 1648, [[6, 1]]), "a", look),

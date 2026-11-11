@@ -97,6 +97,7 @@ export async function treasureLookups(index: import("../types/module.js").Module
       return Number.isFinite(parsed) ? parsed : 0;
     },
     propName: (n) => cell("itempropdef", "Label", n) ?? `prop${n}`,
+    strref: (n) => index.customTlk?.get(n) ?? index.baseTlk?.get(n),
   };
 }
 
@@ -165,6 +166,43 @@ export async function runTreasureBuild(
     general,
     failed: failed.slice(0, 5),
   };
+}
+
+/** Copy one catalog sample into the loaded module as an item blueprint. */
+async function importSample(
+  index: import("../types/module.js").ModuleIndex,
+  sample: string,
+  resref: string,
+  opts: { name?: string; tag?: string; description?: string },
+): Promise<{ created: string; name: string; from: string; sizeBytes: number } | { error: string }> {
+  const bad = resrefError(resref);
+  if (bad) return { error: bad.content[0].text };
+  const resrefLower = resref.toLowerCase();
+  const key = `${resrefLower}.uti`;
+  if (index.resources.has(key)) return { error: `Resource already exists: ${key}` };
+  let doc: GffObj;
+  try {
+    doc = JSON.parse(await fs.readFile(path.join(rawDir(), "treasure-blueprints", `${sample.toLowerCase()}.uti.json`), "utf8")) as GffObj;
+  } catch {
+    return { error: `No catalog sample "${sample}" (adventures/_catalog/treasure-blueprints). Build the catalog with build_treasure_catalog first.` };
+  }
+  setField(doc, "Tag", "cexostring", opts.tag ?? resref.toUpperCase());
+  setField(doc, "TemplateResRef", "resref", resrefLower);
+  if (opts.name !== undefined) doc.LocalizedName = { type: "cexolocstring", value: { "0": opts.name } };
+  if (opts.description !== undefined) {
+    const desc = { type: "cexolocstring", value: { "0": opts.description } };
+    doc.Description = desc;
+    doc.DescIdentified = { ...desc };
+  }
+  setField(doc, "Identified", "byte", 1);
+  setField(doc, "Plot", "byte", 0);
+  const file = path.join(index.tempDir, key);
+  await jsonToGff(doc as unknown as GffDocument, file);
+  const stat = await fs.stat(file);
+  index.resources.set(key, { resref: resrefLower, extension: "uti", filePath: file, sizeBytes: stat.size });
+  index.parsedGff.set(key, doc as unknown as GffDocument);
+  const shown = opts.name ?? ((doc.LocalizedName as { value?: Record<string, string> } | undefined)?.value?.["0"] || "(from the talk table)");
+  return { created: key, name: shown, from: sample, sizeBytes: stat.size };
 }
 
 async function loadGeneral(): Promise<TreasureFile | undefined> {
@@ -255,47 +293,72 @@ export function registerTreasureCatalogTools(server: McpServer): void {
 
   server.tool(
     "import_treasure_item",
-    "Put a sample from the treasure catalog into the loaded module as an item blueprint (.uti), with its own resref, tag and name, so a reward, container or store can use it. Copies value, base item, appearance and properties from the sample; give it a new name (the source's own names are not meant to ship). " +
-      "Find samples with list_treasure_samples. Needs the per-item copies built by build_treasure_catalog.",
+    "Put a sample from the treasure catalog into the loaded module as an item blueprint (.uti), with its own resref and tag, so a reward, container, store or the random-treasure pool can use it. Copies value, base item, appearance and properties from the sample. " +
+      "Give it a new name and description to fit your story; without one the sample keeps its own name (resolved from the talk tables when the source stored a string reference). Find samples with list_treasure_samples. Needs the per-item copies built by build_treasure_catalog.",
     {
       sample: z.string().describe("Resref of the catalog sample (from list_treasure_samples)"),
       resref: z.string().describe("New item resref in the module"),
-      name: z.string().describe("Display name for the item"),
+      name: z.string().optional().describe("Display name for the item (default: the sample's own name)"),
       tag: z.string().optional().describe("Item tag (default: the new resref, upper-case)"),
-      description: z.string().optional().describe("Item description (default: none)"),
+      description: z.string().optional().describe("Item description (default: the sample's own, or none)"),
     },
     { destructiveHint: true },
     async ({ sample, resref, name, tag, description }) => {
-      {
-        const bad = resrefError(resref);
-        if (bad) return bad;
-      }
-      const index = requireIndex();
-      const key = `${resref.toLowerCase()}.uti`;
-      if (index.resources.has(key)) return errorResult(`Resource already exists: ${key}`);
-      let doc: GffObj;
-      try {
-        doc = JSON.parse(await fs.readFile(path.join(rawDir(), "treasure-blueprints", `${sample.toLowerCase()}.uti.json`), "utf8")) as GffObj;
-      } catch {
-        return errorResult(`No catalog sample "${sample}" (adventures/_catalog/treasure-blueprints). Build the catalog with build_treasure_catalog first.`);
-      }
-      const resrefLower = resref.toLowerCase();
-      setField(doc, "Tag", "cexostring", tag ?? resref.toUpperCase());
-      setField(doc, "TemplateResRef", "resref", resrefLower);
-      doc.LocalizedName = { type: "cexolocstring", value: { "0": name } };
-      const desc = { type: "cexolocstring", value: { "0": description ?? "" } };
-      doc.Description = desc;
-      doc.DescIdentified = { ...desc };
-      setField(doc, "Identified", "byte", 1);
-      setField(doc, "Plot", "byte", 0);
-      const file = path.join(index.tempDir, key);
-      await jsonToGff(doc as unknown as GffDocument, file);
-      const stat = await fs.stat(file);
-      index.resources.set(key, { resref: resrefLower, extension: "uti", filePath: file, sizeBytes: stat.size });
-      index.parsedGff.set(key, doc as unknown as GffDocument);
-      return text({ success: true, created: key, name, from: sample, sizeBytes: stat.size });
+      const r = await importSample(requireIndex(), sample, resref, { name, tag, description });
+      if ("error" in r) return errorResult(r.error);
+      return text({ success: true, ...r });
     },
   );
+
+  server.tool(
+    "import_treasure_set",
+    "Import a band of the treasure catalog into the loaded module in one call, so the random-treasure pool (create_treasure_system) has items that fit the module's levels instead of the whole catalog. " +
+      "Choose the value tiers (1-5; for a level 1-4 module tiers 1-3 are plenty: higher tiers would almost never roll at those challenge ratings), the kinds, and how many items per kind and tier (spread evenly across the value range). Items keep their own names (resolved from the talk tables; a name that cannot be resolved becomes the base item's label) and are given the resref prefix `tr_` + the sample's resref (16 characters at most), skipping resrefs the module already has. " +
+      "Plot items and free items are never imported. Run create_treasure_system afterwards to put them in the pool.",
+    {
+      minTier: optNumParam("Lowest value tier to import (default 1)"),
+      maxTier: optNumParam("Highest value tier to import (default 3)"),
+      groups: z.string().optional().describe("Comma-separated kinds (weapon, armor, shield, helmet, cloak, boots, gloves, belt, ring, amulet, ranged, ammo, thrown, potion, scroll, wand, gem, misc); default: all but misc and gem"),
+      perGroupTier: optNumParam("Items per kind and tier (default 6)"),
+      prefix: z.string().optional().describe("Resref prefix (default tr_; keep it short)"),
+    },
+    { destructiveHint: true },
+    async ({ minTier, maxTier, groups, perGroupTier, prefix }) => {
+      const index = requireIndex();
+      const items = await loadItems();
+      if (items.length === 0) return errorResult("No per-item summaries (adventures/_catalog/treasure.json): run build_treasure_catalog first.");
+      const lo = minTier !== undefined ? Number(minTier) : 1;
+      const hi = maxTier !== undefined ? Number(maxTier) : 3;
+      const per = perGroupTier !== undefined ? Number(perGroupTier) : 6;
+      const want = groups ? new Set(groups.split(",").map((g) => g.trim().toLowerCase())) : undefined;
+      const pre = (prefix ?? "tr_").toLowerCase();
+      const chosen: ItemSummary[] = [];
+      const buckets = new Map<string, ItemSummary[]>();
+      for (const s of items) {
+        if (s.plot || s.cost <= 0 || s.tier < lo || s.tier > hi) continue;
+        if (want ? !want.has(s.group) : s.group === "misc" || s.group === "gem") continue;
+        const k = `${s.group}|${s.tier}`;
+        (buckets.get(k) ?? buckets.set(k, []).get(k))?.push(s);
+      }
+      for (const list of buckets.values()) {
+        list.sort((a, b) => a.cost - b.cost);
+        if (list.length <= per) chosen.push(...list);
+        else for (let i = 0; i < per; i++) chosen.push(list[Math.floor(((i + 0.5) * list.length) / per)]);
+      }
+      const done: string[] = [];
+      const failed: string[] = [];
+      for (const s of chosen) {
+        const resref = `${pre}${s.resref}`.slice(0, 16);
+        if (index.resources.has(`${resref}.uti`)) continue;
+        const unnamed = s.name === s.tag || s.name === s.resref;
+        const r = await importSample(index, s.resref, resref, { name: unnamed ? s.baseLabel : undefined });
+        if ("error" in r) failed.push(`${s.resref}: ${r.error}`);
+        else done.push(resref);
+      }
+      return text({ success: true, imported: done.length, failed: failed.slice(0, 5), tiers: `${lo}-${hi}`, perGroupTier: per, next: "create_treasure_system" });
+    },
+  );
+
   server.tool(
     "create_treasure_system",
     "Write the random-treasure include (inc_treasure) and a container OnOpen script (a_trs_open) into the module: The Frozen North's loot selection, ported. A random item is picked by kind (potions most common, then jewels, scrolls, melee, ranged, apparel, armour, ...) and value tier, and the tier weights follow the area's challenge rating (tier 1 always, tier 2 grows with the CR, tiers 3, 4 and 5 start to appear around CR 7, 10 and 13). " +

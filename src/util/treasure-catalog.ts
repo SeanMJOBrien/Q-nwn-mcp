@@ -43,6 +43,8 @@ export interface TreasureLookups {
   /** baseitems.2da EquipableSlots bitmask (0 when unknown). */
   baseItemSlots(n: number): number;
   propName(n: number): string;
+  /** Text of a talk-table string, for items whose name is a string reference (base-game or the world's own table). */
+  strref?(n: number): string | undefined;
 }
 
 // --- value tiers and levels
@@ -107,6 +109,11 @@ function isEnchant(p: PropSummary): boolean {
   return ENCHANT_PROPS.has(p.id);
 }
 
+function strrefName(doc: GffObj, look: TreasureLookups): string | undefined {
+  const ln = doc.LocalizedName as { id?: number } | undefined;
+  return ln && typeof ln.id === "number" && look.strref ? look.strref(ln.id) : undefined;
+}
+
 export function summarizeItem(doc: GffObj, resref: string, look: TreasureLookups): ItemSummary {
   const baseItem = getFieldNum(doc, "BaseItem");
   const baseLabel = look.baseItemLabel(baseItem);
@@ -124,7 +131,7 @@ export function summarizeItem(doc: GffObj, resref: string, look: TreasureLookups
   const enchantProp = props.find(isEnchant);
   return {
     resref,
-    name: getFieldLocStr(doc, "LocalizedName") || getFieldStr(doc, "Tag") || resref,
+    name: getFieldLocStr(doc, "LocalizedName") || strrefName(doc, look) || getFieldStr(doc, "Tag") || resref,
     tag: getFieldStr(doc, "Tag"),
     baseItem,
     baseLabel,
