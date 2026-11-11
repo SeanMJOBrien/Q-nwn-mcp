@@ -8,7 +8,7 @@ import { requireIndex } from "../module-loader.js";
 import { gffToJson, jsonToGff } from "../nim-tools.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { adventureBase } from "../util/adventure-dir.js";
-import { setField } from "../types/gff.js";
+import { getFieldList, getFieldNum, setField } from "../types/gff.js";
 import { optNumParam } from "../util/params.js";
 import { resolveBlueprint } from "../util/git-helpers.js";
 import { buildResmanOptions } from "../module-loader.js";
@@ -170,6 +170,26 @@ export async function runTreasureBuild(
   };
 }
 
+/** Why a sample cannot work in the loaded module: a base item or item property row the module's 2DAs lack (the source world's own tables), or a model that would not render. */
+export function importIssue(doc: GffObj, index: import("../types/module.js").ModuleIndex): string | undefined {
+  const base = index.twodaTables.get("baseitems")?.rows;
+  const props = index.twodaTables.get("itempropdef")?.rows;
+  const baseItem = getFieldNum(doc, "BaseItem");
+  const baseRow = base?.get(baseItem);
+  if (base && !baseRow) return `base item ${baseItem} is not in the module's baseitems.2da`;
+  for (const p of getFieldList(doc, "PropertiesList")) {
+    const id = getFieldNum(p, "PropertyName");
+    if (props && !props.has(id)) return `item property ${id} is not in the module's itempropdef.2da`;
+  }
+  if (baseRow) {
+    const modelType = Number(baseRow.ModelType);
+    const part1 = getFieldNum(doc, "ModelPart1");
+    if (modelType === 2 && (part1 === 0 || getFieldNum(doc, "ModelPart2") === 0 || getFieldNum(doc, "ModelPart3") === 0)) return "a composite model with a model part of 0 (would render as a blob)";
+    if (modelType === 0 && part1 === 0) return "no model (ModelPart1 is 0)";
+  }
+  return undefined;
+}
+
 /** Copy one catalog sample into the loaded module as an item blueprint. */
 async function importSample(
   index: import("../types/module.js").ModuleIndex,
@@ -188,6 +208,8 @@ async function importSample(
   } catch {
     return { error: `No catalog sample "${sample}" (adventures/_catalog/treasure-blueprints). Build the catalog with build_treasure_catalog first.` };
   }
+  const issue = importIssue(doc, index);
+  if (issue) return { error: `${sample} cannot be used in this module: ${issue}` };
   setField(doc, "Tag", "cexostring", opts.tag ?? resref.toUpperCase());
   setField(doc, "TemplateResRef", "resref", resrefLower);
   if (opts.name !== undefined) doc.LocalizedName = { type: "cexolocstring", value: { "0": opts.name } };
