@@ -400,13 +400,27 @@ void CL_GearWeapon(object oCreature)
 {
     if (!GetIsObjectValid(oCreature)) return;
     if (CL_WantsWeapon(oCreature))
-        CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 1, CL_GearLeft(oCreature, 45), 0), INVENTORY_SLOT_RIGHTHAND, 0));
+    {
+        // Preferred weapon within the usual share, else within everything left, else any affordable weapon: never unarmed.
+        object oWeapon = CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 1, CL_GearLeft(oCreature, 45), 0);
+        if (!GetIsObjectValid(oWeapon)) oWeapon = CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 1, CL_GearLeft(oCreature, 0), 0);
+        if (!GetIsObjectValid(oWeapon))
+        {
+            string sPreferred = GetLocalString(oCreature, "MCP_GEAR_WEAPONS");
+            DeleteLocalString(oCreature, "MCP_GEAR_WEAPONS");
+            oWeapon = CL_Pick(oCreature, INVENTORY_SLOT_RIGHTHAND, 1, CL_GearLeft(oCreature, 0), 0);
+            SetLocalString(oCreature, "MCP_GEAR_WEAPONS", sPreferred);
+        }
+        CL_GearSpend(oCreature, CL_Buy(oCreature, oWeapon, INVENTORY_SLOT_RIGHTHAND, 0));
+    }
     // The off-hand choice depends on the equipped weapon, so wait for the equip action.
     DelayCommand(1.0, CL_GearOffhand(oCreature));
 }
 
 void CL_Gear(object oCreature)
 {
+    // A creature levelling in play keeps the gear it has: never shop for it.
+    if (GetLocalInt(oCreature, "MCP_RELEVEL_BUSY") > 0) { DelayCommand(0.2, CL_Finish(oCreature)); return; }
     float fWealth = GetLocalFloat(oCreature, "MCP_GEAR_WEALTH");
     SetLocalInt(oCreature, "MCP_GOLD_BEFORE", GetGold(oCreature));
     if (fWealth <= 0.0) { CL_GearDone(oCreature); return; }

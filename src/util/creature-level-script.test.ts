@@ -230,5 +230,14 @@ describe("wizard school", () => {
     // the kept spells are collected before the domain slot and the random picks
     expect(src.indexOf("GetSpellAbilitySpell(oCreature, nHeld)")).toBeLessThan(src.indexOf("int nOffset = Random(nPoolSize);"));
   });
-});
 
+  it("never leaves a creature unarmed: weapon fallbacks, and no shopping while re-levelling in play", () => {
+    const src = generateCreatureLevelInclude();
+    // preferred within the share, preferred within what is left, then any affordable weapon
+    expect(src).toContain("Preferred weapon within the usual share");
+    expect(src).toContain('DeleteLocalString(oCreature, "MCP_GEAR_WEAPONS")');
+    // CL_Gear itself refuses to shop for a creature being re-levelled (guards a spawn/re-level race)
+    const gear = src.slice(src.indexOf("void CL_Gear(object oCreature)"));
+    expect(gear.indexOf('"MCP_RELEVEL_BUSY"')).toBeLessThan(gear.indexOf("CL_GearSpend"));
+  });
+});
