@@ -26,7 +26,7 @@ import {
 } from "../util/creature-level-script.js";
 import { estimateCRFromLevel } from "../util/encounter-difficulty.js";
 import { EQUIP_SLOT_MAP } from "../util/equip-slots.js";
-import { mergeVarTable, resolveBlueprint } from "../util/git-helpers.js";
+import { getVarTableEntries, mergeVarTable, resolveBlueprint } from "../util/git-helpers.js";
 import type { PowerLevel } from "../util/npc-stat-block.js";
 import { pickWeaponPreference, seedHash } from "../util/npc-weapon-preferences.js";
 import { toF, toI } from "../util/params.js";
@@ -471,8 +471,11 @@ export async function forgeCreature(
 
   // 5. Wire the spawn wrapper, remembering the original handler.
   const current = getFieldStr(obj, "ScriptSpawn");
+  // Forging again must not lose the handler the first forge remembered (a companion's x0_ch_hen_spawn): when the spawn script is
+  // already the wrapper, keep MCP_ORIG_SPAWN as it is.
+  const remembered = getVarTableEntries(obj).find((v) => v.name.toUpperCase() === "MCP_ORIG_SPAWN" && typeof v.value === "string")?.value as string | undefined;
   const originalSpawn =
-    params.originalSpawn ?? (current === CREATURE_LEVEL_WRAPPER ? "nw_c2_default9" : current || "nw_c2_default9");
+    params.originalSpawn ?? (current === CREATURE_LEVEL_WRAPPER ? remembered || "nw_c2_default9" : current || "nw_c2_default9");
   mergeVarTable(obj, [{ name: "MCP_ORIG_SPAWN", type: "string", value: originalSpawn }]);
   setField(obj, "ScriptSpawn", "resref", CREATURE_LEVEL_WRAPPER);
 
