@@ -39,8 +39,13 @@ export interface PcLook {
   Color_Hair: number;
   /** 0 normal or 2 big, at the rate hand-built creatures use them. */
   Phenotype: number;
+  /** Slight size variation: 0.95 to 1.05 of normal (see SCALE_RANGE). */
+  Scale: number;
   SoundSetFile?: number;
 }
+
+/** The size variation allowed either way: a creature is shown between 95 % and 105 % of its normal size (user decision 2026-11-11). */
+export const SCALE_RANGE = 0.05;
 
 /** The player voice sets (soundset.2da rows with TYPE 0) by gender (0 male, 1 female). */
 export interface PcVoices {
@@ -103,7 +108,9 @@ export function pickPcLook(appearance: number, gender: 0 | 1, seed: string, voic
     Color_Skin: weighted(poolFor(appearance, gender, "skin"), rnd()) ?? 1,
     Color_Hair: weighted(poolFor(appearance, gender, "hair"), rnd()) ?? 1,
     Phenotype: weighted(Object.entries(data().phenotype ?? { 0: 1 }).map(([k, w]) => [Number(k), w] as [number, number]), rnd()) ?? 0,
+    Scale: 1,
   };
+  look.Scale = Math.round((1 - SCALE_RANGE + 2 * SCALE_RANGE * rnd()) * 1000) / 1000;
   const v = voices?.[gender];
   if (v && v.length > 0) look.SoundSetFile = v[Math.floor(rnd() * v.length)];
   return look;

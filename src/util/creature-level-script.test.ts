@@ -240,4 +240,16 @@ describe("wizard school", () => {
     const gear = src.slice(src.indexOf("void CL_Gear(object oCreature)"));
     expect(gear.indexOf('"MCP_RELEVEL_BUSY"')).toBeLessThan(gear.indexOf("CL_GearSpend"));
   });
+
+  it("scales every creature slightly at spawn: 95 % to 105 % by default, configurable, off at 0, and kept across the rebuild", () => {
+    const src = generateCreatureLevelInclude();
+    expect(src).toContain("const float CL_SCALE_RANGE = 0.05;");
+    expect(src).toContain("SetObjectVisualTransform(oCreature, OBJECT_VISUAL_TRANSFORM_SCALE, fScale);");
+    expect(src).toContain("1.0 - CL_SCALE_RANGE + 2.0 * CL_SCALE_RANGE * IntToFloat(Random(1001)) / 1000.0");
+    // applied first thing at every spawn, including the rebuilt copy (which keeps MCP_SCALE as a local)
+    expect(src).toMatch(/void CL_OnSpawn\(object oCreature\)\n\{\n    CL_ApplyScale\(oCreature\);/);
+    expect(generateCreatureLevelInclude({ scalePercent: 0 })).toContain("const float CL_SCALE_RANGE = 0;");
+    expect(generateCreatureLevelInclude({ scalePercent: 3 })).toContain("const float CL_SCALE_RANGE = 0.03;");
+    expect(generateCreatureLevelInclude({ scalePercent: 90 })).toContain("const float CL_SCALE_RANGE = 0.25;");
+  });
 });

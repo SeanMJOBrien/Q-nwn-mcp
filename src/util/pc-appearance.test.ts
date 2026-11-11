@@ -55,6 +55,19 @@ describe("pc appearance", () => {
     expect(pickPcLook(6, 0, "x")?.SoundSetFile).toBeUndefined(); // no voices given: voice left alone
   });
 
+  it("gives each a size between 95 % and 105 % of normal", () => {
+    let min = 2;
+    let max = 0;
+    for (let i = 0; i < 500; i++) {
+      const s = pickPcLook(6, 0, `z${i}`)?.Scale ?? 0;
+      min = Math.min(min, s);
+      max = Math.max(max, s);
+    }
+    expect(min).toBeGreaterThanOrEqual(0.95);
+    expect(max).toBeLessThanOrEqual(1.05);
+    expect(max - min).toBeGreaterThan(0.08); // it really varies
+  });
+
   it("gives a normal body most of the time and the big body now and then", () => {
     const seen = new Map<number, number>();
     for (let i = 0; i < 2000; i++) {

@@ -43,7 +43,8 @@ export const GENERATED_SCRIPTS: GeneratedScript[] = [
       const stores = /const string CL_STORES = "([^"]*)";/.exec(existing)?.[1];
       const droppable = /const int CL_DROPPABLE = (\d);/.exec(existing)?.[1];
       if (stores === undefined || droppable === undefined) return undefined;
-      return generateCreatureLevelInclude({ stores: stores.split(",").filter(Boolean), droppable: droppable === "1" });
+      const range = /const float CL_SCALE_RANGE = ([0-9.]+);/.exec(existing)?.[1];
+      return generateCreatureLevelInclude({ stores: stores.split(",").filter(Boolean), droppable: droppable === "1", ...(range !== undefined ? { scalePercent: Math.round(Number(range) * 100) } : {}) });
     },
   },
   { resref: "cf_spawn", tool: "create_creature_level_system", regenerate: () => generateCreatureLevelWrapper() },

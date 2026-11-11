@@ -532,11 +532,12 @@ export async function writeCreatureLevelSystem(
   index: ModuleIndex,
   stores?: string[],
   droppable?: boolean,
+  scalePercent?: number,
 ): Promise<{ include: string; wrapper: string; compiled: boolean; compilerOutput?: string; stores: string[] }> {
   await writeAndCompileScript(
     index,
     CREATURE_LEVEL_INCLUDE,
-    generateCreatureLevelInclude({ stores, droppable }),
+    generateCreatureLevelInclude({ stores, droppable, scalePercent }),
     false,
   );
   const wrapper = await writeAndCompileScript(index, CREATURE_LEVEL_WRAPPER, generateCreatureLevelWrapper(), true);
@@ -563,9 +564,10 @@ export function registerCreatureForgeTools(server: McpServer): void {
         .optional()
         .describe('JSON array of store tags or resrefs, e.g. ["nw_storeweap001","my_smith"]'),
       droppable: z.boolean().optional().describe("Whether bought gear can drop as loot (default true)"),
+      scalePercent: z.string().optional().describe("Slight size variation at spawn: each creature is shown between (100 - n) % and (100 + n) % of its normal size (default 5; 0 turns it off; at most 25)"),
     },
     { destructiveHint: true },
-    async ({ stores, droppable }) => {
+    async ({ stores, droppable, scalePercent }) => {
       const index = requireIndex();
       let storeList: string[] | undefined;
       if (stores) {
@@ -575,7 +577,7 @@ export function registerCreatureForgeTools(server: McpServer): void {
           return { content: [{ type: "text", text: "stores must be a JSON array of strings" }], isError: true };
         }
       }
-      const result = await writeCreatureLevelSystem(index, storeList, droppable);
+      const result = await writeCreatureLevelSystem(index, storeList, droppable, scalePercent !== undefined ? Number(scalePercent) : undefined);
       return {
         content: [{ type: "text", text: JSON.stringify({ success: result.compiled, ...result }, null, 2) }],
         ...(result.compiled ? {} : { isError: true }),
