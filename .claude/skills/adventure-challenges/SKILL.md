@@ -91,6 +91,7 @@ rules to sanity-check the counts above:
 
 - **EL = APL is a standard encounter** — it costs the party roughly 20-25% of its daily
   resources, and four of them make an adventuring day. Design most groups here.
+- **"CR N" in a request is the whole fight's EL.** A "CR 6 battle" is encounter level 6 for everything the party faces together, not the boss's own CR; `compose_encounter(targetEL)` builds to it.
 - **The baseline party is four characters.** EL = APL assumes four. A solo player facing an
   EL = APL group is facing four characters' worth of opposition.
 - **Doubling the number of identical creatures is +2 EL, not +CR.** Two CR 3 orcs are EL 5,

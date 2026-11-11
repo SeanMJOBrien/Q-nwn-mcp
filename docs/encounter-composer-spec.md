@@ -10,6 +10,8 @@ powerLevel `tougher`, faction Hostile): it levels, buys gear and gets spell abil
 The `casterSystem` param, the hand-built stat block, the clothing-only gear and the separate spell
 wrappers described in F6 below are gone. Earlier composed bosses also had no faction set (0 = player).
 
+**Decision 2026-11-11 (TODO #39):** "a CR 6 battle" means the whole fight's Encounter Level is 6, not the boss's own CR. `targetEL` is that figure; `bossCR` is optional and defaults to `targetEL` (the boss alone carries the fight). A lower `bossCR` adds a support cluster; the two ELs are still reported separately because the DMG's rule for combining different-CR groups was never found.
+
 ## Why this exists
 
 The user's stated goal: an LLM should be able to say something like *"I need a

@@ -86,11 +86,14 @@ export function registerEncounterComposerTools(server: McpServer): void {
           `Archetype name (case-insensitive). Currently recognized: ${Object.keys(ARCHETYPES).join(", ")}. ` +
             "An unrecognized role returns an error naming the recognized list — never a guessed mapping.",
         ),
-      bossCR: numParam(
-        "The boss's own target CR (and, via the archetype's levelForCR, its class level). This tool does not " +
-          "derive the boss's power level from targetEL — see this file's own header comment for why.",
+      bossCR: optNumParam(
+        "The boss's own CR (and, via the archetype's levelForCR, its class level). Default: targetEL, so the boss " +
+          "carries the whole fight alone. Give a lower value to add support creatures.",
       ),
-      targetEL: numParam("Desired overall Encounter Level for the fight."),
+      targetEL: numParam(
+        "Desired Encounter Level of the WHOLE fight. A request for 'a CR 6 battle' means this (user decision, " +
+          "2026-11-11): EL 6 for the entire fight, not the boss's own CR. With bossCR omitted the boss is built at CR = targetEL.",
+      ),
       partyLevel: optNumParam(
         "Average party level, used only to band the boss's and the support cluster's difficulty " +
           "(trivial/easy/standard/hard/deadly) for human-readable context — not part of the EL math itself.",
@@ -130,8 +133,9 @@ export function registerEncounterComposerTools(server: McpServer): void {
         };
       }
 
-      const bossCRNum = toF(bossCR);
+      // 'CR N' in a request is the whole fight's EL (user decision 2026-11-11): the boss alone is that fight unless a lower bossCR is given.
       const targetELNum = toF(targetEL);
+      const bossCRNum = bossCR !== undefined ? toF(bossCR) : targetELNum;
       const partyLevelNum = partyLevel !== undefined ? toI(partyLevel) : undefined;
       const partySizeNum = partySize !== undefined ? toI(partySize) : undefined;
       const bossLevel = archetype.levelForCR(bossCRNum);
@@ -159,6 +163,8 @@ export function registerEncounterComposerTools(server: McpServer): void {
           band: bossBand,
         },
         bossAloneSufficient: plan.bossAloneSufficient,
+        targetEL: targetELNum,
+        bossCrDerived: bossCR === undefined,
         support:
           plan.support && supportCandidate
             ? {

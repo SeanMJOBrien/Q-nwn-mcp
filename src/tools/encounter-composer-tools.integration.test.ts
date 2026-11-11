@@ -75,6 +75,25 @@ describe("compose_encounter", () => {
     }
   });
 
+  it("reads 'a CR 6 battle' as the whole fight: with no bossCR the boss is built at CR = targetEL (#39)", async () => {
+    const { client, cleanup } = await createTestClient();
+    try {
+      const parsed = json(await client.callTool({ name: "compose_encounter", arguments: { role: "necromancer", targetEL: "6" } }));
+      expect(parsed.success).toBe(true);
+      expect(parsed.targetEL).toBe(6);
+      expect(parsed.bossCrDerived).toBe(true);
+      expect((parsed.boss as { cr: number }).cr).toBe(6);
+      expect(parsed.bossAloneSufficient).toBe(true);
+      expect(parsed.support).toBeNull();
+      // a lower bossCR still means a lower-CR boss with support filling the rest
+      const withSupport = json(await client.callTool({ name: "compose_encounter", arguments: { role: "necromancer", bossCR: "3", targetEL: "6" } }));
+      expect(withSupport.bossCrDerived).toBe(false);
+      expect(withSupport.bossAloneSufficient).toBe(false);
+    } finally {
+      await cleanup();
+    }
+  });
+
   it("computes a real undead support cluster when the boss alone falls short of the target", async () => {
     const { client, cleanup } = await createTestClient();
     try {
