@@ -40,6 +40,7 @@ import { listOf, loadScriptSources, Report } from "../util/verify/common.js";
 import { findStaleGenerated } from "../util/stale-scripts.js";
 import { verifyDialog } from "../util/verify/dialog.js";
 import { verifyFaction, verifyJournal, verifyModuleInfo } from "../util/verify/journal.js";
+import { verifyEncounterChain } from "../util/verify/encounter-chain.js";
 import { verifyJournalPartyFlags, verifyPartyQuestState, verifyPartyRewards } from "../util/verify/scripts.js";
 
 /** Wrap a result set in the standard MCP text payload. */
@@ -241,6 +242,13 @@ export async function collectVerifyResults(
     }
   }
 
+  // Multi-part encounters: every spawn has a waypoint, a blueprint and a stage that triggers it.
+  {
+    const chain = new Report("encounter chains", "chain");
+    verifyEncounterChain(chain, index);
+    if (chain.errors.length > 0 || chain.warnings.length > 0) results.push(chain.result());
+  }
+
   // Co-op rules — module-wide, not per-asset.
   const coopReport = new Report("module", "coop");
   const coopOpts = { enforce: coop !== false, perPlayerScripts: perPlayerScripts(index) };
@@ -385,6 +393,18 @@ export function registerVerifyTools(server: McpServer): void {
   );
 
   // ─── Journal, module info, faction ──────────────────────────────────────
+
+  server.tool(
+    "verify_encounter_chain",
+    "Verify multi-part encounters (a lookout, then the main force): every spawn (a quest stage's spawn variables, a dialog line's spawn= parameters, a check's pass_spawn/fail_spawn) needs a waypoint to spawn at, a creature blueprint, and, for stage spawns, the stage variable that triggers it; two spawns sharing a key mean the second never happens; a spawned group that carries no quest variable advances nothing. Also part of verify_all.",
+    {},
+    { readOnlyHint: true, idempotentHint: true },
+    async () => {
+      const report = new Report("encounter chains", "chain");
+      verifyEncounterChain(report, requireIndex());
+      return { content: [{ type: "text" as const, text: JSON.stringify(report.result(), null, 2) }] };
+    },
+  );
 
   server.tool(
     "verify_journal",

@@ -914,6 +914,11 @@ export class QuestBuilder {
     if (sp.count && sp.count > 1) params.spawn_count = String(sp.count);
     if (sp.tag) params.spawn_tag = sp.tag;
     if (sp.hostile === false) params.spawn_hostile = "0";
+    if (sp.flag) {
+      params.spawn_flag = sp.flag.var;
+      if (sp.flag.ifSet !== undefined) params.spawn_flag_set = String(sp.flag.ifSet);
+      if (sp.flag.ifUnset !== undefined) params.spawn_flag_unset = String(sp.flag.ifUnset);
+    }
     return params;
   }
 
@@ -1075,6 +1080,8 @@ export class QuestBuilder {
       if (sp.spawn_count) vars.push({ name: `quest${slot}_spawn_count`, type: "string", value: sp.spawn_count });
       if (sp.spawn_tag) vars.push({ name: `quest${slot}_spawn_tag`, type: "string", value: sp.spawn_tag });
       if (sp.spawn_hostile) vars.push({ name: `quest${slot}_spawn_hostile`, type: "string", value: sp.spawn_hostile });
+      for (const k of ["flag", "flag_set", "flag_unset"] as const)
+        if (sp[`spawn_${k}`]) vars.push({ name: `quest${slot}_spawn_${k}`, type: "string", value: sp[`spawn_${k}`] });
       this.setVars(owner, vars);
     }
     this.report.stages.push({

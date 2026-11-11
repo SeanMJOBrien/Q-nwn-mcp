@@ -35,14 +35,14 @@ function journalTexts(journal: GffObj): Map<string, string> {
   return out;
 }
 
-interface DialogUse {
+export interface DialogUse {
   dialog: string;
   actionParams: Record<string, string>[];
   conditionParams: Record<string, string>[];
   scripts: string[];
 }
 
-function dialogUses(index: ModuleIndex): DialogUse[] {
+export function dialogUses(index: ModuleIndex): DialogUse[] {
   const out: DialogUse[] = [];
   for (const [key, doc] of index.parsedGff) {
     if (!key.endsWith(".dlg")) continue;
@@ -63,7 +63,7 @@ function dialogUses(index: ModuleIndex): DialogUse[] {
   return out;
 }
 
-function gitObjects(index: ModuleIndex): Array<{ area: string; list: string; obj: GffObj }> {
+export function gitObjects(index: ModuleIndex): Array<{ area: string; list: string; obj: GffObj }> {
   const out: Array<{ area: string; list: string; obj: GffObj }> = [];
   for (const area of index.areas.keys()) {
     const git = index.parsedGff.get(`${area}.git`) as GffObj | undefined;

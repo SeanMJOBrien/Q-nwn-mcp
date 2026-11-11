@@ -233,6 +233,24 @@ void QuestGiveItem(object oPC, string sItem)
     }
 }
 
+// The outcome of an earlier part picks the count: sFlag is a module variable (set by a dialog line's set_var); sIfSet / sIfUnset are the
+// counts when it is set (non-empty, not "0") and when it is not. Returns -1 when the picked count is 0 (the spawn does not happen).
+int QuestOutcomeCount(int nCount, string sFlag, string sIfSet, string sIfUnset)
+{
+    if (sFlag == "") return nCount;
+    string sValue = GetLocalString(GetModule(), sFlag);
+    int bSet = sValue != "" && sValue != "0";
+    string sPick = bSet ? sIfSet : sIfUnset;
+    if (sPick == "") return nCount;
+    int nPick = StringToInt(sPick);
+    if (nPick < 1)
+    {
+        WriteTimestampedLogEntry("[QUEST] spawn skipped by outcome flag=" + sFlag + " set=" + IntToString(bSet));
+        return -1;
+    }
+    return nPick;
+}
+
 // Creates nCount creatures (blueprint sResref) at the waypoint tagged sAt: once per key (module local QS_SPAWN_<key>), only at a real
 // waypoint, not while a creature tagged sTag is still alive, 1.5 m apart, Hostile when bHostile. Used by q_act (spawn=) and by QuestAdvance
 // (a stage's questK_spawn locals, so a kill/explore/trigger/use/search stage can bring the next group in).
@@ -304,9 +322,13 @@ int QuestAdvance(object oObject, object oPC, int nSlot, string sVia = "")
     if (sSelfScript != "") ExecuteScript(sSelfScript, oObject);
     string sSpawn = GetLocalString(oObject, sBase + "_spawn");
     if (sSpawn != "")
-        QuestSpawn(sSpawn, GetLocalString(oObject, sBase + "_spawn_at"), GetLocalString(oObject, sBase + "_spawn_key"),
-            GetLocalString(oObject, sBase + "_spawn_tag"), StringToInt(GetLocalString(oObject, sBase + "_spawn_count")),
-            GetLocalString(oObject, sBase + "_spawn_hostile") != "0");
+    {
+        int nSpawn = QuestOutcomeCount(StringToInt(GetLocalString(oObject, sBase + "_spawn_count")), GetLocalString(oObject, sBase + "_spawn_flag"),
+            GetLocalString(oObject, sBase + "_spawn_flag_set"), GetLocalString(oObject, sBase + "_spawn_flag_unset"));
+        if (nSpawn != -1)
+            QuestSpawn(sSpawn, GetLocalString(oObject, sBase + "_spawn_at"), GetLocalString(oObject, sBase + "_spawn_key"),
+                GetLocalString(oObject, sBase + "_spawn_tag"), nSpawn, GetLocalString(oObject, sBase + "_spawn_hostile") != "0");
+    }
 
     WriteTimestampedLogEntry("[QUEST] advance tag=" + sTag + " stage=" + IntToString(nStage) + " via=" + sVia
         + " pc=" + GetName(oPC) + " object=" + GetTag(oObject));
@@ -711,7 +733,7 @@ int StartingConditional()
 //   take_gold=N               take gold from the speaker            set_var=<name> var_value=<v>  module local string
 //   hostile=1                 this NPC turns hostile (a fight)      leave=1   this NPC walks off and disappears
 //   unlock=<door tag> [open=1]  unlock (and open) a door           destroy=<tag>  destroy the nearest object with tag
-//   spawn=<resref> at=<waypoint tag> [spawn_count=N spawn_tag=T spawn_key=K spawn_hostile=0]  create creature(s) there, once      escort=K  this NPC starts following the speaker
+//   spawn=<resref> at=<waypoint tag> [spawn_count=N spawn_tag=T spawn_key=K spawn_hostile=0 spawn_flag=<var> spawn_flag_set=N spawn_flag_unset=N]  create creature(s) there, once      escort=K  this NPC starts following the speaker
 //   join=1                    this NPC joins the speaker's party     dismiss=<tag>  that companion leaves the party, comes here
 #include "inc_quest"
 
@@ -778,8 +800,13 @@ void main()
 
     s = GetScriptParam("spawn");
     if (s != "")
-        QuestSpawn(s, GetScriptParam("at"), GetScriptParam("spawn_key"), GetScriptParam("spawn_tag"),
-            StringToInt(GetScriptParam("spawn_count")), GetScriptParam("spawn_hostile") != "0");
+    {
+        int nSpawn = QuestOutcomeCount(StringToInt(GetScriptParam("spawn_count")), GetScriptParam("spawn_flag"),
+            GetScriptParam("spawn_flag_set"), GetScriptParam("spawn_flag_unset"));
+        if (nSpawn != -1)
+            QuestSpawn(s, GetScriptParam("at"), GetScriptParam("spawn_key"), GetScriptParam("spawn_tag"), nSpawn,
+                GetScriptParam("spawn_hostile") != "0");
+    }
 
     s = GetScriptParam("escort");
     if (s != "" && !QuestEscortActive(OBJECT_SELF) && QuestIsEligible(OBJECT_SELF, oPC, StringToInt(s)))

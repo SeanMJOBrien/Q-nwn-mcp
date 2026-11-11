@@ -419,6 +419,31 @@ describe("build_quest", () => {
     }
   });
 
+  it("a spawn can depend on an earlier outcome: flag, ifSet and ifUnset reach the q_act line", async () => {
+    await addResource("bounty_orc.utc", { __data_type: "UTC ", ...creature("bounty_orc") });
+    const { c, done } = await client();
+    try {
+      const spec = JSON.stringify({
+        name: "Orc Bounty",
+        giver: "farmer_ned",
+        template: "bounty",
+        target: "bounty_orc",
+        spawn: { resref: "bounty_orc", area: "fold", x: 20, y: 20, count: 2, tag: "bounty_orc_1", flag: { var: "orc_alarm", ifSet: 5, ifUnset: 1 } },
+      });
+      expect(json(await c.callTool({ name: "build_quest", arguments: { spec } })).success).toBe(true);
+      const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+      const ned = getFieldList(git, "Creature List").find((x) => getFieldStr(x, "Tag") === "farmer_ned") as GffObj;
+      const dlg = mockIndex.parsedGff.get(`${getFieldStr(ned, "Conversation")}.dlg`) as unknown as GffObj;
+      const accept = getFieldList(dlg, "EntryList").find((e) => getFieldStr(e, "Script") === "q_act") as GffObj;
+      expect(getScriptParams(accept, "ActionParams")).toMatchObject({ spawn_flag: "orc_alarm", spawn_flag_set: "5", spawn_flag_unset: "1" });
+      const bad = (await c.callTool({ name: "build_quest", arguments: { spec: spec.replace('"ifSet":5', '"ifSet":9') } })) as { content: Array<{ text: string }>; isError?: boolean };
+      expect(bad.isError).toBe(true);
+      expect(bad.content[0].text).toContain("flag.ifSet");
+    } finally {
+      await done();
+    }
+  });
+
   it("an ability check with a named difficulty uses q_check; a plain skill check still uses q_roll", async () => {
     const { c, done } = await client();
     try {

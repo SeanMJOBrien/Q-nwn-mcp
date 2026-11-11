@@ -95,6 +95,12 @@ export interface StageSpawn {
   y?: number;
   /** Hostile faction (default true). */
   hostile?: boolean;
+  /**
+   * The outcome of an earlier part changes this one: a module variable (set by a dialog line's `set_var`, e.g. "alarm" raised when
+   * the lookout got away) picks the count. `ifSet` is the count when the variable is set (non-empty, not "0"); `ifUnset` when it is not.
+   * A count of 0 skips the spawn (the patrol never arrives). Counts are 0-8.
+   */
+  flag?: { var: string; ifSet?: number; ifUnset?: number };
 }
 
 /** A stage as the model writes it (only `do` and `journal` are needed for most kinds). */
@@ -241,6 +247,12 @@ function validateSpawn(sp: StageSpawn, n: number, kind: StageKind): void {
   if (!sp.at && !sp.area) throw new QuestSpecError(`stage ${n}: spawn needs an at (waypoint tag) or an area to place one in`);
   if (sp.count !== undefined && (!Number.isInteger(sp.count) || sp.count < 1 || sp.count > 8))
     throw new QuestSpecError(`stage ${n}: spawn count must be a whole number from 1 to 8`);
+  if (sp.flag) {
+    if (!/^[A-Za-z0-9_]{1,32}$/.test(sp.flag.var ?? "")) throw new QuestSpecError(`stage ${n}: spawn flag.var must be a variable name (letters, digits, underscore)`);
+    for (const [k, v] of [["ifSet", sp.flag.ifSet], ["ifUnset", sp.flag.ifUnset]] as const)
+      if (v !== undefined && (!Number.isInteger(v) || v < 0 || v > 8)) throw new QuestSpecError(`stage ${n}: spawn flag.${k} must be a whole number from 0 to 8`);
+    if (sp.flag.ifSet === undefined && sp.flag.ifUnset === undefined) throw new QuestSpecError(`stage ${n}: spawn flag needs ifSet or ifUnset`);
+  }
 }
 
 const TAG_RE = /^[a-z][a-z0-9_]*$/;
