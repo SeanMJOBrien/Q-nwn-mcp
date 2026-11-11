@@ -34,3 +34,8 @@ A container holds one item with chance 35 %, a second with 15 %, a third with 5 
 
 ## Differences from the source world
 The source sorts its item blueprints into staging chests at server start and also weighs rarity (common, uncommon, rare) and unique against generic items; here the pool is baked into the include from the module's items, and rarity and uniqueness are not modelled (not recorded in its blueprints). Creature drops of equipped items, guaranteed boss drops and the personal-loot bags are not ported; forged creatures keep their own gear drops (`CL_DROPPABLE`).
+
+## Self-contained: no NWNX, no database
+`inc_treasure` has no `#include` and uses only engine built-ins (`Random`, `atan`, `pow`, `GetLocalJson`/`SetLocalJson`, `JsonParse`, `CreateItemOnObject`). The pool lives in the include itself and is parsed once into a local on the module object. The source world's own system needs NWNX (`nwnx_item`, `nwnx_player`, `nwnx_visibility`), its staging area, a SQLite table and a stack of its own includes; none of that is used here.
+
+Checked in the headless engine (2026-11-11), 37-item pool: 200 rolls at CR 1 gave 158 tier-1 and 42 tier-2 items; at CR 8, 101 / 82 / 17 tier 1 / 2 / 3; at CR 14, 94 / 94 / 12. Tier 4 and 5 stayed absent in 200 rolls because the sample pool held only a few such items (they are rare by design too). A chest with `TR_GUARANTEED` 2 held 2 items after the first fill and still 2 after the second. One VM run stops after a few hundred rolls (each roll scans the pool: "too many instructions"), which a chest or a reward never approaches; spread bulk rolls over `DelayCommand`.
