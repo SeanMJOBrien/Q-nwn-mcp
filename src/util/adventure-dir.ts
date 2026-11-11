@@ -1,6 +1,6 @@
 /**
  * Where an LLM-built module keeps its own files: `adventures/<Title-With-Dashes>/` (git-ignored) holds the story
- * (adventure.md), the DM guide (dm-guide.md), the phase status and the recorded scope. The MCP temp dir stays the
+ * (`<Title-With-Dashes>.md`), the DM guide (`<Title-With-Dashes>-dm-guide.md`), the phase status and the recorded scope. The MCP temp dir stays the
  * working copy of the extracted .mod only; files an older run left in it are moved over on first use.
  */
 
@@ -9,13 +9,40 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 
-/** Files that belong to the adventure, not to the .mod archive. */
-export const ADVENTURE_FILES = {
+/** Files that belong to the adventure, not to the .mod archive (the names an older run used; see adventureFileName). */
+export const LEGACY_ADVENTURE_FILES = {
   story: "adventure.md",
   status: "adventure-status.json",
   scope: "project-scope.json",
   dmGuide: "dm-guide.md",
 } as const;
+
+export type AdventureFileKind = keyof typeof LEGACY_ADVENTURE_FILES;
+
+/** Suffix after the title slug (user rule 2026-11-11): every file carries the title so adventures can share one folder. */
+const NEW_SUFFIX: Record<AdventureFileKind, string> = {
+  story: ".md",
+  status: "-status.json",
+  scope: "-scope.json",
+  dmGuide: "-dm-guide.md",
+};
+
+/** File name of one adventure file inside adventure directory `dir` (`adventures/<Title-With-Dashes>`): `<Title-With-Dashes>.md` etc. */
+export function adventureFileName(dir: string, which: AdventureFileKind): string {
+  return `${path.basename(dir)}${NEW_SUFFIX[which]}`;
+}
+
+/** Full path of one adventure file inside `dir`. */
+export function adventurePath(dir: string, which: AdventureFileKind): string {
+  return path.join(dir, adventureFileName(dir, which));
+}
+
+/** Every adventure file name for `dir`, by kind. */
+export function adventureFileNames(dir: string): Record<AdventureFileKind, string> {
+  return Object.fromEntries(
+    (Object.keys(LEGACY_ADVENTURE_FILES) as AdventureFileKind[]).map((k) => [k, adventureFileName(dir, k)]),
+  ) as Record<AdventureFileKind, string>;
+}
 
 /** "The Salt Gate Conspiracy" -> "The-Salt-Gate-Conspiracy". Never empty, never contains a path separator. */
 export function slugTitle(title: string): string {
@@ -51,12 +78,19 @@ async function exists(file: string): Promise<boolean> {
 export async function ensureAdventureDir(index: { moduleName: string; tempDir: string }): Promise<string> {
   const dir = path.join(adventureBase(), slugTitle(index.moduleName));
   await fs.mkdir(dir, { recursive: true });
-  for (const name of Object.values(ADVENTURE_FILES)) {
-    const legacy = path.join(index.tempDir, name);
-    const target = path.join(dir, name);
-    if ((await exists(legacy)) && !(await exists(target))) {
-      await fs.copyFile(legacy, target);
-      await fs.rm(legacy);
+  for (const kind of Object.keys(LEGACY_ADVENTURE_FILES) as AdventureFileKind[]) {
+    const oldName = LEGACY_ADVENTURE_FILES[kind];
+    const target = adventurePath(dir, kind);
+    // A file an earlier run left in the temp dir, then one under the old (untitled) name in the directory itself.
+    const inTemp = path.join(index.tempDir, oldName);
+    const inDir = path.join(dir, oldName);
+    if (!(await exists(target))) {
+      if (await exists(inTemp)) {
+        await fs.copyFile(inTemp, target);
+        await fs.rm(inTemp);
+      } else if (await exists(inDir)) {
+        await fs.rename(inDir, target);
+      }
     }
   }
   return dir;
@@ -65,7 +99,7 @@ export async function ensureAdventureDir(index: { moduleName: string; tempDir: s
 /** Full path of one adventure file (the directory is created and legacy files migrated first). */
 export async function adventureFile(
   index: { moduleName: string; tempDir: string },
-  which: keyof typeof ADVENTURE_FILES,
+  which: AdventureFileKind,
 ): Promise<string> {
-  return path.join(await ensureAdventureDir(index), ADVENTURE_FILES[which]);
+  return adventurePath(await ensureAdventureDir(index), which);
 }

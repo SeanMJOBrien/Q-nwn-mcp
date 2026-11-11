@@ -76,12 +76,29 @@ describe("ensureAdventureDir", () => {
     await fs.writeFile(path.join(tempDir, "dm-guide.md"), "guide");
     const dir = await ensureAdventureDir({ moduleName: "The Salt Gate Conspiracy", tempDir });
     expect(dir).toBe(path.join(root, "adventures", "The-Salt-Gate-Conspiracy"));
-    expect(await fs.readFile(path.join(dir, "adventure.md"), "utf8")).toBe("# Adventure: X\n");
+    expect(await fs.readFile(path.join(dir, "The-Salt-Gate-Conspiracy.md"), "utf8")).toBe("# Adventure: X\n");
     await expect(fs.access(path.join(tempDir, "adventure.md"))).rejects.toThrow();
     // A second call leaves an existing copy alone.
     await fs.writeFile(path.join(tempDir, "adventure.md"), "newer legacy");
     await ensureAdventureDir({ moduleName: "The Salt Gate Conspiracy", tempDir });
-    expect(await fs.readFile(path.join(dir, "adventure.md"), "utf8")).toBe("# Adventure: X\n");
+    expect(await fs.readFile(path.join(dir, "The-Salt-Gate-Conspiracy.md"), "utf8")).toBe("# Adventure: X\n");
+  });
+  it("renames the untitled files an older run left in the adventure folder to the title-based names", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "adv-"));
+    dirs.push(root);
+    process.env.MCP_FOLDER_ADVENTURES = path.join(root, "adventures");
+    const tempDir = path.join(root, "temp");
+    await fs.mkdir(tempDir);
+    const dir = path.join(root, "adventures", "Two-Words");
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, "adventure.md"), "story");
+    await fs.writeFile(path.join(dir, "dm-guide.md"), "guide");
+    await fs.writeFile(path.join(dir, "adventure-status.json"), "{}");
+    await ensureAdventureDir({ moduleName: "Two Words", tempDir });
+    expect(await fs.readFile(path.join(dir, "Two-Words.md"), "utf8")).toBe("story");
+    expect(await fs.readFile(path.join(dir, "Two-Words-dm-guide.md"), "utf8")).toBe("guide");
+    expect(await fs.readFile(path.join(dir, "Two-Words-status.json"), "utf8")).toBe("{}");
+    await expect(fs.access(path.join(dir, "adventure.md"))).rejects.toThrow();
   });
   it("defaults to a git-ignored adventures folder in the repo", () => {
     expect(adventureBase().endsWith(`${path.sep}adventures`)).toBe(true);

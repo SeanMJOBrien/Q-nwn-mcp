@@ -84,7 +84,7 @@ describe("phase_check", () => {
       expect(r.status).toBe("success");
       const r2 = body(await c.callTool({ name: "phase_check", arguments: { phase: "environment", step: "end", errors: '["boom"]' } }));
       expect(r2.status).toBe("partial");
-      const file = JSON.parse(await fs.readFile(path.join(advDir(), "adventure-status.json"), "utf8"));
+      const file = JSON.parse(await fs.readFile(path.join(advDir(), "Demo-status.json"), "utf8"));
       expect(file.phases.plot.status).toBe("success");
       expect(file.phases.environment.errors).toContain("boom");
     } finally {
@@ -103,7 +103,7 @@ describe("phase_check", () => {
       expect(a.skipped).toBe(true);
       const e = body(await c.callTool({ name: "phase_check", arguments: { phase: "areas", step: "end" } }));
       expect(e.skipped).toBe(true);
-      const file = JSON.parse(await fs.readFile(path.join(advDir(), "adventure-status.json"), "utf8"));
+      const file = JSON.parse(await fs.readFile(path.join(advDir(), "Demo-status.json"), "utf8"));
       expect(file.phases.areas.status).toBe("skipped");
       const env = body(await c.callTool({ name: "phase_check", arguments: { phase: "environment", step: "start" } }));
       expect(env.ok).toBe(true);
@@ -152,7 +152,7 @@ describe("set_project_scope", () => {
     try {
       const r = body(await c.callTool({ name: "set_project_scope", arguments: { kind: "nwscript_only", scope: "fix my scripts" } }));
       expect(r.wroteAdventure).toBe(false);
-      await expect(fs.access(path.join(advDir(), "adventure.md"))).rejects.toThrow();
+      await expect(fs.access(path.join(advDir(), "Demo.md"))).rejects.toThrow();
       const bad = await c.callTool({ name: "set_project_scope", arguments: { kind: "some_phases", scope: "x", phases: '["nope"]' } });
       expect(bad.isError).toBe(true);
     } finally {
@@ -165,10 +165,10 @@ describe("set_project_scope", () => {
     const { c, close } = await client();
     try {
       await c.callTool({ name: "set_project_scope", arguments: { kind: "some_phases", scope: "only quests", phases: '["quests"]' } });
-      expect(await fs.readFile(path.join(advDir(), "adventure.md"), "utf8")).toContain("Skip phases");
+      expect(await fs.readFile(path.join(advDir(), "Demo.md"), "utf8")).toContain("Skip phases");
       const one = body(await c.callTool({ name: "set_project_scope", arguments: { kind: "one_feature", scope: "just a shop" } }));
       expect(one.ok).toBe(true);
-      const md = await fs.readFile(path.join(advDir(), "adventure.md"), "utf8");
+      const md = await fs.readFile(path.join(advDir(), "Demo.md"), "utf8");
       expect(md).not.toContain("Skip phases");
       expect(md).not.toContain("**Scope:**");
       for (const step of ["start", "end"] as const) {

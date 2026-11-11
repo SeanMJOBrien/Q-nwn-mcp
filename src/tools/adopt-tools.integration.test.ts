@@ -101,7 +101,7 @@ describe("adventure directory, adopt and audit", () => {
       expect(r.ok).toBe(true);
       expect(r.gaps).toEqual(["affordances", "polish", "rewards"]);
       const file = r.file as string;
-      expect(file).toBe(path.join(root, "adventures", "The-Salt-Gate-Conspiracy", "adventure.md"));
+      expect(file).toBe(path.join(root, "adventures", "The-Salt-Gate-Conspiracy", "The-Salt-Gate-Conspiracy.md"));
       const md = await fs.readFile(file, "utf8");
       expect(md).toContain("# Adventure: The Salt Gate Conspiracy");
       expect(md).toContain("mira");

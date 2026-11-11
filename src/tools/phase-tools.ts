@@ -12,7 +12,7 @@ import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { requireIndex } from "../module-loader.js";
-import { ADVENTURE_FILES, ensureAdventureDir } from "../util/adventure-dir.js";
+import { adventureFileNames, adventurePath as advFile, ensureAdventureDir } from "../util/adventure-dir.js";
 import { defaultFocus, FOCUS, guideFor, type Focus } from "../util/focus.js";
 import type { GffObj } from "../types/gff.js";
 import { getFieldStr } from "../types/gff.js";
@@ -50,7 +50,7 @@ async function readIfExists(file: string): Promise<string | null> {
 }
 
 async function recordStatus(dir: string, phase: Phase, entry: PhaseEntry): Promise<string> {
-  const statusPath = path.join(dir, ADVENTURE_FILES.status);
+  const statusPath = advFile(dir, "status");
   let existing: unknown;
   const raw = await readIfExists(statusPath);
   if (raw) {
@@ -78,7 +78,7 @@ export function registerPhaseTools(server: McpServer): void {
     async ({ kind, scope, phases, focus }) => {
       const index = requireIndex();
       const dir = await ensureAdventureDir(index);
-      const scopePath = path.join(dir, ADVENTURE_FILES.scope);
+      const scopePath = advFile(dir, "scope");
       if (!kind) {
         const raw = await readIfExists(scopePath);
         if (raw) {
@@ -107,13 +107,13 @@ export function registerPhaseTools(server: McpServer): void {
       const usesPipeline = kind === "whole_adventure" || kind === "some_phases";
       let wroteAdventure = false;
       if (usesPipeline) {
-        const adventurePath = path.join(dir, ADVENTURE_FILES.story);
+        const adventurePath = advFile(dir, "story");
         const md = (await readIfExists(adventurePath)) ?? `# Adventure: ${index.moduleName}\n`;
         await fs.writeFile(adventurePath, setScopeFields(md, scope.trim(), skip));
         wroteAdventure = true;
       } else {
         // Switching away from a pipeline scope: drop the old Scope/Skip lines so phase_check can't follow them.
-        const adventurePath = path.join(dir, ADVENTURE_FILES.story);
+        const adventurePath = advFile(dir, "story");
         const md = await readIfExists(adventurePath);
         if (md !== null && clearScopeFields(md) !== md) {
           await fs.writeFile(adventurePath, clearScopeFields(md));
@@ -147,9 +147,9 @@ export function registerPhaseTools(server: McpServer): void {
     async ({ phase, step, warnings, errors, coop }) => {
       const index = requireIndex();
       const dir = await ensureAdventureDir(index);
-      const adventurePath = path.join(dir, ADVENTURE_FILES.story);
+      const adventurePath = advFile(dir, "story");
       // One feature / NWScript only: the adventure pipeline is not in use, so no phase runs.
-      const recordedRaw = await readIfExists(path.join(dir, ADVENTURE_FILES.scope));
+      const recordedRaw = await readIfExists(advFile(dir, "scope"));
       let recorded: unknown;
       try {
         recorded = recordedRaw ? JSON.parse(recordedRaw) : undefined;

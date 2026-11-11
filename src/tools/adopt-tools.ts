@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { requireIndex } from "../module-loader.js";
 import { buildAdoptedAdventure, hasStoryContent, listNotRecorded } from "../util/adopt.js";
-import { ADVENTURE_FILES, ensureAdventureDir } from "../util/adventure-dir.js";
+import { adventureFileNames, adventurePath as advFile, ensureAdventureDir } from "../util/adventure-dir.js";
 import { buildAudit, gapList, type VerifyCounts } from "../util/audit.js";
 import { exportProject, isProjectDir } from "../util/project.js";
 import { gatherSnapshot } from "../util/module-snapshot.js";
@@ -50,14 +50,14 @@ function counts(results: VerifyResult[]): VerifyCounts {
 export function registerAdoptTools(server: McpServer): void {
   server.tool(
     "get_adventure_dir",
-    "Where this module's own files live: `adventures/<Title-With-Dashes>/` (git-ignored) holding adventure.md (the story), dm-guide.md, adventure-status.json and project-scope.json. Creates the folder and moves over any of those files an older run left in the module's temp dir. Every adventure skill reads and writes adventure.md and dm-guide.md here, not in the temp dir.",
+    "Where this module's own files live: `adventures/<Title-With-Dashes>/` (git-ignored) holding the story (`<Title-With-Dashes>.md`, formerly adventure.md), `<Title-With-Dashes>-dm-guide.md`, adventure-status.json and project-scope.json. Creates the folder and moves over any of those files an older run left in the module's temp dir. Every adventure skill reads and writes adventure.md and dm-guide.md here, not in the temp dir.",
     {},
     { idempotentHint: true },
     async () => {
       const index = requireIndex();
       const dir = await ensureAdventureDir(index);
       const files: Record<string, { path: string; exists: boolean }> = {};
-      for (const [key, name] of Object.entries(ADVENTURE_FILES)) {
+      for (const [key, name] of Object.entries(adventureFileNames(dir))) {
         const p = path.join(dir, name);
         files[key] = { path: p, exists: await exists(p) };
       }
@@ -75,7 +75,7 @@ export function registerAdoptTools(server: McpServer): void {
     async ({ overwrite }) => {
       const index = requireIndex();
       const dir = await ensureAdventureDir(index);
-      const file = path.join(dir, ADVENTURE_FILES.story);
+      const file = advFile(dir, "story");
       const existing = await readIfExists(file);
       if (hasStoryContent(existing) && !overwrite) {
         return text({ ok: false, error: `${file} already has story content. Use audit_module to review it, or pass overwrite: true to adopt over it.`, file }, true);
@@ -115,7 +115,7 @@ export function registerAdoptTools(server: McpServer): void {
         verify[phase] = counts(filterForPhase(phase, results));
       }
 
-      const md = await readIfExists(path.join(dir, ADVENTURE_FILES.story));
+      const md = await readIfExists(advFile(dir, "story"));
       let storyErrors = 0;
       let storyWarnings = 0;
       if (md) {
@@ -128,7 +128,7 @@ export function registerAdoptTools(server: McpServer): void {
         snapshot,
         verify,
         story: { exists: md !== null, notRecorded: md ? (md.match(/\(not recorded\)/g) ?? []).length : 0, errors: storyErrors, warnings: storyWarnings },
-        dmGuideExists: await exists(path.join(dir, ADVENTURE_FILES.dmGuide)),
+        dmGuideExists: await exists(advFile(dir, "dmGuide")),
       });
 
       return text({
