@@ -205,6 +205,29 @@ ${branches}
  * Globals are declared as plain `int` rather than `const int` to match
  * nwscript.nss's own convention and stay compatible with every compiler.
  */
+/**
+ * Read the settings a generated inc_reward was built with back out of its text (for the stale-script check, TODO #22). Returns undefined
+ * when the text is not in the generated form.
+ */
+export function readRewardOptions(existing: string): RewardSystemOptions | undefined {
+  const code = /^int COOP_POLICY\s*=\s*(\d+);/m.exec(existing)?.[1];
+  const share = /^int COOP_SHARE_PERCENT\s*=\s*(\d+);/m.exec(existing)?.[1];
+  const policy = (Object.keys(POLICY_CODES) as RewardPolicy[]).find((p) => String(POLICY_CODES[p]) === code);
+  if (!policy || share === undefined) return undefined;
+  const classItems: ClassItemTier[] = [];
+  const constantToClass = new Map(Object.entries(CLASS_CONSTANTS).map(([name, c]) => [c, name]));
+  const re = /if \(sTier == "([^"]*)"\)\s*\{\n([\s\S]*?)\n        return "([^"]*)";\n    \}/g;
+  for (const m of existing.matchAll(re)) {
+    const items: Record<string, string> = {};
+    for (const line of m[2].matchAll(/if \(nClass == (CLASS_TYPE_[A-Z]+)\) return "([^"]*)";/g)) {
+      const cls = constantToClass.get(line[1]);
+      if (cls) items[cls] = line[2];
+    }
+    classItems.push({ tier: m[1], items, ...(m[3] ? { fallback: m[3] } : {}) });
+  }
+  return { policy, sharePercent: Number(share), classItems };
+}
+
 export function generateRewardInclude(opts: RewardSystemOptions = {}): string {
   const policy = opts.policy ?? "full";
   const share = opts.sharePercent ?? 100;

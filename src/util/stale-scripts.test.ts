@@ -8,6 +8,9 @@ import { generateSpecCheckInclude } from "./spec-check-script.js";
 import { generateCompanionScripts } from "./companion-script.js";
 import { generateCreatureLevelInclude, generateCreatureLevelWrapper } from "./creature-level-script.js";
 import { findStaleGenerated } from "./stale-scripts.js";
+import { generateRewardInclude } from "./reward-script.js";
+import { generateAppearanceInclude } from "./gear-appearance.js";
+import { addToPool, emptyPool, generateTreasureDeathScript, generateTreasureInclude, generateTreasureOpenScript } from "./treasure-script.js";
 
 describe("findStaleGenerated", () => {
   it("is quiet for freshly generated scripts, with the settings they were built with", () => {
@@ -49,5 +52,37 @@ describe("findStaleGenerated", () => {
     const names = findStaleGenerated(old).map((f) => f.resref).sort();
     expect(names).toEqual(["inc_spec_check", "q_act"]);
   });
-});
 
+  it("covers the other companion scripts, inc_reward with its tiers, and the treasure system with its pool (#22)", () => {
+    const pool = emptyPool();
+    addToPool(pool, 4, 2, "tr_sword");
+    addToPool(pool, 3, 1, "nw_it_mpotion001");
+    addToPool(pool, 3, 1, 'odd"name');
+    const rewardOpts = {
+      policy: "split" as const,
+      sharePercent: 75,
+      classItems: [
+        { tier: "boss", items: { fighter: "rw_blade", wizard: "rw_staff" }, fallback: "rw_ring" },
+        { tier: "minor", items: { cleric: "rw_mace" } },
+      ],
+    };
+    const companions = generateCompanionScripts({ maxCompanions: 3, originalLevelUp: "a_old_lvlup" });
+    const fresh = new Map<string, string>([
+      ...["c_hen_free", "c_hen_mine", "c_hen_full", "a_hen_join", "a_hen_leave", "a_hen_stay", "a_hen_follow", "a_hen_lvlup"].map((n) => [n, companions[n]] as [string, string]),
+      ["inc_reward", generateRewardInclude(rewardOpts)],
+      ["inc_appear", generateAppearanceInclude({ armorColors: true, weaponColors: false, weaponModels: true, weaponModelMax: 5 })],
+      ["inc_treasure", generateTreasureInclude(pool)],
+      ["a_trs_open", generateTreasureOpenScript()],
+      ["a_trs_death", generateTreasureDeathScript()],
+    ]);
+    expect(findStaleGenerated(fresh)).toEqual([]);
+    // an old copy of each is found, naming its tool
+    const old = new Map(fresh);
+    old.set("a_trs_death", fresh.get("a_trs_death")?.replace("nw_c2_default7", "nw_c2_default6") ?? "");
+    old.set("inc_treasure", fresh.get("inc_treasure")?.replace("TR_BASE_T2 = 200", "TR_BASE_T2 = 100") ?? "");
+    old.set("a_hen_stay", "// older\nvoid main() {}\n");
+    const found = findStaleGenerated(old);
+    expect(found.map((f) => f.resref).sort()).toEqual(["a_hen_stay", "a_trs_death", "inc_treasure"]);
+    expect(found.find((f) => f.resref === "inc_treasure")?.tool).toBe("create_treasure_system");
+  });
+});
