@@ -1,0 +1,11697 @@
+{
+ "generated": "2026-11-11",
+ "source": {
+  "blueprints": 505,
+  "categorised": 505,
+  "excluded": []
+ },
+ "categories": [
+  {
+   "type": "aberration",
+   "class": "aberration",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 15,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.3333,
+    "median": 0.5,
+    "max": 4
+   },
+   "hp": {
+    "min": 1,
+    "median": 4,
+    "max": 36
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 2
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 11,
+    "int": 3,
+    "wis": 14,
+    "cha": 5
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 0,
+    "median": 0,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 9
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.13,
+   "commonGear": [
+    "cweapon_b: cslashweapon (13%)",
+    "cweapon_l: cslshprcweap (7%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "aberration",
+   "class": "aberration",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 5,
+   "level": {
+    "min": 6,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 6,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 48,
+    "median": 72,
+    "max": 88
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 6,
+    "max": 7
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 17,
+    "con": 14,
+    "int": 10,
+    "wis": 14,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 7,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 2
+   },
+   "armored": 0.2,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.6,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (80%)",
+    "cweapon_b: cslashweapon (60%)",
+    "chest: armor (20%)",
+    "righthand: shortsword (20%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "aberration",
+   "class": "aberration",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 4,
+   "level": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "cr": {
+    "min": 8,
+    "median": 10,
+    "max": 11
+   },
+   "hp": {
+    "min": 81,
+    "median": 109,
+    "max": 121
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 4.5,
+    "max": 8
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 16,
+    "int": 18,
+    "wis": 17,
+    "cha": 17
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 6,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 16.5,
+    "max": 23
+   },
+   "armored": 0.25,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cslashweapon (50%)",
+    "cweapon_l: cslshprcweap (50%)",
+    "chest: armor (25%)",
+    "righthand: twobladedsword (25%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "aberration",
+   "class": "aberration",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 120,
+    "median": 120,
+    "max": 120
+   },
+   "naturalAC": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "abilities": {
+    "str": 22,
+    "dex": 13,
+    "con": 18,
+    "int": 9,
+    "wis": 11,
+    "cha": 13
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "aberration",
+   "class": "aberration",
+   "levelBand": "17-20",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "cr": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "hp": {
+    "min": 270,
+    "median": 270,
+    "max": 270
+   },
+   "naturalAC": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "abilities": {
+    "str": 22,
+    "dex": 16,
+    "con": 24,
+    "int": 21,
+    "wis": 16,
+    "cha": 20
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 44,
+    "median": 44,
+    "max": 44
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "aberration",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 51,
+    "median": 51,
+    "max": 51
+   },
+   "naturalAC": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 16,
+    "int": 15,
+    "wis": 16,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: warhammer (100%)",
+    "lefthand: lightmace (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 8
+    }
+   }
+  },
+  {
+   "type": "aberration",
+   "class": "wizard",
+   "levelBand": "13-16",
+   "role": "familiar",
+   "count": 1,
+   "level": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "cr": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "hp": {
+    "min": 104,
+    "median": 104,
+    "max": 104
+   },
+   "naturalAC": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 11,
+    "con": 19,
+    "int": 21,
+    "wis": 16,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 13
+    }
+   }
+  },
+  {
+   "type": "aberration",
+   "class": "wizard",
+   "levelBand": "13-16",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "cr": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "hp": {
+    "min": 150,
+    "median": 150,
+    "max": 150
+   },
+   "naturalAC": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 14,
+    "con": 22,
+    "int": 23,
+    "wis": 16,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 15
+    }
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "1-4",
+   "role": "ambient",
+   "count": 12,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.125,
+    "median": 0.3,
+    "max": 4
+   },
+   "hp": {
+    "min": 1,
+    "median": 5.5,
+    "max": 44
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 2
+   },
+   "abilities": {
+    "str": 5,
+    "dex": 11,
+    "con": 10,
+    "int": 3,
+    "wis": 13,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 0,
+    "median": 1,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 1
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.17,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (33%)",
+    "cweapon_b: cslashweapon (25%)",
+    "cweapon_b: cpiercweapon (17%)",
+    "cweapon_l: cslashweapon (8%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 14,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.125,
+    "median": 1,
+    "max": 4
+   },
+   "hp": {
+    "min": 3,
+    "median": 9.5,
+    "max": 40
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 3
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 13,
+    "con": 12,
+    "int": 3,
+    "wis": 12,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 1,
+    "median": 2,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 2
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.29,
+   "commonGear": [
+    "cweapon_b: cslashweapon (64%)",
+    "cweapon_l: cslshprcweap (14%)",
+    "cweapon_b: cpiercweapon (14%)",
+    "cweapon_l: cbludgweapon (7%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 50,
+    "median": 50,
+    "max": 50
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "abilities": {
+    "str": 19,
+    "dex": 17,
+    "con": 15,
+    "int": 3,
+    "wis": 12,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 5,
+    "median": 6.5,
+    "max": 8
+   },
+   "cr": {
+    "min": 5,
+    "median": 6.5,
+    "max": 8
+   },
+   "hp": {
+    "min": 50,
+    "median": 81,
+    "max": 112
+   },
+   "naturalAC": {
+    "min": 4,
+    "median": 4.5,
+    "max": 5
+   },
+   "abilities": {
+    "str": 19,
+    "dex": 14,
+    "con": 17,
+    "int": 5,
+    "wis": 12,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_b: cslashweapon (100%)",
+    "cweapon_l: cslshprcweap (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "5-8",
+   "role": "ambient",
+   "count": 4,
+   "level": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "cr": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "hp": {
+    "min": 60,
+    "median": 94.5,
+    "max": 120
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 4.5,
+    "max": 5
+   },
+   "abilities": {
+    "str": 23,
+    "dex": 13,
+    "con": 20,
+    "int": 3,
+    "wis": 12,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 80,
+    "median": 80,
+    "max": 80
+   },
+   "naturalAC": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "abilities": {
+    "str": 19,
+    "dex": 16,
+    "con": 16,
+    "int": 6,
+    "wis": 12,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 119,
+    "median": 119,
+    "max": 119
+   },
+   "naturalAC": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "abilities": {
+    "str": 22,
+    "dex": 13,
+    "con": 22,
+    "int": 3,
+    "wis": 12,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "9-12",
+   "role": "ambient",
+   "count": 2,
+   "level": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "cr": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "hp": {
+    "min": 135,
+    "median": 154.5,
+    "max": 174
+   },
+   "naturalAC": {
+    "min": 7,
+    "median": 8,
+    "max": 9
+   },
+   "abilities": {
+    "str": 28,
+    "dex": 13,
+    "con": 23,
+    "int": 3,
+    "wis": 12,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4.5,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "animal",
+   "class": "animal",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 120,
+    "median": 120,
+    "max": 120
+   },
+   "naturalAC": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "abilities": {
+    "str": 24,
+    "dex": 20,
+    "con": 18,
+    "int": 3,
+    "wis": 12,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "beast",
+   "class": "beast",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 144,
+    "median": 144,
+    "max": 144
+   },
+   "naturalAC": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 15,
+    "con": 22,
+    "int": 3,
+    "wis": 13,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 6,
+   "level": {
+    "min": 2,
+    "median": 3.5,
+    "max": 4
+   },
+   "cr": {
+    "min": 2,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 16,
+    "median": 32,
+    "max": 33
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 2
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 10,
+    "con": 6,
+    "int": 3,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 4,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.17,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greatsword (50%)",
+    "righthand: lightmace (17%)",
+    "righthand: halberd (17%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "cr": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "hp": {
+    "min": 66,
+    "median": 73,
+    "max": 80
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 4.5,
+    "max": 7
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 10,
+    "con": 11,
+    "int": 3,
+    "wis": 12,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2.5,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 2.5,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cbludgweapon (50%)",
+    "righthand: longsword (50%)",
+    "cweapon_b: cpiercweapon (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 8,
+   "level": {
+    "min": 9,
+    "median": 9.5,
+    "max": 12
+   },
+   "cr": {
+    "min": 6,
+    "median": 10.5,
+    "max": 13
+   },
+   "hp": {
+    "min": 60,
+    "median": 78,
+    "max": 110
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 11,
+    "max": 14
+   },
+   "abilities": {
+    "str": 19,
+    "dex": 9,
+    "con": 10,
+    "int": 10,
+    "wis": 11,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 1,
+    "median": 2,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 2
+   },
+   "armored": 0.63,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.5,
+   "commonGear": [
+    "chest: armor (63%)",
+    "cweapon_b: cbludgweapon (25%)",
+    "righthand: greatsword (13%)",
+    "cweapon_l: cslshprcweap (13%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 4,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 12
+   },
+   "cr": {
+    "min": 11,
+    "median": 12,
+    "max": 12
+   },
+   "hp": {
+    "min": 100,
+    "median": 110,
+    "max": 110
+   },
+   "naturalAC": {
+    "min": 4,
+    "median": 12.5,
+    "max": 13
+   },
+   "abilities": {
+    "str": 23,
+    "dex": 9,
+    "con": 10,
+    "int": 3,
+    "wis": 11,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (75%)",
+    "cweapon_l: cbludgweapon (25%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "13-16",
+   "role": "standard",
+   "count": 4,
+   "level": {
+    "min": 13,
+    "median": 14,
+    "max": 15
+   },
+   "cr": {
+    "min": 12,
+    "median": 12.5,
+    "max": 14
+   },
+   "hp": {
+    "min": 77,
+    "median": 95,
+    "max": 120
+   },
+   "naturalAC": {
+    "min": 13,
+    "median": 17,
+    "max": 20
+   },
+   "abilities": {
+    "str": 26,
+    "dex": 9,
+    "con": 10,
+    "int": 3,
+    "wis": 11,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 2.5,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "13-16",
+   "role": "boss",
+   "count": 4,
+   "level": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "cr": {
+    "min": 19,
+    "median": 19,
+    "max": 19
+   },
+   "hp": {
+    "min": 140,
+    "median": 140,
+    "max": 140
+   },
+   "naturalAC": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "abilities": {
+    "str": 31,
+    "dex": 9,
+    "con": 10,
+    "int": 24,
+    "wis": 13,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 5,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "armored": 0.5,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cbludgweapon (100%)",
+    "cweapon_b: cslshprcweap (50%)",
+    "chest: armor (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "13-16",
+   "role": "semiboss",
+   "count": 2,
+   "level": {
+    "min": 14,
+    "median": 15,
+    "max": 16
+   },
+   "cr": {
+    "min": 13,
+    "median": 16.5,
+    "max": 20
+   },
+   "hp": {
+    "min": 88,
+    "median": 104,
+    "max": 120
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 7.5,
+    "max": 15
+   },
+   "abilities": {
+    "str": 25,
+    "dex": 9,
+    "con": 10,
+    "int": 7,
+    "wis": 11,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 1,
+    "median": 1.5,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1.5,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.5,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (50%)",
+    "cweapon_l: cbludgweapon (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "construct",
+   "class": "construct",
+   "levelBand": "17-20",
+   "role": "semiboss",
+   "count": 2,
+   "level": {
+    "min": 18,
+    "median": 19,
+    "max": 20
+   },
+   "cr": {
+    "min": 18,
+    "median": 18.5,
+    "max": 19
+   },
+   "hp": {
+    "min": 180,
+    "median": 190,
+    "max": 200
+   },
+   "naturalAC": {
+    "min": 21,
+    "median": 25.5,
+    "max": 30
+   },
+   "abilities": {
+    "str": 42,
+    "dex": 14,
+    "con": 10,
+    "int": 10,
+    "wis": 11,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "dragon",
+   "class": "dragon",
+   "levelBand": "17-20",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "cr": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "hp": {
+    "min": 342,
+    "median": 342,
+    "max": 342
+   },
+   "naturalAC": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "abilities": {
+    "str": 27,
+    "dex": 10,
+    "con": 24,
+    "int": 16,
+    "wis": 17,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "elemental",
+   "class": "elemental",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 6,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 8
+   },
+   "cr": {
+    "min": 5,
+    "median": 6,
+    "max": 9
+   },
+   "hp": {
+    "min": 50,
+    "median": 70,
+    "max": 120
+   },
+   "naturalAC": {
+    "min": 4,
+    "median": 4,
+    "max": 8
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 16,
+    "con": 16,
+    "int": 10,
+    "wis": 11,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.67,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "elemental",
+   "class": "elemental",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 2,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 55,
+    "median": 57.5,
+    "max": 60
+   },
+   "naturalAC": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 10,
+    "con": 17,
+    "int": 4,
+    "wis": 11,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cbludgweapon (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "elemental",
+   "class": "elemental",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 2,
+   "level": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "cr": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "hp": {
+    "min": 168,
+    "median": 186,
+    "max": 204
+   },
+   "naturalAC": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "abilities": {
+    "str": 22,
+    "dex": 25,
+    "con": 21,
+    "int": 10,
+    "wis": 15,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 3,
+    "max": 4
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "elemental",
+   "class": "elemental",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 3,
+   "level": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "cr": {
+    "min": 11,
+    "median": 12,
+    "max": 14
+   },
+   "hp": {
+    "min": 132,
+    "median": 156,
+    "max": 168
+   },
+   "naturalAC": {
+    "min": 7,
+    "median": 7,
+    "max": 9
+   },
+   "abilities": {
+    "str": 21,
+    "dex": 22,
+    "con": 20,
+    "int": 6,
+    "wis": 11,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "fey",
+   "class": "bard",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 35,
+    "median": 35,
+    "max": 35
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 18,
+    "con": 12,
+    "int": 16,
+    "wis": 13,
+    "cha": 20
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "righthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 1,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "fey",
+   "class": "bard",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 64,
+    "median": 64,
+    "max": 64
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 18,
+    "con": 14,
+    "int": 12,
+    "wis": 10,
+    "cha": 18
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: kukri (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 1,
+     "level": 8
+    }
+   }
+  },
+  {
+   "type": "giant",
+   "class": "giant",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 48,
+    "median": 48,
+    "max": 48
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 8,
+    "con": 14,
+    "int": 6,
+    "wis": 10,
+    "cha": 7
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: club (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "giant",
+   "class": "giant",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 4,
+   "level": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "cr": {
+    "min": 6,
+    "median": 7.5,
+    "max": 8
+   },
+   "hp": {
+    "min": 82,
+    "median": 97,
+    "max": 132
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 4.5,
+    "max": 8
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 13,
+    "con": 18,
+    "int": 6,
+    "wis": 10,
+    "cha": 7
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 5,
+    "max": 13
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0.25,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (50%)",
+    "cweapon_b: cslashweapon (50%)",
+    "righthand: club (25%)",
+    "lefthand: shortspear (25%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "giant",
+   "class": "giant",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "cr": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "hp": {
+    "min": 126,
+    "median": 145.5,
+    "max": 165
+   },
+   "naturalAC": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "abilities": {
+    "str": 24,
+    "dex": 8,
+    "con": 20,
+    "int": 6,
+    "wis": 9,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6.5,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1.5,
+    "max": 2
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "righthand: club (50%)",
+    "righthand: greataxe (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "giant",
+   "class": "giant",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "cr": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "hp": {
+    "min": 216,
+    "median": 216,
+    "max": 216
+   },
+   "naturalAC": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "abilities": {
+    "str": 25,
+    "dex": 16,
+    "con": 25,
+    "int": 6,
+    "wis": 9,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "giant",
+   "class": "giant",
+   "levelBand": "13-16",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 13,
+    "median": 14,
+    "max": 15
+   },
+   "cr": {
+    "min": 13,
+    "median": 14,
+    "max": 15
+   },
+   "hp": {
+    "min": 195,
+    "median": 202.5,
+    "max": 210
+   },
+   "naturalAC": {
+    "min": 8,
+    "median": 8.5,
+    "max": 9
+   },
+   "abilities": {
+    "str": 30,
+    "dex": 9,
+    "con": 20,
+    "int": 10,
+    "wis": 10,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greatsword (50%)",
+    "righthand: heavyflail (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "giant",
+   "class": "sorcerer",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 78,
+    "median": 78,
+    "max": 78
+   },
+   "naturalAC": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "abilities": {
+    "str": 19,
+    "dex": 10,
+    "con": 18,
+    "int": 15,
+    "wis": 14,
+    "cha": 17
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: katana (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 9
+    }
+   }
+  },
+  {
+   "type": "giant",
+   "class": "sorcerer",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 105,
+    "median": 105,
+    "max": 105
+   },
+   "naturalAC": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "abilities": {
+    "str": 22,
+    "dex": 10,
+    "con": 20,
+    "int": 15,
+    "wis": 14,
+    "cha": 19
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "righthand: katana (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 11
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "barbarian",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 70,
+    "median": 70,
+    "max": 70
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 13,
+    "con": 14,
+    "int": 10,
+    "wis": 10,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: bastardsword (100%)",
+    "lefthand: towershield (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 0,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "cleric",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 24,
+    "median": 24,
+    "max": 24
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 8,
+    "dex": 13,
+    "con": 11,
+    "int": 10,
+    "wis": 15,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lighthammer (50%)",
+    "righthand: club (50%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 45,
+    "median": 45,
+    "max": 45
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 12,
+    "con": 12,
+    "int": 10,
+    "wis": 14,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightmace (100%)",
+    "lefthand: largeshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 50,
+    "median": 50,
+    "max": 50
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 8,
+    "dex": 16,
+    "con": 14,
+    "int": 10,
+    "wis": 16,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lighthammer (100%)",
+    "lefthand: smallshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "druid",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 45,
+    "median": 45,
+    "max": 45
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 12,
+    "con": 12,
+    "int": 12,
+    "wis": 14,
+    "cha": 13
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: quarterstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 3,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3.5,
+    "max": 4
+   },
+   "hp": {
+    "min": 33,
+    "median": 33,
+    "max": 33
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 13,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 55,
+    "median": 55,
+    "max": 55
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 16,
+    "con": 12,
+    "int": 9,
+    "wis": 8,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: shortsword (100%)",
+    "lefthand: shortsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 4,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 6
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 6
+   },
+   "hp": {
+    "min": 55,
+    "median": 59,
+    "max": 68
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 14,
+    "con": 16,
+    "int": 10,
+    "wis": 10,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 13,
+    "median": 13.5,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0.25,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: halberd (25%)",
+    "righthand: longbow (25%)",
+    "righthand: greataxe (25%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "humanoid",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 1,
+    "median": 2.5,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 2.3,
+    "max": 4
+   },
+   "hp": {
+    "min": 7,
+    "median": 25.5,
+    "max": 44
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 11,
+    "dex": 11,
+    "con": 11,
+    "int": 8,
+    "wis": 10,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0.5,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (50%)",
+    "righthand: halberd (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "rogue",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 25,
+    "median": 25,
+    "max": 25
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 11,
+    "dex": 15,
+    "con": 12,
+    "int": 8,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: shortsword (100%)",
+    "lefthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 8,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "sorcerer",
+   "levelBand": "1-4",
+   "role": "familiar",
+   "count": 2,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 8,
+    "dex": 13,
+    "con": 13,
+    "int": 10,
+    "wis": 11,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "righthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "sorcerer",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 25,
+    "median": 25,
+    "max": 25
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 10,
+    "con": 13,
+    "int": 8,
+    "wis": 11,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: club (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "wizard",
+   "levelBand": "5-8",
+   "role": "familiar",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 25,
+    "median": 25,
+    "max": 25
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 11,
+    "dex": 13,
+    "con": 13,
+    "int": 15,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "righthand: quarterstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_goblinoid",
+   "class": "wizard",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 55,
+    "median": 55,
+    "max": 55
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 14,
+    "con": 16,
+    "int": 18,
+    "wis": 10,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 23,
+    "median": 23,
+    "max": 23
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: magicstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 7
+    }
+   }
+  },
+  {
+   "type": "humanoid_monstrous",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "cr": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "hp": {
+    "min": 70,
+    "median": 70,
+    "max": 70
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 15,
+    "int": 10,
+    "wis": 16,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: diremace (100%)",
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 7
+    }
+   }
+  },
+  {
+   "type": "humanoid_monstrous",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 40,
+    "median": 40,
+    "max": 40
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 12,
+    "con": 10,
+    "int": 10,
+    "wis": 10,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: longsword (100%)",
+    "lefthand: largeshield (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 4
+    }
+   }
+  },
+  {
+   "type": "humanoid_monstrous",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 50,
+    "median": 50,
+    "max": 50
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 12,
+    "con": 10,
+    "int": 10,
+    "wis": 10,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: halberd (100%)",
+    "lefthand: towershield (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_monstrous",
+   "class": "monstrous",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 6,
+    "median": 6.5,
+    "max": 7
+   },
+   "cr": {
+    "min": 6,
+    "median": 6.5,
+    "max": 7
+   },
+   "hp": {
+    "min": 55,
+    "median": 70.5,
+    "max": 86
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 4,
+    "max": 5
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 11,
+    "con": 14,
+    "int": 9,
+    "wis": 12,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 5.5,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 2,
+    "max": 4
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.5,
+   "commonGear": [
+    "righthand: heavyflail (50%)",
+    "cweapon_b: cpiercweapon (50%)",
+    "cweapon_l: cslshprcweap (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "humanoid_monstrous",
+   "class": "monstrous",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 138,
+    "median": 138,
+    "max": 138
+   },
+   "naturalAC": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "abilities": {
+    "str": 22,
+    "dex": 12,
+    "con": 16,
+    "int": 7,
+    "wis": 10,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "righthand: greataxe (100%)",
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "humanoid_monstrous",
+   "class": "monstrous",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 138,
+    "median": 138,
+    "max": 138
+   },
+   "naturalAC": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "abilities": {
+    "str": 21,
+    "dex": 12,
+    "con": 16,
+    "int": 9,
+    "wis": 10,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greataxe (100%)",
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "humanoid_monstrous",
+   "class": "sorcerer",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 36,
+    "median": 36,
+    "max": 36
+   },
+   "naturalAC": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 15,
+    "int": 13,
+    "wis": 10,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "righthand: shortspear (100%)",
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 6
+    }
+   }
+  },
+  {
+   "type": "humanoid_orc",
+   "class": "barbarian",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 65,
+    "median": 65,
+    "max": 65
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 10,
+    "con": 12,
+    "int": 9,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greatsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 0,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_orc",
+   "class": "cleric",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 36,
+    "median": 36,
+    "max": 36
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 10,
+    "con": 12,
+    "int": 9,
+    "wis": 13,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: handaxe (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 4
+    }
+   }
+  },
+  {
+   "type": "humanoid_orc",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 60,
+    "median": 60,
+    "max": 60
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 10,
+    "con": 14,
+    "int": 9,
+    "wis": 16,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: warhammer (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 6
+    }
+   }
+  },
+  {
+   "type": "humanoid_orc",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 30,
+    "median": 30,
+    "max": 30
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 10,
+    "con": 10,
+    "int": 9,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "barbarian",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 52,
+    "median": 52,
+    "max": 52
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 13,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: heavyflail (100%)",
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 0,
+     "level": 4
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "barbarian",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 84,
+    "median": 84,
+    "max": 84
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 15,
+    "int": 9,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: doubleaxe (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 0,
+     "level": 6
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 5,
+    "median": 6.5,
+    "max": 8
+   },
+   "cr": {
+    "min": 5,
+    "median": 6.5,
+    "max": 8
+   },
+   "hp": {
+    "min": 45,
+    "median": 66.5,
+    "max": 88
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 2.5,
+    "max": 4
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 15,
+    "int": 14,
+    "wis": 16,
+    "cha": 13
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9.5,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0.5,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "lefthand: smallshield (100%)",
+    "righthand: lightmace (50%)",
+    "cweapon_l: cslshprcweap (50%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 7
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "cleric",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 120,
+    "median": 120,
+    "max": 120
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "abilities": {
+    "str": 18,
+    "dex": 18,
+    "con": 18,
+    "int": 18,
+    "wis": 18,
+    "cha": 18
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightflail (100%)",
+    "lefthand: largeshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 10
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "druid",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 60,
+    "median": 60,
+    "max": 60
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 14,
+    "int": 9,
+    "wis": 16,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: scimitar (100%)",
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 3,
+     "level": 6
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 5,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 4
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 4
+   },
+   "hp": {
+    "min": 23,
+    "median": 33,
+    "max": 44
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 1,
+    "max": 2
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 12,
+    "int": 9,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 5,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0.2,
+   "ranged": 0.2,
+   "caster": 0.8,
+   "commonGear": [
+    "chest: armor (100%)",
+    "cweapon_l: cslshprcweap (60%)",
+    "cweapon_l: cbludgweapon (40%)",
+    "righthand: shortspear (40%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 60,
+    "median": 60,
+    "max": 60
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 14,
+    "int": 9,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "cr": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "hp": {
+    "min": 91,
+    "median": 91,
+    "max": 91
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 16,
+    "con": 16,
+    "int": 9,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: twobladedsword (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 7
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "humanoid",
+   "levelBand": "1-4",
+   "role": "ambient",
+   "count": 1,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 0.5,
+    "max": 0.5
+   },
+   "hp": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 6,
+    "dex": 13,
+    "con": 11,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "humanoid",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 0.5,
+    "max": 0.5
+   },
+   "hp": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 7,
+    "dex": 13,
+    "con": 8,
+    "int": 8,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0.5,
+   "ranged": 0.5,
+   "caster": 0,
+   "commonGear": [
+    "righthand: shortsword (50%)",
+    "lefthand: smallshield (50%)",
+    "cweapon_l: cbludgweapon (50%)",
+    "righthand: lightcrossbow (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "rogue",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 25,
+    "median": 25,
+    "max": 25
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 13,
+    "con": 12,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 1,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: shortbow (100%)",
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 8,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "sorcerer",
+   "levelBand": "1-4",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 6,
+    "dex": 12,
+    "con": 11,
+    "int": 10,
+    "wis": 10,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: club (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "humanoid_reptilian",
+   "class": "sorcerer",
+   "levelBand": "5-8",
+   "role": "familiar",
+   "count": 2,
+   "level": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "cr": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "hp": {
+    "min": 36,
+    "median": 46,
+    "max": 56
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2.5,
+    "max": 3
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 13,
+    "con": 15,
+    "int": 13,
+    "wis": 15,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 5.5,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: quarterstaff (50%)",
+    "cweapon_l: cslshprcweap (50%)",
+    "cweapon_b: cslashweapon (50%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 7
+    }
+   }
+  },
+  {
+   "type": "magical_beast",
+   "class": "animal",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "cr": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "hp": {
+    "min": 70,
+    "median": 70,
+    "max": 70
+   },
+   "naturalAC": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "abilities": {
+    "str": 18,
+    "dex": 18,
+    "con": 14,
+    "int": 3,
+    "wis": 14,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "magical_beast",
+   "class": "magicbeast",
+   "levelBand": "1-4",
+   "role": "ambient",
+   "count": 1,
+   "level": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "cr": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "hp": {
+    "min": 22,
+    "median": 22,
+    "max": 22
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 14,
+    "con": 12,
+    "int": 3,
+    "wis": 11,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "magical_beast",
+   "class": "magicbeast",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 3,
+   "level": {
+    "min": 3,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 3,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 33,
+    "median": 36,
+    "max": 44
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 2,
+    "max": 4
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 14,
+    "con": 13,
+    "int": 6,
+    "wis": 12,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 2
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.33,
+   "commonGear": [
+    "cweapon_b: cslashweapon (100%)",
+    "cweapon_l: cslshprcweap (67%)",
+    "cweapon_l: cslashweapon (33%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "magical_beast",
+   "class": "magicbeast",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 6,
+   "level": {
+    "min": 5,
+    "median": 6.5,
+    "max": 8
+   },
+   "cr": {
+    "min": 4,
+    "median": 5,
+    "max": 7
+   },
+   "hp": {
+    "min": 45,
+    "median": 55.5,
+    "max": 68
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 7,
+    "max": 9
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 10,
+    "con": 16,
+    "int": 3,
+    "wis": 12,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 1,
+    "median": 4,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1.5,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.83,
+   "commonGear": [
+    "cweapon_l: cslashweapon (50%)",
+    "cweapon_l: cpiercweapon (50%)",
+    "cweapon_b: cslashweapon (17%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "magical_beast",
+   "class": "magicbeast",
+   "levelBand": "13-16",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "cr": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "hp": {
+    "min": 210,
+    "median": 210,
+    "max": 210
+   },
+   "naturalAC": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 18,
+    "con": 18,
+    "int": 14,
+    "wis": 17,
+    "cha": 18
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "spellAbilities": {
+    "min": 40,
+    "median": 40,
+    "max": 40
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cbludgweapon (100%)",
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "magical_beast",
+   "class": "vermin",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 36,
+    "median": 36,
+    "max": 36
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 16,
+    "con": 13,
+    "int": 7,
+    "wis": 13,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslashweapon (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "ooze",
+   "class": "ooze",
+   "levelBand": "1-4",
+   "role": "ambient",
+   "count": 2,
+   "level": {
+    "min": 1,
+    "median": 1.5,
+    "max": 2
+   },
+   "cr": {
+    "min": 0.25,
+    "median": 0.6,
+    "max": 1
+   },
+   "hp": {
+    "min": 10,
+    "median": 15,
+    "max": 20
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 3,
+    "con": 15,
+    "int": 3,
+    "wis": 3,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "ooze",
+   "class": "ooze",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 3,
+   "level": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "cr": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "hp": {
+    "min": 11,
+    "median": 24,
+    "max": 26
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 3,
+    "con": 13,
+    "int": 3,
+    "wis": 3,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "ooze",
+   "class": "ooze",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 62,
+    "median": 62,
+    "max": 62
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 3,
+    "con": 15,
+    "int": 3,
+    "wis": 3,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "ooze",
+   "class": "ooze",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 198,
+    "median": 198,
+    "max": 198
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 3,
+    "con": 23,
+    "int": 10,
+    "wis": 3,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 91,
+    "median": 91,
+    "max": 91
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 14,
+    "int": 9,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: scimitar (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 8
+    }
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "outsider",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 11,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 4
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 4
+   },
+   "hp": {
+    "min": 15,
+    "median": 18,
+    "max": 36
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 4
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 12,
+    "con": 10,
+    "int": 12,
+    "wis": 11,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 3,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.91,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (55%)",
+    "cweapon_l: cbludgweapon (36%)",
+    "cweapon_l: cslashweapon (9%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "outsider",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 9,
+   "level": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "cr": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "hp": {
+    "min": 39,
+    "median": 54,
+    "max": 78
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 6,
+    "max": 9
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 13,
+    "con": 14,
+    "int": 10,
+    "wis": 12,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 5,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 3,
+    "max": 7
+   },
+   "armored": 0.22,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.89,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (67%)",
+    "cweapon_b: cslashweapon (33%)",
+    "chest: armor (22%)",
+    "cweapon_b: cpiercweapon (22%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "outsider",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 8,
+   "level": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "cr": {
+    "min": 9,
+    "median": 10,
+    "max": 11
+   },
+   "hp": {
+    "min": 70,
+    "median": 86.5,
+    "max": 143
+   },
+   "naturalAC": {
+    "min": 9,
+    "median": 10.5,
+    "max": 13
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 14,
+    "con": 17,
+    "int": 14,
+    "wis": 14,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 4.5,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 8,
+    "max": 10
+   },
+   "armored": 0.13,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (63%)",
+    "cweapon_b: cslashweapon (50%)",
+    "cweapon_b: cpiercweapon (25%)",
+    "cweapon_b: cbludgweapon (25%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "outsider",
+   "levelBand": "13-16",
+   "role": "boss",
+   "count": 2,
+   "level": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "cr": {
+    "min": 15,
+    "median": 17.5,
+    "max": 20
+   },
+   "hp": {
+    "min": 160,
+    "median": 185,
+    "max": 210
+   },
+   "naturalAC": {
+    "min": 16,
+    "median": 20.5,
+    "max": 25
+   },
+   "abilities": {
+    "str": 27,
+    "dex": 13,
+    "con": 19,
+    "int": 18,
+    "wis": 18,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 5,
+    "max": 10
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.5,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (50%)",
+    "righthand: bastardsword (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "sorcerer",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 32,
+    "median": 32,
+    "max": 32
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 17,
+    "con": 11,
+    "int": 11,
+    "wis": 12,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 8
+    }
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "sorcerer",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 56,
+    "median": 56,
+    "max": 56
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 16,
+    "con": 16,
+    "int": 12,
+    "wis": 11,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: magicstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 8
+    }
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "sorcerer",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "cr": {
+    "min": 17,
+    "median": 17,
+    "max": 17
+   },
+   "hp": {
+    "min": 130,
+    "median": 130,
+    "max": 130
+   },
+   "naturalAC": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 20,
+    "int": 20,
+    "wis": 20,
+    "cha": 21
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 40,
+    "median": 40,
+    "max": 40
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 9,
+     "level": 12
+    }
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "wizard",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 9,
+    "dex": 14,
+    "con": 9,
+    "int": 14,
+    "wis": 12,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 3
+    }
+   }
+  },
+  {
+   "type": "outsider",
+   "class": "wizard",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "cr": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "hp": {
+    "min": 37,
+    "median": 37,
+    "max": 37
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 9,
+    "dex": 14,
+    "con": 12,
+    "int": 18,
+    "wis": 12,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 7
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "barbarian",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 5,
+   "level": {
+    "min": 1,
+    "median": 2,
+    "max": 2
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 2,
+    "max": 2
+   },
+   "hp": {
+    "min": 15,
+    "median": 24,
+    "max": 26
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 10,
+    "con": 12,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 7,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: club (20%)",
+    "righthand: greataxe (20%)",
+    "righthand: battleaxe (20%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 0,
+     "level": 2,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "barbarian",
+   "levelBand": "1-4",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 52,
+    "median": 52,
+    "max": 52
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 13,
+    "con": 12,
+    "int": 8,
+    "wis": 12,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: diremace (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 0,
+     "level": 4,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "barbarian",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 3,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 6
+   },
+   "cr": {
+    "min": 4,
+    "median": 5,
+    "max": 6
+   },
+   "hp": {
+    "min": 54,
+    "median": 70,
+    "max": 96
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 12,
+    "con": 14,
+    "int": 8,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 12,
+    "max": 12
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0.33,
+   "caster": 0.67,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greatsword (33%)",
+    "righthand: longbow (33%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 0,
+     "level": 5,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "barbarian",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 135,
+    "median": 135,
+    "max": 135
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 12,
+    "con": 16,
+    "int": 8,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 19,
+    "median": 19,
+    "max": 19
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: scythe (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 0,
+     "level": 9,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "barbarian",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 187,
+    "median": 187,
+    "max": 187
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 10,
+    "con": 18,
+    "int": 10,
+    "wis": 10,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greataxe (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 0,
+     "level": 11,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "bard",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 0.5,
+    "max": 0.5
+   },
+   "hp": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 14,
+    "con": 14,
+    "int": 12,
+    "wis": 10,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 1,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightcrossbow (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 1,
+     "level": 1,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 5,
+   "level": {
+    "min": 1,
+    "median": 3,
+    "max": 4
+   },
+   "cr": {
+    "min": 1,
+    "median": 3,
+    "max": 4
+   },
+   "hp": {
+    "min": 9,
+    "median": 32,
+    "max": 36
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 10,
+    "con": 12,
+    "int": 10,
+    "wis": 15,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 12,
+    "max": 16
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0.4,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: morningstar (20%)",
+    "lefthand: smallshield (20%)",
+    "righthand: warhammer (20%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 3,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "1-4",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 36,
+    "median": 36,
+    "max": 36
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 10,
+    "con": 12,
+    "int": 10,
+    "wis": 18,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: warhammer (100%)",
+    "lefthand: smallshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 4,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 42,
+    "median": 42,
+    "max": 42
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 8,
+    "con": 13,
+    "int": 10,
+    "wis": 15,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 5,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 3,
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "cr": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "hp": {
+    "min": 63,
+    "median": 63,
+    "max": 70
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 11,
+    "con": 12,
+    "int": 10,
+    "wis": 15,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 12
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0.67,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: morningstar (33%)",
+    "righthand: warhammer (33%)",
+    "lefthand: largeshield (33%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 7,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 99,
+    "median": 99,
+    "max": 99
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 11,
+    "con": 16,
+    "int": 10,
+    "wis": 18,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightmace (100%)",
+    "lefthand: smallshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 9,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 70,
+    "median": 70,
+    "max": 70
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 12,
+    "con": 10,
+    "int": 10,
+    "wis": 18,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: morningstar (100%)",
+    "lefthand: largeshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 10,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 100,
+    "median": 100,
+    "max": 100
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 8,
+    "con": 12,
+    "int": 12,
+    "wis": 18,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 17,
+    "median": 17,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightmace (100%)",
+    "lefthand: largeshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 10,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "13-16",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "cr": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "hp": {
+    "min": 143,
+    "median": 143,
+    "max": 143
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 10,
+    "con": 16,
+    "int": 10,
+    "wis": 22,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightmace (100%)",
+    "lefthand: towershield (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 13,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "cleric",
+   "levelBand": "17-20",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "cr": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "hp": {
+    "min": 133,
+    "median": 133,
+    "max": 133
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 8,
+    "con": 14,
+    "int": 10,
+    "wis": 21,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 17,
+    "median": 17,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightmace (100%)",
+    "lefthand: smallshield (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 2,
+     "level": 20,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "commoner",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 25,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "cr": {
+    "min": 0.125,
+    "median": 1,
+    "max": 3
+   },
+   "hp": {
+    "min": 2,
+    "median": 8,
+    "max": 24
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 10,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 1,
+    "median": 1,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0.68,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (68%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "druid",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 3,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 20,
+    "median": 32,
+    "max": 48
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 14,
+    "con": 13,
+    "int": 12,
+    "wis": 15,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 17,
+    "max": 18
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0.67,
+   "shield": 0.33,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (67%)",
+    "righthand: sickle (33%)",
+    "lefthand: smallshield (33%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 3,
+     "level": 4,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "druid",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "cr": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "hp": {
+    "min": 60,
+    "median": 60,
+    "max": 60
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 15,
+    "int": 10,
+    "wis": 16,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: quarterstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 3,
+     "level": 6,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "druid",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 92,
+    "median": 92,
+    "max": 92
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 8,
+    "dex": 8,
+    "con": 16,
+    "int": 8,
+    "wis": 20,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 17,
+    "median": 17,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: quarterstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 3,
+     "level": 9,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "druid",
+   "levelBand": "17-20",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "cr": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "hp": {
+    "min": 113,
+    "median": 113,
+    "max": 113
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 13,
+    "con": 13,
+    "int": 10,
+    "wis": 21,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 22,
+    "median": 22,
+    "max": 22
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: sickle (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 3,
+     "level": 20,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 41,
+   "level": {
+    "min": 1,
+    "median": 2,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 2,
+    "max": 4
+   },
+   "hp": {
+    "min": 10,
+    "median": 22,
+    "max": 52
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 12,
+    "con": 12,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 0,
+    "median": 8,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 1
+   },
+   "armored": 0.9,
+   "shield": 0.22,
+   "ranged": 0.1,
+   "caster": 0.02,
+   "commonGear": [
+    "chest: armor (90%)",
+    "lefthand: largeshield (17%)",
+    "righthand: longsword (15%)",
+    "righthand: halberd (7%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 2,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "familiar",
+   "count": 1,
+   "level": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "cr": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "hp": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 12,
+    "con": 12,
+    "int": 12,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 2,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "semiboss",
+   "count": 4,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 4
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 4
+   },
+   "hp": {
+    "min": 30,
+    "median": 33,
+    "max": 40
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 13,
+    "con": 10,
+    "int": 11,
+    "wis": 10,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 7,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0.25,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "lefthand: towershield (25%)",
+    "righthand: halberd (25%)",
+    "righthand: handaxe (25%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 3,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "hp": {
+    "min": 40,
+    "median": 40,
+    "max": 40
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 13,
+    "dex": 13,
+    "con": 10,
+    "int": 10,
+    "wis": 10,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: katana (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 4,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 22,
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 8
+   },
+   "cr": {
+    "min": 4,
+    "median": 6,
+    "max": 8
+   },
+   "hp": {
+    "min": 45,
+    "median": 70.5,
+    "max": 104
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 13,
+    "con": 14,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 9,
+    "max": 28
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0.91,
+   "shield": 0.36,
+   "ranged": 0.14,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (91%)",
+    "lefthand: towershield (23%)",
+    "righthand: bastardsword (18%)",
+    "righthand: halberd (18%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 6,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 5,
+   "level": {
+    "min": 6,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 6,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 76,
+    "median": 88,
+    "max": 104
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 18,
+    "dex": 10,
+    "con": 15,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 11,
+    "median": 11,
+    "max": 19
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0.4,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: bastardsword (20%)",
+    "lefthand: towershield (20%)",
+    "righthand: shortsword (20%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 8,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 5,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 11
+   },
+   "cr": {
+    "min": 8,
+    "median": 9,
+    "max": 11
+   },
+   "hp": {
+    "min": 79,
+    "median": 90,
+    "max": 130
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 13,
+    "con": 14,
+    "int": 12,
+    "wis": 10,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 18,
+    "median": 20,
+    "max": 28
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0.4,
+   "ranged": 0.2,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "lefthand: towershield (40%)",
+    "righthand: longsword (20%)",
+    "righthand: longbow (20%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 9,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 2,
+   "level": {
+    "min": 9,
+    "median": 10.5,
+    "max": 12
+   },
+   "cr": {
+    "min": 9,
+    "median": 11,
+    "max": 13
+   },
+   "hp": {
+    "min": 117,
+    "median": 177.5,
+    "max": 238
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 19,
+    "dex": 12,
+    "con": 17,
+    "int": 12,
+    "wis": 10,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 22.5,
+    "max": 35
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: bastardsword (50%)",
+    "lefthand: towershield (50%)",
+    "righthand: longsword (50%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 11,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "fighter",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 4,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 12
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 123,
+    "median": 143,
+    "max": 156
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 18,
+    "dex": 15,
+    "con": 15,
+    "int": 10,
+    "wis": 10,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 18,
+    "median": 21,
+    "max": 23
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0.5,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "lefthand: towershield (50%)",
+    "righthand: morningstar (25%)",
+    "lefthand: kukri (25%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 4,
+     "level": 11,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "humanoid",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 0.8,
+    "max": 1
+   },
+   "hp": {
+    "min": 9,
+    "median": 9.5,
+    "max": 10
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 10,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0.5,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: shortsword (50%)",
+    "lefthand: shortsword (50%)",
+    "righthand: sling (50%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "monk",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 0.5,
+    "max": 0.5
+   },
+   "hp": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 14,
+    "con": 14,
+    "int": 10,
+    "wis": 14,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 15,
+    "median": 15,
+    "max": 15
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 5,
+     "level": 1,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "monk",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 50,
+    "median": 50,
+    "max": 50
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 14,
+    "int": 10,
+    "wis": 14,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 5,
+     "level": 5,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "monk",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 50,
+    "median": 50,
+    "max": 50
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 14,
+    "int": 10,
+    "wis": 14,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 5,
+     "level": 5,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "monk",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 2,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 110,
+    "median": 110,
+    "max": 110
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 14,
+    "con": 14,
+    "int": 9,
+    "wis": 14,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 23,
+    "median": 23,
+    "max": 23
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: quarterstaff (50%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 5,
+     "level": 10,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "paladin",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 1.8,
+    "max": 3
+   },
+   "hp": {
+    "min": 11,
+    "median": 22,
+    "max": 33
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 9,
+    "con": 12,
+    "int": 9,
+    "wis": 12,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 12,
+    "median": 13.5,
+    "max": 15
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greatsword (50%)",
+    "righthand: lightflail (50%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 6,
+     "level": 2,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "paladin",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 60,
+    "median": 60,
+    "max": 60
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 10,
+    "con": 14,
+    "int": 10,
+    "wis": 12,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 17,
+    "median": 17,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: heavyflail (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 6,
+     "level": 5,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "pale_master",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 63,
+    "median": 63,
+    "max": 63
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 9,
+    "dex": 8,
+    "con": 17,
+    "int": 20,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 17,
+    "median": 17,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 34,
+     "level": 9,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "purple_dragon_knight",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 150,
+    "median": 150,
+    "max": 150
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 18,
+    "dex": 12,
+    "con": 16,
+    "int": 12,
+    "wis": 8,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 21,
+    "median": 21,
+    "max": 21
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: greatsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 41,
+     "level": 11,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "ranger",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 1.8,
+    "max": 3
+   },
+   "hp": {
+    "min": 10,
+    "median": 20,
+    "max": 30
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 11,
+    "int": 10,
+    "wis": 13,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 10.5,
+    "max": 12
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0.5,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: longbow (50%)",
+    "righthand: shortsword (50%)",
+    "lefthand: handaxe (50%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 7,
+     "level": 2,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "ranger",
+   "levelBand": "1-4",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 40,
+    "median": 40,
+    "max": 40
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 13,
+    "con": 11,
+    "int": 12,
+    "wis": 13,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: twobladedsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 7,
+     "level": 4,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "ranger",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 50,
+    "median": 50,
+    "max": 50
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 15,
+    "con": 11,
+    "int": 12,
+    "wis": 13,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: shortspear (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 7,
+     "level": 5,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "ranger",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "cr": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "hp": {
+    "min": 77,
+    "median": 77,
+    "max": 77
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 18,
+    "con": 14,
+    "int": 10,
+    "wis": 12,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: twobladedsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 7,
+     "level": 7,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "ranger",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 99,
+    "median": 99,
+    "max": 99
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 18,
+    "con": 14,
+    "int": 8,
+    "wis": 12,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 22,
+    "median": 22,
+    "max": 22
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: twobladedsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 7,
+     "level": 9,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "ranger",
+   "levelBand": "17-20",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "cr": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "hp": {
+    "min": 182,
+    "median": 182,
+    "max": 182
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 18,
+    "con": 14,
+    "int": 10,
+    "wis": 14,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 24,
+    "median": 24,
+    "max": 24
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: katana (100%)",
+    "lefthand: shortsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 7,
+     "level": 18,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "rogue",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 6,
+   "level": {
+    "min": 1,
+    "median": 1.5,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 2,
+    "max": 4
+   },
+   "hp": {
+    "min": 6,
+    "median": 12,
+    "max": 28
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 16,
+    "con": 13,
+    "int": 11,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 10,
+    "max": 12
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0.33,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (17%)",
+    "righthand: rapier (17%)",
+    "righthand: shortbow (17%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 8,
+     "level": 2,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "rogue",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 7,
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 8
+   },
+   "cr": {
+    "min": 4,
+    "median": 5,
+    "max": 8
+   },
+   "hp": {
+    "min": 30,
+    "median": 40,
+    "max": 43
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 16,
+    "con": 12,
+    "int": 10,
+    "wis": 11,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 13,
+    "max": 24
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0.86,
+   "shield": 0,
+   "ranged": 0.29,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (86%)",
+    "righthand: shortbow (29%)",
+    "righthand: shortsword (29%)",
+    "righthand: battleaxe (14%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 8,
+     "level": 6,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "rogue",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 2,
+   "level": {
+    "min": 9,
+    "median": 9.5,
+    "max": 10
+   },
+   "cr": {
+    "min": 9,
+    "median": 9.5,
+    "max": 10
+   },
+   "hp": {
+    "min": 72,
+    "median": 76,
+    "max": 80
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 19,
+    "con": 14,
+    "int": 11,
+    "wis": 12,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 15,
+    "median": 18.5,
+    "max": 22
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0.5,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (50%)",
+    "righthand: heavycrossbow (50%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 8,
+     "level": 10,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "rogue",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 99,
+    "median": 99,
+    "max": 99
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 20,
+    "con": 16,
+    "int": 12,
+    "wis": 10,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: shortsword (100%)",
+    "lefthand: shortsword (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 8,
+     "level": 11,
+     "gearRole": "elite",
+     "powerLevel": "tougher"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "sorcerer",
+   "levelBand": "1-4",
+   "role": "familiar",
+   "count": 3,
+   "level": {
+    "min": 1,
+    "median": 3,
+    "max": 4
+   },
+   "cr": {
+    "min": 1,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 8,
+    "median": 9,
+    "max": 16
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 11,
+    "dex": 10,
+    "con": 12,
+    "int": 13,
+    "wis": 10,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 8,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0.67,
+   "shield": 0,
+   "ranged": 0.33,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (67%)",
+    "righthand: quarterstaff (33%)",
+    "righthand: heavycrossbow (33%)",
+    "righthand: dagger (33%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 9,
+     "level": 3,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "sorcerer",
+   "levelBand": "1-4",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "cr": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "hp": {
+    "min": 18,
+    "median": 18,
+    "max": 18
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 10,
+    "con": 12,
+    "int": 12,
+    "wis": 10,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 9,
+     "level": 3,
+     "gearRole": "elite",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "sorcerer",
+   "levelBand": "5-8",
+   "role": "familiar",
+   "count": 1,
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 21,
+    "median": 21,
+    "max": 21
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 11,
+    "dex": 12,
+    "con": 12,
+    "int": 13,
+    "wis": 10,
+    "cha": 16
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "righthand: quarterstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 9,
+     "level": 6,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "sorcerer",
+   "levelBand": "17-20",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "cr": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "hp": {
+    "min": 91,
+    "median": 91,
+    "max": 91
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 14,
+    "con": 14,
+    "int": 14,
+    "wis": 12,
+    "cha": 21
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 9,
+     "level": 20,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "wizard",
+   "levelBand": "1-4",
+   "role": "familiar",
+   "count": 2,
+   "level": {
+    "min": 1,
+    "median": 2.5,
+    "max": 4
+   },
+   "cr": {
+    "min": 1,
+    "median": 2.5,
+    "max": 4
+   },
+   "hp": {
+    "min": 8,
+    "median": 14,
+    "max": 20
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 9,
+    "dex": 9,
+    "con": 14,
+    "int": 17,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 6.5,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (50%)",
+    "righthand: magicstaff (50%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 10,
+     "level": 3,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "wizard",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 2,
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "cr": {
+    "min": 5,
+    "median": 5.5,
+    "max": 6
+   },
+   "hp": {
+    "min": 42,
+    "median": 42,
+    "max": 42
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 11,
+    "con": 13,
+    "int": 16,
+    "wis": 10,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8.5,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (50%)",
+    "righthand: morningstar (50%)",
+    "lefthand: torch (50%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 10,
+     "level": 6,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "wizard",
+   "levelBand": "5-8",
+   "role": "familiar",
+   "count": 3,
+   "level": {
+    "min": 5,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 5,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 34,
+    "median": 48,
+    "max": 48
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 14,
+    "int": 16,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 4,
+    "max": 13
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0.33,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: magicstaff (67%)",
+    "righthand: lightcrossbow (33%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 10,
+     "level": 8,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "wizard",
+   "levelBand": "9-12",
+   "role": "familiar",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 72,
+    "median": 72,
+    "max": 72
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 16,
+    "int": 20,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 10,
+     "level": 9,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "wizard",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 40,
+    "median": 40,
+    "max": 40
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 12,
+    "int": 18,
+    "wis": 12,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: magicstaff (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 10,
+     "level": 10,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "player-race",
+   "class": "wizard",
+   "levelBand": "17-20",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "cr": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "hp": {
+    "min": 91,
+    "median": 91,
+    "max": 91
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 14,
+    "con": 14,
+    "int": 21,
+    "wis": 12,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 16,
+    "median": 16,
+    "max": 16
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (100%)"
+   ],
+   "buildWith": {
+    "tool": "build_key_npc",
+    "args": {
+     "classId": 10,
+     "level": 20,
+     "gearRole": "standard",
+     "powerLevel": "standard"
+    }
+   }
+  },
+  {
+   "type": "shapechanger",
+   "class": "shapechanger",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "cr": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "hp": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "naturalAC": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 14,
+    "con": 13,
+    "int": 10,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "shapechanger",
+   "class": "shapechanger",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 55,
+    "median": 55,
+    "max": 55
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 18,
+    "con": 13,
+    "int": 10,
+    "wis": 8,
+    "cha": 8
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "shapechanger",
+   "class": "shapechanger",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 4,
+   "level": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "cr": {
+    "min": 6,
+    "median": 7,
+    "max": 8
+   },
+   "hp": {
+    "min": 54,
+    "median": 70,
+    "max": 112
+   },
+   "naturalAC": {
+    "min": 5,
+    "median": 5,
+    "max": 8
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 14,
+    "con": 15,
+    "int": 10,
+    "wis": 12,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 5,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0.5,
+    "max": 16
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.5,
+   "commonGear": [
+    "cweapon_b: cslashweapon (75%)",
+    "cweapon_l: cslshprcweap (50%)",
+    "cweapon_l: cbludgweapon (25%)",
+    "cweapon_b: cpiercweapon (25%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "shapechanger",
+   "class": "shapechanger",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 3,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 72,
+    "median": 80,
+    "max": 80
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 3
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 14,
+    "con": 14,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "shapechanger",
+   "class": "shapechanger",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "cr": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "hp": {
+    "min": 143,
+    "median": 143,
+    "max": 143
+   },
+   "naturalAC": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "abilities": {
+    "str": 20,
+    "dex": 14,
+    "con": 16,
+    "int": 10,
+    "wis": 10,
+    "cha": 10
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 13,
+    "median": 13,
+    "max": 13
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "undead",
+   "class": "cleric",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "hp": {
+    "min": 30,
+    "median": 30,
+    "max": 30
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 11,
+    "dex": 10,
+    "con": 7,
+    "int": 10,
+    "wis": 15,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 1,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: lightmace (100%)",
+    "lefthand: largeshield (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 5
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "cleric",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 90,
+    "median": 90,
+    "max": 90
+   },
+   "naturalAC": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 10,
+    "con": 10,
+    "int": 6,
+    "wis": 15,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 2,
+     "level": 10
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "fighter",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "cr": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "hp": {
+    "min": 20,
+    "median": 20,
+    "max": 20
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 8,
+    "con": 12,
+    "int": 3,
+    "wis": 10,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: battleaxe (100%)",
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 4,
+     "level": 2
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "undead",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 7,
+   "level": {
+    "min": 1,
+    "median": 2,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.3333,
+    "median": 2,
+    "max": 4
+   },
+   "hp": {
+    "min": 6,
+    "median": 20,
+    "max": 32
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 0,
+    "max": 3
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 12,
+    "con": 10,
+    "int": 6,
+    "wis": 10,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 3,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 1
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.29,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (71%)",
+    "cweapon_b: cbludgweapon (29%)",
+    "cweapon_b: cslashweapon (14%)",
+    "righthand: club (14%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "undead",
+   "class": "undead",
+   "levelBand": "5-8",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 45,
+    "median": 45,
+    "max": 45
+   },
+   "naturalAC": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "abilities": {
+    "str": 17,
+    "dex": 8,
+    "con": 10,
+    "int": 6,
+    "wis": 14,
+    "cha": 15
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "undead",
+   "class": "undead",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 17,
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 8
+   },
+   "cr": {
+    "min": 4,
+    "median": 6,
+    "max": 10
+   },
+   "hp": {
+    "min": 36,
+    "median": 48,
+    "max": 77
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 2,
+    "max": 8
+   },
+   "abilities": {
+    "str": 15,
+    "dex": 14,
+    "con": 10,
+    "int": 10,
+    "wis": 12,
+    "cha": 13
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 4,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 3
+   },
+   "armored": 0.35,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.47,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (65%)",
+    "chest: armor (35%)",
+    "cweapon_b: cslashweapon (18%)",
+    "cweapon_b: cbludgweapon (12%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "undead",
+   "class": "undead",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 15,
+   "level": {
+    "min": 9,
+    "median": 10,
+    "max": 12
+   },
+   "cr": {
+    "min": 9,
+    "median": 12,
+    "max": 15
+   },
+   "hp": {
+    "min": 47,
+    "median": 88,
+    "max": 121
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 7,
+    "max": 12
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 16,
+    "con": 12,
+    "int": 12,
+    "wis": 13,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 6,
+    "max": 17
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 10
+   },
+   "armored": 0.27,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.73,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (60%)",
+    "cweapon_b: cbludgweapon (27%)",
+    "chest: armor (27%)",
+    "cweapon_b: cslashweapon (27%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "undead",
+   "class": "undead",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "cr": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "hp": {
+    "min": 96,
+    "median": 96,
+    "max": 96
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "abilities": {
+    "str": 16,
+    "dex": 16,
+    "con": 10,
+    "int": 12,
+    "wis": 14,
+    "cha": 14
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: longsword (100%)",
+    "cweapon_b: cpiercweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "undead",
+   "class": "wizard",
+   "levelBand": "1-4",
+   "role": "familiar",
+   "count": 1,
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "cr": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "hp": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 8,
+    "int": 16,
+    "wis": 10,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 4
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "wizard",
+   "levelBand": "5-8",
+   "role": "familiar",
+   "count": 2,
+   "level": {
+    "min": 5,
+    "median": 6.5,
+    "max": 8
+   },
+   "cr": {
+    "min": 6,
+    "median": 7.5,
+    "max": 9
+   },
+   "hp": {
+    "min": 15,
+    "median": 17,
+    "max": 19
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 8,
+    "int": 17,
+    "wis": 10,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6.5,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: dagger (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 7
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "wizard",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 32,
+    "median": 32,
+    "max": 32
+   },
+   "naturalAC": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 10,
+    "con": 10,
+    "int": 17,
+    "wis": 10,
+    "cha": 11
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: magicstaff (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 8
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "wizard",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 54,
+    "median": 54,
+    "max": 54
+   },
+   "naturalAC": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 12,
+    "con": 10,
+    "int": 18,
+    "wis": 9,
+    "cha": 9
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 7,
+    "median": 7,
+    "max": 7
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: magicstaff (100%)",
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 10
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "wizard",
+   "levelBand": "9-12",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 12,
+    "median": 12,
+    "max": 12
+   },
+   "cr": {
+    "min": 19,
+    "median": 19,
+    "max": 19
+   },
+   "hp": {
+    "min": 112,
+    "median": 112,
+    "max": 112
+   },
+   "naturalAC": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 14,
+    "con": 13,
+    "int": 21,
+    "wis": 14,
+    "cha": 12
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "spellAbilities": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "armored": 1,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "chest: armor (100%)",
+    "righthand: magicstaff (100%)",
+    "cweapon_l: cslshprcweap (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 12
+    }
+   }
+  },
+  {
+   "type": "undead",
+   "class": "wizard",
+   "levelBand": "21+",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 21,
+    "median": 21,
+    "max": 21
+   },
+   "cr": {
+    "min": 25,
+    "median": 25,
+    "max": 25
+   },
+   "hp": {
+    "min": 145,
+    "median": 145,
+    "max": 145
+   },
+   "naturalAC": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "abilities": {
+    "str": 10,
+    "dex": 16,
+    "con": 10,
+    "int": 39,
+    "wis": 18,
+    "cha": 20
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 23,
+    "median": 23,
+    "max": 23
+   },
+   "spellAbilities": {
+    "min": 14,
+    "median": 14,
+    "max": 14
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_b: cbludgweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "forge_creature",
+    "args": {
+     "classId": 10,
+     "level": 21
+    }
+   }
+  },
+  {
+   "type": "vermin",
+   "class": "vermin",
+   "levelBand": "1-4",
+   "role": "standard",
+   "count": 5,
+   "level": {
+    "min": 1,
+    "median": 3,
+    "max": 4
+   },
+   "cr": {
+    "min": 0.5,
+    "median": 3,
+    "max": 4
+   },
+   "hp": {
+    "min": 6,
+    "median": 18,
+    "max": 32
+   },
+   "naturalAC": {
+    "min": 0,
+    "median": 2,
+    "max": 5
+   },
+   "abilities": {
+    "str": 12,
+    "dex": 11,
+    "con": 11,
+    "int": 3,
+    "wis": 10,
+    "cha": 6
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 2,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 1,
+    "max": 2
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.8,
+   "commonGear": [
+    "cweapon_l: cslashweapon (80%)",
+    "cweapon_b: cslashweapon (60%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "vermin",
+   "class": "vermin",
+   "levelBand": "5-8",
+   "role": "standard",
+   "count": 5,
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "cr": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "hp": {
+    "min": 45,
+    "median": 54,
+    "max": 63
+   },
+   "naturalAC": {
+    "min": 3,
+    "median": 6,
+    "max": 12
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 18,
+    "con": 14,
+    "int": 3,
+    "wis": 10,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 2,
+    "median": 3,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 2,
+    "max": 3
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0.6,
+   "commonGear": [
+    "cweapon_b: cslashweapon (80%)",
+    "cweapon_l: cslashweapon (20%)",
+    "cweapon_l: cslshprcweap (20%)",
+    "cweapon_b: cpiercweapon (20%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "vermin",
+   "class": "vermin",
+   "levelBand": "5-8",
+   "role": "boss",
+   "count": 1,
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "cr": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "hp": {
+    "min": 88,
+    "median": 88,
+    "max": 88
+   },
+   "naturalAC": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "abilities": {
+    "str": 21,
+    "dex": 20,
+    "con": 16,
+    "int": 3,
+    "wis": 10,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cslashweapon (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "vermin",
+   "class": "vermin",
+   "levelBand": "9-12",
+   "role": "semiboss",
+   "count": 1,
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "cr": {
+    "min": 9,
+    "median": 9,
+    "max": 9
+   },
+   "hp": {
+    "min": 90,
+    "median": 90,
+    "max": 90
+   },
+   "naturalAC": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "abilities": {
+    "str": 14,
+    "dex": 18,
+    "con": 14,
+    "int": 3,
+    "wis": 11,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "spellAbilities": {
+    "min": 0,
+    "median": 0,
+    "max": 0
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 0,
+   "commonGear": [
+    "cweapon_l: cslshprcweap (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  },
+  {
+   "type": "vermin",
+   "class": "vermin",
+   "levelBand": "9-12",
+   "role": "standard",
+   "count": 1,
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "cr": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "hp": {
+    "min": 104,
+    "median": 104,
+    "max": 104
+   },
+   "naturalAC": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "abilities": {
+    "str": 22,
+    "dex": 20,
+    "con": 14,
+    "int": 3,
+    "wis": 10,
+    "cha": 3
+   },
+   "saveBonus": {
+    "fort": 0,
+    "ref": 0,
+    "will": 0
+   },
+   "feats": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "spellAbilities": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "armored": 0,
+   "shield": 0,
+   "ranged": 0,
+   "caster": 1,
+   "commonGear": [
+    "cweapon_l: cslashweapon (100%)",
+    "cweapon_b: cslashweapon (100%)"
+   ],
+   "buildWith": {
+    "tool": "place_creature",
+    "note": "a monster class: place a ready-made palette creature of this type and adjust with the numbers here; the forge builds player classes only"
+   }
+  }
+ ]
+}

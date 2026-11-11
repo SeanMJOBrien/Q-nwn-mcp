@@ -26,3 +26,8 @@ Rule: **`forge_creature` is the one supported way to build a class-based creatur
 | Random Abilities (`create_random_abilities_system`, `a_ra_spawn`) | **Deprecated.** Capped at cantrips for a never-levelled creature (confirmed live); the forge does not have that limit. |
 
 Monsters (Animal, Beast, Undead, Outsider ...) are not forged: place a palette creature as it is.
+
+## Choosing a template
+
+`list_creature_samples` finds sample categories near a CR or level (type, class, role) with the numbers to aim for and the build arguments; the catalog (`src/data/creature-catalog.json`, readable form `docs/creature-catalog.md`) was built from 505 hand-built creature blueprints by `build_creature_catalog` (ranges and medians only, no names). Re-run `build_creature_catalog({source, writeGeneral: true})` against another world's `utc` folder to extend it; the per-creature summaries stay in the git-ignored `adventures/_catalog/`.
+
