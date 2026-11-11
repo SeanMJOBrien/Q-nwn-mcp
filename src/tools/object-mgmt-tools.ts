@@ -544,4 +544,64 @@ export function registerObjectMgmtTools(server: McpServer): void {
       };
     },
   );
+
+  // ─── remove_resource ───────────────────────────────────────────────────────
+
+  server.tool(
+    "remove_resource",
+    "Remove a resource (a blueprint, script, dialog, area file, ...) from the loaded module, and from its module project when there is one (the file and the manifest entry). " +
+      "Removing an .nss also removes its compiled .ncs. Refuses while something else still names the resref (a placed object, a script, a dialog, a store list) unless force is true; the refusal lists what refers to it. " +
+      "Use this instead of deleting files by hand: a project whose manifest names a file that no longer exists will not reload.",
+    {
+      resource: z.string().describe("Resource resref (e.g. 'tr_dart')"),
+      type: z.string().describe("Resource extension without the dot (nss, ncs, uti, utc, utp, utm, dlg, are, git, ...)"),
+      force: z.boolean().optional().describe("Remove even when other resources still name it (default false)"),
+    },
+    { destructiveHint: true },
+    async ({ resource, type, force }) => {
+      const index = requireIndex();
+      const resref = resource.toLowerCase();
+      const ext = type.toLowerCase().replace(/^\./, "");
+      const key = `${resref}.${ext}`;
+      const entry = index.resources.get(key);
+      if (!entry) {
+        return { isError: true, content: [{ type: "text", text: `No resource ${key} in the loaded module.` }] };
+      }
+      // What names it: scripts (text), and every parsed GFF (blueprints, areas, dialogs, ...).
+      const needle = resref;
+      const refs: string[] = [];
+      for (const [other, res] of index.resources) {
+        if (other === key || (ext === "nss" && other === `${resref}.ncs`) || other.endsWith(".ncs")) continue;
+        try {
+          let hay = "";
+          if (res.extension === "nss") hay = await fsPromises.readFile(res.filePath, "utf8");
+          else hay = JSON.stringify(index.parsedGff.get(other) ?? "");
+          if (hay.toLowerCase().includes(`"${needle}"`) || (res.extension === "nss" && new RegExp(`["\\s]${needle}["\\s.;]`, "i").test(hay))) refs.push(other);
+        } catch {
+          /* unreadable: ignore */
+        }
+      }
+      if (refs.length > 0 && force !== true) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: JSON.stringify({ removed: false, reason: `${key} is still named by ${refs.length} resource(s); pass force: true to remove it anyway`, referencedBy: refs.slice(0, 25) }, null, 2) }],
+        };
+      }
+      const keys = [key];
+      if (ext === "nss" && index.resources.has(`${resref}.ncs`)) keys.push(`${resref}.ncs`);
+      for (const k of keys) {
+        const r = index.resources.get(k);
+        if (!r) continue;
+        if (r.filePath) {
+          await fsPromises.rm(r.filePath, { force: true });
+          await afterRemove(r.filePath);
+        }
+        index.resources.delete(k);
+        index.parsedGff.delete(k);
+      }
+      index.items = index.items.filter((i) => !(ext === "uti" && i.source === "blueprint" && i.resref === resref));
+      markDirty(entry.filePath || path.join(index.tempDir, key));
+      return { content: [{ type: "text", text: JSON.stringify({ removed: true, resources: keys, project: "manifest and file updated when the module is a project", forcedPastReferences: refs.length > 0 ? refs.slice(0, 25) : undefined }, null, 2) }] };
+    },
+  );
 }

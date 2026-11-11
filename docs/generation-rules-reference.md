@@ -64,7 +64,7 @@ challenges) so the orchestrator regains control to print spoiler-free heartbeat
 messages between calls (e.g. *"Shaping the land... (area 2 of 3)"*).
 
 **Undo toolkit** available to the orchestrator for correcting sub-skill mistakes
-without a full restart: `undo_last_change`, `undo_history`, `remove_object`,
+without a full restart: `undo_last_change`, `undo_history`, `remove_object`, `remove_resource` (a whole resource, project kept in step),
 `bulk_remove_objects` (tag-pattern, dry-run mode — the primary phase-rollback tool),
 `remove_journal_quest`/`remove_journal_entry`, `remove_items_from_container`,
 `clear_creature_equipment`.
