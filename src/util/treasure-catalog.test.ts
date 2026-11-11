@@ -3,6 +3,7 @@ import type { GffObj } from "../types/gff.js";
 import {
   aggregateTreasure,
   fitLevel,
+  isTreasure,
   itemTier,
   queryTreasureCategories,
   queryTreasureItems,
@@ -72,6 +73,18 @@ describe("treasure catalog", () => {
     expect(s.name).toBe("Longsword +1");
     // no table entry: falls back to the tag
     expect(summarizeItem(doc, "sword1", look).name).toBe("T");
+  });
+
+  it("leaves out gear tied to a world's story or monsters, and groups consumables", () => {
+    const sword = summarizeItem(item(1, 500), "weapon12", look);
+    expect(isTreasure(sword)).toBe(true);
+    for (const r of ["cre_zomslam", "hen_dorna_arm", "key_hawk", "q_wedding_ring", "linu_reward1", "gamble_ring"]) {
+      expect(isTreasure(summarizeItem(item(1, 500), r, look))).toBe(false);
+    }
+    const claw: TreasureLookups = { ...look, baseItemLabel: () => "cslshprcweap" };
+    expect(isTreasure(summarizeItem(item(9, 500), "weapon99", claw))).toBe(false);
+    expect(treasureGroup("grenade", 0)).toBe("consumable");
+    expect(treasureGroup("healerskit", 0)).toBe("consumable");
   });
 
   it("aggregates by kind and tier, leaves out plot and free items, and ranks by level", () => {

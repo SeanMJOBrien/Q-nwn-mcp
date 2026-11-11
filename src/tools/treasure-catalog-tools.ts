@@ -29,6 +29,8 @@ import {
 import { errorResult } from "../util/tool-result.js";
 import {
   aggregateTreasure,
+  isTreasure,
+  UNSUITABLE_RESREF,
   type ItemSummary,
   queryTreasureCategories,
   queryTreasureItems,
@@ -136,7 +138,7 @@ export async function runTreasureBuild(
       failed.push(`${f}: ${e}`);
     }
   }
-  const usable = summaries.filter((s) => !s.plot && s.cost > 0);
+  const usable = summaries.filter(isTreasure);
   const categories = aggregateTreasure(summaries);
   const file: TreasureFile = {
     generated: new Date().toISOString().slice(0, 10),
@@ -144,7 +146,7 @@ export async function runTreasureBuild(
       items: files.length,
       categorised: usable.length,
       excluded: [
-        { reason: "plot items and items with no value (quest tokens, placeholders)", count: summaries.length - usable.length },
+        { reason: "plot items, items with no value, and gear tied to the source world's story or monsters (creature attacks, companion outfits, keys, quest artifacts, named rewards)", count: summaries.length - usable.length },
         ...(failed.length ? [{ reason: "unreadable", count: failed.length }] : []),
       ].filter((e) => e.count > 0),
     },
@@ -314,7 +316,7 @@ export function registerTreasureCatalogTools(server: McpServer): void {
     "import_treasure_set",
     "Import a band of the treasure catalog into the loaded module in one call, so the random-treasure pool (create_treasure_system) has items that fit the module's levels instead of the whole catalog. " +
       "Choose the value tiers (1-5; for a level 1-4 module tiers 1-3 are plenty: higher tiers would almost never roll at those challenge ratings), the kinds, and how many items per kind and tier (spread evenly across the value range). Items keep their own names (resolved from the talk tables; a name that cannot be resolved becomes the base item's label) and are given the resref prefix `tr_` + the sample's resref (16 characters at most), skipping resrefs the module already has. " +
-      "Plot items and free items are never imported. Run create_treasure_system afterwards to put them in the pool.",
+      "Plot items, free items and gear tied to the source world's own story or monsters (creature attacks, companion outfits, keys, quest artifacts, named rewards) are never imported. Run create_treasure_system afterwards to put them in the pool.",
     {
       minTier: optNumParam("Lowest value tier to import (default 1)"),
       maxTier: optNumParam("Highest value tier to import (default 3)"),
@@ -335,7 +337,7 @@ export function registerTreasureCatalogTools(server: McpServer): void {
       const chosen: ItemSummary[] = [];
       const buckets = new Map<string, ItemSummary[]>();
       for (const s of items) {
-        if (s.plot || s.cost <= 0 || s.tier < lo || s.tier > hi) continue;
+        if (!isTreasure(s) || s.tier < lo || s.tier > hi) continue;
         if (want ? !want.has(s.group) : s.group === "misc" || s.group === "gem") continue;
         const k = `${s.group}|${s.tier}`;
         (buckets.get(k) ?? buckets.set(k, []).get(k))?.push(s);
@@ -379,7 +381,7 @@ export function registerTreasureCatalogTools(server: McpServer): void {
       const counts: Record<string, number> = {};
       const add = (doc: GffObj, resref: string) => {
         const s = summarizeItem(doc, resref, look);
-        if (s.plot || s.cost < floor) {
+        if (s.plot || s.cost < floor || UNSUITABLE_RESREF.test(resref)) {
           skipped.push(resref);
           return;
         }

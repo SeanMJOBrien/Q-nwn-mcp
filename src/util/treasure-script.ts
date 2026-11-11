@@ -63,6 +63,7 @@ export function kindOfGroup(group: string): number {
     case "scroll":
       return 2;
     case "wand":
+    case "consumable":
       return 0;
     default:
       return 1;

@@ -25,6 +25,7 @@ describe("treasure include", () => {
     expect(kindOfGroup("potion")).toBe(3);
     expect(kindOfGroup("scroll")).toBe(2);
     expect(kindOfGroup("wand")).toBe(0);
+    expect(kindOfGroup("consumable")).toBe(0);
     expect(kindOfGroup("gem")).toBe(1);
   });
 

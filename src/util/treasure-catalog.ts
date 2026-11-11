@@ -89,6 +89,7 @@ export function treasureGroup(label: string, slots: number): string {
   if (has("amulet") || has("necklace")) return "amulet";
   if (has("bow") || has("crossbow") || has("sling")) return "ranged";
   if (has("dart") || has("shuriken") || has("throwing")) return "thrown";
+  if (has("grenade") || has("healerskit") || has("thievestools") || has("trapkit")) return "consumable";
   if (has("gem")) return "gem";
   if (slots & 0x30 || slots & 0x20) return "weapon";
   if (slots & 0x2) return "helmet";
@@ -191,9 +192,14 @@ function top(counts: Map<string, number>, n: number): Array<{ name: string; coun
     .map(([name, count]) => ({ name, count }));
 }
 
-/** Items that make sense as treasure: not plot items, not free (value 0, placeholders and quest tokens). */
+/** Blueprints that belong to one world's story or its monsters rather than being generic treasure: creature attacks and outfits, a companion's or a quest's own gear, keys, quest artifacts, named rewards, gambling stand-ins. */
+export const UNSUITABLE_RESREF = /^(cre_|hen_|key_|q_|gamble_)|reward|daelan|sharwyn|linu|revat|tomi/i;
+/** Creature natural weapons and skins (bites, claws, slams, skin properties) are not items a player carries. */
+export const CREATURE_BASE_ITEM = /^c(slash|pierc|bludg|slsh)|creatureitem/i;
+
+/** Items that make sense as treasure: not plot items, not free (value 0, placeholders and quest tokens), nothing tied to one world's story or monsters. */
 export function isTreasure(s: ItemSummary): boolean {
-  return !s.plot && s.cost > 0;
+  return !s.plot && s.cost > 0 && !UNSUITABLE_RESREF.test(s.resref) && !CREATURE_BASE_ITEM.test(s.baseLabel);
 }
 
 export function aggregateTreasure(items: ItemSummary[]): TreasureCategory[] {
