@@ -19,6 +19,7 @@ const NOT_MODULE_RESOURCES: Record<string, string> = {
   "tileset-tools.ts": "HTML reports",
   "verify-server-tools.ts": "throwaway staging directories and the verify server's own files",
   "creature-catalog-tools.ts": "writes the catalog files under adventures/_catalog and the repo's src/data and docs, never into the module",
+  "treasure-catalog-tools.ts": "writes the catalog files under adventures/_catalog and the repo's src/data and docs; import_treasure_item writes through jsonToGff, which syncs the project",
   "module-tools.ts": "create_module assembles a new module in its own directory before loading it",
 };
 for (const f of ["gear-tools.ts", "random-abilities-tools.ts", "reward-tools.ts", "spec-ability-tools.ts", "spec-assert-tools.ts", "spec-check-tools.ts", "systest-tools.ts"]) {

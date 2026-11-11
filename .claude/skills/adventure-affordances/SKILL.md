@@ -61,6 +61,7 @@ Read `adventure.md`. Extract from all sections:
 
 **From `## Challenges`:**
 - **Enemy difficulty** — determines what gear the player needs
+- **Treasure samples** — for container loot of a known level, `list_treasure_samples(level, group)` and `import_treasure_item` give hand-built items of fitting value (see `/adventure-rewards`, item sourcing)
 - **Enemy equipment** — magic items on enemies become loot on death (no need to duplicate)
 - **Traps** — antidotes or healing may be needed
 - **CR range** — guides store inventory level

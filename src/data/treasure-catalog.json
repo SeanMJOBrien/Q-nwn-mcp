@@ -1,0 +1,3327 @@
+{
+ "generated": "2026-11-11",
+ "source": {
+  "items": 1358,
+  "categorised": 1312,
+  "excluded": [
+   {
+    "reason": "plot items and items with no value (quest tokens, placeholders)",
+    "count": 46
+   }
+  ]
+ },
+ "categories": [
+  {
+   "group": "ammo",
+   "tier": 2,
+   "count": 6,
+   "cost": {
+    "min": 1360,
+    "median": 1488,
+    "max": 1818
+   },
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Damage",
+     "count": 5
+    },
+    {
+     "name": "OnHit",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "arrow",
+    "bullet",
+    "bolt"
+   ]
+  },
+  {
+   "group": "ammo",
+   "tier": 3,
+   "count": 7,
+   "cost": {
+    "min": 3776,
+    "median": 4012,
+    "max": 4248
+   },
+   "level": {
+    "min": 6,
+    "median": 6,
+    "max": 6
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Damage",
+     "count": 7
+    }
+   ],
+   "baseItems": [
+    "arrow",
+    "bolt",
+    "bullet"
+   ]
+  },
+  {
+   "group": "ammo",
+   "tier": 4,
+   "count": 12,
+   "cost": {
+    "min": 8118,
+    "median": 10588,
+    "max": 15120
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Damage",
+     "count": 9
+    },
+    {
+     "name": "OnHit",
+     "count": 3
+    },
+    {
+     "name": "DamageRacialGroup",
+     "count": 1
+    },
+    {
+     "name": "OnHitCastSpell",
+     "count": 1
+    },
+    {
+     "name": "VampiricRegeneration",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "bullet",
+    "bolt",
+    "arrow"
+   ]
+  },
+  {
+   "group": "ammo",
+   "tier": 5,
+   "count": 3,
+   "cost": {
+    "min": 16065,
+    "median": 16065,
+    "max": 17010
+   },
+   "level": {
+    "min": 10,
+    "median": 10,
+    "max": 11
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Damage",
+     "count": 3
+    }
+   ],
+   "baseItems": [
+    "bolt",
+    "arrow"
+   ]
+  },
+  {
+   "group": "amulet",
+   "tier": 1,
+   "count": 4,
+   "cost": {
+    "min": 51,
+    "median": 51,
+    "max": 51
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "amulet"
+   ]
+  },
+  {
+   "group": "amulet",
+   "tier": 2,
+   "count": 8,
+   "cost": {
+    "min": 449,
+    "median": 813,
+    "max": 1757
+   },
+   "level": {
+    "min": 3,
+    "median": 4,
+    "max": 4
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.13,
+   "properties": [
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 3
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 1
+    },
+    {
+     "name": "Light",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "amulet"
+   ]
+  },
+  {
+   "group": "amulet",
+   "tier": 3,
+   "count": 11,
+   "cost": {
+    "min": 2049,
+    "median": 3608,
+    "max": 6702
+   },
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 8
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Ability",
+     "count": 3
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 3
+    },
+    {
+     "name": "CastSpell",
+     "count": 2
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 2
+    },
+    {
+     "name": "prop88",
+     "count": 1
+    },
+    {
+     "name": "SingleBonusSpellOfLevel",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "amulet"
+   ]
+  },
+  {
+   "group": "amulet",
+   "tier": 4,
+   "count": 10,
+   "cost": {
+    "min": 7654,
+    "median": 11286,
+    "max": 12635
+   },
+   "level": {
+    "min": 8,
+    "median": 10,
+    "max": 10
+   },
+   "enchant": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "enchanted": 0.1,
+   "properties": [
+    {
+     "name": "Ability",
+     "count": 5
+    },
+    {
+     "name": "UseLimitationAlignmentGroup",
+     "count": 2
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "BonusFeats",
+     "count": 1
+    },
+    {
+     "name": "CastSpell",
+     "count": 1
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "amulet"
+   ]
+  },
+  {
+   "group": "amulet",
+   "tier": 5,
+   "count": 2,
+   "cost": {
+    "min": 17763,
+    "median": 19309,
+    "max": 20854
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "enchant": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "enchanted": 1,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 2
+    },
+    {
+     "name": "DamageResist",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "amulet"
+   ]
+  },
+  {
+   "group": "armor",
+   "tier": 1,
+   "count": 34,
+   "cost": {
+    "min": 1,
+    "median": 18,
+    "max": 161
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "armor"
+   ]
+  },
+  {
+   "group": "armor",
+   "tier": 2,
+   "count": 31,
+   "cost": {
+    "min": 191,
+    "median": 900,
+    "max": 1987
+   },
+   "level": {
+    "min": 2,
+    "median": 3,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.06,
+   "properties": [
+    {
+     "name": "UseLimitationClass",
+     "count": 13
+    },
+    {
+     "name": "DamageResist",
+     "count": 6
+    },
+    {
+     "name": "SingleBonusSpellOfLevel",
+     "count": 4
+    },
+    {
+     "name": "Skill",
+     "count": 4
+    },
+    {
+     "name": "ArmorDamageType",
+     "count": 3
+    },
+    {
+     "name": "Armor",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "armor"
+   ]
+  },
+  {
+   "group": "armor",
+   "tier": 3,
+   "count": 23,
+   "cost": {
+    "min": 2386,
+    "median": 4884,
+    "max": 6912
+   },
+   "level": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchanted": 0.43,
+   "properties": [
+    {
+     "name": "prop90",
+     "count": 14
+    },
+    {
+     "name": "Armor",
+     "count": 10
+    },
+    {
+     "name": "Skill",
+     "count": 8
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 7
+    },
+    {
+     "name": "ArcaneSpellFailure",
+     "count": 5
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 5
+    }
+   ],
+   "baseItems": [
+    "armor"
+   ]
+  },
+  {
+   "group": "armor",
+   "tier": 4,
+   "count": 47,
+   "cost": {
+    "min": 7005,
+    "median": 10322,
+    "max": 15726
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "enchanted": 0.77,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 36
+    },
+    {
+     "name": "prop90",
+     "count": 34
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 13
+    },
+    {
+     "name": "DamageResist",
+     "count": 11
+    },
+    {
+     "name": "Skill",
+     "count": 8
+    },
+    {
+     "name": "DamageReduced",
+     "count": 5
+    }
+   ],
+   "baseItems": [
+    "armor"
+   ]
+  },
+  {
+   "group": "armor",
+   "tier": 5,
+   "count": 41,
+   "cost": {
+    "min": 16492,
+    "median": 19861,
+    "max": 32301
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 13
+   },
+   "enchant": {
+    "min": 1,
+    "median": 3,
+    "max": 4
+   },
+   "enchanted": 0.8,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 33
+    },
+    {
+     "name": "prop90",
+     "count": 31
+    },
+    {
+     "name": "DamageResist",
+     "count": 11
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 8
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 8
+    },
+    {
+     "name": "Skill",
+     "count": 7
+    }
+   ],
+   "baseItems": [
+    "armor"
+   ]
+  },
+  {
+   "group": "belt",
+   "tier": 1,
+   "count": 2,
+   "cost": {
+    "min": 2,
+    "median": 9,
+    "max": 16
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "belt"
+   ]
+  },
+  {
+   "group": "belt",
+   "tier": 2,
+   "count": 3,
+   "cost": {
+    "min": 462,
+    "median": 674,
+    "max": 1218
+   },
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 4
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 2
+    },
+    {
+     "name": "Light",
+     "count": 1
+    },
+    {
+     "name": "Skill",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "belt"
+   ]
+  },
+  {
+   "group": "belt",
+   "tier": 3,
+   "count": 10,
+   "cost": {
+    "min": 2266,
+    "median": 2738,
+    "max": 4382
+   },
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 7
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 4
+    },
+    {
+     "name": "ArmorDamageType",
+     "count": 3
+    },
+    {
+     "name": "Ability",
+     "count": 2
+    },
+    {
+     "name": "Damage_Vulnerability",
+     "count": 1
+    },
+    {
+     "name": "DamageResist",
+     "count": 1
+    },
+    {
+     "name": "Light",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "belt"
+   ]
+  },
+  {
+   "group": "belt",
+   "tier": 4,
+   "count": 8,
+   "cost": {
+    "min": 7298,
+    "median": 8644,
+    "max": 15126
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.38,
+   "properties": [
+    {
+     "name": "Ability",
+     "count": 5
+    },
+    {
+     "name": "Armor",
+     "count": 3
+    },
+    {
+     "name": "UseLimitationAlignmentGroup",
+     "count": 3
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 2
+    },
+    {
+     "name": "BonusFeats",
+     "count": 1
+    },
+    {
+     "name": "ImprovedMagicResist",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "belt"
+   ]
+  },
+  {
+   "group": "belt",
+   "tier": 5,
+   "count": 3,
+   "cost": {
+    "min": 18912,
+    "median": 18912,
+    "max": 21782
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "DamageResist",
+     "count": 2
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 2
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "belt"
+   ]
+  },
+  {
+   "group": "boots",
+   "tier": 1,
+   "count": 2,
+   "cost": {
+    "min": 2,
+    "median": 15,
+    "max": 28
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "boots"
+   ]
+  },
+  {
+   "group": "boots",
+   "tier": 2,
+   "count": 8,
+   "cost": {
+    "min": 260,
+    "median": 919,
+    "max": 1806
+   },
+   "level": {
+    "min": 2,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.13,
+   "properties": [
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 3
+    },
+    {
+     "name": "DamageResist",
+     "count": 2
+    },
+    {
+     "name": "Skill",
+     "count": 2
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "CastSpell",
+     "count": 1
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "boots"
+   ]
+  },
+  {
+   "group": "boots",
+   "tier": 3,
+   "count": 7,
+   "cost": {
+    "min": 2206,
+    "median": 4206,
+    "max": 5850
+   },
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "enchant": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "enchanted": 0.14,
+   "properties": [
+    {
+     "name": "Ability",
+     "count": 3
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 2
+    },
+    {
+     "name": "Skill",
+     "count": 2
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "ImprovedMagicResist",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "boots"
+   ]
+  },
+  {
+   "group": "boots",
+   "tier": 4,
+   "count": 5,
+   "cost": {
+    "min": 7606,
+    "median": 9682,
+    "max": 13626
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "enchanted": 0.2,
+   "properties": [
+    {
+     "name": "Ability",
+     "count": 1
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "CastSpell",
+     "count": 1
+    },
+    {
+     "name": "DamageReduced",
+     "count": 1
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "boots"
+   ]
+  },
+  {
+   "group": "boots",
+   "tier": 5,
+   "count": 1,
+   "cost": {
+    "min": 16998,
+    "median": 16998,
+    "max": 16998
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "boots"
+   ]
+  },
+  {
+   "group": "cloak",
+   "tier": 1,
+   "count": 17,
+   "cost": {
+    "min": 24,
+    "median": 24,
+    "max": 120
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "SingleBonusSpellOfLevel",
+     "count": 1
+    },
+    {
+     "name": "Skill",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "cloak"
+   ]
+  },
+  {
+   "group": "cloak",
+   "tier": 2,
+   "count": 17,
+   "cost": {
+    "min": 484,
+    "median": 1178,
+    "max": 1944
+   },
+   "level": {
+    "min": 3,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.06,
+   "properties": [
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 5
+    },
+    {
+     "name": "ArmorAlignmentGroup",
+     "count": 4
+    },
+    {
+     "name": "Skill",
+     "count": 3
+    },
+    {
+     "name": "SpellImmunity_Specific",
+     "count": 2
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "ArmorDamageType",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "cloak"
+   ]
+  },
+  {
+   "group": "cloak",
+   "tier": 3,
+   "count": 19,
+   "cost": {
+    "min": 2044,
+    "median": 3560,
+    "max": 6558
+   },
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchanted": 0.37,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 7
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 6
+    },
+    {
+     "name": "DamageResist",
+     "count": 5
+    },
+    {
+     "name": "Skill",
+     "count": 3
+    },
+    {
+     "name": "Ability",
+     "count": 2
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "cloak"
+   ]
+  },
+  {
+   "group": "cloak",
+   "tier": 4,
+   "count": 21,
+   "cost": {
+    "min": 7016,
+    "median": 9880,
+    "max": 14836
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "enchanted": 0.38,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 8
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 7
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 6
+    },
+    {
+     "name": "CastSpell",
+     "count": 4
+    },
+    {
+     "name": "DamageResist",
+     "count": 3
+    },
+    {
+     "name": "SingleBonusSpellOfLevel",
+     "count": 3
+    }
+   ],
+   "baseItems": [
+    "cloak"
+   ]
+  },
+  {
+   "group": "cloak",
+   "tier": 5,
+   "count": 3,
+   "cost": {
+    "min": 18024,
+    "median": 18506,
+    "max": 19120
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "enchant": {
+    "min": 2,
+    "median": 3,
+    "max": 3
+   },
+   "enchanted": 0.67,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 2
+    },
+    {
+     "name": "ImprovedMagicResist",
+     "count": 1
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 1
+    },
+    {
+     "name": "Skill",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "cloak"
+   ]
+  },
+  {
+   "group": "gem",
+   "tier": 1,
+   "count": 5,
+   "cost": {
+    "min": 32,
+    "median": 80,
+    "max": 160
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "gem"
+   ]
+  },
+  {
+   "group": "gem",
+   "tier": 2,
+   "count": 4,
+   "cost": {
+    "min": 200,
+    "median": 530,
+    "max": 1000
+   },
+   "level": {
+    "min": 2,
+    "median": 3,
+    "max": 4
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "gem"
+   ]
+  },
+  {
+   "group": "gem",
+   "tier": 3,
+   "count": 4,
+   "cost": {
+    "min": 2600,
+    "median": 3500,
+    "max": 6000
+   },
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "gem"
+   ]
+  },
+  {
+   "group": "gem",
+   "tier": 4,
+   "count": 1,
+   "cost": {
+    "min": 8000,
+    "median": 8000,
+    "max": 8000
+   },
+   "level": {
+    "min": 8,
+    "median": 8,
+    "max": 8
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "gem"
+   ]
+  },
+  {
+   "group": "gloves",
+   "tier": 1,
+   "count": 4,
+   "cost": {
+    "min": 1,
+    "median": 11,
+    "max": 23
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "bracer",
+    "gloves"
+   ]
+  },
+  {
+   "group": "gloves",
+   "tier": 2,
+   "count": 21,
+   "cost": {
+    "min": 208,
+    "median": 830,
+    "max": 1937
+   },
+   "level": {
+    "min": 2,
+    "median": 3,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.24,
+   "properties": [
+    {
+     "name": "Skill",
+     "count": 14
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 9
+    },
+    {
+     "name": "Damage",
+     "count": 5
+    },
+    {
+     "name": "AttackBonus",
+     "count": 4
+    },
+    {
+     "name": "Ability",
+     "count": 1
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "gloves",
+    "bracer"
+   ]
+  },
+  {
+   "group": "gloves",
+   "tier": 3,
+   "count": 10,
+   "cost": {
+    "min": 2163,
+    "median": 4291,
+    "max": 5899
+   },
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 7
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 2
+   },
+   "enchanted": 0.6,
+   "properties": [
+    {
+     "name": "UseLimitationClass",
+     "count": 6
+    },
+    {
+     "name": "AttackBonus",
+     "count": 5
+    },
+    {
+     "name": "Damage",
+     "count": 5
+    },
+    {
+     "name": "Skill",
+     "count": 2
+    },
+    {
+     "name": "Ability",
+     "count": 1
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "gloves",
+    "bracer"
+   ]
+  },
+  {
+   "group": "gloves",
+   "tier": 4,
+   "count": 13,
+   "cost": {
+    "min": 7745,
+    "median": 12769,
+    "max": 15480
+   },
+   "level": {
+    "min": 8,
+    "median": 10,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 3,
+    "max": 3
+   },
+   "enchanted": 0.62,
+   "properties": [
+    {
+     "name": "AttackBonus",
+     "count": 6
+    },
+    {
+     "name": "Damage",
+     "count": 5
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 5
+    },
+    {
+     "name": "Ability",
+     "count": 4
+    },
+    {
+     "name": "CastSpell",
+     "count": 3
+    },
+    {
+     "name": "Armor",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "gloves",
+    "bracer"
+   ]
+  },
+  {
+   "group": "gloves",
+   "tier": 5,
+   "count": 5,
+   "cost": {
+    "min": 17425,
+    "median": 19713,
+    "max": 24830
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 12
+   },
+   "enchant": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "enchanted": 0.2,
+   "properties": [
+    {
+     "name": "Ability",
+     "count": 3
+    },
+    {
+     "name": "Skill",
+     "count": 2
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 2
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "CastSpell",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationRacial",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "bracer",
+    "gloves"
+   ]
+  },
+  {
+   "group": "helmet",
+   "tier": 1,
+   "count": 10,
+   "cost": {
+    "min": 12,
+    "median": 40,
+    "max": 40
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Skill",
+     "count": 8
+    }
+   ],
+   "baseItems": [
+    "helmet"
+   ]
+  },
+  {
+   "group": "helmet",
+   "tier": 2,
+   "count": 7,
+   "cost": {
+    "min": 730,
+    "median": 1524,
+    "max": 1932
+   },
+   "level": {
+    "min": 3,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.29,
+   "properties": [
+    {
+     "name": "Skill",
+     "count": 4
+    },
+    {
+     "name": "Armor",
+     "count": 2
+    },
+    {
+     "name": "ArmorDamageType",
+     "count": 1
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "helmet"
+   ]
+  },
+  {
+   "group": "helmet",
+   "tier": 3,
+   "count": 14,
+   "cost": {
+    "min": 2012,
+    "median": 4518,
+    "max": 6856
+   },
+   "level": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.14,
+   "properties": [
+    {
+     "name": "Skill",
+     "count": 5
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 4
+    },
+    {
+     "name": "CastSpell",
+     "count": 3
+    },
+    {
+     "name": "DamageResist",
+     "count": 3
+    },
+    {
+     "name": "Light",
+     "count": 3
+    },
+    {
+     "name": "Ability",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "helmet"
+   ]
+  },
+  {
+   "group": "helmet",
+   "tier": 4,
+   "count": 9,
+   "cost": {
+    "min": 8172,
+    "median": 11320,
+    "max": 14636
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.11,
+   "properties": [
+    {
+     "name": "DamageResist",
+     "count": 5
+    },
+    {
+     "name": "CastSpell",
+     "count": 4
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 4
+    },
+    {
+     "name": "Ability",
+     "count": 2
+    },
+    {
+     "name": "Skill",
+     "count": 2
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "helmet"
+   ]
+  },
+  {
+   "group": "helmet",
+   "tier": 5,
+   "count": 1,
+   "cost": {
+    "min": 21136,
+    "median": 21136,
+    "max": 21136
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 1
+    },
+    {
+     "name": "Skill",
+     "count": 1
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "helmet"
+   ]
+  },
+  {
+   "group": "misc",
+   "tier": 1,
+   "count": 68,
+   "cost": {
+    "min": 1,
+    "median": 36,
+    "max": 168
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 9
+    },
+    {
+     "name": "Weight_Increase",
+     "count": 7
+    },
+    {
+     "name": "Healers_Kit",
+     "count": 2
+    },
+    {
+     "name": "Monster_damage",
+     "count": 1
+    },
+    {
+     "name": "ThievesTools",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "key",
+    "miscsmall",
+    "book",
+    "miscthin",
+    "grenade"
+   ]
+  },
+  {
+   "group": "misc",
+   "tier": 2,
+   "count": 22,
+   "cost": {
+    "min": 250,
+    "median": 1124,
+    "max": 1950
+   },
+   "level": {
+    "min": 2,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Monster_damage",
+     "count": 8
+    },
+    {
+     "name": "Damage",
+     "count": 5
+    },
+    {
+     "name": "CastSpell",
+     "count": 4
+    },
+    {
+     "name": "Weight_Increase",
+     "count": 4
+    },
+    {
+     "name": "OnHitCastSpell",
+     "count": 2
+    },
+    {
+     "name": "ThievesTools",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "miscthin",
+    "cbludgweapon",
+    "cslshprcweap",
+    "cpiercweapon",
+    "grenade"
+   ]
+  },
+  {
+   "group": "misc",
+   "tier": 3,
+   "count": 27,
+   "cost": {
+    "min": 2000,
+    "median": 3918,
+    "max": 6478
+   },
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.26,
+   "properties": [
+    {
+     "name": "Monster_damage",
+     "count": 14
+    },
+    {
+     "name": "CastSpell",
+     "count": 8
+    },
+    {
+     "name": "Enhancement",
+     "count": 7
+    },
+    {
+     "name": "OnMonsterHit",
+     "count": 3
+    },
+    {
+     "name": "Weight_Increase",
+     "count": 3
+    },
+    {
+     "name": "Damage",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "cslshprcweap",
+    "cbludgweapon",
+    "cslashweapon",
+    "miscsmall",
+    "craftbase"
+   ]
+  },
+  {
+   "group": "misc",
+   "tier": 4,
+   "count": 18,
+   "cost": {
+    "min": 8000,
+    "median": 13847,
+    "max": 15678
+   },
+   "level": {
+    "min": 8,
+    "median": 10,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchanted": 0.44,
+   "properties": [
+    {
+     "name": "Monster_damage",
+     "count": 12
+    },
+    {
+     "name": "Enhancement",
+     "count": 8
+    },
+    {
+     "name": "OnMonsterHit",
+     "count": 6
+    },
+    {
+     "name": "Damage",
+     "count": 2
+    },
+    {
+     "name": "CastSpell",
+     "count": 1
+    },
+    {
+     "name": "DamageReduced",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "cslashweapon",
+    "cslshprcweap",
+    "creatureitem",
+    "cbludgweapon",
+    "largebox"
+   ]
+  },
+  {
+   "group": "misc",
+   "tier": 5,
+   "count": 92,
+   "cost": {
+    "min": 17184,
+    "median": 420500,
+    "max": 53808396
+   },
+   "level": {
+    "min": 11,
+    "median": 20,
+    "max": 20
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 6
+   },
+   "enchanted": 0.13,
+   "properties": [
+    {
+     "name": "Immunity",
+     "count": 60
+    },
+    {
+     "name": "DamageImmunity",
+     "count": 45
+    },
+    {
+     "name": "DamageReduced",
+     "count": 33
+    },
+    {
+     "name": "ImprovedMagicResist",
+     "count": 21
+    },
+    {
+     "name": "Damage_Vulnerability",
+     "count": 16
+    },
+    {
+     "name": "Monster_damage",
+     "count": 15
+    }
+   ],
+   "baseItems": [
+    "creatureitem",
+    "cbludgweapon",
+    "cslshprcweap",
+    "book",
+    "largebox"
+   ]
+  },
+  {
+   "group": "potion",
+   "tier": 1,
+   "count": 12,
+   "cost": {
+    "min": 4,
+    "median": 80,
+    "max": 173
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 11
+    }
+   ],
+   "baseItems": [
+    "potions",
+    "empty_potion"
+   ]
+  },
+  {
+   "group": "potion",
+   "tier": 2,
+   "count": 28,
+   "cost": {
+    "min": 180,
+    "median": 350,
+    "max": 1801
+   },
+   "level": {
+    "min": 2,
+    "median": 3,
+    "max": 5
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 28
+    }
+   ],
+   "baseItems": [
+    "potions"
+   ]
+  },
+  {
+   "group": "ranged",
+   "tier": 1,
+   "count": 2,
+   "cost": {
+    "min": 107,
+    "median": 116,
+    "max": 125
+   },
+   "level": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "lightcrossbow",
+    "shortbow"
+   ]
+  },
+  {
+   "group": "ranged",
+   "tier": 2,
+   "count": 10,
+   "cost": {
+    "min": 179,
+    "median": 1688,
+    "max": 1979
+   },
+   "level": {
+    "min": 2,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.2,
+   "properties": [
+    {
+     "name": "UnlimitedAmmo",
+     "count": 5
+    },
+    {
+     "name": "AttackBonus",
+     "count": 2
+    },
+    {
+     "name": "BonusFeats",
+     "count": 1
+    },
+    {
+     "name": "Massive_Criticals",
+     "count": 1
+    },
+    {
+     "name": "Mighty",
+     "count": 1
+    },
+    {
+     "name": "Skill",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "heavycrossbow",
+    "lightcrossbow",
+    "longbow",
+    "shortbow",
+    "sling"
+   ]
+  },
+  {
+   "group": "ranged",
+   "tier": 3,
+   "count": 16,
+   "cost": {
+    "min": 2300,
+    "median": 5026,
+    "max": 6996
+   },
+   "level": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "enchanted": 0.94,
+   "properties": [
+    {
+     "name": "AttackBonus",
+     "count": 15
+    },
+    {
+     "name": "Mighty",
+     "count": 5
+    },
+    {
+     "name": "AttackBonusRacialGroup",
+     "count": 3
+    },
+    {
+     "name": "Massive_Criticals",
+     "count": 3
+    },
+    {
+     "name": "CastSpell",
+     "count": 2
+    },
+    {
+     "name": "Keen",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "longbow",
+    "shortbow",
+    "sling",
+    "heavycrossbow",
+    "lightcrossbow"
+   ]
+  },
+  {
+   "group": "ranged",
+   "tier": 4,
+   "count": 14,
+   "cost": {
+    "min": 7023,
+    "median": 10952,
+    "max": 14344
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 3,
+    "max": 4
+   },
+   "enchanted": 0.93,
+   "properties": [
+    {
+     "name": "AttackBonus",
+     "count": 13
+    },
+    {
+     "name": "Mighty",
+     "count": 7
+    },
+    {
+     "name": "Massive_Criticals",
+     "count": 3
+    },
+    {
+     "name": "CastSpell",
+     "count": 2
+    },
+    {
+     "name": "Keen",
+     "count": 2
+    },
+    {
+     "name": "UnlimitedAmmo",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "shortbow",
+    "sling",
+    "heavycrossbow",
+    "lightcrossbow",
+    "longbow"
+   ]
+  },
+  {
+   "group": "ranged",
+   "tier": 5,
+   "count": 20,
+   "cost": {
+    "min": 16199,
+    "median": 18540,
+    "max": 45044
+   },
+   "level": {
+    "min": 10,
+    "median": 11,
+    "max": 14
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 4
+   },
+   "enchanted": 1,
+   "properties": [
+    {
+     "name": "AttackBonus",
+     "count": 20
+    },
+    {
+     "name": "Mighty",
+     "count": 16
+    },
+    {
+     "name": "UnlimitedAmmo",
+     "count": 7
+    },
+    {
+     "name": "Ability",
+     "count": 4
+    },
+    {
+     "name": "Skill",
+     "count": 3
+    },
+    {
+     "name": "Keen",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "longbow",
+    "heavycrossbow",
+    "lightcrossbow",
+    "shortbow",
+    "sling"
+   ]
+  },
+  {
+   "group": "ring",
+   "tier": 1,
+   "count": 3,
+   "cost": {
+    "min": 2,
+    "median": 2,
+    "max": 48
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "ring"
+   ]
+  },
+  {
+   "group": "ring",
+   "tier": 2,
+   "count": 15,
+   "cost": {
+    "min": 178,
+    "median": 686,
+    "max": 1910
+   },
+   "level": {
+    "min": 2,
+    "median": 3,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.07,
+   "properties": [
+    {
+     "name": "Skill",
+     "count": 4
+    },
+    {
+     "name": "Light",
+     "count": 3
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 2
+    },
+    {
+     "name": "Ability",
+     "count": 1
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "DamageResist",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "ring"
+   ]
+  },
+  {
+   "group": "ring",
+   "tier": 3,
+   "count": 11,
+   "cost": {
+    "min": 2167,
+    "median": 4183,
+    "max": 6482
+   },
+   "level": {
+    "min": 5,
+    "median": 6,
+    "max": 8
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "Skill",
+     "count": 4
+    },
+    {
+     "name": "CastSpell",
+     "count": 2
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 2
+    },
+    {
+     "name": "ImprovedSavingThrowsSpecific",
+     "count": 2
+    },
+    {
+     "name": "Light",
+     "count": 2
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "ring"
+   ]
+  },
+  {
+   "group": "ring",
+   "tier": 4,
+   "count": 14,
+   "cost": {
+    "min": 7020,
+    "median": 9052,
+    "max": 15362
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "enchanted": 0.07,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 4
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 3
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 3
+    },
+    {
+     "name": "Light",
+     "count": 2
+    },
+    {
+     "name": "Regeneration",
+     "count": 2
+    },
+    {
+     "name": "SingleBonusSpellOfLevel",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "ring"
+   ]
+  },
+  {
+   "group": "ring",
+   "tier": 5,
+   "count": 6,
+   "cost": {
+    "min": 16351,
+    "median": 18683,
+    "max": 26482
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 12
+   },
+   "enchant": {
+    "min": 3,
+    "median": 3,
+    "max": 3
+   },
+   "enchanted": 0.17,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 3
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 2
+    },
+    {
+     "name": "Armor",
+     "count": 1
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 1
+    },
+    {
+     "name": "Regeneration",
+     "count": 1
+    },
+    {
+     "name": "SingleBonusSpellOfLevel",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "ring"
+   ]
+  },
+  {
+   "group": "scroll",
+   "tier": 1,
+   "count": 1,
+   "cost": {
+    "min": 10,
+    "median": 10,
+    "max": 10
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "blank_scroll"
+   ]
+  },
+  {
+   "group": "scroll",
+   "tier": 2,
+   "count": 1,
+   "cost": {
+    "min": 1200,
+    "median": 1200,
+    "max": 1200
+   },
+   "level": {
+    "min": 4,
+    "median": 4,
+    "max": 4
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "blank_scroll"
+   ]
+  },
+  {
+   "group": "shield",
+   "tier": 1,
+   "count": 7,
+   "cost": {
+    "min": 27,
+    "median": 70,
+    "max": 70
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "largeshield",
+    "smallshield"
+   ]
+  },
+  {
+   "group": "shield",
+   "tier": 2,
+   "count": 8,
+   "cost": {
+    "min": 200,
+    "median": 1218,
+    "max": 1907
+   },
+   "level": {
+    "min": 2,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 0.5,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 4
+    },
+    {
+     "name": "ArcaneSpellFailure",
+     "count": 2
+    },
+    {
+     "name": "WeightReduction",
+     "count": 2
+    },
+    {
+     "name": "Ability",
+     "count": 1
+    },
+    {
+     "name": "prop88",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "largeshield",
+    "smallshield",
+    "towershield"
+   ]
+  },
+  {
+   "group": "shield",
+   "tier": 3,
+   "count": 9,
+   "cost": {
+    "min": 4413,
+    "median": 5672,
+    "max": 6930
+   },
+   "level": {
+    "min": 7,
+    "median": 7,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 2
+   },
+   "enchanted": 0.78,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 7
+    },
+    {
+     "name": "ArmorRacialGroup",
+     "count": 4
+    },
+    {
+     "name": "ImprovedMagicResist",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "largeshield",
+    "smallshield",
+    "towershield"
+   ]
+  },
+  {
+   "group": "shield",
+   "tier": 4,
+   "count": 15,
+   "cost": {
+    "min": 7495,
+    "median": 13364,
+    "max": 15820
+   },
+   "level": {
+    "min": 8,
+    "median": 10,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchanted": 0.93,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 14
+    },
+    {
+     "name": "DamageResist",
+     "count": 4
+    },
+    {
+     "name": "ImprovedMagicResist",
+     "count": 3
+    },
+    {
+     "name": "OnHitCastSpell",
+     "count": 2
+    },
+    {
+     "name": "UseLimitationAlignmentGroup",
+     "count": 2
+    },
+    {
+     "name": "Ability",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "largeshield",
+    "smallshield",
+    "towershield"
+   ]
+  },
+  {
+   "group": "shield",
+   "tier": 5,
+   "count": 13,
+   "cost": {
+    "min": 16102,
+    "median": 17468,
+    "max": 25706
+   },
+   "level": {
+    "min": 10,
+    "median": 11,
+    "max": 12
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchanted": 0.92,
+   "properties": [
+    {
+     "name": "Armor",
+     "count": 12
+    },
+    {
+     "name": "Ability",
+     "count": 3
+    },
+    {
+     "name": "ArmorRacialGroup",
+     "count": 3
+    },
+    {
+     "name": "DamageResist",
+     "count": 3
+    },
+    {
+     "name": "ImprovedSavingThrows",
+     "count": 3
+    },
+    {
+     "name": "OnHitCastSpell",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "largeshield",
+    "smallshield",
+    "towershield"
+   ]
+  },
+  {
+   "group": "thrown",
+   "tier": 1,
+   "count": 3,
+   "cost": {
+    "min": 51,
+    "median": 51,
+    "max": 100
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [],
+   "baseItems": [
+    "dart",
+    "shuriken",
+    "throwingaxe"
+   ]
+  },
+  {
+   "group": "thrown",
+   "tier": 2,
+   "count": 1,
+   "cost": {
+    "min": 1984,
+    "median": 1984,
+    "max": 1984
+   },
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 5
+   },
+   "enchant": {
+    "min": 2,
+    "median": 2,
+    "max": 2
+   },
+   "enchanted": 1,
+   "properties": [
+    {
+     "name": "AttackBonus",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "dart"
+   ]
+  },
+  {
+   "group": "thrown",
+   "tier": 3,
+   "count": 10,
+   "cost": {
+    "min": 2717,
+    "median": 5124,
+    "max": 6554
+   },
+   "level": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchanted": 1,
+   "properties": [
+    {
+     "name": "Enhancement",
+     "count": 9
+    },
+    {
+     "name": "Damage",
+     "count": 6
+    },
+    {
+     "name": "DamageRacialGroup",
+     "count": 2
+    },
+    {
+     "name": "AttackBonus",
+     "count": 1
+    },
+    {
+     "name": "DamageAlignmentGroup",
+     "count": 1
+    },
+    {
+     "name": "EnhancementRacialGroup",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "throwingaxe",
+    "dart",
+    "shuriken"
+   ]
+  },
+  {
+   "group": "thrown",
+   "tier": 4,
+   "count": 7,
+   "cost": {
+    "min": 7580,
+    "median": 9887,
+    "max": 14978
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 4
+   },
+   "enchanted": 1,
+   "properties": [
+    {
+     "name": "Enhancement",
+     "count": 5
+    },
+    {
+     "name": "OnHit",
+     "count": 4
+    },
+    {
+     "name": "AttackBonus",
+     "count": 2
+    },
+    {
+     "name": "Damage",
+     "count": 1
+    },
+    {
+     "name": "Keen",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "dart",
+    "throwingaxe",
+    "shuriken"
+   ]
+  },
+  {
+   "group": "thrown",
+   "tier": 5,
+   "count": 10,
+   "cost": {
+    "min": 17409,
+    "median": 18858,
+    "max": 21600
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "enchant": {
+    "min": 2,
+    "median": 2,
+    "max": 3
+   },
+   "enchanted": 1,
+   "properties": [
+    {
+     "name": "Damage",
+     "count": 7
+    },
+    {
+     "name": "Enhancement",
+     "count": 6
+    },
+    {
+     "name": "AttackBonus",
+     "count": 4
+    },
+    {
+     "name": "OnHit",
+     "count": 3
+    },
+    {
+     "name": "Keen",
+     "count": 1
+    },
+    {
+     "name": "OnHitCastSpell",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "shuriken",
+    "throwingaxe",
+    "dart"
+   ]
+  },
+  {
+   "group": "wand",
+   "tier": 1,
+   "count": 2,
+   "cost": {
+    "min": 2,
+    "median": 26,
+    "max": 50
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 2
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "magicrod",
+    "magicwand"
+   ]
+  },
+  {
+   "group": "wand",
+   "tier": 2,
+   "count": 5,
+   "cost": {
+    "min": 500,
+    "median": 750,
+    "max": 1875
+   },
+   "level": {
+    "min": 3,
+    "median": 3,
+    "max": 5
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 5
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 5
+    }
+   ],
+   "baseItems": [
+    "magicwand"
+   ]
+  },
+  {
+   "group": "wand",
+   "tier": 3,
+   "count": 13,
+   "cost": {
+    "min": 2250,
+    "median": 2381,
+    "max": 5625
+   },
+   "level": {
+    "min": 5,
+    "median": 5,
+    "max": 7
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 13
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 12
+    },
+    {
+     "name": "UseLimitationAlignmentGroup",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "magicwand",
+    "magicrod"
+   ]
+  },
+  {
+   "group": "wand",
+   "tier": 4,
+   "count": 11,
+   "cost": {
+    "min": 9006,
+    "median": 10500,
+    "max": 13125
+   },
+   "level": {
+    "min": 9,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 11
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 10
+    }
+   ],
+   "baseItems": [
+    "magicwand",
+    "magicrod"
+   ]
+  },
+  {
+   "group": "wand",
+   "tier": 5,
+   "count": 3,
+   "cost": {
+    "min": 16875,
+    "median": 16875,
+    "max": 18210
+   },
+   "level": {
+    "min": 11,
+    "median": 11,
+    "max": 11
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "CastSpell",
+     "count": 3
+    },
+    {
+     "name": "UseLimitationClass",
+     "count": 2
+    }
+   ],
+   "baseItems": [
+    "magicrod",
+    "magicwand"
+   ]
+  },
+  {
+   "group": "weapon",
+   "tier": 1,
+   "count": 13,
+   "cost": {
+    "min": 8,
+    "median": 35,
+    "max": 88
+   },
+   "level": {
+    "min": 1,
+    "median": 1,
+    "max": 1
+   },
+   "enchant": null,
+   "enchanted": 0,
+   "properties": [
+    {
+     "name": "DamagePenalty",
+     "count": 1
+    },
+    {
+     "name": "Light",
+     "count": 1
+    }
+   ],
+   "baseItems": [
+    "shortsword",
+    "battleaxe",
+    "club",
+    "dagger",
+    "greataxe"
+   ]
+  },
+  {
+   "group": "weapon",
+   "tier": 2,
+   "count": 53,
+   "cost": {
+    "min": 240,
+    "median": 1380,
+    "max": 1955
+   },
+   "level": {
+    "min": 2,
+    "median": 4,
+    "max": 5
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 2
+   },
+   "enchanted": 0.25,
+   "properties": [
+    {
+     "name": "Damage",
+     "count": 28
+    },
+    {
+     "name": "AttackBonus",
+     "count": 12
+    },
+    {
+     "name": "OnHit",
+     "count": 8
+    },
+    {
+     "name": "Ability",
+     "count": 4
+    },
+    {
+     "name": "ToHitPenalty",
+     "count": 4
+    },
+    {
+     "name": "Weight_Increase",
+     "count": 4
+    }
+   ],
+   "baseItems": [
+    "dagger",
+    "shortsword",
+    "club",
+    "kukri",
+    "warhammer"
+   ]
+  },
+  {
+   "group": "weapon",
+   "tier": 3,
+   "count": 83,
+   "cost": {
+    "min": 2040,
+    "median": 4455,
+    "max": 6921
+   },
+   "level": {
+    "min": 5,
+    "median": 7,
+    "max": 8
+   },
+   "enchant": {
+    "min": 1,
+    "median": 1,
+    "max": 3
+   },
+   "enchanted": 0.81,
+   "properties": [
+    {
+     "name": "Enhancement",
+     "count": 48
+    },
+    {
+     "name": "OnHit",
+     "count": 29
+    },
+    {
+     "name": "Damage",
+     "count": 25
+    },
+    {
+     "name": "AttackBonus",
+     "count": 19
+    },
+    {
+     "name": "DamagePenalty",
+     "count": 7
+    },
+    {
+     "name": "CastSpell",
+     "count": 5
+    }
+   ],
+   "baseItems": [
+    "shortsword",
+    "quarterstaff",
+    "shortspear",
+    "dagger",
+    "greatsword"
+   ]
+  },
+  {
+   "group": "weapon",
+   "tier": 4,
+   "count": 121,
+   "cost": {
+    "min": 7174,
+    "median": 10736,
+    "max": 15860
+   },
+   "level": {
+    "min": 8,
+    "median": 9,
+    "max": 10
+   },
+   "enchant": {
+    "min": 1,
+    "median": 2,
+    "max": 3
+   },
+   "enchanted": 0.95,
+   "properties": [
+    {
+     "name": "Enhancement",
+     "count": 86
+    },
+    {
+     "name": "OnHit",
+     "count": 42
+    },
+    {
+     "name": "Damage",
+     "count": 39
+    },
+    {
+     "name": "AttackBonus",
+     "count": 29
+    },
+    {
+     "name": "EnhancementRacialGroup",
+     "count": 15
+    },
+    {
+     "name": "CastSpell",
+     "count": 9
+    }
+   ],
+   "baseItems": [
+    "bastardsword",
+    "greatsword",
+    "shortsword",
+    "club",
+    "shortspear"
+   ]
+  },
+  {
+   "group": "weapon",
+   "tier": 5,
+   "count": 72,
+   "cost": {
+    "min": 16235,
+    "median": 19058,
+    "max": 39115
+   },
+   "level": {
+    "min": 10,
+    "median": 11,
+    "max": 14
+   },
+   "enchant": {
+    "min": 1,
+    "median": 3,
+    "max": 4
+   },
+   "enchanted": 0.94,
+   "properties": [
+    {
+     "name": "Damage",
+     "count": 49
+    },
+    {
+     "name": "AttackBonus",
+     "count": 38
+    },
+    {
+     "name": "Enhancement",
+     "count": 30
+    },
+    {
+     "name": "VisualEffect",
+     "count": 13
+    },
+    {
+     "name": "OnHit",
+     "count": 12
+    },
+    {
+     "name": "Ability",
+     "count": 8
+    }
+   ],
+   "baseItems": [
+    "dagger",
+    "greatsword",
+    "longsword",
+    "bastardsword",
+    "katana"
+   ]
+  }
+ ]
+}
