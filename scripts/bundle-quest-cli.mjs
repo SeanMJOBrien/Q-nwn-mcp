@@ -16,7 +16,7 @@ await build({
   platform: "node",
   format: "esm",
   target: "node20",
-  define: { __QUEST_SCHEMA__: JSON.stringify(schema) },
+  define: { __QUEST_SCHEMA__: JSON.stringify(schema), __QUEST_VERSION__: JSON.stringify(JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).version) },
   // CommonJS dependencies inside an ES module bundle need require().
   banner: { js: "import { createRequire as __cr } from 'node:module';\nconst require = __cr(import.meta.url);" },
   legalComments: "none",
