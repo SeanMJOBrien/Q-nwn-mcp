@@ -33,14 +33,15 @@ export function registerCoreReadTools(server: McpServer): void {
       }
       // A module project directory (docs/module-projects.md): pack it into build/module.mod, then load that.
       let packedFrom: string | undefined;
-      try {
-        if ((await fs.stat(resolvedPath)).isDirectory()) {
-          if (!(await isProjectDir(resolvedPath))) throw new Error(`load_module: ${resolvedPath} is a directory without project.json (not a module project; run export_project first).`);
-          packedFrom = resolvedPath;
-          resolvedPath = await packProject(resolvedPath);
-        }
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      const isDir = await fs
+        .stat(resolvedPath)
+        .then((st) => st.isDirectory())
+        .catch(() => false); // a missing path is reported by loadModule below
+      if (isDir) {
+        if (!(await isProjectDir(resolvedPath))) throw new Error(`load_module: ${resolvedPath} is a directory without project.json (not a module project; run export_project first).`);
+        packedFrom = resolvedPath;
+        // Not caught: a manifest naming a file that is missing from src/ is reported as that, not as "cannot open <dir>".
+        resolvedPath = await packProject(resolvedPath);
       }
       const index = await loadModule(resolvedPath, { force });
       const typeCounts: Record<string, number> = {};

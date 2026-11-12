@@ -43,3 +43,18 @@ Q-nwn-manager vendors it as `nwn-tools/quest-cli.mjs`; refresh that copy after c
 run the manager's tests). `quest-source.live.test.ts` runs the whole flow through `dist` and through a copy of the bundle in a
 folder with no `node_modules`. Only the quest paths are meant to work from the bundle: files the server reads beside its own
 code (`templates/`, `data/`, `nwscript-override/`) are not packed, which the quest commands never need.
+
+## Played on the real engine (T1, 2026-11-12)
+
+`run_live_verification` with `simulate` (docs/player-simulation.md) on a scratch copy of the Sim-Quest module, quest `T1 Parcel`
+(`talk` -> `deliver` of a new quest item -> `return`, level 4), built with `build_quest` (the same builder code the CLI and the
+manager run; the manager's own file path is covered by `quest-source.live.test.ts` and the browser suite, because an MCP
+session cannot load a manager project until P3). Ten steps, all passed, no engine error: offer eligible; accept (stage 1);
+offer no longer eligible; hand-in not eligible without the parcel; "lost it" line eligible; parcel given to the player;
+hand-in eligible with it; deliver (stage 2, parcel taken); final line (stage 3, 100 gold); thanks line after the end.
+Not simulable (they depend on engine events the driver cannot raise): `kill` (`GetLastKiller`), `pickup` (OnAcquireItem),
+`explore`/`trigger` (`GetEnteringObject`), `use`/`search` (`GetLastUsedBy`), escort and rescue movement, the dialog engine's
+own condition ordering. Those stages are checked statically by `verify_quest_completability` (T2).
+Findings while setting it up: an old throwaway module whose manifest named missing scripts packed with a misleading
+"cannot open file stream <dir>" (fixed: `load_module` no longer swallows the pack error), and a module whose area list names an
+`.are` that is missing fails to load in the engine ("Failed to demand the Area info resource"), which `verify_module_info` already reports (`Mod_Area_list names ... no such .are exists`).
