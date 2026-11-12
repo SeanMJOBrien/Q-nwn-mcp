@@ -39,7 +39,7 @@ reading files, and can do it on any machine the manager runs on.
 | L2 | Rebuild the `nwn-pytools` binaries with the Quests page | manager | open | needs L1 pushed; CI workflow `build-pytools.yml` |
 | L3 | Linux binary runs on older glibc | manager | open | fails here: needs GLIBC 2.38 |
 | T1 | Play a manager-built quest in the engine | mcp + manager | open | no quest from the form has been played |
-| T2 | Completability check after a build (`quest verify` in the CLI) | mcp, then manager | open | |
+| T2 | Completability check after a build (`quest verify` in the CLI) | mcp, then manager | done | 2026-11-12: CLI `verify` (live test incl. unreachable giver), manager shows it after Build (`lib.verify`, test_9, smoke 15/15 on a Chronicles copy with the real CLI) |
 | T3 | Rebuild of an unchanged quest writes nothing | mcp | done | 2026-11-12: shared `[Leave]` reply is created first, saved `MCP_Q_ORIG_*` var kept last; test compares the whole index before and after |
 | T4 | Remove leaves the module as it was | mcp | open | D2 = A, ready |
 | T5 | Undo a whole quest in one step | manager | open | today: one History entry per file, new files stay |
@@ -49,7 +49,7 @@ reading files, and can do it on any machine the manager runs on.
 | U3 | Parcel, reward and check as plain fields | manager | open | Deliver needs the item typed inside "Reward" |
 | U4 | Plan errors point at the field | mcp + manager | open | |
 | U5 | See and adopt quests made elsewhere | manager (+ mcp) | open | listed, not editable |
-| P1 | One-file builder shipped with the manager | mcp + manager | open | waits on D1 (port question) |
+| P1 | One-file builder shipped with the manager | mcp + manager | open | D1 = bundle, ready |
 | P2 | Builder and form versions checked against each other | mcp + manager | open | after P1 |
 | P3 | `load_module` on a manager project | mcp | open | lets an LLM session work on the same project |
 | S1 | One form for both front ends | mcp + manager + studio | open | D3 = A; copy step after D1 |
@@ -61,7 +61,7 @@ reading files, and can do it on any machine the manager runs on.
 
 Answered 2026-11-12 (user):
 
-- **D1 (blocks P1): open, user asked "port the manager to TypeScript?"** Finding (2026-11-12): the manager's Python is
+- **D1: keep Python (user, 2026-11-12) = bundle the builder as one `quest-cli.mjs` (old option A).** Question asked and findings: Finding (2026-11-12): the manager's Python is
   stdlib only (no numpy, no native modules; `sqlite3`, `http.server`, `struct`, `hashlib` and the like) and the heavy
   tools are external binaries (neverwinter.nim, nwnsc), so **no capability requires Python**. Size is the obstacle:
   about 26,000 lines in `bin/` (`nwn-wiki` 15,400, `nwn-area-editor` 4,800, `nwn-manager` 1,100 plus a 1,170-line

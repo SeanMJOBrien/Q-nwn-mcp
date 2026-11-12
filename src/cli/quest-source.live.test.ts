@@ -69,6 +69,26 @@ describe.skipIf(!NIM_FOLDER_NWTOOLS || !hasCli)("quest CLI on a flat source dire
       expect(jrl.Categories.value[0].Tag.value).toBe("q_wolves");
       expect((await fs.readdir(src)).sort()).toEqual(before);
       expect(JSON.parse(await fs.readFile(path.join(src, "farmer_ned.utc.json"), "utf-8"))).toEqual(ned);
+
+      // verify: read-only; apply the staged files to a copy, then ask whether the quest can be completed
+      const applied = path.join(dir, "applied");
+      await fs.cp(src, applied, { recursive: true });
+      await fs.cp(out, applied, { recursive: true });
+      const ok = await cli(["verify", "q_wolves", "--project", applied]);
+      expect(ok.ok, ok.error).toBe(true);
+      expect(ok.result?.completable, JSON.stringify(ok.result)).toBe(true);
+      const missing = await cli(["verify", "q_nope", "--project", applied]);
+      expect(missing.ok).toBe(false);
+      // the giver moves to an area no door or trigger leads to: the gap shows, naming the area
+      const git = JSON.parse(await fs.readFile(path.join(applied, "dm_area.git.json"), "utf-8"));
+      git["Creature List"] = { type: "list", value: [{ __struct_id: 4, Tag: str("farmer_ned"), TemplateResRef: str("farmer_ned", "resref"), Conversation: str("dq_farmer_ned", "resref") }] };
+      await fs.writeFile(path.join(applied, "dm_area.git.json"), JSON.stringify(git));
+      const ifo = JSON.parse(await fs.readFile(path.join(applied, "module.ifo.json"), "utf-8"));
+      ifo.Mod_Entry_Area = str("elsewhere", "resref");
+      await fs.writeFile(path.join(applied, "module.ifo.json"), JSON.stringify(ifo));
+      const bad = await cli(["verify", "q_wolves", "--project", applied]);
+      expect(bad.ok, bad.error).toBe(true);
+      expect(bad.result?.completable).toBe(false);
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
