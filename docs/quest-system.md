@@ -7,7 +7,7 @@ changed from TFN" for the differences. Last updated 2026-11-07.
 ## In short
 
 - **`build_quest(spec, dryRun)`** turns a short spec into journal, dialog, variables and event wiring. Run it with
-  `dryRun: true` first and read the plan. Rebuilding the same quest replaces only what it made; `remove_quest(tag)` undoes it.
+  `dryRun: true` first and read the plan. Rebuilding the same quest replaces only what it made; `remove_quest(tag)` undoes it completely (see "Remove" below).
 - **`create_quest_system`** writes the shared runtime. `build_quest` runs it for you the first time.
 - **Whole party:** any member's advance moves every member's journal and pays every player the full reward.
 - **State:** a player's progress is the engine's own journal number (`NW_JOURNAL_ENTRY<tag>`). Nothing else is stored.
@@ -205,3 +205,16 @@ State-dependent greetings: a quest NPC already has one line per state. `offer` (
 
 `spawn.flag: {var, ifSet?, ifUnset?}` on a stage's spawn (or q_act parameters `spawn_flag`, `spawn_flag_set`, `spawn_flag_unset`; stage locals `questK_spawn_flag*`): the module variable `var` (set by a dialog line's `set_var`) picks the spawn count, `ifSet` when it is non-empty and not "0", `ifUnset` otherwise; a count of 0 skips the spawn (`[QUEST] spawn skipped by outcome flag`). Counts 0-8. `verify_encounter_chain` checks the spawns themselves.
 
+
+## Remove (2026-11-12, decision D2 of `docs/quest-frontends-work-plan.md`)
+
+`remove_quest` gives back what the quest created or replaced, so a build followed by a remove leaves the module as it was
+(`quest-tools.integration.test.ts` compares the whole module before and after for a kill quest, a pickup quest and a bounty):
+journal category (and the journal file when it ends up empty), dialog nodes and the shared `[Leave]`, a conversation the
+quest created (marked `mcpq:_created`; the NPC's `Conversation` is cleared), quest items `<tag>_i<n>`, spawn waypoints
+`<tag>_s<n>_spawn`, the saved original of every event handler the quest replaced (`MCP_Q_ORIG_*`; kept while another quest
+still has an event stage on the same object), and the module's `Mod_OnAcquirItem` / `Mod_OnHeartbeat` wrapper once no
+object carries a pickup (`quest_event`) or bounty (`*_bounty_end`) variable. The shared runtime scripts (`inc_quest`,
+`inc_sim`, `q_*`) stay: other quests, and a later rebuild, use them. In a flat source directory the deleted files are
+listed in the CLI result's `source.removed`; the Q-nwn-manager console deletes them through its history, so History can
+bring them back.

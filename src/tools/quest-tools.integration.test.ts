@@ -206,7 +206,9 @@ describe("build_quest", () => {
         };
         const out: string[] = [];
         for (const [k, d] of b) walk(a.find(([kk]) => kk === k)?.[1], d, k, out);
-        throw new Error(`identical rebuild changed (${diff.join(", ")}): ${out.slice(0, 12).join(" | ")} ${JSON.stringify(again).length}`);
+        throw new Error(
+          `identical rebuild changed (${diff.join(", ")}): ${out.slice(0, 12).join(" | ")} ${JSON.stringify(again).length}`,
+        );
       }
       expect(getFieldList(dlg2, "EntryList").length).toBe(nodes);
       expect(vars(getFieldList(git, "Creature List")[1]).quest1).toBe("2_q_wolves_at_the_fold");
@@ -215,8 +217,83 @@ describe("build_quest", () => {
       json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_wolves_at_the_fold" } }));
       expect(vars(getFieldList(git, "Creature List")[0]).quest1).toBeUndefined();
       expect(vars(getFieldList(git, "Creature List")[1]).quest_event).toBeUndefined();
-      expect(getFieldList(mockIndex.parsedGff.get(`${dlgRes}.dlg`) as unknown as GffObj, "EntryList").length).toBe(1);
-      expect(getFieldList(mockIndex.parsedGff.get("module.jrl") as unknown as GffObj, "Categories")).toHaveLength(0);
+      // the conversation and the journal the quest created are gone, and Ned has no conversation again
+      expect(mockIndex.parsedGff.has(`${dlgRes}.dlg`)).toBe(false);
+      expect(mockIndex.resources.has(`${dlgRes}.dlg`)).toBe(false);
+      expect(getFieldStr(getFieldList(git, "Creature List")[0], "Conversation")).toBe("");
+      expect(mockIndex.parsedGff.has("module.jrl")).toBe(false);
+    } finally {
+      await done();
+    }
+  });
+
+  it("build then remove puts the module back as it was (only the shared runtime scripts stay)", async () => {
+    (mockIndex.parsedGff.get("module.ifo") as unknown as GffObj).Mod_OnAcquirItem = v("resref", "x2_mod_def_aqu");
+    await addResource("bounty_orc.utc", { __data_type: "UTC ", ...creature("bounty_orc") });
+    const specs = [
+      SPEC,
+      JSON.stringify({
+        name: "Pelt",
+        giver: "farmer_ned",
+        template: "fetch",
+        itemName: "Wolf pelt",
+        journal: ["a", "b", "c"],
+      }),
+      JSON.stringify({
+        name: "Orc Bounty",
+        giver: "farmer_ned",
+        template: "bounty",
+        target: "bounty_orc",
+        spawn: { resref: "bounty_orc", area: "fold", x: 20, y: 20, count: 2, tag: "bounty_orc_1" },
+      }),
+    ];
+    const tags = ["q_wolves_at_the_fold", "q_pelt", "b_orc_bounty"];
+    // an empty list or empty resref is the same as none (the mock objects start without them; real GFF always has both)
+    const snap = () =>
+      new Map(
+        [...mockIndex.parsedGff.entries()].map(([k, d]) => [
+          k,
+          JSON.stringify(d, (_key, val) =>
+            val &&
+            typeof val === "object" &&
+            ((val.type === "list" && val.value?.length === 0) || (val.type === "resref" && val.value === ""))
+              ? undefined
+              : val,
+          ),
+        ]),
+      );
+    const { c, done } = await client();
+    try {
+      for (let i = 0; i < specs.length; i++) {
+        const before = snap();
+        const resourcesBefore = new Set(mockIndex.resources.keys());
+        json(await c.callTool({ name: "build_quest", arguments: { spec: specs[i] } }));
+        json(await c.callTool({ name: "remove_quest", arguments: { tag: tags[i] } }));
+        const after = snap();
+        const problems: string[] = [];
+        for (const [k, d] of before) if (after.get(k) !== d) problems.push(`changed: ${k}`);
+        for (const k of after.keys()) if (!before.has(k)) problems.push(`left behind: ${k}`);
+        const stray = [...mockIndex.resources.keys()].filter(
+          (k) => !resourcesBefore.has(k) && !/^(inc_quest|inc_sim|q_[a-z_]+)\.(nss|ncs)$/.test(k),
+        );
+        problems.push(...stray.map((k) => `resource left behind: ${k}`));
+        if (problems.length) {
+          for (const [k, d] of before) {
+            if (after.get(k) === d) continue;
+            const a = JSON.parse(d) as unknown;
+            const b = JSON.parse(after.get(k) ?? "null") as unknown;
+            const walk = (x: unknown, y: unknown, at: string): void => {
+              if (JSON.stringify(x) === JSON.stringify(y)) return;
+              if (x && y && typeof x === "object" && typeof y === "object")
+                for (const key of new Set([...Object.keys(x), ...Object.keys(y)]))
+                  walk((x as Record<string, unknown>)[key], (y as Record<string, unknown>)[key], `${at}.${key}`);
+              else problems.push(`${k}${at}: ${JSON.stringify(x)} -> ${JSON.stringify(y)}`);
+            };
+            walk(a, b, "");
+          }
+        }
+        expect(problems, `${tags[i]}: ${problems.join("; ")}`).toEqual([]);
+      }
     } finally {
       await done();
     }
@@ -244,8 +321,7 @@ describe("build_quest", () => {
       expect(conds.length).toBeGreaterThan(0);
       // the explicit exit is still the only way out: no entry from this quest ends the talk by accident
       json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_wolves_at_the_fold" } }));
-      const after = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
-      expect(getFieldList(after, "ReplyList").filter((r) => /:hub:/.test(getFieldStr(r, "Comment")))).toHaveLength(0);
+      expect(mockIndex.parsedGff.has("dq_farmer_ned.dlg")).toBe(false); // nothing left in it: the builder's dialog goes
     } finally {
       await done();
     }
@@ -445,15 +521,30 @@ describe("build_quest", () => {
         giver: "farmer_ned",
         template: "bounty",
         target: "bounty_orc",
-        spawn: { resref: "bounty_orc", area: "fold", x: 20, y: 20, count: 2, tag: "bounty_orc_1", flag: { var: "orc_alarm", ifSet: 5, ifUnset: 1 } },
+        spawn: {
+          resref: "bounty_orc",
+          area: "fold",
+          x: 20,
+          y: 20,
+          count: 2,
+          tag: "bounty_orc_1",
+          flag: { var: "orc_alarm", ifSet: 5, ifUnset: 1 },
+        },
       });
       expect(json(await c.callTool({ name: "build_quest", arguments: { spec } })).success).toBe(true);
       const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
       const ned = getFieldList(git, "Creature List").find((x) => getFieldStr(x, "Tag") === "farmer_ned") as GffObj;
       const dlg = mockIndex.parsedGff.get(`${getFieldStr(ned, "Conversation")}.dlg`) as unknown as GffObj;
       const accept = getFieldList(dlg, "EntryList").find((e) => getFieldStr(e, "Script") === "q_act") as GffObj;
-      expect(getScriptParams(accept, "ActionParams")).toMatchObject({ spawn_flag: "orc_alarm", spawn_flag_set: "5", spawn_flag_unset: "1" });
-      const bad = (await c.callTool({ name: "build_quest", arguments: { spec: spec.replace('"ifSet":5', '"ifSet":9') } })) as { content: Array<{ text: string }>; isError?: boolean };
+      expect(getScriptParams(accept, "ActionParams")).toMatchObject({
+        spawn_flag: "orc_alarm",
+        spawn_flag_set: "5",
+        spawn_flag_unset: "1",
+      });
+      const bad = (await c.callTool({
+        name: "build_quest",
+        arguments: { spec: spec.replace('"ifSet":5', '"ifSet":9') },
+      })) as { content: Array<{ text: string }>; isError?: boolean };
       expect(bad.isError).toBe(true);
       expect(bad.content[0].text).toContain("flag.ifSet");
     } finally {
@@ -477,9 +568,15 @@ describe("build_quest", () => {
         const dlg = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
         return getFieldList(dlg, "ReplyList").find((r) => getFieldStr(r, "Comment").endsWith(":try")) as GffObj;
       };
-      json(await c.callTool({ name: "build_quest", arguments: { spec: spec({ ability: "cha", difficulty: "hard" }) } }));
+      json(
+        await c.callTool({ name: "build_quest", arguments: { spec: spec({ ability: "cha", difficulty: "hard" }) } }),
+      );
       expect(getFieldStr(reply(), "Script")).toBe("q_check");
-      expect(getScriptParams(reply(), "ActionParams")).toMatchObject({ ability: "cha", difficulty: "hard", who: "best" });
+      expect(getScriptParams(reply(), "ActionParams")).toMatchObject({
+        ability: "cha",
+        difficulty: "hard",
+        who: "best",
+      });
       json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_hard_talk" } }));
       json(await c.callTool({ name: "build_quest", arguments: { spec: spec({ skill: "persuade", dc: 15 }) } }));
       expect(getFieldStr(reply(), "Script")).toBe("q_roll");
@@ -497,7 +594,12 @@ describe("build_quest", () => {
         giver: "farmer_ned",
         stages: [
           { do: "talk", journal: "Ned wants the wolves gone." },
-          { do: "kill", target: "wolf_alpha", journal: "The lookout is dead; the pack is coming.", spawn: { resref: "wolf_pack", area: "fold", x: 25, y: 25, count: 3, tag: "wolf_pack_1" } },
+          {
+            do: "kill",
+            target: "wolf_alpha",
+            journal: "The lookout is dead; the pack is coming.",
+            spawn: { resref: "wolf_pack", area: "fold", x: 25, y: 25, count: 3, tag: "wolf_pack_1" },
+          },
           { do: "kill", target: "wolf_pack", journal: "The pack is destroyed." },
           { do: "return", journal: "Ned paid me." },
         ],
@@ -517,7 +619,9 @@ describe("build_quest", () => {
       expect(getFieldList(git, "Creature List").map((x) => getFieldStr(x, "Tag"))).not.toContain("wolf_pack");
       const bp = mockIndex.parsedGff.get("wolf_pack.utc") as unknown as GffObj;
       expect(getFieldStr(bp, "ScriptDeath")).toBe("q_ondeath");
-      expect(getFieldList(git, "WaypointList").map((w) => getFieldStr(w, "Tag"))).toContain("q_lookout_and_pack_s2_spawn");
+      expect(getFieldList(git, "WaypointList").map((w) => getFieldStr(w, "Tag"))).toContain(
+        "q_lookout_and_pack_s2_spawn",
+      );
     } finally {
       await done();
     }

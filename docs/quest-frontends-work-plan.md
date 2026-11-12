@@ -41,7 +41,7 @@ reading files, and can do it on any machine the manager runs on.
 | T1 | Play a manager-built quest in the engine | mcp + manager | open | no quest from the form has been played |
 | T2 | Completability check after a build (`quest verify` in the CLI) | mcp, then manager | done | 2026-11-12: CLI `verify` (live test incl. unreachable giver), manager shows it after Build (`lib.verify`, test_9, smoke 15/15 on a Chronicles copy with the real CLI) |
 | T3 | Rebuild of an unchanged quest writes nothing | mcp | done | 2026-11-12: shared `[Leave]` reply is created first, saved `MCP_Q_ORIG_*` var kept last; test compares the whole index before and after |
-| T4 | Remove leaves the module as it was | mcp | open | D2 = A, ready |
+| T4 | Remove leaves the module as it was | mcp + manager | done | 2026-11-12: `cleanupAfterRemove` (handlers, created dialog/items/waypoints/journal, module wrappers); whole-module before/after test; manager deletes `source.removed` through History. Not covered: scripts wired by a stage's own `script` field, shared scripts stay by design |
 | T5 | Undo a whole quest in one step | manager | open | today: one History entry per file, new files stay |
 | T6 | Windows, macOS, reverse proxy, wiki shell | manager | open | only Linux, no prefix, console theme were run |
 | U1 | Base-game creatures and items in the pick lists | mcp + manager | open | |

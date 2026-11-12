@@ -8,6 +8,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { jsonToGff, type ResmanOptions } from "../nim-tools.js";
+import { afterRemove } from "./project-sync.js";
 import {
   buildDialogDocument,
   makeEntry,
@@ -84,6 +85,7 @@ export interface QuestBuildReport {
 
 const COMMENT = (tag: string) => `mcpq:${tag}:`;
 const HUB_LEAVE = "mcpq:_hub:leave";
+const CREATED_DIALOG = "mcpq:_created";
 
 // --- small helpers
 
@@ -443,6 +445,11 @@ export class QuestBuilder {
 
   // --- removing an earlier build of this quest
 
+  /** Objects whose event stage belonged to the quest being stripped (their handler is restored on a remove). */
+  private readonly eventOwners: GffObj[] = [];
+  /** Resources a remove deletes (a conversation or item the quest created, an emptied journal). */
+  private readonly toDelete = new Set<string>();
+
   stripPrevious(): number {
     const tag = this.spec.tag;
     let removed = 0;
@@ -452,7 +459,10 @@ export class QuestBuilder {
       const slots = names.filter((n) => /^quest\d{1,2}$/.test(n)).map((n) => Number(n.slice(5)));
       for (const n of names) removeVarTableEntry(obj, n);
       const ev = getVarTableEntries(obj).find((e) => e.name.toLowerCase() === "quest_event");
-      if (ev && slots.includes(Number(ev.value))) removeVarTableEntry(obj, "quest_event");
+      if (ev && slots.includes(Number(ev.value))) {
+        removeVarTableEntry(obj, "quest_event");
+        this.eventOwners.push(obj);
+      }
       removed += names.length;
       touch();
     };
@@ -502,6 +512,144 @@ export class QuestBuilder {
       }
     }
     return removed;
+  }
+
+  // --- what a remove gives back (user decision D2, 2026-11-12): everything the quest created or replaced, except
+  // the shared runtime scripts, which other quests use.
+
+  /** The event handlers a quest installs, with the variable that holds the one it replaced. */
+  private static readonly HANDLERS: Array<{ field: string; script: string[]; origVar: string }> = [
+    { field: "ScriptDeath", script: ["q_ondeath"], origVar: "MCP_Q_ORIG_DEATH" },
+    { field: "OnEnter", script: ["q_onenter"], origVar: "MCP_Q_ORIG_ENTER" },
+    { field: "ScriptOnEnter", script: ["q_trigger"], origVar: "MCP_Q_ORIG_ENTER" },
+    { field: "OnUsed", script: ["q_search", "q_onused"], origVar: "MCP_Q_ORIG_USED" },
+  ];
+
+  private restoreHandlers(): void {
+    for (const obj of this.eventOwners) {
+      if (getVarTableEntries(obj).some((e) => e.name.toLowerCase() === "quest_event")) continue; // another quest's
+      for (const h of QuestBuilder.HANDLERS) {
+        if (!h.script.includes(getFieldStr(obj, h.field))) continue;
+        const saved = getVarTableEntries(obj).find((e) => e.name === h.origVar);
+        setField(obj, h.field, "resref", saved ? String(saved.value) : "");
+        if (saved) removeVarTableEntry(obj, h.origVar);
+      }
+    }
+  }
+
+  /** Does any object in the module still carry a variable matching `re`? */
+  private anyVar(re: RegExp): boolean {
+    const has = (o: GffObj) => getVarTableEntries(o).some((e) => re.test(e.name));
+    for (const [key, doc] of this.index.parsedGff) {
+      if (/\.(utc|uti|utp|are|utt)$/.test(key) && has(doc as GffObj)) return true;
+    }
+    for (const area of this.areas()) {
+      for (const list of ["Creature List", "Placeable List", "TriggerList", "Item List"]) {
+        try {
+          const git = this.git(area);
+          if (git[list] && getFieldList(git, list).some(has)) return true;
+        } catch {
+          /* no such list */
+        }
+      }
+    }
+    return false;
+  }
+
+  private async restoreModuleEvent(field: string, wrapper: string, stillNeeded: boolean): Promise<void> {
+    const ifo = this.doc("module.ifo") as GffObj | undefined;
+    if (!ifo || getFieldStr(ifo, field) !== wrapper || stillNeeded) return;
+    let orig = "";
+    const entry = this.index.resources.get(`${wrapper}.nss`);
+    if (entry?.filePath) {
+      const text = await fs.readFile(entry.filePath, "utf8").catch(() => "");
+      orig = /was "([^"]*)"/.exec(text)?.[1] ?? "";
+    }
+    setField(ifo, field, "resref", orig);
+    this.markBp("module.ifo", ifo as GffDocument);
+  }
+
+  /** Called by removeQuest after stripPrevious: restores what the quest replaced and lists what it created. */
+  async cleanupAfterRemove(): Promise<string[]> {
+    const tag = this.spec.tag;
+    this.restoreHandlers();
+    // Conversations: no quest left on a dialog -> drop the shared [Leave]; a dialog the builder created goes away.
+    for (const [key, entry] of this.index.resources) {
+      if (entry.extension !== "dlg") continue;
+      const doc = this.doc(key) as GffObj | undefined;
+      if (!doc) continue;
+      const comments = [...getFieldList(doc, "EntryList"), ...getFieldList(doc, "ReplyList")].map((n) =>
+        getFieldStr(n, "Comment"),
+      );
+      if (comments.some((c) => c.startsWith("mcpq:") && !c.startsWith("mcpq:_"))) continue; // another quest's lines
+      if (removeTaggedNodes(doc, "mcpq:_hub") > 0) this.markBp(key, doc as GffDocument);
+      const entries = getFieldList(doc, "EntryList");
+      const builderOwned =
+        comments.includes(CREATED_DIALOG) ||
+        (/^dq_/.test(entry.resref) && entries.length === 1 && getFieldLocStr(entries[0], "Text") === "Greetings.");
+      if (!builderOwned || entries.length !== 1) continue;
+      this.toDelete.add(key);
+      this.dirtyBp.delete(key);
+      const clear = (o: GffObj, touch: () => void) => {
+        if (getFieldStr(o, "Conversation").toLowerCase() !== entry.resref.toLowerCase()) return;
+        setField(o, "Conversation", "resref", "");
+        touch();
+      };
+      for (const [k, d] of this.index.parsedGff) if (k.endsWith(".utc")) clear(d as GffObj, () => this.markBp(k, d));
+      for (const area of this.areas()) {
+        try {
+          for (const o of getFieldList(this.git(area), "Creature List")) clear(o, () => this.markGit(area));
+        } catch {
+          /* no GIT */
+        }
+      }
+    }
+    // Quest items and spawn waypoints this quest made.
+    const itemName = new RegExp(`^${tag.replace(/[^a-z0-9_]/g, "")}_i\\d+$`);
+    for (const [key, entry] of this.index.resources) {
+      if (entry.extension === "uti" && itemName.test(entry.resref)) {
+        this.toDelete.add(key);
+        this.dirtyBp.delete(key);
+      }
+    }
+    for (const area of this.areas()) {
+      let git: GffObj;
+      try {
+        git = this.git(area);
+      } catch {
+        continue;
+      }
+      if (!git.WaypointList) continue;
+      const wps = getFieldList(git, "WaypointList");
+      const kept = wps.filter((w) => !new RegExp(`^${tag}_s\\d+_spawn$`).test(getFieldStr(w, "Tag")));
+      if (kept.length !== wps.length) {
+        (git.WaypointList as { value: GffObj[] }).value = kept;
+        this.markGit(area);
+      }
+    }
+    // An empty journal the quest started goes with it; module event wrappers are undone once nothing needs them.
+    const jrl = this.journalDoc(false);
+    if (jrl && getFieldList(jrl.doc as GffObj, "Categories").length === 0) {
+      this.toDelete.add(jrl.key);
+      this.dirtyBp.delete(jrl.key);
+    }
+    await this.restoreModuleEvent("Mod_OnAcquirItem", ACQUIRE_WRAPPER, this.anyVar(/^quest_event$/i));
+    await this.restoreModuleEvent("Mod_OnHeartbeat", HEARTBEAT_WRAPPER, this.anyVar(/_bounty_end$/i));
+    return [...this.toDelete];
+  }
+
+  /** Writes the changes of a remove, then deletes what the quest created. */
+  async commitRemove(): Promise<void> {
+    await this.commit();
+    for (const key of this.toDelete) {
+      const entry = this.index.resources.get(key);
+      if (entry?.filePath) {
+        await fs.rm(entry.filePath, { force: true });
+        await afterRemove(entry.filePath);
+      }
+      this.index.resources.delete(key);
+      this.index.parsedGff.delete(key);
+    }
   }
 
   // --- journal
@@ -574,6 +722,8 @@ export class QuestBuilder {
       const base = (getFieldStr(npc.copies[0].obj, "TemplateResRef") || npc.label).toLowerCase();
       resref = resref || `dq_${base}`.slice(0, 16);
       dlg = buildDialogDocument([{ speaker: "npc", text: "Greetings." }]) as unknown as GffObj;
+      // Marks the dialog as the builder's, so a remove that empties it can delete it and give the NPC its old (no) conversation.
+      setField(getFieldList(dlg, "EntryList")[0], "Comment", "cexostring", CREATED_DIALOG);
       // The greeting is this quest's too only if the quest created the dialog; keep it unmarked so it survives.
       this.newDialogs.set(resref, dlg as GffDocument);
       created = true;
@@ -603,7 +753,8 @@ export class QuestBuilder {
   private spawnParams: ScriptParams | undefined;
 
   private entry(d: { dlg: GffObj }, text: string, comment: string, script?: string, params?: ScriptParams): number {
-    if (script === "q_act" && params?.target !== undefined && this.spawnParams) params = { ...params, ...this.spawnParams };
+    if (script === "q_act" && params?.target !== undefined && this.spawnParams)
+      params = { ...params, ...this.spawnParams };
     const e = makeEntry(text, script, { params });
     setField(e, "Comment", "cexostring", comment);
     const list = getFieldList(d.dlg, "EntryList");
@@ -721,7 +872,13 @@ export class QuestBuilder {
       if (chk.dc !== undefined) rollParams.dc = String(chk.dc);
       if (chk.difficulty) rollParams.difficulty = chk.difficulty.replace(" ", "");
       if (generic) rollParams.who = chk.save ? "speaker" : "best";
-      const tryIt = this.reply(d, chk.prompt ?? `[${what}] Hear me out.`, `${c}try`, generic ? "q_check" : "q_roll", rollParams);
+      const tryIt = this.reply(
+        d,
+        chk.prompt ?? `[${what}] Hear me out.`,
+        `${c}try`,
+        generic ? "q_check" : "q_roll",
+        rollParams,
+      );
       const pass = this.entry(d, s.check.pass ?? thanks, `${c}pass`, "q_act", { target });
       const failParams: ScriptParams = s.check.else === "fight" ? { hostile: "1" } : {};
       const fail = this.entry(
@@ -783,7 +940,6 @@ export class QuestBuilder {
     }
   }
 
-
   /**
    * Dialog rule (user, 2026-11-09): an answer does not end the talk. Every quest line that would end it links back to a
    * shared hub: one option per still-active subject of this NPC ("About <quest>": its reminder line while the quest is
@@ -812,7 +968,7 @@ export class QuestBuilder {
     const entries = getFieldList(d.dlg, "EntryList");
     entries.forEach((e, ei) => {
       const comment = getFieldStr(e, "Comment");
-      if (!comment.startsWith("mcpq:") || d.ends.has(ei)) return;
+      if (!comment.startsWith("mcpq:") || comment.startsWith("mcpq:_") || d.ends.has(ei)) return;
       const links = getFieldList(e, "RepliesList");
       const isHub = (l: GffObj) => {
         const c = getFieldStr(getFieldList(d.dlg, "ReplyList")[getFieldNum(l, "Index")], "Comment");
@@ -880,7 +1036,8 @@ export class QuestBuilder {
     let at = sp.at;
     if (!at) {
       const area = (sp.area as string).toLowerCase();
-      if (!this.index.areas.has(area)) throw new QuestBuildError(`stage ${s.n}: spawn area ${area} isn't in the module`);
+      if (!this.index.areas.has(area))
+        throw new QuestBuildError(`stage ${s.n}: spawn area ${area} isn't in the module`);
       at = `${this.spec.tag}_s${s.n}_spawn`.slice(0, 32);
       if (!this.waypointExists(at)) {
         if (this.dryRun) {
@@ -892,7 +1049,8 @@ export class QuestBuilder {
               : (await findSimpleWalkableSpots(this.index, this.resman, area, 1))[0];
           if (!spot) throw new QuestBuildError(`stage ${s.n}: no walkable spot in ${area} for the spawn waypoint`);
           const walk = await checkPlacementWalkable(spot.x, spot.y, area, this.index, this.resman);
-          if (!walk.ok) throw new QuestBuildError(`stage ${s.n}: spawn point (${spot.x}, ${spot.y}) in ${area}: ${walk.reason}`);
+          if (!walk.ok)
+            throw new QuestBuildError(`stage ${s.n}: spawn point (${spot.x}, ${spot.y}) in ${area}: ${walk.reason}`);
           const list = getFieldList(this.git(area), "WaypointList");
           list.push({
             __struct_id: GIT_STRUCT_WAYPOINT,
@@ -916,7 +1074,9 @@ export class QuestBuilder {
         }
       }
     } else if (!this.waypointExists(at)) {
-      this.report.warnings.push(`stage ${s.n}: spawn waypoint ${at} isn't placed anywhere; nothing will spawn until it is`);
+      this.report.warnings.push(
+        `stage ${s.n}: spawn waypoint ${at} isn't placed anywhere; nothing will spawn until it is`,
+      );
     }
     if (!(await resolveBlueprint(this.index, sp.resref, "utc", this.resman)))
       throw new QuestBuildError(`stage ${s.n}: no creature blueprint ${sp.resref} to spawn`);
@@ -983,7 +1143,8 @@ export class QuestBuilder {
         let target = this.creature(spawned ?? (s.target as string));
         if (spawned) {
           if (!target) throw new QuestBuildError(`stage ${s.n}: no blueprint ${spawned} for the spawned kill target`);
-        } else if (!target || !target.copies.some((c) => c.where.startsWith("git:"))) target = await this.placeCreature(s);
+        } else if (!target || !target.copies.some((c) => c.where.startsWith("git:")))
+          target = await this.placeCreature(s);
         const placedCount = target.copies.filter((c) => c.where.startsWith("git:")).length;
         if (placedCount > 3) {
           this.report.warnings.push(
@@ -1338,6 +1499,7 @@ export async function removeQuest(index: ModuleIndex, resman: ResmanOptions, tag
     false,
   );
   const removed = b.stripPrevious();
-  await b.commit();
+  await b.cleanupAfterRemove();
+  await b.commitRemove();
   return removed;
 }

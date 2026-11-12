@@ -79,6 +79,18 @@ describe.skipIf(!NIM_FOLDER_NWTOOLS || !hasCli)("quest CLI on a flat source dire
       expect(ok.result?.completable, JSON.stringify(ok.result)).toBe(true);
       const missing = await cli(["verify", "q_nope", "--project", applied]);
       expect(missing.ok).toBe(false);
+      // remove: the conversation and journal the quest created are reported as removed, the giver is restored
+      const out2 = path.join(dir, "out2");
+      const gone = await cli(["remove", "q_wolves", "--project", applied, "--out", out2, "--no-compile"]);
+      expect(gone.ok, gone.error).toBe(true);
+      const removedFiles = (gone.result?.source as { removed: string[]; files: string[] }).removed;
+      expect(removedFiles).toContain("module.jrl.json");
+      expect(removedFiles.some((f) => /^dq_farmer_ned\.dlg/.test(f))).toBe(true);
+      expect((gone.result?.source as { files: string[] }).files).toContain("farmer_ned.utc.json");
+      const restored = JSON.parse(await fs.readFile(path.join(out2, "farmer_ned.utc.json"), "utf-8"));
+      expect(restored.Conversation.value).toBe("");
+      expect(restored.VarTable?.value ?? []).toEqual([]);
+
       // the giver moves to an area no door or trigger leads to: the gap shows, naming the area
       const git = JSON.parse(await fs.readFile(path.join(applied, "dm_area.git.json"), "utf-8"));
       git["Creature List"] = { type: "list", value: [{ __struct_id: 4, Tag: str("farmer_ned"), TemplateResRef: str("farmer_ned", "resref"), Conversation: str("dq_farmer_ned", "resref") }] };

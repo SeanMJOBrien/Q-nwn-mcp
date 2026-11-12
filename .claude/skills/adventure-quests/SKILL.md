@@ -130,7 +130,7 @@ nodes by hand.** After `build_quest`, run `verify_dialog` on each touched dialog
 NPC's root lines, in the order the engine tests them), `placed` and `warnings`. Fix the spec until there are no warnings.
 
 **3. Build:** `build_quest(spec: <JSON>)`. Keep the returned `adventureMd` block for Phase 4. Rebuilding with a changed spec
-replaces only what this quest made; `remove_quest(tag)` removes it.
+replaces only what this quest made; `remove_quest(tag)` removes it and gives back what it replaced (see docs/quest-system.md "Remove").
 
 ---
 

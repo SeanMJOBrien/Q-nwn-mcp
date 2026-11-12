@@ -159,9 +159,12 @@ export function registerQuestTools(server: McpServer): void {
 
   server.tool(
     "remove_quest",
-    "Remove a quest built by build_quest: its journal category, its dialog nodes (other dialog lines stay), its stage " +
-      "variables on every object, and triggers it created. Event scripts it wired stay in place (they do nothing without " +
-      "the variables); blueprints and items it created stay too.",
+    "Remove a quest built by build_quest and give back what it replaced (user decision 2026-11-12): its journal category " +
+      "(the journal too when that leaves it empty), its dialog nodes (other dialog lines stay; a conversation the quest " +
+      "created is deleted and the NPC has none again), its stage variables on every object, the triggers, spawn waypoints " +
+      "and quest items it created, the event handlers it replaced (ScriptDeath, OnEnter, OnUsed, ...) and the module's " +
+      "OnAcquireItem / OnHeartbeat once no other quest needs its wrapper. The shared runtime scripts (inc_quest, q_*) stay " +
+      "for the other quests.",
     { tag: z.string().describe("Quest tag, e.g. q_wolves_at_the_fold") },
     { destructiveHint: true },
     async ({ tag }) => {
