@@ -41,7 +41,7 @@ reading files, and can do it on any machine the manager runs on.
 | T1 | Play a manager-built quest in the engine | mcp + manager | open | no quest from the form has been played |
 | T2 | Completability check after a build (`quest verify` in the CLI) | mcp, then manager | open | |
 | T3 | Rebuild of an unchanged quest writes nothing | mcp | done | 2026-11-12: shared `[Leave]` reply is created first, saved `MCP_Q_ORIG_*` var kept last; test compares the whole index before and after |
-| T4 | Remove leaves the module as it was | mcp | open | needs decision D2 |
+| T4 | Remove leaves the module as it was | mcp | open | D2 = A, ready |
 | T5 | Undo a whole quest in one step | manager | open | today: one History entry per file, new files stay |
 | T6 | Windows, macOS, reverse proxy, wiki shell | manager | open | only Linux, no prefix, console theme were run |
 | U1 | Base-game creatures and items in the pick lists | mcp + manager | open | |
@@ -49,30 +49,35 @@ reading files, and can do it on any machine the manager runs on.
 | U3 | Parcel, reward and check as plain fields | manager | open | Deliver needs the item typed inside "Reward" |
 | U4 | Plan errors point at the field | mcp + manager | open | |
 | U5 | See and adopt quests made elsewhere | manager (+ mcp) | open | listed, not editable |
-| P1 | One-file builder shipped with the manager | mcp + manager | open | needs decision D1 |
+| P1 | One-file builder shipped with the manager | mcp + manager | open | waits on D1 (port question) |
 | P2 | Builder and form versions checked against each other | mcp + manager | open | after P1 |
 | P3 | `load_module` on a manager project | mcp | open | lets an LLM session work on the same project |
-| S1 | One form for both front ends | mcp + manager + studio | open | needs decision D3 |
+| S1 | One form for both front ends | mcp + manager + studio | open | D3 = A; copy step after D1 |
 | S2 | Studio builds into manager projects | studio | open | |
 | S3 | TFN generic check and action scripts (CLAUDE.md #16) | studio | open | plan in `docs/tfn-quest-findings.md` |
 | C1 | Small defects found on the way | mcp | open | list below; good for the end of a session |
 
-## Decisions needed from the user
+## Decisions
 
-- **D1 (blocks P1): how the manager gets the builder.** Today: a built Q-nwn-mcp checkout next to the manager, plus Node.
-  Option A (recommended): `npm run quest:bundle` in Q-nwn-mcp writes one `quest-cli.mjs` (esbuild), vendored into the
-  manager like the other tools, refreshed by a documented step. Node is still needed. Option B: keep the sibling
-  checkout. Option C: port the builder to Python (about 3,000 lines kept twice; not recommended).
-- **D2 (blocks T4): what Remove does with what the quest created.** Today the conversation `dq_<npc>`, quest items,
-  the shared scripts and the event wiring stay. Option A (recommended): the builder records what it created and what
-  it replaced (a `mcpq:<tag>` marker already exists for triggers) and Remove deletes its own files and puts the old
-  values back, keeping the shared scripts while another quest uses them. Option B: leave as is and list the leftovers
-  in the result.
-- **D3 (blocks S1): where the shared form lives.** Option A (recommended): `web/quest-form.js` in Q-nwn-mcp, next to
-  the schema it is drawn from, copied into each front end by the same step as D1's bundle. Option B: the manager
-  owns it and the studio copies it. Option C: keep two forms.
-- **D4: is `quests/` in a manager project committed?** The saved specs are the only editable source of a quest;
-  recommended yes, with a line in the `.gitignore`/README stub that `nwn-manager init` writes.
+Answered 2026-11-12 (user):
+
+- **D1 (blocks P1): open, user asked "port the manager to TypeScript?"** Finding (2026-11-12): the manager's Python is
+  stdlib only (no numpy, no native modules; `sqlite3`, `http.server`, `struct`, `hashlib` and the like) and the heavy
+  tools are external binaries (neverwinter.nim, nwnsc), so **no capability requires Python**. Size is the obstacle:
+  about 26,000 lines in `bin/` (`nwn-wiki` 15,400, `nwn-area-editor` 4,800, `nwn-manager` 1,100 plus a 1,170-line
+  PowerShell twin, `nwn-palette` 700, `nwn-quests` 500, others), with a PyInstaller build as the distribution. Options:
+  (1) port everything (large, risky, no user-visible gain by itself); (2) **port nothing now, ship the builder as one
+  bundle (old option A) and keep Python** (smallest; Node stays a requirement for Quests only); (3) **port gradually
+  with the quest path first**: the console server and Quests page move to TypeScript beside the builder (one language
+  there, no subprocess, no bundle step), the wiki generator stays Python until it is worth moving; a Node single
+  executable (or bun compile) could then replace PyInstaller for the ported parts. Recommendation: (3), starting
+  with nothing blocked: P1 proceeds as (2) meanwhile. Waiting for the user's choice before P1.
+- **D2: A.** The builder records what it created and what it replaced; Remove deletes its own files and restores the
+  old values; shared scripts stay while another quest uses them. Unblocks T4.
+- **D3: A.** `web/quest-form.js` in Q-nwn-mcp next to the schema, copied into each front end by the same step as the
+  bundle (D1). Unblocks S1 (after D1 settles how files are copied).
+- **D4: yes.** `quests/` in a manager project is committed; the README/`.gitignore` stub that `nwn-manager init`
+  writes says so.
 
 ## Phase L: land it
 
