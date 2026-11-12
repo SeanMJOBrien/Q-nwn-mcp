@@ -42,3 +42,6 @@ adventure-status.json
 
 # Per-module story, DM guide and status written by the adventure pipeline (one folder per title).
 adventures/
+
+# Quest CLI one-file bundle (npm run quest:bundle)
+bundle/

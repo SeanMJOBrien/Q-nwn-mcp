@@ -13,9 +13,13 @@ import { gffToJson } from "../nim-tools.js";
 
 const run = promisify(execFile);
 const ROOT = path.join(import.meta.dirname, "..", "..");
-const CLI = path.join(ROOT, "dist", "cli", "quest.js");
+const DIST_CLI = path.join(ROOT, "dist", "cli", "quest.js");
+let CLI = DIST_CLI;
 const TEMPLATES = path.join(ROOT, "src", "templates");
-const hasCli = await fs.stat(CLI).then(() => true, () => false);
+const hasCli = await fs.stat(DIST_CLI).then(
+  () => true,
+  () => false,
+);
 
 const str = (value: string, type = "cexostring") => ({ type, value });
 const ned = {
@@ -31,20 +35,48 @@ async function cli(args: string[]): Promise<{ ok: boolean; result?: Record<strin
   return JSON.parse(r.stdout);
 }
 
+/** The one-file bundle, built now and run from a folder with no node_modules (what the manager vendors). */
+async function bundledCli(): Promise<string> {
+  await run("node", [path.join(ROOT, "scripts", "bundle-quest-cli.mjs")], { cwd: ROOT });
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "nwn-mcp-bundle-"));
+  await fs.copyFile(path.join(ROOT, "bundle", "quest-cli.mjs"), path.join(dir, "quest-cli.mjs"));
+  return path.join(dir, "quest-cli.mjs");
+}
+
 describe.skipIf(!NIM_FOLDER_NWTOOLS || !hasCli)("quest CLI on a flat source directory", () => {
-  it("plans without writing, builds into --out, and refuses to write without it", async () => {
+  it.each([
+    "dist",
+    "bundle",
+  ])("plans without writing, builds into --out, and refuses to write without it (%s)", async (which) => {
+    CLI = which === "bundle" ? await bundledCli() : DIST_CLI;
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "nwn-mcp-src-"));
     try {
       const src = path.join(dir, "proj", "unpacked");
       await fs.mkdir(src, { recursive: true });
       for (const name of ["dm_area.are", "dm_area.git", "dm_area.gic"]) {
-        await fs.writeFile(path.join(src, `${name}.json`), JSON.stringify(await gffToJson(path.join(TEMPLATES, name)), null, 2));
+        await fs.writeFile(
+          path.join(src, `${name}.json`),
+          JSON.stringify(await gffToJson(path.join(TEMPLATES, name)), null, 2),
+        );
       }
-      await fs.writeFile(path.join(src, "module.ifo.json"), JSON.stringify({ __data_type: "IFO ", Mod_Name: { type: "cexolocstring", value: { "0": "Src Test" } } }));
+      await fs.writeFile(
+        path.join(src, "module.ifo.json"),
+        JSON.stringify({ __data_type: "IFO ", Mod_Name: { type: "cexolocstring", value: { "0": "Src Test" } } }),
+      );
       await fs.writeFile(path.join(src, "farmer_ned.utc.json"), JSON.stringify(ned));
       await fs.writeFile(path.join(src, "hello.nss"), "void main() {}\n");
       const spec = path.join(dir, "q.json");
-      await fs.writeFile(spec, JSON.stringify({ name: "Wolves", giver: "farmer_ned", stages: [{ do: "talk", journal: "Ned asked." }, { do: "return", journal: "Done." }] }));
+      await fs.writeFile(
+        spec,
+        JSON.stringify({
+          name: "Wolves",
+          giver: "farmer_ned",
+          stages: [
+            { do: "talk", journal: "Ned asked." },
+            { do: "return", journal: "Done." },
+          ],
+        }),
+      );
       const before = (await fs.readdir(src)).sort();
 
       const plan = await cli(["build", spec, "--project", path.join(dir, "proj"), "--dry-run"]);
@@ -93,7 +125,17 @@ describe.skipIf(!NIM_FOLDER_NWTOOLS || !hasCli)("quest CLI on a flat source dire
 
       // the giver moves to an area no door or trigger leads to: the gap shows, naming the area
       const git = JSON.parse(await fs.readFile(path.join(applied, "dm_area.git.json"), "utf-8"));
-      git["Creature List"] = { type: "list", value: [{ __struct_id: 4, Tag: str("farmer_ned"), TemplateResRef: str("farmer_ned", "resref"), Conversation: str("dq_farmer_ned", "resref") }] };
+      git["Creature List"] = {
+        type: "list",
+        value: [
+          {
+            __struct_id: 4,
+            Tag: str("farmer_ned"),
+            TemplateResRef: str("farmer_ned", "resref"),
+            Conversation: str("dq_farmer_ned", "resref"),
+          },
+        ],
+      };
       await fs.writeFile(path.join(applied, "dm_area.git.json"), JSON.stringify(git));
       const ifo = JSON.parse(await fs.readFile(path.join(applied, "module.ifo.json"), "utf-8"));
       ifo.Mod_Entry_Area = str("elsewhere", "resref");

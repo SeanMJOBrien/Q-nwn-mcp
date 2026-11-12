@@ -32,6 +32,9 @@ import { buildQuestFromJson } from "../tools/quest-tools.js";
 import { removeQuest } from "../util/quest-builder.js";
 import { normalizeQuestSpec, QuestSpecError, type QuestInput } from "../util/quest-spec.js";
 
+/** Set by scripts/bundle-quest-cli.mjs (esbuild define) so the one-file bundle carries the schema; absent in dist/. */
+declare const __QUEST_SCHEMA__: unknown;
+
 function out(ok: boolean, payload: unknown): never {
   process.stdout.write(`${JSON.stringify(ok ? { ok, result: payload } : { ok, error: payload }, null, 2)}\n`);
   process.exit(ok ? 0 : 1);
@@ -141,6 +144,7 @@ async function verifyQuest(tag: string): Promise<Record<string, unknown>> {
 async function main(): Promise<void> {
   const { cmd, arg, project, out: outDir, dryRun, compile } = parse(process.argv.slice(2));
   if (cmd === "schema") {
+    if (typeof __QUEST_SCHEMA__ !== "undefined") out(true, __QUEST_SCHEMA__);
     const schemaPath = path.join(import.meta.dirname, "..", "..", "docs", "quest-spec.schema.json");
     out(true, JSON.parse(await fs.readFile(schemaPath, "utf8")));
   }

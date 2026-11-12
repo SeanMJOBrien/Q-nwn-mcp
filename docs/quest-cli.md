@@ -32,3 +32,12 @@ node dist/cli/quest.js normalize <spec.json>
 - `verify` is read-only (no `--out`): it runs `verify_quest_completability` and `verify_journal` on the target and prints `{tag, name, completable, gaps, stages, questGiver, journal:{errors, warnings}}` for that quest (journal findings that name the tag). Exit code 1 with an error if the module has no quest with that tag. The Q-nwn-manager console calls it after every Build and shows "can be completed" or the gaps.
 - `normalize` prints the spec with templates expanded, stages numbered, `from`/`end` defaulted and rewards sized (no module needed). The TFN Content Studio
   translates that into TFN's quest model (`tfnstudio/questbridge.py` there), so templates are expanded once, here.
+
+## One-file bundle (2026-11-12, decision D1)
+
+`npm run quest:bundle` writes `bundle/quest-cli.mjs` (git-ignored; esbuild, the quest schema inside, about 1.6 MB). It runs with
+Node 20.11+ alone: `node quest-cli.mjs build|remove|verify|normalize|schema ...`, same commands and JSON as `dist/cli/quest.js`.
+Q-nwn-manager vendors it as `nwn-tools/quest-cli.mjs`; refresh that copy after changing the builder (copy the new file over it,
+run the manager's tests). `quest-source.live.test.ts` runs the whole flow through `dist` and through a copy of the bundle in a
+folder with no `node_modules`. Only the quest paths are meant to work from the bundle: files the server reads beside its own
+code (`templates/`, `data/`, `nwscript-override/`) are not packed, which the quest commands never need.
