@@ -35,7 +35,7 @@ reading files, and can do it on any machine the manager runs on.
 
 | Id | Package | Repo | State | Commit / Notes |
 |----|---------|------|-------|----------------|
-| L1 | Commit the 2026-11-11 work, one commit per repo | all three | open | nothing is committed; studio: only the quest files |
+| L1 | Commit the 2026-11-11 work, one commit per repo | all three | partly done | mcp `f1a1e81`, manager `d79d3c3` (2026-11-11). Studio NOT committed: its quest work is mixed with the user's other uncommitted edits in `server.py`, `cli.py`, `service.py`, `index.py`, `common.js`; needs the user to say how to split |
 | L2 | Rebuild the `nwn-pytools` binaries with the Quests page | manager | open | needs L1 pushed; CI workflow `build-pytools.yml` |
 | L3 | Linux binary runs on older glibc | manager | open | fails here: needs GLIBC 2.38 |
 | T1 | Play a manager-built quest in the engine | mcp + manager | open | no quest from the form has been played |
