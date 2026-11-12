@@ -26,6 +26,18 @@ export interface WriteScriptResult {
   compiledSize?: number;
 }
 
+let compileEnabled = true;
+export const COMPILE_SKIPPED = "not compiled here: the module build compiles it";
+
+/**
+ * Turn compiling off for a caller whose module is compiled elsewhere (the quest CLI's `--no-compile`, for a source
+ * project that nasher builds). A compile request then writes the source only and reports `compiled: true` with
+ * `compilerOutput` = COMPILE_SKIPPED, so generators that stop on a failed compile carry on.
+ */
+export function setCompileEnabled(on: boolean): void {
+  compileEnabled = on;
+}
+
 /**
  * Write `source` as `<resref>.nss`, register it in the index, and compile it
  * unless `doCompile` is false.
@@ -65,6 +77,11 @@ export async function writeAndCompileScript(
 
   const result: WriteScriptResult = { written: nssKey, sizeBytes: nssStat.size };
   if (!doCompile) return result;
+  if (!compileEnabled) {
+    result.compiled = true;
+    result.compilerOutput = COMPILE_SKIPPED;
+    return result;
+  }
 
   const ncsPath = nssPath.replace(/\.nss$/i, ".ncs");
   const resman = await buildResmanOptions(index);

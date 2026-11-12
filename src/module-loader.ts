@@ -8,7 +8,7 @@ import { clearWokCache, setWokCacheDir } from "./util/walkmesh.js";
 import { clearTilesetCache } from "./util/tileset.js";
 import { clearUndoStack } from "./util/undo.js";
 import { isDirtyUnder, clearDirtyUnder } from "./util/dirty-state.js";
-import { setSyncIndexGetter, trackAll } from "./util/project-sync.js";
+import { setFlatSync, setSyncIndexGetter, trackAll } from "./util/project-sync.js";
 import { acquireModuleLock, releaseModuleLock } from "./util/module-lock.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList } from "./types/gff.js";
 import type { GffDocument, GffObj } from "./types/gff.js";
@@ -99,9 +99,8 @@ export async function buildResmanOptions(index: ModuleIndex): Promise<ResmanOpti
   };
 }
 
-export async function loadModule(modPath: string, opts: { force?: boolean } = {}): Promise<ModuleIndex> {
-  const absPath = path.resolve(modPath);
-
+/** The checks and resets every load starts with. Returns the temp dir, claimed for this process. */
+async function beginLoad(absPath: string, opts: { force?: boolean }): Promise<string> {
   // Re-extracting (below) or wiping the old temp dir (cleanupTempDir, for a
   // module switch) both silently discard any edit made since the last
   // repack_module — confirmed real, not theoretical: this exact sequence
@@ -132,8 +131,6 @@ export async function loadModule(modPath: string, opts: { force?: boolean } = {}
   clearTilesetCache();
   clearUndoStack();
 
-  const BATCH_SIZE = 20;  // Max concurrent child processes per batch
-  const loadWarnings: Array<{ type: string; message: string }> = [];
   const tempDir = await createTempDir(absPath);
   setWokCacheDir(tempDir);
 
@@ -143,6 +140,15 @@ export async function loadModule(modPath: string, opts: { force?: boolean } = {}
   // running its own separate MCP server, the real case that motivated this)
   // already mid-flight on the same module.
   await acquireModuleLock(tempDir);
+  return tempDir;
+}
+
+export async function loadModule(modPath: string, opts: { force?: boolean } = {}): Promise<ModuleIndex> {
+  const absPath = path.resolve(modPath);
+  const BATCH_SIZE = 20;  // Max concurrent child processes per batch
+  const loadWarnings: Array<{ type: string; message: string }> = [];
+  const tempDir = await beginLoad(absPath, opts);
+  setFlatSync(null);
 
   // Extract module
   await erfExtract(absPath, tempDir);
@@ -189,6 +195,101 @@ export async function loadModule(modPath: string, opts: { force?: boolean } = {}
       }
     }
   }
+
+  return finishLoad(absPath, tempDir, resources, parsedGff, loadWarnings);
+}
+
+/** GFF JSON files read at once by loadSourceDir (plain file reads, no child processes). */
+const SOURCE_READ_BATCH = 64;
+/** Files in a source directory that are not module resources. */
+const SOURCE_SKIP_EXTENSIONS = new Set(["json", "bak", "tmp", "orig", "swp"]);
+
+/**
+ * True when `dir` holds nasher-style module source in one flat directory: `<resref>.<ext>.json` for every GFF resource
+ * (the `nwn_gff` JSON form), scripts as `.nss`, other files as they are. This is a Q-nwn-manager project's `unpacked/`.
+ */
+export async function isSourceDir(dir: string): Promise<boolean> {
+  try {
+    return (await fs.stat(path.join(dir, "module.ifo.json"))).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Loads a module straight from a flat source directory (see isSourceDir): the JSON is read as it is, so no .mod is
+ * packed or extracted and thousands of resources load in seconds. The source directory is never written. Every
+ * resource's `filePath` points into the temp dir (scripts and other files are copied there; a GFF binary exists there
+ * only after a tool writes it), and each write is reported through the flat project sync: with `out` set, the changed
+ * resource is also written there in the source layout for the caller to apply; without it nothing leaves the temp dir.
+ */
+export async function loadSourceDir(dir: string, opts: { force?: boolean; out?: string } = {}): Promise<ModuleIndex> {
+  const absPath = path.resolve(dir);
+  if (!(await isSourceDir(absPath))) throw new Error(`${absPath} has no module.ifo.json (not a module source directory)`);
+  const loadWarnings: Array<{ type: string; message: string }> = [];
+  const tempDir = await beginLoad(absPath, opts);
+  setFlatSync({ out: opts.out ? path.resolve(opts.out) : null });
+  clearDirtyUnder(tempDir);
+
+  const resources = new Map<string, ResourceEntry>();
+  const parsedGff = new Map<string, GffDocument>();
+  const jsonFiles: Array<{ key: string; file: string }> = [];
+  const keep = new Set<string>();
+  for (const dirent of await fs.readdir(absPath, { withFileTypes: true })) {
+    if (!dirent.isFile()) continue;
+    const lower = dirent.name.toLowerCase();
+    const isJson = lower.endsWith(".json");
+    const key = isJson ? lower.slice(0, -".json".length) : lower;
+    const ext = path.extname(key).slice(1);
+    const resref = path.basename(key, path.extname(key));
+    const filePath = path.join(tempDir, key);
+    if (isJson) {
+      if (!GFF_EXTENSIONS.has(ext)) continue;
+      jsonFiles.push({ key, file: path.join(absPath, dirent.name) });
+      resources.set(key, { resref, extension: ext, filePath, sizeBytes: 0 });
+      continue;
+    }
+    if (!ext || SOURCE_SKIP_EXTENSIONS.has(ext) || lower.startsWith(".")) continue;
+    await fs.copyFile(path.join(absPath, dirent.name), filePath);
+    keep.add(key);
+    resources.set(key, { resref, extension: ext, filePath, sizeBytes: (await fs.stat(filePath)).size });
+  }
+  // The temp dir is reused for the same source path: drop files of an earlier run (old binaries, deleted scripts).
+  for (const dirent of await fs.readdir(tempDir, { withFileTypes: true })) {
+    if (dirent.isFile() && !dirent.name.startsWith(".") && !keep.has(dirent.name)) {
+      await fs.rm(path.join(tempDir, dirent.name), { force: true });
+    }
+  }
+  for (let i = 0; i < jsonFiles.length; i += SOURCE_READ_BATCH) {
+    const results = await Promise.allSettled(
+      jsonFiles.slice(i, i + SOURCE_READ_BATCH).map(async ({ key, file }) => ({
+        key,
+        doc: JSON.parse(await fs.readFile(file, "utf-8")) as GffDocument,
+      })),
+    );
+    results.forEach((result, n) => {
+      if (result.status === "fulfilled") {
+        parsedGff.set(result.value.key, result.value.doc);
+      } else {
+        const { key } = jsonFiles[i + n];
+        resources.delete(key);
+        loadWarnings.push({ type: "gff", message: `Failed to read ${key}.json: ${result.reason}` });
+      }
+    });
+  }
+  return finishLoad(absPath, tempDir, resources, parsedGff, loadWarnings);
+}
+
+/** Builds the index from the listed resources and parsed GFF documents, and makes it the loaded module. */
+async function finishLoad(
+  absPath: string,
+  tempDir: string,
+  resources: Map<string, ResourceEntry>,
+  parsedGff: Map<string, GffDocument>,
+  loadWarnings: Array<{ type: string; message: string }>,
+): Promise<ModuleIndex> {
+  const BATCH_SIZE = 20;  // Max concurrent child processes per batch
+  const modPath = absPath;
 
   // Build indexes
   const tags = new Map<string, TagLocation[]>();

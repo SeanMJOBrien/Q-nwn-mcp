@@ -36,6 +36,7 @@
 | How do quests work, and what can a `build_quest` spec say (stage kinds, templates, `q_chk`/`q_act` parameters, whole-party credit)? | [quest-system.md](quest-system.md) |
 | How does the parametrized PQJ quest system work? | [pqj-quest-system.md](pqj-quest-system.md) |
 | Where does the pipeline flatten or drop the story it was meant to tell? | [story-vs-pipeline.md](story-vs-pipeline.md) |
+| How is a quest built without an LLM (CLI, manager console, studio), and what is left to do? | [quest-cli.md](quest-cli.md), [quest-frontends-work-plan.md](quest-frontends-work-plan.md) |
 | Which bugs in TFN's quest scripts are confirmed, and what is the plan to port our quest fixes to the content studio? | [tfn-quest-findings.md](tfn-quest-findings.md) |
 | What happened when random caster abilities ran on a real headless server? | [random-abilities-runtime-findings.md](random-abilities-runtime-findings.md) |
 | How does the Special-Abilities caster system (the project-wide default) work, and how does a DM actually see/use the abilities in-game? | [special-abilities-system.md](special-abilities-system.md) |

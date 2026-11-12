@@ -24,6 +24,67 @@ export function setSyncIndexGetter(fn: () => ModuleIndex | null): void {
   getIndex = fn;
 }
 
+/**
+ * Flat sync, for a module loaded from a flat source directory (`loadSourceDir`): the source is never written. Each
+ * written resource is recorded, and with `out` set it is also written there in the source layout (`<name>.json` for
+ * GFF, scripts as they are; compiled scripts are left out, the module build compiles them). No module project or
+ * adventure directory is involved.
+ */
+let flat: { out: string | null; files: Set<string>; removed: Set<string> } | null = null;
+
+export function setFlatSync(target: { out: string | null } | null): void {
+  flat = target ? { out: target.out, files: new Set(), removed: new Set() } : null;
+}
+
+/** File names (source layout) written to `out` and resources removed since the load, sorted. */
+export function flatSyncReport(): { out: string | null; files: string[]; removed: string[] } | null {
+  return flat ? { out: flat.out, files: [...flat.files].sort(), removed: [...flat.removed].sort() } : null;
+}
+
+function flatName(key: string): string {
+  return GFF_EXTENSIONS.has(path.extname(key).slice(1)) ? `${key}.json` : key;
+}
+
+async function flushFlat(index: ModuleIndex, file: string, doc?: GffDocument): Promise<void> {
+  if (!flat) return;
+  const key = path.basename(file).toLowerCase();
+  const ext = path.extname(key).slice(1);
+  if (ext === "ncs") return;
+  const name = flatName(key);
+  flat.removed.delete(name);
+  flat.files.add(name);
+  if (!flat.out) return;
+  await fs.mkdir(flat.out, { recursive: true });
+  if (GFF_EXTENSIONS.has(ext)) {
+    const d = doc ?? index.parsedGff.get(key);
+    if (!d) return;
+    await fs.writeFile(path.join(flat.out, name), `${stringifySource(d)}\n`);
+  } else {
+    await fs.copyFile(file, path.join(flat.out, name));
+  }
+}
+
+const NEGATIVE_ZERO = "\u0000-0";
+
+/**
+ * Pretty JSON for a source file. JSON.stringify writes -0 as 0, which would flip the sign of every `-0.0` the source
+ * holds (orientations, positions) in a file the tool only touched elsewhere; they are written back as `-0.0`.
+ */
+export function stringifySource(doc: unknown): string {
+  const text = JSON.stringify(doc, (_key, value) => (Object.is(value, -0) ? NEGATIVE_ZERO : value), 2);
+  return text.replaceAll(JSON.stringify(NEGATIVE_ZERO), "-0.0");
+}
+
+async function removeFlat(file: string): Promise<void> {
+  if (!flat) return;
+  const key = path.basename(file).toLowerCase();
+  if (path.extname(key) === ".ncs") return;
+  const name = flatName(key);
+  flat.files.delete(name);
+  flat.removed.add(name);
+  if (flat.out) await fs.rm(path.join(flat.out, name), { force: true });
+}
+
 function inside(index: ModuleIndex, file: string): boolean {
   const base = index.tempDir.endsWith(path.sep) ? index.tempDir : index.tempDir + path.sep;
   return path.dirname(file) + path.sep === base;
@@ -62,6 +123,7 @@ function isProbe(file: string): boolean {
 export async function beforeWrite(file: string): Promise<void> {
   const index = getIndex();
   if (!index || !inside(index, file) || isProbe(file)) return;
+  if (flat) return; // the temp dir is private to this load: nothing else edits it
   const known = stats.get(file);
   if (!known) return;
   let now: { size: number; mtimeMs: number };
@@ -89,6 +151,10 @@ export async function afterWrite(file: string, doc?: GffDocument): Promise<void>
   const index = getIndex();
   if (!index || !inside(index, file) || isProbe(file)) return;
   await trackFile(file);
+  if (flat) {
+    await flushFlat(index, file, doc);
+    return;
+  }
   try {
     await flushResource(index, file, doc);
   } catch (e) {
@@ -126,6 +192,10 @@ export async function afterRemove(file: string): Promise<void> {
   const index = getIndex();
   if (!index || !inside(index, file) || isProbe(file)) return;
   stats.delete(file);
+  if (flat) {
+    await removeFlat(file);
+    return;
+  }
   try {
     const dir = await projectDirFor(index);
     if (!(await isProjectDir(dir))) return;

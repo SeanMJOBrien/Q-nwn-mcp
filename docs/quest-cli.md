@@ -3,8 +3,8 @@
 `build_quest` is deterministic; an LLM only ever wrote the spec. The CLI runs the same code from a script, a form or CI.
 
 ```
-node dist/cli/quest.js build  <spec.json> --project <module project dir | .mod> [--dry-run]
-node dist/cli/quest.js remove <quest tag>  --project <module project dir | .mod>
+node dist/cli/quest.js build  <spec.json> --project <module project dir | source dir | .mod> [--dry-run] [--out <dir>] [--no-compile]
+node dist/cli/quest.js remove <quest tag>  --project <module project dir | source dir | .mod> [--out <dir>]
 node dist/cli/quest.js schema
 node dist/cli/quest.js normalize <spec.json>
 ```
@@ -14,6 +14,16 @@ node dist/cli/quest.js normalize <spec.json>
 - `--dry-run` returns the plan (stages, slots, rewards, notes) and changes nothing. Always show it before the real build.
 - A **project directory** is edited in place (journal, dialog, blueprints, `.git`, scripts under `src/`); no `.mod` is built.
   A `.mod` is edited in the temp dir only and is not repacked by the CLI.
+- A **source directory** is nasher JSON in one flat folder (`<resref>.<ext>.json`, scripts as `.nss`, a `module.ifo.json`): a
+  Q-nwn-manager project (its `unpacked/`) or that folder itself. It is read as it is (no `.mod` packed or extracted; a module
+  of 8,000 resources plans in about 5 s) and **never written**. `build` and `remove` need `--out <empty dir>`, which receives
+  the changed files in the same layout; the result's `source` is `{dir, out, files, removed, compiled}`. The caller applies
+  them (Q-nwn-manager's console does, through its edit history, after compiling the staged scripts with its own `nwnsc`).
+  `--dry-run` needs no `--out`. Code: `loadSourceDir` in `src/module-loader.ts`, flat sync in `src/util/project-sync.ts`.
+- `--no-compile` writes the scripts without compiling them, for a project whose build compiles every script (nasher).
+  Without it the scripts are compiled with `nwn_script_comp`, which needs `NWN_FOLDER_DATA`.
+- With a source directory only `NIM_FOLDER_NWTOOLS` (for `nwn_gff`) is required. Without `NWN_FOLDER_DATA` the base game is
+  not visible: a giver, target or item must then be in the module, and a spawn or kill target cannot be placed by area.
 - `schema` prints `docs/quest-spec.schema.json`, generated from `QuestInput` in `src/util/quest-spec.ts` by `npm run quest:schema`
   (rerun it when the spec types change). Forms and validators should read it instead of copying the field list.
 - The spec fields are documented in `docs/quest-system.md`. Targets the vanilla whole-party model; TFN needs its own backend

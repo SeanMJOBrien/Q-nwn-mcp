@@ -13,6 +13,7 @@
 import path from "path";
 import fs from "fs/promises";
 
+import { GIT_STRUCT_ID } from "../config.js";
 import { gffToJson, jsonToGff, resmanExtractToJson } from "../nim-tools.js";
 import type { ResmanOptions } from "../nim-tools.js";
 import { invalidateTagToAreaCache } from "../tools/tileset-tools.js";
@@ -75,10 +76,42 @@ export async function writeBackGit(index: ModuleIndex, areaResref: string, doc: 
   await syncGic(index, areaResref, doc);
 }
 
+/** GIC list name -> the struct id its entries carry (the same id as the GIT entry of that kind). */
+const GIC_LISTS: Array<[string, number]> = [
+  ["Creature List", GIT_STRUCT_ID.CREATURE],
+  ["Door List", GIT_STRUCT_ID.DOOR],
+  ["Encounter List", GIT_STRUCT_ID.ENCOUNTER],
+  ["Placeable List", GIT_STRUCT_ID.PLACEABLE],
+  ["SoundList", GIT_STRUCT_ID.SOUND],
+  ["StoreList", GIT_STRUCT_ID.STORE],
+  ["TriggerList", GIT_STRUCT_ID.TRIGGER],
+  ["WaypointList", GIT_STRUCT_ID.WAYPOINT],
+];
+
+/**
+ * Brings the GIC lists to the length of the GIT lists, keeping the entries that are there: a hand-built area's GIC
+ * holds the toolset comment of every object, by position. New objects get an empty comment at the end; a shorter GIT
+ * list drops entries from the end. Returns true when a list changed.
+ */
+export function syncGicLists(gic: GffObj, git: GffObj): boolean {
+  let changed = false;
+  for (const [listName, structId] of GIC_LISTS) {
+    const want = getFieldList(git, listName).length;
+    const field = gic[listName] as { type?: string; value?: GffObj[] } | undefined;
+    const have = Array.isArray(field?.value) ? field.value : null;
+    if (have && have.length === want) continue;
+    const next = (have ?? []).slice(0, want);
+    while (next.length < want) next.push({ __struct_id: structId, Comment: { type: "cexostring", value: "" } });
+    gic[listName] = { type: "list", value: next };
+    changed = true;
+  }
+  return changed;
+}
+
 /**
  * Sync the GIC (Game Instance Comments) file to match the GIT.
  * The toolset uses the GIC to know which objects exist in an area.
- * Each GIC list must have one entry per GIT object (just a Comment struct).
+ * Each GIC list must have one entry per GIT object (a Comment struct). The file is written only when a list changed.
  */
 async function syncGic(index: ModuleIndex, areaResref: string, gitDoc: GffDocument): Promise<void> {
   const gicKey = `${areaResref.toLowerCase()}.gic`;
@@ -88,28 +121,7 @@ async function syncGic(index: ModuleIndex, areaResref: string, gitDoc: GffDocume
   const gicDoc = index.parsedGff.get(gicKey);
   if (!gicDoc) return;
 
-  const gic = gicDoc as GffObj;
-  const git = gitDoc as GffObj;
-
-  const listNames = [
-    "Creature List", "Door List", "Encounter List",
-    "Placeable List", "SoundList", "StoreList",
-    "TriggerList", "WaypointList",
-  ];
-
-  for (const listName of listNames) {
-    const gitList = getFieldList(git, listName);
-    const gicList: GffObj[] = [];
-    for (let i = 0; i < gitList.length; i++) {
-      gicList.push({
-        __struct_id: 0,
-        Comment: { type: "cexostring", value: "" },
-      });
-    }
-    gic[listName] = { type: "list", value: gicList };
-  }
-
-  await jsonToGff(gicDoc, gicEntry.filePath);
+  if (syncGicLists(gicDoc as GffObj, gitDoc as GffObj)) await jsonToGff(gicDoc, gicEntry.filePath);
 }
 
 /** Update area summary counts from the current GIT. */

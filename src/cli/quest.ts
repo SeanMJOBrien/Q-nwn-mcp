@@ -9,11 +9,18 @@
  *
  * stdout is one JSON document: {"ok":true,"result":...} or {"ok":false,"error":"..."}; exit code 0 on success.
  * A project directory is edited in place (edits are flushed to its src/ as they happen); a .mod is edited in the temp dir
- * and NOT repacked here (use repack_module, or pass a project). See docs/quest-cli.md.
+ * and NOT repacked here (use repack_module, or pass a project).
+ *
+ * A flat source directory (a Q-nwn-manager project, or its `unpacked/`: `<resref>.<ext>.json` + `.nss`) is read directly
+ * and never written: build and remove need `--out <dir>`, which receives the changed files in the same layout for the
+ * caller to apply; the result's `source` lists them. `--no-compile` writes the scripts without compiling them (the
+ * module build does that). See docs/quest-cli.md.
  */
 import fs from "fs/promises";
 import path from "path";
-import { loadModule, buildResmanOptions, requireIndex } from "../module-loader.js";
+import { loadModule, loadSourceDir, isSourceDir, buildResmanOptions, requireIndex } from "../module-loader.js";
+import { flatSyncReport } from "../util/project-sync.js";
+import { setCompileEnabled } from "../util/script-writer.js";
 import { isProjectDir, packProject } from "../util/project.js";
 import { buildQuestFromJson } from "../tools/quest-tools.js";
 import { removeQuest } from "../util/quest-builder.js";
@@ -24,30 +31,68 @@ function out(ok: boolean, payload: unknown): never {
   process.exit(ok ? 0 : 1);
 }
 
-function parse(argv: string[]): { cmd: string; arg?: string; project?: string; dryRun: boolean } {
-  const [cmd, ...rest] = argv;
-  let arg: string | undefined;
-  let project: string | undefined;
-  let dryRun = false;
-  for (let i = 0; i < rest.length; i++) {
-    if (rest[i] === "--project") project = rest[++i];
-    else if (rest[i] === "--dry-run") dryRun = true;
-    else if (arg === undefined) arg = rest[i];
-  }
-  return { cmd: cmd ?? "", arg, project, dryRun };
+interface Args {
+  cmd: string;
+  arg?: string;
+  project?: string;
+  out?: string;
+  dryRun: boolean;
+  compile: boolean;
 }
 
-async function loadTarget(target: string): Promise<void> {
+function parse(argv: string[]): Args {
+  const [cmd, ...rest] = argv;
+  const a: Args = { cmd: cmd ?? "", dryRun: false, compile: true };
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] === "--project") a.project = rest[++i];
+    else if (rest[i] === "--out") a.out = rest[++i];
+    else if (rest[i] === "--dry-run") a.dryRun = true;
+    else if (rest[i] === "--no-compile") a.compile = false;
+    else if (a.arg === undefined) a.arg = rest[i];
+  }
+  return a;
+}
+
+/** The flat source directory behind `dir`: its `unpacked/` (a Q-nwn-manager project) or `dir` itself; null if neither. */
+async function sourceDirOf(dir: string): Promise<string | null> {
+  for (const cand of [path.join(dir, "unpacked"), dir]) if (await isSourceDir(cand)) return cand;
+  return null;
+}
+
+/** Loads the target; returns true when it is a flat source directory (changes go to `out`, not into the target). */
+async function loadTarget(target: string, out: string | undefined, writes: boolean): Promise<boolean> {
   let p = path.resolve(target);
   if ((await fs.stat(p)).isDirectory()) {
-    if (!(await isProjectDir(p))) throw new Error(`${p} is a directory without project.json (not a module project)`);
+    if (!(await isProjectDir(p))) {
+      const source = await sourceDirOf(p);
+      if (!source) {
+        throw new Error(`${p} is neither a module project (project.json) nor module source (module.ifo.json, or unpacked/ with one)`);
+      }
+      if (writes && !out) {
+        throw new Error("a source directory is never written directly: pass --out <dir> to receive the changed files");
+      }
+      if (out) {
+        const outAbs = path.resolve(out);
+        if (outAbs === source || outAbs.startsWith(source + path.sep)) throw new Error("--out must be outside the source directory");
+        if ((await fs.readdir(outAbs).catch(() => [])).length > 0) throw new Error(`--out ${outAbs} is not empty`);
+      }
+      await loadSourceDir(source, { out: writes ? out : undefined });
+      return true;
+    }
     p = await packProject(p);
   }
   await loadModule(p);
+  return false;
+}
+
+/** For a source directory: where the changed files are and which they are. */
+function sourceReport(compile: boolean): Record<string, unknown> {
+  const r = flatSyncReport();
+  return r ? { source: { dir: requireIndex().modPath, out: r.out, files: r.files, removed: r.removed, compiled: compile } } : {};
 }
 
 async function main(): Promise<void> {
-  const { cmd, arg, project, dryRun } = parse(process.argv.slice(2));
+  const { cmd, arg, project, out: outDir, dryRun, compile } = parse(process.argv.slice(2));
   if (cmd === "schema") {
     const schemaPath = path.join(import.meta.dirname, "..", "..", "docs", "quest-spec.schema.json");
     out(true, JSON.parse(await fs.readFile(schemaPath, "utf8")));
@@ -62,18 +107,20 @@ async function main(): Promise<void> {
     }
   }
   if (!["build", "remove"].includes(cmd) || !arg || !project) {
-    out(false, "usage: quest build <spec.json> --project <dir|.mod> [--dry-run] | quest remove <tag> --project <dir|.mod> | quest normalize <spec.json> | quest schema");
+    out(false, "usage: quest build <spec.json> --project <dir|.mod> [--dry-run] [--out <dir>] [--no-compile] | quest remove <tag> --project <dir|.mod> [--out <dir>] | quest normalize <spec.json> | quest schema");
   }
-  await loadTarget(project as string);
+  const writes = cmd === "remove" || !dryRun;
+  const isSource = await loadTarget(project as string, outDir, writes);
+  if (!compile || (isSource && !writes)) setCompileEnabled(false);
   if (cmd === "build") {
     const res = await buildQuestFromJson(await fs.readFile(arg as string, "utf8"), dryRun);
     const text = res.content[0]?.text ?? "";
     if (res.isError) out(false, text);
-    out(true, JSON.parse(text));
+    out(true, { ...JSON.parse(text), ...(isSource && writes ? sourceReport(compile) : {}) });
   }
   const index = requireIndex();
   const removed = await removeQuest(index, await buildResmanOptions(index), (arg as string).toLowerCase());
-  out(true, { tag: arg, variablesRemoved: removed });
+  out(true, { tag: arg, variablesRemoved: removed, ...(isSource ? sourceReport(compile) : {}) });
 }
 
 main().catch((e) => out(false, (e as Error).message));
