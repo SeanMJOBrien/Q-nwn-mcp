@@ -1,0 +1,471 @@
+{
+  "$ref": "#/definitions/QuestInput",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "QuestInput": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "type": "string"
+        },
+        "autowire": {
+          "type": "boolean"
+        },
+        "captive": {
+          "type": "string"
+        },
+        "check": {
+          "$ref": "#/definitions/StageCheck"
+        },
+        "clues": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "journal": {
+                "type": "string"
+              },
+              "use": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "use"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "dest": {
+          "additionalProperties": false,
+          "properties": {
+            "area": {
+              "type": "string"
+            },
+            "radius": {
+              "type": "number"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "area"
+          ],
+          "type": "object"
+        },
+        "giver": {
+          "type": "string"
+        },
+        "item": {
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "journal": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "level": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "npc": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "number"
+        },
+        "reward": {
+          "$ref": "#/definitions/StageReward"
+        },
+        "spawn": {
+          "$ref": "#/definitions/StageSpawn",
+          "description": "Template shortcut: spawn this when the quest is accepted (e.g. the bounty target)."
+        },
+        "stages": {
+          "items": {
+            "$ref": "#/definitions/StageInput"
+          },
+          "type": "array"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "target": {
+          "description": "Template fields.",
+          "type": "string"
+        },
+        "template": {
+          "$ref": "#/definitions/TemplateName"
+        },
+        "thanks": {
+          "description": "Thank-you line for the end stage.",
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "StageCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "ability": {
+          "type": "string"
+        },
+        "assured": {
+          "description": "search: succeed anyway once a player's tries are spent, so a required clue can't block the quest (default true).",
+          "type": "boolean"
+        },
+        "dc": {
+          "description": "A number, or leave out and give `difficulty`.",
+          "type": "number"
+        },
+        "difficulty": {
+          "description": "easy (10), moderate (15), hard (20) or veryhard (25), instead of dc.",
+          "enum": [
+            "easy",
+            "moderate",
+            "hard",
+            "very hard",
+            "veryhard"
+          ],
+          "type": "string"
+        },
+        "else": {
+          "description": "What a failed check leads to: \"fight\" (the NPC turns hostile; a kill stage can still finish it), \"end\" (nothing).",
+          "enum": [
+            "fight",
+            "end"
+          ],
+          "type": "string"
+        },
+        "fail": {
+          "type": "string"
+        },
+        "pass": {
+          "type": "string"
+        },
+        "prompt": {
+          "description": "PC line offering the check.",
+          "type": "string"
+        },
+        "save": {
+          "type": "string"
+        },
+        "skill": {
+          "description": "One of skill, ability (str/dex/con/int/wis/cha) or save (fort/reflex/will); a search stage takes a skill only.",
+          "type": "string"
+        },
+        "tries": {
+          "description": "search: attempts per player (default 2).",
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "StageExamine": {
+      "additionalProperties": false,
+      "description": "search: a second check rolled on success by whoever in the party is best at it (e.g. Lore on a found letter's seal).",
+      "properties": {
+        "dc": {
+          "type": "number"
+        },
+        "fail": {
+          "type": "string"
+        },
+        "pass": {
+          "type": "string"
+        },
+        "skill": {
+          "type": "string"
+        },
+        "var": {
+          "description": "Module local string set to \"1\" on a pass (readable with q_chk var=).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "skill",
+        "dc"
+      ],
+      "type": "object"
+    },
+    "StageInput": {
+      "additionalProperties": false,
+      "description": "A stage as the model writes it (only `do` and `journal` are needed for most kinds).",
+      "properties": {
+        "accept": {
+          "type": "string"
+        },
+        "acceptReply": {
+          "type": "string"
+        },
+        "approach": {
+          "description": "Stage 1: the giver walks up to the first player it sees and starts its conversation; a string is a bark as it goes.",
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "area": {
+          "description": "Area for explore/trigger stages, for placing an unplaced kill target, and an escort's destination.",
+          "type": "string"
+        },
+        "arrive": {
+          "type": "string"
+        },
+        "check": {
+          "$ref": "#/definitions/StageCheck"
+        },
+        "companion": {
+          "description": "Talk stage: only offered while this companion (tag) is in the party.",
+          "type": "string"
+        },
+        "count": {
+          "type": "number"
+        },
+        "decline": {
+          "type": "string"
+        },
+        "declineReply": {
+          "type": "string"
+        },
+        "dismiss": {
+          "description": "Talk stage: this companion (tag) leaves the party when the stage advances and goes to the NPC.",
+          "type": "string"
+        },
+        "do": {
+          "$ref": "#/definitions/StageKind"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "const": "fail",
+              "type": "string"
+            }
+          ]
+        },
+        "examine": {
+          "$ref": "#/definitions/StageExamine"
+        },
+        "from": {
+          "type": "number"
+        },
+        "from_creature": {
+          "description": "Where a pickup item is: in this creature's inventory (it drops on death) or this placeable's.",
+          "type": "string"
+        },
+        "in": {
+          "type": "string"
+        },
+        "item": {
+          "description": "Item: picked up (pickup) or handed over (deliver), by resref; `itemName` creates a new quest item.",
+          "type": "string"
+        },
+        "itemName": {
+          "type": "string"
+        },
+        "join": {
+          "description": "The NPC running this talk stage joins the speaker's party as a henchman when it advances.",
+          "type": "boolean"
+        },
+        "journal": {
+          "type": "string"
+        },
+        "keep": {
+          "description": "deliver: the NPC looks at the item but the party keeps it.",
+          "type": "boolean"
+        },
+        "leave": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "string"
+        },
+        "n": {
+          "type": "number"
+        },
+        "none": {
+          "description": "search: text when the placeable is used before the quest reaches this stage.",
+          "type": "string"
+        },
+        "offer": {
+          "description": "Dialog lines (all optional; defaults are used).",
+          "type": "string"
+        },
+        "optional": {
+          "description": "search: an optional clue, not a numbered stage — no journal entry, doesn't move the quest on; available once the quest is at or past `from` (default 1); pays its `reward` to the party once.",
+          "type": "boolean"
+        },
+        "plea": {
+          "type": "string"
+        },
+        "radius": {
+          "type": "number"
+        },
+        "reminder": {
+          "type": "string"
+        },
+        "reply": {
+          "type": "string"
+        },
+        "reward": {
+          "$ref": "#/definitions/StageReward"
+        },
+        "script": {
+          "description": "Script run on the advancing object (the NPC) when the stage advances (questK_self_script).",
+          "type": "string"
+        },
+        "spawn": {
+          "$ref": "#/definitions/StageSpawn",
+          "description": "Creature(s) that appear when this stage's line advances the quest."
+        },
+        "target": {
+          "description": "Kill target, captive, escorted NPC, or placeable to use (tag or blueprint resref).",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "to": {
+          "description": "NPC who runs a talk/deliver stage (tag or blueprint resref); default the giver.",
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "StageKind": {
+      "enum": [
+        "talk",
+        "return",
+        "kill",
+        "pickup",
+        "explore",
+        "trigger",
+        "use",
+        "search",
+        "deliver",
+        "rescue",
+        "escort",
+        "custom"
+      ],
+      "type": "string"
+    },
+    "StageReward": {
+      "additionalProperties": false,
+      "properties": {
+        "gold": {
+          "type": "number"
+        },
+        "item": {
+          "type": "string"
+        },
+        "xp": {
+          "description": "Flat XP per player (exact; used by /adventure-rewards), in addition to or instead of a tier.",
+          "type": "number"
+        },
+        "xp_level": {
+          "type": "number"
+        },
+        "xp_tier": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "StageSpawn": {
+      "additionalProperties": false,
+      "description": "A creature that appears when this stage advances the quest (stage 1 = when the quest is accepted): a bounty target in an area the party has already explored, an ambush, guards, the next part of a multi-part encounter. On a dialog stage it rides on the q_act line; on a kill/pickup/explore/trigger/use/search stage it is written as the slot's questK_spawn locals. A kill stage whose target is this resref or tag needs no placed copy.",
+      "properties": {
+        "area": {
+          "description": "Otherwise: an area (and optionally x,y) where the builder places a waypoint itself, on walkable ground.",
+          "type": "string"
+        },
+        "at": {
+          "description": "Tag of an existing waypoint to appear at.",
+          "type": "string"
+        },
+        "count": {
+          "description": "How many (default 1).",
+          "type": "number"
+        },
+        "flag": {
+          "additionalProperties": false,
+          "description": "The outcome of an earlier part changes this one: a module variable (set by a dialog line's `set_var`, e.g. \"alarm\" raised when the lookout got away) picks the count. `ifSet` is the count when the variable is set (non-empty, not \"0\"); `ifUnset` when it is not. A count of 0 skips the spawn (the patrol never arrives). Counts are 0-8.",
+          "properties": {
+            "ifSet": {
+              "type": "number"
+            },
+            "ifUnset": {
+              "type": "number"
+            },
+            "var": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "var"
+          ],
+          "type": "object"
+        },
+        "hostile": {
+          "description": "Hostile faction (default true).",
+          "type": "boolean"
+        },
+        "resref": {
+          "description": "Creature blueprint resref.",
+          "type": "string"
+        },
+        "tag": {
+          "description": "Instance tag (default: the blueprint's own). Lets several quests reuse one blueprint.",
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "resref"
+      ],
+      "type": "object"
+    },
+    "TemplateName": {
+      "enum": [
+        "fetch",
+        "kill",
+        "deliver",
+        "rescue",
+        "escort",
+        "investigate",
+        "bounty",
+        "persuade-or-fight"
+      ],
+      "type": "string"
+    }
+  }
+}

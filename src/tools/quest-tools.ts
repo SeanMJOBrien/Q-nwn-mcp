@@ -52,6 +52,64 @@ function tagExists(index: ModuleIndex, tag: string): boolean {
   return index.resources.has(`${t}.uti`);
 }
 
+/** The whole build_quest operation on the loaded module; shared by the MCP tool and the quest CLI (src/cli/quest.ts). */
+export async function buildQuestFromJson(spec: string, dryRun?: boolean): Promise<{
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+}> {
+    const index = requireIndex();
+    let input: QuestInput;
+    try {
+      input = JSON.parse(spec) as QuestInput;
+    } catch (e) {
+      return { content: [{ type: "text", text: `spec is not valid JSON: ${(e as Error).message}` }], isError: true };
+    }
+    try {
+      const normalized = normalizeQuestSpec(input, (tag) => tagExists(index, tag));
+      let systemWritten = false;
+      if (!index.resources.has(`${QUEST_INCLUDE}.nss`) && !dryRun) {
+        const sys = await writeQuestSystem(index);
+        if (!sys.compiled)
+          return {
+            content: [
+              { type: "text", text: JSON.stringify({ error: "quest runtime failed to compile", ...sys }, null, 2) },
+            ],
+            isError: true,
+          };
+        systemWritten = true;
+      }
+      const resman = await buildResmanOptions(index);
+      const builder = new QuestBuilder(index, resman, normalized, dryRun === true);
+      if (dryRun && !index.resources.has(`${QUEST_INCLUDE}.nss`)) {
+        // A dry run doesn't write the runtime; let the plan run anyway.
+        index.resources.set(`${QUEST_INCLUDE}.nss`, {
+          resref: QUEST_INCLUDE,
+          extension: "nss",
+          filePath: "",
+          sizeBytes: 0,
+        });
+        try {
+          const report = await builder.build();
+          report.notes.push("the quest runtime will be written on the real build");
+          return { content: [{ type: "text", text: JSON.stringify({ success: true, ...report }, null, 2) }] };
+        } finally {
+          await afterRemove(path.join(index.tempDir, `${QUEST_INCLUDE}.nss`));
+          index.resources.delete(`${QUEST_INCLUDE}.nss`);
+        }
+      }
+      const report = await builder.build();
+      if (systemWritten) report.notes.push("quest runtime written (create_quest_system)");
+      // Later phases (rewards, polish) rebuild from this exact spec.
+      report.adventureMd += `\n- **Spec:** \`${JSON.stringify(input)}\``;
+      return { content: [{ type: "text", text: JSON.stringify({ success: true, ...report }, null, 2) }] };
+    } catch (e) {
+      if (e instanceof QuestSpecError || e instanceof QuestBuildError) {
+        return { content: [{ type: "text", text: e.message }], isError: true };
+      }
+      throw e;
+    }
+}
+
 export function registerQuestTools(server: McpServer): void {
   server.tool(
     "create_quest_system",
@@ -96,59 +154,7 @@ export function registerQuestTools(server: McpServer): void {
       dryRun: z.boolean().optional().describe("Plan only, change nothing (default false). Do this first."),
     },
     { destructiveHint: true },
-    async ({ spec, dryRun }) => {
-      const index = requireIndex();
-      let input: QuestInput;
-      try {
-        input = JSON.parse(spec) as QuestInput;
-      } catch (e) {
-        return { content: [{ type: "text", text: `spec is not valid JSON: ${(e as Error).message}` }], isError: true };
-      }
-      try {
-        const normalized = normalizeQuestSpec(input, (tag) => tagExists(index, tag));
-        let systemWritten = false;
-        if (!index.resources.has(`${QUEST_INCLUDE}.nss`) && !dryRun) {
-          const sys = await writeQuestSystem(index);
-          if (!sys.compiled)
-            return {
-              content: [
-                { type: "text", text: JSON.stringify({ error: "quest runtime failed to compile", ...sys }, null, 2) },
-              ],
-              isError: true,
-            };
-          systemWritten = true;
-        }
-        const resman = await buildResmanOptions(index);
-        const builder = new QuestBuilder(index, resman, normalized, dryRun === true);
-        if (dryRun && !index.resources.has(`${QUEST_INCLUDE}.nss`)) {
-          // A dry run doesn't write the runtime; let the plan run anyway.
-          index.resources.set(`${QUEST_INCLUDE}.nss`, {
-            resref: QUEST_INCLUDE,
-            extension: "nss",
-            filePath: "",
-            sizeBytes: 0,
-          });
-          try {
-            const report = await builder.build();
-            report.notes.push("the quest runtime will be written on the real build");
-            return { content: [{ type: "text", text: JSON.stringify({ success: true, ...report }, null, 2) }] };
-          } finally {
-            await afterRemove(path.join(index.tempDir, `${QUEST_INCLUDE}.nss`));
-            index.resources.delete(`${QUEST_INCLUDE}.nss`);
-          }
-        }
-        const report = await builder.build();
-        if (systemWritten) report.notes.push("quest runtime written (create_quest_system)");
-        // Later phases (rewards, polish) rebuild from this exact spec.
-        report.adventureMd += `\n- **Spec:** \`${JSON.stringify(input)}\``;
-        return { content: [{ type: "text", text: JSON.stringify({ success: true, ...report }, null, 2) }] };
-      } catch (e) {
-        if (e instanceof QuestSpecError || e instanceof QuestBuildError) {
-          return { content: [{ type: "text", text: e.message }], isError: true };
-        }
-        throw e;
-      }
-    },
+    async ({ spec, dryRun }) => buildQuestFromJson(spec, dryRun),
   );
 
   server.tool(

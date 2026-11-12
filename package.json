@@ -13,7 +13,8 @@
     "format": "biome format --write src/",
     "check": "biome check src/",
     "verify": "./scripts/verify.sh",
-    "hooks:install": "./scripts/install-hooks.sh"
+    "hooks:install": "./scripts/install-hooks.sh",
+    "quest:schema": "ts-json-schema-generator --path src/util/quest-spec.ts --type QuestInput --tsconfig tsconfig.json --no-type-check -o docs/quest-spec.schema.json"
   },
   "keywords": [
     "nwn",
@@ -33,6 +34,7 @@
     "@biomejs/biome": "^2.4.9",
     "@types/node": "^25.5.0",
     "@types/sql.js": "^1.4.11",
+    "ts-json-schema-generator": "^2.4.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
     "vitest": "^3.1.0"
