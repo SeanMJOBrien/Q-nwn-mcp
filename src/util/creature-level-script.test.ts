@@ -252,4 +252,29 @@ describe("wizard school", () => {
     expect(generateCreatureLevelInclude({ scalePercent: 3 })).toContain("const float CL_SCALE_RANGE = 0.03;");
     expect(generateCreatureLevelInclude({ scalePercent: 90 })).toContain("const float CL_SCALE_RANGE = 0.25;");
   });
+  it("buys a helmet only when it has a magical property besides +1 Concentration, and keeps armor already worn", () => {
+    const src = generateCreatureLevelInclude();
+    // the helmet test: skill bonus + concentration + cost value 1 is the plain helmet; any other property counts as magical
+    const fn = src.slice(src.indexOf("int CL_HelmetIsMagical"), src.indexOf("// ---- stores ----"));
+    expect(fn).toContain("ITEM_PROPERTY_SKILL_BONUS");
+    expect(fn).toContain("SKILL_CONCENTRATION");
+    expect(fn).toContain("GetItemPropertyCostTableValue(ipProperty) == 1");
+    expect(fn).toContain("return FALSE;");
+    // applied to the head slot only, inside the shopping filter
+    expect(src).toContain("(nSlot != INVENTORY_SLOT_HEAD || CL_HelmetIsMagical(oItem))");
+    // armor with a base AC that the creature already wears is not shopped over (cloth still is)
+    const gear = src.slice(src.indexOf("void CL_Gear(object oCreature)"));
+    expect(gear).toContain("CL_ArmorBaseAC(oWorn) <= 0");
+    expect(gear.indexOf("CL_ArmorBaseAC(oWorn) <= 0")).toBeLessThan(gear.indexOf("INVENTORY_SLOT_CHEST, 0, CL_GearLeft"));
+  });
+
+  it("makes the original destroyable before the rebuild destroys it (a henchman original otherwise survives as a spell-less duplicate)", () => {
+    const src = generateCreatureLevelInclude();
+    const fn = src.slice(src.indexOf("void CL_DestroyOriginal"), src.indexOf("void CL_EnsureGone"));
+    expect(fn).toContain("SetIsDestroyable(TRUE, TRUE, FALSE, oOld);");
+    expect(fn.indexOf("SetIsDestroyable")).toBeLessThan(fn.indexOf("DestroyObject(oOld)"));
+    const finish = src.slice(src.indexOf("void CL_Finish(object oCreature)"));
+    expect(finish).toContain("CL_DestroyOriginal(oCreature);");
+    expect(finish).not.toMatch(/\n    DestroyObject\(oCreature\);/);
+  });
 });

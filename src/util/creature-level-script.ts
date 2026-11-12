@@ -222,6 +222,22 @@ int CL_FitsSlot(object oItem, int nSlot)
     return (nMask & (1 << nSlot)) != 0;
 }
 
+// A helmet is only worth buying when it carries a magical property besides the +1 Concentration
+// that plain helmets in the stores have (a helmet with no property at all is plain too).
+int CL_HelmetIsMagical(object oItem)
+{
+    itemproperty ipProperty = GetFirstItemProperty(oItem);
+    while (GetIsItemPropertyValid(ipProperty))
+    {
+        int bPlainConcentration = GetItemPropertyType(ipProperty) == ITEM_PROPERTY_SKILL_BONUS
+            && GetItemPropertySubType(ipProperty) == SKILL_CONCENTRATION
+            && GetItemPropertyCostTableValue(ipProperty) == 1;
+        if (!bPlainConcentration) return TRUE;
+        ipProperty = GetNextItemProperty(oItem);
+    }
+    return FALSE;
+}
+
 // ---- stores ----
 
 object CL_Store(string sName, location lWhere)
@@ -276,6 +292,7 @@ object CL_Pick(object oCreature, int nSlot, int nKind, int nBudget, int nAmmoBas
                 else bKind = nBase != BASE_ITEM_ARMOR && !bShield;
             }
             if (bKind && CL_FitsSlot(oItem, nSlot) && (nKind != 4 || !CL_FitsSlot(oItem, INVENTORY_SLOT_RIGHTHAND))
+                && (nSlot != INVENTORY_SLOT_HEAD || CL_HelmetIsMagical(oItem))
                 && CL_CanUse(oCreature, oItem))
             {
                 int nScore = 0;
@@ -435,7 +452,10 @@ void CL_Gear(object oCreature)
     SetLocalInt(oCreature, "MCP_GEAR_TOTAL",
         FloatToInt(IntToFloat(CL_Wealth(nLevel)) * CL_RoleShare(GetLocalString(oCreature, "MCP_GEAR_ROLE")) * fWealth));
     SetLocalInt(oCreature, "MCP_GEAR_SPENT", 0);
-    CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, INVENTORY_SLOT_CHEST, 0, CL_GearLeft(oCreature, 20), 0), INVENTORY_SLOT_CHEST, 0));
+    // Armor the creature already wears (anything with a base AC) is kept: only clothing is shopped over.
+    object oWorn = GetItemInSlot(INVENTORY_SLOT_CHEST, oCreature);
+    if (!GetIsObjectValid(oWorn) || CL_ArmorBaseAC(oWorn) <= 0)
+        CL_GearSpend(oCreature, CL_Buy(oCreature, CL_Pick(oCreature, INVENTORY_SLOT_CHEST, 0, CL_GearLeft(oCreature, 20), 0), INVENTORY_SLOT_CHEST, 0));
     DelayCommand(0.1, CL_GearWeapon(oCreature));
 }
 
@@ -788,6 +808,21 @@ void CL_Verify(object oCreature)
 
 // ---- finish: write spell abilities with a state-keeping rebuild ----
 
+// The rebuild must leave exactly one creature. A creature set non-destroyable (the stock henchman scripts do this) ignores
+// DestroyObject, so its original would stay beside the rebuilt copy: make it destroyable first, and check once afterwards.
+void CL_DestroyOriginal(object oOld)
+{
+    SetIsDestroyable(TRUE, TRUE, FALSE, oOld);
+    DestroyObject(oOld);
+}
+
+void CL_EnsureGone(object oOld, object oNew)
+{
+    if (!GetIsObjectValid(oOld) || oOld == oNew) return;
+    CL_Log(GetTag(oOld) + " original survived the rebuild; destroying it again");
+    CL_DestroyOriginal(oOld);
+}
+
 void CL_Finish(object oCreature)
 {
     if (!GetIsObjectValid(oCreature)) return;
@@ -813,7 +848,8 @@ void CL_Finish(object oCreature)
         CL_Verify(oCreature);
         return;
     }
-    DestroyObject(oCreature);
+    CL_DestroyOriginal(oCreature);
+    DelayCommand(1.0, CL_EnsureGone(oCreature, oNew));
     if (GetIsObjectValid(oMaster) && GetMaster(oNew) != oMaster) DelayCommand(0.5, AddHenchman(oMaster, oNew));
 }
 
