@@ -49,6 +49,13 @@ describe.skipIf(!NIM_FOLDER_NWTOOLS || !hasCli)("quest CLI on a flat source dire
     "bundle",
   ])("plans without writing, builds into --out, and refuses to write without it (%s)", async (which) => {
     CLI = which === "bundle" ? await bundledCli() : DIST_CLI;
+    // dist and bundle must agree on the contract: same quest-spec schema hash (the manager compares them)
+    const ver = await cli(["version"]);
+    expect(ver.result?.schemaHash).toMatch(/^[0-9a-f]{12}$/);
+    expect(ver.result?.bundled).toBe(which === "bundle");
+    expect(ver.result?.schemaHash).toBe(
+      ((await run("node", [DIST_CLI, "version"])).stdout.match(/"schemaHash": "([0-9a-f]+)"/) ?? [])[1],
+    );
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "nwn-mcp-src-"));
     try {
       const src = path.join(dir, "proj", "unpacked");

@@ -50,7 +50,7 @@ reading files, and can do it on any machine the manager runs on.
 | U4 | Plan errors point at the field | mcp + manager | open | |
 | U5 | See and adopt quests made elsewhere | manager (+ mcp) | open | listed, not editable |
 | P1 | One-file builder shipped with the manager | mcp + manager | done | 2026-11-12: `npm run quest:bundle`; manager vendors `nwn-tools/quest-cli.mjs` and looks for it before the sibling checkout; live test runs dist and bundle; browser suite 15/15 on the bundle |
-| P2 | Builder and form versions checked against each other | mcp + manager | open | after P1 |
+| P2 | Builder and form versions checked against each other | mcp + manager | done | 2026-11-12: CLI `version` (package version + schema hash); manager notes a builder whose schema differs from the checkout beside it (`version_note`); the form itself is drawn from the builder's own `schema`, so it cannot disagree with it |
 | P3 | `load_module` on a manager project | mcp | open | lets an LLM session work on the same project |
 | S1 | One form for both front ends | mcp + manager + studio | open | D3 = A; copy step after D1 |
 | S2 | Studio builds into manager projects | studio | open | |

@@ -5,6 +5,7 @@
  *   node dist/cli/quest.js build  <spec.json> --project <project dir | .mod> [--dry-run]
  *   node dist/cli/quest.js remove <quest tag>  --project <project dir | .mod>
  *   node dist/cli/quest.js verify <quest tag> --project <project dir | .mod | source dir>   (read-only: can it be completed?)
+ *   node dist/cli/quest.js version   (package version + hash of the schema: tells a stale bundle from a current one)
  *   node dist/cli/quest.js schema            (JSON Schema of the spec, for forms and validation)
  *   node dist/cli/quest.js normalize <spec.json>   (templates expanded, stages numbered, rewards sized; no module needed)
  *
@@ -17,6 +18,7 @@
  * caller to apply; the result's `source` lists them. `--no-compile` writes the scripts without compiling them (the
  * module build does that). See docs/quest-cli.md.
  */
+import { createHash } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { loadModule, loadSourceDir, isSourceDir, buildResmanOptions, requireIndex } from "../module-loader.js";
@@ -34,6 +36,7 @@ import { normalizeQuestSpec, QuestSpecError, type QuestInput } from "../util/que
 
 /** Set by scripts/bundle-quest-cli.mjs (esbuild define) so the one-file bundle carries the schema; absent in dist/. */
 declare const __QUEST_SCHEMA__: unknown;
+declare const __QUEST_VERSION__: string;
 
 function out(ok: boolean, payload: unknown): never {
   process.stdout.write(`${JSON.stringify(ok ? { ok, result: payload } : { ok, error: payload }, null, 2)}\n`);
@@ -75,14 +78,17 @@ async function loadTarget(target: string, out: string | undefined, writes: boole
     if (!(await isProjectDir(p))) {
       const source = await sourceDirOf(p);
       if (!source) {
-        throw new Error(`${p} is neither a module project (project.json) nor module source (module.ifo.json, or unpacked/ with one)`);
+        throw new Error(
+          `${p} is neither a module project (project.json) nor module source (module.ifo.json, or unpacked/ with one)`,
+        );
       }
       if (writes && !out) {
         throw new Error("a source directory is never written directly: pass --out <dir> to receive the changed files");
       }
       if (out) {
         const outAbs = path.resolve(out);
-        if (outAbs === source || outAbs.startsWith(source + path.sep)) throw new Error("--out must be outside the source directory");
+        if (outAbs === source || outAbs.startsWith(source + path.sep))
+          throw new Error("--out must be outside the source directory");
         if ((await fs.readdir(outAbs).catch(() => [])).length > 0) throw new Error(`--out ${outAbs} is not empty`);
       }
       await loadSourceDir(source, { out: writes ? out : undefined });
@@ -97,7 +103,9 @@ async function loadTarget(target: string, out: string | undefined, writes: boole
 /** For a source directory: where the changed files are and which they are. */
 function sourceReport(compile: boolean): Record<string, unknown> {
   const r = flatSyncReport();
-  return r ? { source: { dir: requireIndex().modPath, out: r.out, files: r.files, removed: r.removed, compiled: compile } } : {};
+  return r
+    ? { source: { dir: requireIndex().modPath, out: r.out, files: r.files, removed: r.removed, compiled: compile } }
+    : {};
 }
 
 interface Finding {
@@ -122,10 +130,15 @@ async function verifyQuest(tag: string): Promise<Record<string, unknown>> {
     const quest = (comp.quests as Array<Record<string, unknown>> | undefined)?.find(
       (q) => String(q.tag).toLowerCase() === tag.toLowerCase(),
     );
-    if (!quest) throw new Error(`no journal quest with tag ${tag} in this module (${String(comp.error ?? comp.message ?? "build it first")})`);
+    if (!quest)
+      throw new Error(
+        `no journal quest with tag ${tag} in this module (${String(comp.error ?? comp.message ?? "build it first")})`,
+      );
     const journal = await call("verify_journal");
     const mine = (list: unknown): Finding[] =>
-      ((list as Finding[] | undefined) ?? []).filter((f) => (f.message ?? "").toLowerCase().includes(tag.toLowerCase()));
+      ((list as Finding[] | undefined) ?? []).filter((f) =>
+        (f.message ?? "").toLowerCase().includes(tag.toLowerCase()),
+      );
     return {
       tag: quest.tag,
       name: quest.name,
@@ -143,6 +156,28 @@ async function verifyQuest(tag: string): Promise<Record<string, unknown>> {
 
 async function main(): Promise<void> {
   const { cmd, arg, project, out: outDir, dryRun, compile } = parse(process.argv.slice(2));
+  if (cmd === "version") {
+    const schema =
+      typeof __QUEST_SCHEMA__ !== "undefined"
+        ? __QUEST_SCHEMA__
+        : JSON.parse(
+            await fs.readFile(path.join(import.meta.dirname, "..", "..", "docs", "quest-spec.schema.json"), "utf8"),
+          );
+    const version =
+      typeof __QUEST_VERSION__ !== "undefined"
+        ? __QUEST_VERSION__
+        : (
+            JSON.parse(await fs.readFile(path.join(import.meta.dirname, "..", "..", "package.json"), "utf8")) as {
+              version: string;
+            }
+          ).version;
+    // the schema is part of the contract between a builder and a form drawn from it
+    out(true, {
+      version,
+      schemaHash: createHash("sha256").update(JSON.stringify(schema)).digest("hex").slice(0, 12),
+      bundled: typeof __QUEST_SCHEMA__ !== "undefined",
+    });
+  }
   if (cmd === "schema") {
     if (typeof __QUEST_SCHEMA__ !== "undefined") out(true, __QUEST_SCHEMA__);
     const schemaPath = path.join(import.meta.dirname, "..", "..", "docs", "quest-spec.schema.json");
@@ -164,7 +199,10 @@ async function main(): Promise<void> {
     out(true, await verifyQuest(arg as string));
   }
   if (!["build", "remove"].includes(cmd) || !arg || !project) {
-    out(false, "usage: quest build <spec.json> --project <dir|.mod> [--dry-run] [--out <dir>] [--no-compile] | quest remove <tag> --project <dir|.mod> [--out <dir>] | quest verify <tag> --project <dir|.mod> | quest normalize <spec.json> | quest schema");
+    out(
+      false,
+      "usage: quest build <spec.json> --project <dir|.mod> [--dry-run] [--out <dir>] [--no-compile] | quest remove <tag> --project <dir|.mod> [--out <dir>] | quest verify <tag> --project <dir|.mod> | quest version | quest normalize <spec.json> | quest schema",
+    );
   }
   const writes = cmd === "remove" || !dryRun;
   const isSource = await loadTarget(project as string, outDir, writes);
