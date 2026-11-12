@@ -40,7 +40,7 @@ reading files, and can do it on any machine the manager runs on.
 | L3 | Linux binary runs on older glibc | manager | open | fails here: needs GLIBC 2.38 |
 | T1 | Play a manager-built quest in the engine | mcp + manager | open | no quest from the form has been played |
 | T2 | Completability check after a build (`quest verify` in the CLI) | mcp, then manager | open | |
-| T3 | Rebuild of an unchanged quest writes nothing | mcp | open | `dq_<npc>.dlg` was rewritten on an identical rebuild |
+| T3 | Rebuild of an unchanged quest writes nothing | mcp | done | 2026-11-12: shared `[Leave]` reply is created first, saved `MCP_Q_ORIG_*` var kept last; test compares the whole index before and after |
 | T4 | Remove leaves the module as it was | mcp | open | needs decision D2 |
 | T5 | Undo a whole quest in one step | manager | open | today: one History entry per file, new files stay |
 | T6 | Windows, macOS, reverse proxy, wiki shell | manager | open | only Linux, no prefix, console theme were run |

@@ -431,6 +431,12 @@ export class QuestBuilder {
         if (orig) mergeVarTable(c.obj, [{ name: origVar, type: "string", value: orig }]);
         setField(c.obj, scriptField, "resref", script);
       }
+      // Keep the saved original handler last, as on a first build, so an identical rebuild writes the same table.
+      const saved = getVarTableEntries(c.obj).find((e) => e.name === origVar);
+      if (saved) {
+        removeVarTableEntry(c.obj, origVar);
+        mergeVarTable(c.obj, [saved]);
+      }
       this.touch(c);
     }
   }
@@ -576,6 +582,10 @@ export class QuestBuilder {
         this.touch(c);
       }
     }
+    // The shared [Leave] reply outlives a quest's strip, so it sits before the quest's own replies on a rebuild;
+    // creating it first on the first build gives both builds the same node order (an identical rebuild writes nothing).
+    const dlgReplies = getFieldList(dlg, "ReplyList");
+    if (!dlgReplies.some((r) => getFieldStr(r, "Comment") === HUB_LEAVE)) this.reply({ dlg }, "[Leave]", HUB_LEAVE);
     const d = {
       dlg,
       resref,

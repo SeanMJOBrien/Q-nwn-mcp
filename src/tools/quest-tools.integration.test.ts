@@ -189,8 +189,25 @@ describe("build_quest", () => {
 
       // Rebuild: same slots, no duplicated nodes.
       const nodes = getFieldList(dlg, "EntryList").length;
-      json(await c.callTool({ name: "build_quest", arguments: { spec: SPEC } }));
+      const snapshot = JSON.stringify([...mockIndex.parsedGff.entries()].sort(([a], [b]) => a.localeCompare(b)));
+      const again = json(await c.callTool({ name: "build_quest", arguments: { spec: SPEC } }));
       const dlg2 = mockIndex.parsedGff.get(`${dlgRes}.dlg`) as unknown as GffObj;
+      const snapshot2 = JSON.stringify([...mockIndex.parsedGff.entries()].sort(([a], [b]) => a.localeCompare(b)));
+      if (snapshot !== snapshot2) {
+        const a = JSON.parse(snapshot) as Array<[string, unknown]>;
+        const b = JSON.parse(snapshot2) as Array<[string, unknown]>;
+        const diff = b.filter(([k, d], i) => JSON.stringify(d) !== JSON.stringify(a[i]?.[1])).map(([k]) => k);
+        const walk = (x: unknown, y: unknown, path: string, out: string[]) => {
+          if (JSON.stringify(x) === JSON.stringify(y)) return;
+          if (x && y && typeof x === "object" && typeof y === "object") {
+            for (const k of new Set([...Object.keys(x), ...Object.keys(y)]))
+              walk((x as Record<string, unknown>)[k], (y as Record<string, unknown>)[k], `${path}.${k}`, out);
+          } else out.push(`${path}: ${JSON.stringify(x)} -> ${JSON.stringify(y)}`);
+        };
+        const out: string[] = [];
+        for (const [k, d] of b) walk(a.find(([kk]) => kk === k)?.[1], d, k, out);
+        throw new Error(`identical rebuild changed (${diff.join(", ")}): ${out.slice(0, 12).join(" | ")} ${JSON.stringify(again).length}`);
+      }
       expect(getFieldList(dlg2, "EntryList").length).toBe(nodes);
       expect(vars(getFieldList(git, "Creature List")[1]).quest1).toBe("2_q_wolves_at_the_fold");
 
