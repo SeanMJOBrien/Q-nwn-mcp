@@ -45,7 +45,7 @@ reading files, and can do it on any machine the manager runs on.
 | T5 | Undo a whole quest in one step | manager | open | today: one History entry per file, new files stay |
 | T6 | Windows, macOS, reverse proxy, wiki shell | manager | open | only Linux, no prefix, console theme were run |
 | U1 | Base-game creatures and items in the pick lists | mcp + manager | done | `quest contents` lists base-game blueprints by resref (no display names); manager loads it after the form |
-| U2 | Pick a position on the area map | manager | open | x / y are typed today |
+| U2 | Pick a position on the area map | manager | done | click fills x and y from the area drawn to scale with its placed objects; no walkability check yet (needs a probe_ground CLI command) |
 | U3 | Parcel, reward and check as plain fields | manager | done | parcel on stage 1, XP and gold on the last stage, skill/ability/save/difficulty drop-downs (schema enums) |
 | U4 | Plan errors point at the field | mcp + manager | done | `QuestSpecError.stage/field`; CLI `build`/`normalize` return them; form outlines the box; builder-side (not spec) errors still unmarked |
 | U5 | See and adopt quests made elsewhere | manager (+ mcp) | open | listed, not editable |
