@@ -46,8 +46,8 @@ reading files, and can do it on any machine the manager runs on.
 | T6 | Windows, macOS, reverse proxy, wiki shell | manager | open | only Linux, no prefix, console theme were run |
 | U1 | Base-game creatures and items in the pick lists | mcp + manager | open | |
 | U2 | Pick a position on the area map | manager | open | x / y are typed today |
-| U3 | Parcel, reward and check as plain fields | manager | open | Deliver needs the item typed inside "Reward" |
-| U4 | Plan errors point at the field | mcp + manager | open | |
+| U3 | Parcel, reward and check as plain fields | manager | done | parcel on stage 1, XP and gold on the last stage, skill/ability/save/difficulty drop-downs (schema enums) |
+| U4 | Plan errors point at the field | mcp + manager | done | `QuestSpecError.stage/field`; CLI `build`/`normalize` return them; form outlines the box; builder-side (not spec) errors still unmarked |
 | U5 | See and adopt quests made elsewhere | manager (+ mcp) | open | listed, not editable |
 | P1 | One-file builder shipped with the manager | mcp + manager | done | 2026-11-12: `npm run quest:bundle`; manager vendors `nwn-tools/quest-cli.mjs` and looks for it before the sibling checkout; live test runs dist and bundle; browser suite 15/15 on the bundle |
 | P2 | Builder and form versions checked against each other | mcp + manager | done | 2026-11-12: CLI `version` (package version + schema hash); manager notes a builder whose schema differs from the checkout beside it (`version_note`); the form itself is drawn from the builder's own `schema`, so it cannot disagree with it |

@@ -2,6 +2,38 @@
   "$ref": "#/definitions/QuestInput",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "CheckSkill": {
+      "description": "The skill names a check accepts (QuestSkillId in the runtime also takes a skill number).",
+      "enum": [
+        "persuade",
+        "bluff",
+        "intimidate",
+        "lore",
+        "search",
+        "spot",
+        "listen",
+        "heal",
+        "spellcraft",
+        "open_lock",
+        "disable_trap",
+        "pick_pocket",
+        "appraise",
+        "animal_empathy",
+        "perform",
+        "taunt",
+        "concentration",
+        "discipline",
+        "hide",
+        "move_silently",
+        "set_trap",
+        "tumble",
+        "use_magic_device",
+        "parry",
+        "craft_trap",
+        "ride"
+      ],
+      "type": "string"
+    },
     "QuestInput": {
       "additionalProperties": false,
       "properties": {
@@ -123,6 +155,14 @@
       "additionalProperties": false,
       "properties": {
         "ability": {
+          "enum": [
+            "str",
+            "dex",
+            "con",
+            "int",
+            "wis",
+            "cha"
+          ],
           "type": "string"
         },
         "assured": {
@@ -163,11 +203,16 @@
           "type": "string"
         },
         "save": {
+          "enum": [
+            "fort",
+            "reflex",
+            "will"
+          ],
           "type": "string"
         },
         "skill": {
-          "description": "One of skill, ability (str/dex/con/int/wis/cha) or save (fort/reflex/will); a search stage takes a skill only.",
-          "type": "string"
+          "$ref": "#/definitions/CheckSkill",
+          "description": "One of skill, ability (str/dex/con/int/wis/cha) or save (fort/reflex/will); a search stage takes a skill only."
         },
         "tries": {
           "description": "search: attempts per player (default 2).",

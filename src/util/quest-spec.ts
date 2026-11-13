@@ -32,11 +32,18 @@ export const TEMPLATES = [
 ] as const;
 export type TemplateName = (typeof TEMPLATES)[number];
 
+/** The skill names a check accepts (QuestSkillId in the runtime also takes a skill number). */
+export type CheckSkill =
+  | "persuade" | "bluff" | "intimidate" | "lore" | "search" | "spot" | "listen" | "heal" | "spellcraft"
+  | "open_lock" | "disable_trap" | "pick_pocket" | "appraise" | "animal_empathy" | "perform" | "taunt"
+  | "concentration" | "discipline" | "hide" | "move_silently" | "set_trap" | "tumble" | "use_magic_device"
+  | "parry" | "craft_trap" | "ride";
+
 export interface StageCheck {
   /** One of skill, ability (str/dex/con/int/wis/cha) or save (fort/reflex/will); a search stage takes a skill only. */
-  skill?: string;
-  ability?: string;
-  save?: string;
+  skill?: CheckSkill;
+  ability?: "str" | "dex" | "con" | "int" | "wis" | "cha";
+  save?: "fort" | "reflex" | "will";
   /** A number, or leave out and give `difficulty`. */
   dc?: number;
   /** easy (10), moderate (15), hard (20) or veryhard (25), instead of dc. */
@@ -212,7 +219,16 @@ export interface QuestSpec {
   notes: string[];
 }
 
-export class QuestSpecError extends Error {}
+/** A spec problem; `stage` (its number) and `field` say where, so a form can mark the box. */
+export class QuestSpecError extends Error {
+  constructor(
+    message: string,
+    public readonly stage?: number,
+    public readonly field?: string,
+  ) {
+    super(message);
+  }
+}
 
 /** q_<slug of name>, at most 27 characters (TFN's limit, safe for every journal and variable use). */
 export function tagFromName(name: string, prefix = "q_"): string {
@@ -232,9 +248,9 @@ export function checkDc(c: StageCheck): number {
 
 function validateCheck(c: StageCheck, n: number, skillOnly: boolean): void {
   const kinds = [c.skill, c.ability, c.save].filter(Boolean).length;
-  if (kinds !== 1) throw new QuestSpecError(`stage ${n}: a check needs exactly one of skill, ability or save`);
-  if (skillOnly && !c.skill) throw new QuestSpecError(`stage ${n}: a search check is a skill check`);
-  if (c.dc === undefined && !c.difficulty) throw new QuestSpecError(`stage ${n}: a check needs dc or difficulty`);
+  if (kinds !== 1) throw new QuestSpecError(`stage ${n}: a check needs exactly one of skill, ability or save`, n, "check");
+  if (skillOnly && !c.skill) throw new QuestSpecError(`stage ${n}: a search check is a skill check`, n, "check");
+  if (c.dc === undefined && !c.difficulty) throw new QuestSpecError(`stage ${n}: a check needs dc or difficulty`, n, "check");
 }
 
 /** Dialog stages put the spawn on their q_act line; event stages put it on the slot's locals and QuestAdvance runs it. */
@@ -242,16 +258,16 @@ const SPAWN_KINDS: StageKind[] = ["talk", "return", "deliver", "rescue", "kill",
 
 function validateSpawn(sp: StageSpawn, n: number, kind: StageKind): void {
   if (!SPAWN_KINDS.includes(kind))
-    throw new QuestSpecError(`stage ${n} (${kind}): spawn works on ${SPAWN_KINDS.join(", ")} stages (not escort or custom)`);
-  if (!sp.resref) throw new QuestSpecError(`stage ${n}: spawn needs a resref`);
-  if (!sp.at && !sp.area) throw new QuestSpecError(`stage ${n}: spawn needs an at (waypoint tag) or an area to place one in`);
+    throw new QuestSpecError(`stage ${n} (${kind}): spawn works on ${SPAWN_KINDS.join(", ")} stages (not escort or custom)`, n, "spawn");
+  if (!sp.resref) throw new QuestSpecError(`stage ${n}: spawn needs a resref`, n, "spawn");
+  if (!sp.at && !sp.area) throw new QuestSpecError(`stage ${n}: spawn needs an at (waypoint tag) or an area to place one in`, n, "spawn");
   if (sp.count !== undefined && (!Number.isInteger(sp.count) || sp.count < 1 || sp.count > 8))
-    throw new QuestSpecError(`stage ${n}: spawn count must be a whole number from 1 to 8`);
+    throw new QuestSpecError(`stage ${n}: spawn count must be a whole number from 1 to 8`, n, "spawn");
   if (sp.flag) {
-    if (!/^[A-Za-z0-9_]{1,32}$/.test(sp.flag.var ?? "")) throw new QuestSpecError(`stage ${n}: spawn flag.var must be a variable name (letters, digits, underscore)`);
+    if (!/^[A-Za-z0-9_]{1,32}$/.test(sp.flag.var ?? "")) throw new QuestSpecError(`stage ${n}: spawn flag.var must be a variable name (letters, digits, underscore)`, n, "spawn");
     for (const [k, v] of [["ifSet", sp.flag.ifSet], ["ifUnset", sp.flag.ifUnset]] as const)
-      if (v !== undefined && (!Number.isInteger(v) || v < 0 || v > 8)) throw new QuestSpecError(`stage ${n}: spawn flag.${k} must be a whole number from 0 to 8`);
-    if (sp.flag.ifSet === undefined && sp.flag.ifUnset === undefined) throw new QuestSpecError(`stage ${n}: spawn flag needs ifSet or ifUnset`);
+      if (v !== undefined && (!Number.isInteger(v) || v < 0 || v > 8)) throw new QuestSpecError(`stage ${n}: spawn flag.${k} must be a whole number from 0 to 8`, n, "spawn");
+    if (sp.flag.ifSet === undefined && sp.flag.ifUnset === undefined) throw new QuestSpecError(`stage ${n}: spawn flag needs ifSet or ifUnset`, n, "spawn");
   }
 }
 
@@ -340,7 +356,7 @@ function expandTemplate(q: QuestInput): StageInput[] {
 export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => boolean = () => false): QuestSpec {
   if (!input || typeof input !== "object") throw new QuestSpecError("spec must be an object");
   const name = (input.name ?? "").trim();
-  if (!name) throw new QuestSpecError("a quest needs a name");
+  if (!name) throw new QuestSpecError("a quest needs a name", undefined, "name");
   const isBounty = input.template === "bounty";
   const tag = (input.tag ?? tagFromName(name, isBounty ? "b_" : "q_")).toLowerCase();
   if (!TAG_RE.test(tag) || tag.length > 27)
@@ -362,7 +378,7 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     wire("npc", "npc");
     wire("item", "item");
   }
-  if (!q.giver) throw new QuestSpecError("a quest needs a giver (an NPC tag or blueprint resref)");
+  if (!q.giver) throw new QuestSpecError("a quest needs a giver (an NPC tag or blueprint resref)", undefined, "giver");
 
   let stagesIn: StageInput[];
   if (q.template) {
@@ -398,10 +414,10 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     }
     const n = s.n ?? next;
     if (!Number.isInteger(n) || n < 1)
-      throw new QuestSpecError(`stage numbers must be whole numbers from 1 (got ${s.n})`);
+      throw new QuestSpecError(`stage numbers must be whole numbers from 1 (got ${s.n})`, undefined, "n");
     if (s.n === undefined || s.n >= next) next = n + 1;
     const journal = (s.journal ?? "").trim();
-    if (!journal) throw new QuestSpecError(`stage ${n} (${kind}) needs a journal line`);
+    if (!journal) throw new QuestSpecError(`stage ${n} (${kind}) needs a journal line`, n, "journal");
     if (s.spawn) validateSpawn(s.spawn, n, kind);
     stages.push({ ...s, do: kind, n, from: s.from ?? n - 1, journal, end: s.end ?? false });
   }
@@ -412,22 +428,22 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
   // Requirements per kind.
   for (const s of stages) {
     const need = (field: keyof StageInput, what: string) => {
-      if (s[field] === undefined || s[field] === "") throw new QuestSpecError(`stage ${s.n} (${s.do}) needs ${what}`);
+      if (s[field] === undefined || s[field] === "") throw new QuestSpecError(`stage ${s.n} (${s.do}) needs ${what}`, s.n, field);
     };
     if (s.do === "kill" || s.do === "rescue" || s.do === "escort" || s.do === "use" || s.do === "search")
       need("target", "a target");
-    if (s.do === "search" && !s.check) throw new QuestSpecError(`stage ${s.n} (search) needs a check {skill, dc}`);
+    if (s.do === "search" && !s.check) throw new QuestSpecError(`stage ${s.n} (search) needs a check {skill, dc}`, s.n, "check");
     if (s.check) validateCheck(s.check, s.n, s.do === "search");
     if (s.do === "pickup" && !s.item && !s.itemName)
-      throw new QuestSpecError(`stage ${s.n} (pickup) needs an item or itemName`);
+      throw new QuestSpecError(`stage ${s.n} (pickup) needs an item or itemName`, s.n, "item");
     if (s.do === "explore" || s.do === "trigger") need("area", "an area");
     if (s.do === "trigger" && (s.x === undefined || s.y === undefined))
-      throw new QuestSpecError(`stage ${s.n} (trigger) needs x and y`);
+      throw new QuestSpecError(`stage ${s.n} (trigger) needs x and y`, s.n, s.x === undefined ? "x" : "y");
     if (s.do === "deliver" && !s.item && !s.itemName) {
       // Deliver what an earlier stage handed out or picked up.
       const earlier = [...stages].reverse().find((e) => e.n < s.n && (e.reward?.item || e.item || e.itemName));
       if (!earlier)
-        throw new QuestSpecError(`stage ${s.n} (deliver) needs an item (or an earlier stage that gives one)`);
+        throw new QuestSpecError(`stage ${s.n} (deliver) needs an item (or an earlier stage that gives one)`, s.n, "item");
       s.item = earlier.item ?? earlier.reward?.item;
       s.itemName = s.item ? undefined : earlier.itemName;
     }

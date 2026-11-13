@@ -106,3 +106,32 @@ describe("quest runtime", () => {
     expect(w).toContain('SetLocalInt(oItem, "QS_DONE", 1)');
   });
 });
+
+describe("QuestSpecError says where", () => {
+  const where = (spec: Parameters<typeof normalizeQuestSpec>[0]): { stage?: number; field?: string } => {
+    try {
+      normalizeQuestSpec(spec);
+    } catch (e) {
+      if (e instanceof QuestSpecError) return { stage: e.stage, field: e.field };
+      throw e;
+    }
+    return {};
+  };
+  const base = { name: "Q", giver: "ned" };
+  it("names the target box of a kill stage without a target", () => {
+    expect(where({ ...base, stages: [{ do: "talk", journal: "a" }, { do: "kill", journal: "b" }] })).toEqual({
+      stage: 2,
+      field: "target",
+    });
+  });
+  it("names the journal box, the check and top-level fields", () => {
+    expect(where({ ...base, stages: [{ do: "talk", journal: "" }] })).toEqual({ stage: 1, field: "journal" });
+    expect(
+      where({ ...base, stages: [{ do: "talk", journal: "a" }, { do: "talk", journal: "b", check: { dc: 10 } }] }),
+    ).toEqual({ stage: 2, field: "check" });
+    expect(where({ name: "", giver: "ned", stages: [{ do: "talk", journal: "a" }] })).toEqual({
+      stage: undefined,
+      field: "name",
+    });
+  });
+});

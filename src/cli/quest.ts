@@ -38,8 +38,8 @@ import { normalizeQuestSpec, QuestSpecError, type QuestInput } from "../util/que
 declare const __QUEST_SCHEMA__: unknown;
 declare const __QUEST_VERSION__: string;
 
-function out(ok: boolean, payload: unknown): never {
-  process.stdout.write(`${JSON.stringify(ok ? { ok, result: payload } : { ok, error: payload }, null, 2)}\n`);
+function out(ok: boolean, payload: unknown, where?: { stage?: number; field?: string }): never {
+  process.stdout.write(`${JSON.stringify(ok ? { ok, result: payload } : { ok, error: payload, ...where }, null, 2)}\n`);
   process.exit(ok ? 0 : 1);
 }
 
@@ -188,7 +188,7 @@ async function main(): Promise<void> {
     try {
       out(true, normalizeQuestSpec(JSON.parse(await fs.readFile(arg as string, "utf8")) as QuestInput));
     } catch (e) {
-      if (e instanceof QuestSpecError) out(false, e.message);
+      if (e instanceof QuestSpecError) out(false, e.message, { stage: e.stage, field: e.field });
       throw e;
     }
   }
@@ -208,7 +208,15 @@ async function main(): Promise<void> {
   const isSource = await loadTarget(project as string, outDir, writes);
   if (!compile || (isSource && !writes)) setCompileEnabled(false);
   if (cmd === "build") {
-    const res = await buildQuestFromJson(await fs.readFile(arg as string, "utf8"), dryRun);
+    const specText = await fs.readFile(arg as string, "utf8");
+    // A spec problem is reported with its stage and field so a form can mark the box.
+    try {
+      normalizeQuestSpec(JSON.parse(specText) as QuestInput);
+    } catch (e) {
+      if (e instanceof QuestSpecError) out(false, e.message, { stage: e.stage, field: e.field });
+      throw e;
+    }
+    const res = await buildQuestFromJson(specText, dryRun);
     const text = res.content[0]?.text ?? "";
     if (res.isError) out(false, text);
     out(true, { ...JSON.parse(text), ...(isSource && writes ? sourceReport(compile) : {}) });

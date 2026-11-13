@@ -12,7 +12,7 @@ node dist/cli/quest.js normalize <spec.json>
 ```
 
 - Needs the same environment as the server: `NIM_FOLDER_NWTOOLS`, `NWN_FOLDER_DATA`, `NWN_FOLDER_USER`.
-- stdout is one JSON document, `{"ok":true,"result":...}` or `{"ok":false,"error":"..."}`; exit 0 on success. Progress lines go to stderr.
+- stdout is one JSON document, `{"ok":true,"result":...}` or `{"ok":false,"error":"..."}`; exit 0 on success. A problem in the spec itself also carries `stage` (its number) and `field` (e.g. `target`, `journal`, `check`, `name`) so a form can mark the box. Progress lines go to stderr.
 - `--dry-run` returns the plan (stages, slots, rewards, notes) and changes nothing. Always show it before the real build.
 - A **project directory** is edited in place (journal, dialog, blueprints, `.git`, scripts under `src/`); no `.mod` is built.
   A `.mod` is edited in the temp dir only and is not repacked by the CLI.
