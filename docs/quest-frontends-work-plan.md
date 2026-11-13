@@ -48,7 +48,7 @@ reading files, and can do it on any machine the manager runs on.
 | U2 | Pick a position on the area map | manager | done | click fills x and y from the area drawn to scale with its placed objects; no walkability check yet (needs a probe_ground CLI command) |
 | U3 | Parcel, reward and check as plain fields | manager | done | parcel on stage 1, XP and gold on the last stage, skill/ability/save/difficulty drop-downs (schema enums) |
 | U4 | Plan errors point at the field | mcp + manager | done | `QuestSpecError.stage/field`; CLI `build`/`normalize` return them; form outlines the box; builder-side (not spec) errors still unmarked |
-| U5 | See and adopt quests made elsewhere | manager (+ mcp) | open | listed, not editable |
+| U5 | See and adopt quests made elsewhere | manager (+ mcp) | done (journal only) | read-only entries + "Adopt as a draft": one talk stage per entry, giver empty; not drafted from `questK` variables or dialogs yet, so the author fills the real stage kinds |
 | P1 | One-file builder shipped with the manager | mcp + manager | done | 2026-11-12: `npm run quest:bundle`; manager vendors `nwn-tools/quest-cli.mjs` and looks for it before the sibling checkout; live test runs dist and bundle; browser suite 15/15 on the bundle |
 | P2 | Builder and form versions checked against each other | mcp + manager | done | 2026-11-12: CLI `version` (package version + schema hash); manager notes a builder whose schema differs from the checkout beside it (`version_note`); the form itself is drawn from the builder's own `schema`, so it cannot disagree with it |
 | P3 | `load_module` on a manager project | mcp | open | lets an LLM session work on the same project |
