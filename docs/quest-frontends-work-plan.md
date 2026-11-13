@@ -44,7 +44,7 @@ reading files, and can do it on any machine the manager runs on.
 | T4 | Remove leaves the module as it was | mcp + manager | done | 2026-11-12: `cleanupAfterRemove` (handlers, created dialog/items/waypoints/journal, module wrappers); whole-module before/after test; manager deletes `source.removed` through History. Not covered: scripts wired by a stage's own `script` field, shared scripts stay by design |
 | T5 | Undo a whole quest in one step | manager | open | today: one History entry per file, new files stay |
 | T6 | Windows, macOS, reverse proxy, wiki shell | manager | open | only Linux, no prefix, console theme were run |
-| U1 | Base-game creatures and items in the pick lists | mcp + manager | open | |
+| U1 | Base-game creatures and items in the pick lists | mcp + manager | done | `quest contents` lists base-game blueprints by resref (no display names); manager loads it after the form |
 | U2 | Pick a position on the area map | manager | open | x / y are typed today |
 | U3 | Parcel, reward and check as plain fields | manager | done | parcel on stage 1, XP and gold on the last stage, skill/ability/save/difficulty drop-downs (schema enums) |
 | U4 | Plan errors point at the field | mcp + manager | done | `QuestSpecError.stage/field`; CLI `build`/`normalize` return them; form outlines the box; builder-side (not spec) errors still unmarked |

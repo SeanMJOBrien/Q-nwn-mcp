@@ -32,6 +32,9 @@ import { registerAnalysisTools } from "../tools/analysis-tools.js";
 import { registerVerifyTools } from "../tools/verify-tools.js";
 import { buildQuestFromJson } from "../tools/quest-tools.js";
 import { removeQuest } from "../util/quest-builder.js";
+import { writeSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resmanGrep } from "../nim-tools.js";
 import { normalizeQuestSpec, QuestSpecError, type QuestInput } from "../util/quest-spec.js";
 
 /** Set by scripts/bundle-quest-cli.mjs (esbuild define) so the one-file bundle carries the schema; absent in dist/. */
@@ -39,7 +42,16 @@ declare const __QUEST_SCHEMA__: unknown;
 declare const __QUEST_VERSION__: string;
 
 function out(ok: boolean, payload: unknown, where?: { stage?: number; field?: string }): never {
-  process.stdout.write(`${JSON.stringify(ok ? { ok, result: payload } : { ok, error: payload, ...where }, null, 2)}\n`);
+  const text = `${JSON.stringify(ok ? { ok, result: payload } : { ok, error: payload, ...where }, null, 2)}\n`;
+  // process.exit() right after write() cuts a large answer at the pipe size, so write it out synchronously first
+  const buf = Buffer.from(text);
+  for (let done = 0; done < buf.length; ) {
+    try {
+      done += writeSync(1, buf, done);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EAGAIN") throw e; // pipe full: try again
+    }
+  }
   process.exit(ok ? 0 : 1);
 }
 
@@ -154,6 +166,27 @@ async function verifyQuest(tag: string): Promise<Record<string, unknown>> {
   }
 }
 
+/**
+ * Base-game (and hak) creature and item blueprints, by resref, so a form can offer `nw_wolf` next to the module's own
+ * names. Empty lists with a `note` when the game files are not configured (NWN_FOLDER_DATA).
+ */
+async function baseGameContents(): Promise<{ creatures: string[]; items: string[]; note?: string }> {
+  const resman = await buildResmanOptions(requireIndex());
+  if (!resman.root && !resman.erfs?.length) {
+    return { creatures: [], items: [], note: "NWN_FOLDER_DATA is not set, so base-game names are not listed" };
+  }
+  try {
+    const lines = (await resmanGrep({ ...resman, userDir: resman.userDir ?? tmpdir() })).split("\n");
+    const pick = (ext: string): string[] =>
+      [...new Set(lines.map((l) => l.trim().split(/\s+/)[0] ?? "").filter((n) => n.toLowerCase().endsWith(ext)))]
+        .map((n) => n.slice(0, -ext.length).toLowerCase())
+        .sort();
+    return { creatures: pick(".utc"), items: pick(".uti") };
+  } catch (e) {
+    return { creatures: [], items: [], note: `could not list the game files: ${(e as Error).message.split("\n")[0]}` };
+  }
+}
+
 async function main(): Promise<void> {
   const { cmd, arg, project, out: outDir, dryRun, compile } = parse(process.argv.slice(2));
   if (cmd === "version") {
@@ -192,6 +225,11 @@ async function main(): Promise<void> {
       throw e;
     }
   }
+  if (cmd === "contents") {
+    if (!project) out(false, "usage: quest contents --project <dir|.mod>");
+    await loadTarget(project as string, undefined, false);
+    out(true, await baseGameContents());
+  }
   if (cmd === "verify") {
     if (!arg || !project) out(false, "usage: quest verify <tag> --project <dir|.mod>");
     await loadTarget(project as string, undefined, false);
@@ -201,7 +239,7 @@ async function main(): Promise<void> {
   if (!["build", "remove"].includes(cmd) || !arg || !project) {
     out(
       false,
-      "usage: quest build <spec.json> --project <dir|.mod> [--dry-run] [--out <dir>] [--no-compile] | quest remove <tag> --project <dir|.mod> [--out <dir>] | quest verify <tag> --project <dir|.mod> | quest version | quest normalize <spec.json> | quest schema",
+      "usage: quest build <spec.json> --project <dir|.mod> [--dry-run] [--out <dir>] [--no-compile] | quest remove <tag> --project <dir|.mod> [--out <dir>] | quest verify <tag> --project <dir|.mod> | quest contents --project <dir|.mod> | quest version | quest normalize <spec.json> | quest schema",
     );
   }
   const writes = cmd === "remove" || !dryRun;

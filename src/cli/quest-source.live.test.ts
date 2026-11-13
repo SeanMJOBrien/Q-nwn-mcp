@@ -72,6 +72,13 @@ describe.skipIf(!NIM_FOLDER_NWTOOLS || !hasCli)("quest CLI on a flat source dire
       );
       await fs.writeFile(path.join(src, "farmer_ned.utc.json"), JSON.stringify(ned));
       await fs.writeFile(path.join(src, "hello.nss"), "void main() {}\n");
+      // U1: `contents` lists base-game blueprints; without NWN_FOLDER_DATA it says so rather than failing
+      if (process.env.NWN_FOLDER_DATA) {
+        const big = await cli(["contents", "--project", path.join(dir, "proj")]);
+        const lists = big.result as unknown as { creatures: string[]; items: string[] };
+        expect(lists.creatures, JSON.stringify(big)).toContain("nw_wolf"); // the answer is larger than a pipe buffer: not cut off
+        expect(lists.items.length).toBeGreaterThan(100);
+      }
       const spec = path.join(dir, "q.json");
       await fs.writeFile(
         spec,

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import fs from "fs/promises";
 import path from "path";
 import { GFF_EXTENSIONS, SCRIPT_FIELDS, NWN_FOLDER_DATA, NWN_FOLDER_USER } from "./config.js";
@@ -95,7 +96,8 @@ export async function buildResmanOptions(index: ModuleIndex): Promise<ResmanOpti
     userDir: NWN_FOLDER_USER || undefined,
     // Reverse: hakList[0] = highest priority; resman loads later erfs with higher priority
     erfs: hakPaths.length > 0 ? [...hakPaths].reverse() : undefined,
-    dirs: [NWSCRIPT_OVERRIDE_DIR, index.tempDir],
+    // the one-file quest bundle has no nwscript-override next to it; a missing --dirs entry makes resman refuse to start
+    dirs: [...(existsSync(NWSCRIPT_OVERRIDE_DIR) ? [NWSCRIPT_OVERRIDE_DIR] : []), index.tempDir],
   };
 }
 
