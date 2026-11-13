@@ -1,3 +1,8 @@
+---
+name: create-adventure
+description: Create a brand-new Neverwinter Nights adventure module from scratch (story, areas, NPCs, quests, monsters, loot) from a high-level creative prompt. Use whenever the user asks to create, make, build, generate, or design a new adventure, story, campaign, or module. Orchestrates the adventure-* sub-skills autonomously.
+---
+
 # /create-adventure
 
 **Master directive skill.** Given a high-level creative goal ("make me an adventure for 3rd level characters in a haunted forest"), orchestrate the full module-building pipeline by invoking sub-skills in sequence.
