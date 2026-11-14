@@ -35,6 +35,7 @@
 | How are an adventure's size, events, encounter kinds, multi-part encounters and story threads planned and checked? | [adventure-composition.md](adventure-composition.md) |
 | How do quests work, and what can a `build_quest` spec say (stage kinds, templates, `q_chk`/`q_act` parameters, whole-party credit)? | [quest-system.md](quest-system.md) |
 | How does the parametrized PQJ quest system work? | [pqj-quest-system.md](pqj-quest-system.md) |
+| How should a cutscene that advances per dialog choice work (design, packages X0-X5)? | [cutscene-design.md](cutscene-design.md) |
 | Where does the pipeline flatten or drop the story it was meant to tell? | [story-vs-pipeline.md](story-vs-pipeline.md) |
 | How is a quest built without an LLM (CLI, manager console, studio), and what is left to do? | [quest-cli.md](quest-cli.md), [quest-frontends-work-plan.md](quest-frontends-work-plan.md) |
 | How could a local model (Qwen) drive this project, and what still needs an LLM? | [local-model-guide.md](local-model-guide.md) |
