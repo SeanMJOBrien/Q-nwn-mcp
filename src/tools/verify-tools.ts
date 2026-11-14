@@ -17,6 +17,7 @@
  * - verify_all: every applicable checker across the whole module
  */
 
+import { briefVerifyAll, resolveBrief } from "../util/brief.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
@@ -504,11 +505,13 @@ export function registerVerifyTools(server: McpServer): void {
     {
       checkWalkable: z.boolean().optional().describe("Include the per-area walkmesh reachability pass (slower)"),
       coop: COOP_PARAM,
+      brief: z.boolean().optional().describe("Short result (counts plus the first errors to fix, each with its fix) for small models (default: on when MCP_TOOL_PROFILE is set). false = full result"),
     },
     READ_ONLY,
-    async ({ checkWalkable, coop }) => {
+    async ({ checkWalkable, coop, brief }) => {
       const index = requireIndex();
       const results = await collectVerifyResults(index, { checkWalkable, coop });
+      if (resolveBrief(brief)) return payload(briefVerifyAll(results));
       const failed = results.filter((r) => r.status === "fail");
       const warned = results.filter((r) => r.status === "warn");
       const errorCount = results.reduce((n, r) => n + r.errors.length, 0);

@@ -14,6 +14,7 @@
  *   they visualize exactly the same data the LLM sees. The MCP engine never depends on HTML output.
  */
 
+import { briefAreaPayload, resolveBrief } from "../util/brief.js";
 import fs from "fs/promises";
 import path from "path";
 import { z } from "zod";
@@ -251,9 +252,10 @@ export function registerTilesetTools(server: McpServer): void {
     "Get the spatial awareness payload for an area: tile grid with terrain, materials, crossers, walkability, and features; walkable zones with connectivity and area transition analysis; all placed objects (creatures, placeables, doors, waypoints, triggers, encounters, sounds, stores) with world positions and full properties. Use this for spatial reasoning, quest design, object placement, and area analysis. To generate a human-readable HTML visualization, use export_area_report.",
     {
       area: z.string().describe("Area resref (e.g., 'area001')"),
+      brief: z.boolean().optional().describe("Short result for small models (default: on when MCP_TOOL_PROFILE is set). false = full result"),
     },
     { readOnlyHint: true, idempotentHint: true },
-    async ({ area }) => {
+    async ({ area, brief }) => {
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
@@ -278,6 +280,10 @@ export function registerTilesetTools(server: McpServer): void {
       const objects = extractAreaObjects(index, area);
 
       const payload = serializeAreaPayload(area, areaName, areaTag, width, height, tileset.displayName, grid, features, zones, objects);
+
+      if (resolveBrief(brief)) {
+        return { content: [{ type: "text", text: JSON.stringify(briefAreaPayload(payload)) }] };
+      }
 
       return {
         content: [{

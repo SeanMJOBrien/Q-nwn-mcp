@@ -1,3 +1,4 @@
+import { briefModuleSummary, resolveBrief } from "../util/brief.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, currentScriptUsages, indexAreaCreatures, requireIndex } from "../module-loader.js";
@@ -343,9 +344,11 @@ export function registerAnalysisTools(server: McpServer): void {
   server.tool(
     "get_module_summary",
     "Get a high-level summary of the entire module.",
-    {},
+    {
+      brief: z.boolean().optional().describe("Short result for small models (default: on when MCP_TOOL_PROFILE is set). false = full result"),
+    },
     { readOnlyHint: true, idempotentHint: true },
-    async () => {
+    async ({ brief }) => {
       const index = requireIndex();
 
       const scriptCount = [...index.resources.values()].filter((r) => r.extension === "nss").length;
@@ -394,6 +397,9 @@ export function registerAnalysisTools(server: McpServer): void {
         loadWarnings: index.loadWarnings,
       };
 
+      if (resolveBrief(brief)) {
+        return { content: [{ type: "text", text: JSON.stringify(briefModuleSummary(summary), null, 1) }] };
+      }
       return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
     },
   );

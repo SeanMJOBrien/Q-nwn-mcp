@@ -1,0 +1,115 @@
+{
+  "$ref": "#/definitions/AreaLayoutSpec",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "AreaLayoutSpec": {
+      "additionalProperties": false,
+      "description": "A generated area layout (maps to `adventure_generate_layout`; pass its result to `adventure_apply_layout`).",
+      "properties": {
+        "height": {
+          "description": "Height in tiles.",
+          "maximum": 32,
+          "minimum": 8,
+          "type": "integer"
+        },
+        "style": {
+          "$ref": "#/definitions/LayoutStyle"
+        },
+        "tileset": {
+          "description": "Tileset resref, e.g. \"ttf01\" forest, \"tdc01\" crypt, \"ttr01\" rural (see `list_tilesets`).",
+          "type": "string"
+        },
+        "transitionCount": {
+          "description": "Number of exits to generate. Default 1.",
+          "maximum": 4,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transitionDirections": {
+          "description": "Which edges the exits sit on.",
+          "items": {
+            "enum": [
+              "north",
+              "south",
+              "east",
+              "west"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "width": {
+          "description": "Width in tiles. 9 fits one room, 14 fits several (see `suggest_area_size`).",
+          "maximum": 32,
+          "minimum": 8,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tileset",
+        "width",
+        "height",
+        "style"
+      ],
+      "type": "object"
+    },
+    "LayoutStyle": {
+      "additionalProperties": false,
+      "properties": {
+        "avenue": {
+          "description": "Reserve the primary room-to-room connectivity spine as a protected avenue BEFORE packing feature groups, so a stamped group never lands on it — and bias a feature placed in an avenue-adjacent room toward a position/rotation whose entrance faces the avenue (best-effort; falls back to the ordinary uniform-random placement if no facing match fits). Default false — every existing caller's output is byte-identical without it. Ignored when `safeMode` is set (no features are packed at all in that mode, so there is nothing to bias).",
+          "type": "boolean"
+        },
+        "clearings": {
+          "type": "number"
+        },
+        "corridorStyle": {
+          "enum": [
+            "straight",
+            "zigzag"
+          ],
+          "type": "string"
+        },
+        "preferredFeatures": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rooms": {
+          "type": "number"
+        },
+        "safeMode": {
+          "description": "\"Safe scaffold\" mode: disables every variety knob (L-shaped room merges, S-curve corridors, shortcut corridors, obstacle patches, feature-group packing) so the result uses only plain rectangular rooms, straight corridors, and uniform floor/wall zones — the tile classes least likely to hit a solver fallback. Intended for a human to finish by hand in the toolset (add scenery, placeables, and terrain variety themselves) rather than trust the solver for everything. Combine with `rooms: 1` and a small width/height (see MIN_SINGLE_ROOM_AREA_SIZE) for a minimal-footprint scaffold the user can expand outward manually.",
+          "type": "boolean"
+        },
+        "seed": {
+          "description": "Seed for the layout's randomness: the same seed, tileset, size and style give the same layout (default: a fresh seed, returned in the result).",
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "type": {
+          "enum": [
+            "dungeon",
+            "cave",
+            "dwelling",
+            "forest",
+            "rural",
+            "city",
+            "plains",
+            "desert",
+            "castle",
+            "tundra"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    }
+  }
+}

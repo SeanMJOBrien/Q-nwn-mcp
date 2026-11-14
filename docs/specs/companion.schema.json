@@ -1,0 +1,155 @@
+{
+  "$ref": "#/definitions/CompanionSpec",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "CompanionSpec": {
+      "additionalProperties": false,
+      "description": "A recruitable companion (maps to `build_companion`).",
+      "properties": {
+        "accept": {
+          "description": "Line when they agree to join.",
+          "type": "string"
+        },
+        "area": {
+          "description": "Resref of the area to place the character in (must exist in the module).",
+          "type": "string"
+        },
+        "backstory": {
+          "description": "Answer to \"Tell me about yourself\".",
+          "minLength": 1,
+          "type": "string"
+        },
+        "bearing": {
+          "description": "Compass facing in degrees: 0 north, 90 east. Default 0.",
+          "maximum": 360,
+          "minimum": 0,
+          "type": "number"
+        },
+        "classId": {
+          "$ref": "#/definitions/PcClass"
+        },
+        "domains": {
+          "description": "Cleric only: exactly two domains.2da rows.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "farewell": {
+          "description": "Line when dismissed.",
+          "type": "string"
+        },
+        "gender": {
+          "$ref": "#/definitions/Gender"
+        },
+        "introduction": {
+          "description": "First-meeting line: who they are and why they are here.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "level": {
+          "description": "Level the character has when it spawns.",
+          "maximum": 40,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "description": "Display name shown in the game.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "partyFull": {
+          "description": "Line when the party is full.",
+          "type": "string"
+        },
+        "powerLevel": {
+          "$ref": "#/definitions/PowerLevel",
+          "description": "Default \"standard\"; \"tougher\" and \"epic\" are for a real boss."
+        },
+        "race": {
+          "$ref": "#/definitions/PcRace"
+        },
+        "resref": {
+          "description": "Blueprint resref, also the tag: lower-case letters, digits and underscore, at most 16 characters.",
+          "pattern": "^[a-z0-9_]{1,16}$",
+          "type": "string"
+        },
+        "school": {
+          "description": "Wizard only: spellschools.2da row.",
+          "type": "number"
+        },
+        "x": {
+          "description": "X position in metres (10 m per tile, 0 = west edge).",
+          "type": "number"
+        },
+        "y": {
+          "description": "Y position in metres (10 m per tile, 0 = south edge).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "area",
+        "backstory",
+        "classId",
+        "gender",
+        "introduction",
+        "level",
+        "name",
+        "race",
+        "resref",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "Gender": {
+      "description": "0 male, 1 female.",
+      "enum": [
+        0,
+        1
+      ],
+      "type": "number"
+    },
+    "PcClass": {
+      "description": "classes.2da row: 0 Barbarian, 1 Bard, 2 Cleric, 3 Druid, 4 Fighter, 5 Monk, 6 Paladin, 7 Ranger, 8 Rogue, 9 Sorcerer, 10 Wizard.",
+      "enum": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "type": "number"
+    },
+    "PcRace": {
+      "description": "racialtypes.2da row: 0 Dwarf, 1 Elf, 2 Gnome, 3 Halfling, 4 Half-Elf, 5 Half-Orc, 6 Human.",
+      "enum": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "type": "number"
+    },
+    "PowerLevel": {
+      "enum": [
+        "low",
+        "standard",
+        "tougher",
+        "epic"
+      ],
+      "type": "string"
+    }
+  }
+}

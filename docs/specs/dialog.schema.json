@@ -1,0 +1,97 @@
+{
+  "$ref": "#/definitions/DialogSpec",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "DialogNodeSpec": {
+      "additionalProperties": false,
+      "description": "One line of a conversation. NPC and PC lines alternate: the children of an NPC line are PC lines and the reverse.",
+      "properties": {
+        "children": {
+          "items": {
+            "$ref": "#/definitions/DialogNodeSpec"
+          },
+          "type": "array"
+        },
+        "condition": {
+          "description": "Script that decides whether this line is shown.",
+          "type": "string"
+        },
+        "conditionParams": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Parameters for `condition`.",
+          "type": "object"
+        },
+        "end": {
+          "description": "NPC line that deliberately ends the conversation (a fight starts). Normally omit: answers return to the main menu.",
+          "type": "boolean"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Parameters for `script`.",
+          "type": "object"
+        },
+        "quest": {
+          "description": "Journal tag to advance when this line plays (with `questEntry`).",
+          "type": "string"
+        },
+        "questEntry": {
+          "description": "Journal entry id to set for `quest`.",
+          "type": "number"
+        },
+        "script": {
+          "description": "Script run when this line plays (resref of an existing script).",
+          "type": "string"
+        },
+        "speaker": {
+          "enum": [
+            "npc",
+            "pc"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "description": "The spoken line.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "speaker",
+        "text"
+      ],
+      "type": "object"
+    },
+    "DialogSpec": {
+      "additionalProperties": false,
+      "description": "A new conversation (maps to `create_dialog`).",
+      "properties": {
+        "nodes": {
+          "description": "Root lines. Each must be an NPC line; the first is the greeting whose PC children are the main menu.",
+          "items": {
+            "$ref": "#/definitions/DialogNodeSpec"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "resref": {
+          "description": "Dialog resref: lower-case letters, digits and underscore, at most 16 characters.",
+          "pattern": "^[a-z0-9_]{1,16}$",
+          "type": "string"
+        },
+        "returnToHub": {
+          "description": "Default true: every answer returns to the main menu and a leave option is added.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resref",
+        "nodes"
+      ],
+      "type": "object"
+    }
+  }
+}

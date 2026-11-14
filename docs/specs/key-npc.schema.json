@@ -1,0 +1,155 @@
+{
+  "$ref": "#/definitions/KeyNpcSpec",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Gender": {
+      "description": "0 male, 1 female.",
+      "enum": [
+        0,
+        1
+      ],
+      "type": "number"
+    },
+    "KeyNpcSpec": {
+      "additionalProperties": false,
+      "description": "A combat-capable key NPC or boss (maps to `build_key_npc`).",
+      "properties": {
+        "area": {
+          "description": "Resref of the area to place the character in (must exist in the module).",
+          "type": "string"
+        },
+        "bearing": {
+          "description": "Compass facing in degrees: 0 north, 90 east. Default 0.",
+          "maximum": 360,
+          "minimum": 0,
+          "type": "number"
+        },
+        "classId": {
+          "$ref": "#/definitions/PcClass"
+        },
+        "conversation": {
+          "description": "Resref of an existing dialog to attach.",
+          "type": "string"
+        },
+        "domains": {
+          "description": "Cleric only: exactly two domains.2da rows.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "faction": {
+          "description": "Default \"hostile\" (a boss). Use \"commoner\" for a friendly NPC.",
+          "enum": [
+            "hostile",
+            "commoner",
+            "merchant",
+            "defender"
+          ],
+          "type": "string"
+        },
+        "gearRole": {
+          "description": "Gear budget. Default \"elite\".",
+          "enum": [
+            "pc",
+            "elite",
+            "standard",
+            "mook"
+          ],
+          "type": "string"
+        },
+        "gender": {
+          "$ref": "#/definitions/Gender"
+        },
+        "level": {
+          "description": "Level the character has when it spawns.",
+          "maximum": 40,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "name": {
+          "description": "Display name shown in the game.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "powerLevel": {
+          "$ref": "#/definitions/PowerLevel",
+          "description": "Default \"standard\"; \"tougher\" and \"epic\" are for a real boss."
+        },
+        "race": {
+          "$ref": "#/definitions/PcRace"
+        },
+        "resref": {
+          "description": "Blueprint resref, also the tag: lower-case letters, digits and underscore, at most 16 characters.",
+          "pattern": "^[a-z0-9_]{1,16}$",
+          "type": "string"
+        },
+        "school": {
+          "description": "Wizard only: spellschools.2da row.",
+          "type": "number"
+        },
+        "x": {
+          "description": "X position in metres (10 m per tile, 0 = west edge).",
+          "type": "number"
+        },
+        "y": {
+          "description": "Y position in metres (10 m per tile, 0 = south edge).",
+          "type": "number"
+        }
+      },
+      "required": [
+        "area",
+        "classId",
+        "gender",
+        "level",
+        "name",
+        "race",
+        "resref",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "PcClass": {
+      "description": "classes.2da row: 0 Barbarian, 1 Bard, 2 Cleric, 3 Druid, 4 Fighter, 5 Monk, 6 Paladin, 7 Ranger, 8 Rogue, 9 Sorcerer, 10 Wizard.",
+      "enum": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "type": "number"
+    },
+    "PcRace": {
+      "description": "racialtypes.2da row: 0 Dwarf, 1 Elf, 2 Gnome, 3 Halfling, 4 Half-Elf, 5 Half-Orc, 6 Human.",
+      "enum": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "type": "number"
+    },
+    "PowerLevel": {
+      "enum": [
+        "low",
+        "standard",
+        "tougher",
+        "epic"
+      ],
+      "type": "string"
+    }
+  }
+}

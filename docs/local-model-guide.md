@@ -26,7 +26,7 @@ document says which parts are which.
 
 | Problem | Why it matters for Qwen-class models | What to do |
 |---|---|---|
-| About 200 tools in one session | Tool selection degrades past a few dozen tools; the tool list alone is tens of thousands of tokens | Expose a **profile** per task (section 5). No profile switch exists yet: work package W1 |
+| About 200 tools in one session | Tool selection degrades past a few dozen tools; the tool list alone is tens of thousands of tokens | Expose a **profile** per task (section 5, `MCP_TOOL_PROFILE`, built as W1) |
 | Skills of 20-36 KB each | Needs a 32k+ context just to read one phase, and small models drop rules in the middle of long instructions | Drive each phase from a script that hands over only the steps and tools for that phase (W2) |
 | Tool results are large JSON (`visualize_area`, `get_module_summary`) | Fills the context; spatial reasoning over coordinates is weak in small models | Cap and summarise results in the client; prefer tools that decide for you (`adventure_generate_layout`, `suggest_area_size`) |
 | Numeric parameters are strings, lists are JSON strings | Already friendly to weak function-calling: no nested schemas to get wrong | Keep as is |
@@ -149,19 +149,77 @@ Give the client only the tools a task needs. Suggested profiles; counts are appr
 | `encounters` | `compose_encounter`, `suggest_encounter`, `forge_creature`, `place_encounter`, `create_treasure_system` | Fights and loot |
 | `verify` | `verify_*`, `validate_module`, `audit_module`, `phase_check`, `run_live_verification` | Check and test |
 
-Today a client sees all tools. The profile would be an environment variable read at registration
-(`MCP_TOOL_PROFILE=quests,verify`), implemented in one place (the registration functions are already grouped per
-file). Not built; W1.
+**Built (W1, 2026-11-13).** `MCP_TOOL_PROFILE=quests,verify` (comma list of `read`, `quests`, `actors`, `areas`,
+`encounters`, `verify`; `all` or unset = every tool) registers only those tools plus a small always-on core
+(`load_module`, `get_module_summary`, `get_adventure_dir`, `set_project_scope`, `phase_check`, `repack_module`,
+`undo_last_change`). An unknown name stops the server with the list of valid ones. The profiles are exact names and
+`prefix*` globs in `src/tool-profiles.ts`; `src/register-all.ts` holds the registration list. Measured over stdio:
+all tools 208, `quests,verify` 37. `src/tool-profiles.test.ts` fails if a profile entry names a tool that no longer
+exists, if `quests,verify` reaches 40 tools, or if one profile outgrows 60 tools. A new tool is in no profile until
+it is added there. Client config example: `"env": {"MCP_TOOL_PROFILE": "quests,verify"}`.
+
+### Brief results (W5, built 2026-11-13)
+
+`visualize_area`, `get_module_summary` and `verify_all` take `brief`. It defaults to on whenever a tool profile is
+active (or `MCP_BRIEF_RESULTS=1`; `MCP_BRIEF_RESULTS=0` turns the default off); `brief: false` always gives the full
+result. Code: `src/util/brief.ts`. Measured on The Salt Gate Conspiracy (characters / 4 as a token estimate):
+
+| Tool | Full | Brief | What brief keeps |
+|---|---|---|---|
+| `visualize_area` (22x22 area) | ~73,000 tokens | ~1,260 | A text map (one character per tile, north up: `.` walkable, `:` partly, `#` blocked, `~` water, `F` feature), zones, features, objects by type as tag/x/y (40 per type, rest counted) |
+| `verify_all` | ~7,250 | ~150 | Counts, errors and warnings by code, `fixFirst` (up to 8 errors, one per code before repeats, each with its `fix`), a `next` line |
+| `get_module_summary` | ~1,330 | ~420 | Dialog names (30) and counts in place of per-dialog detail and the quest-variable list |
+
+Brief drops per-tile terrain, corners and crossers, so tile painting by hand still needs `brief: false`. The other
+`verify_*` tools and `audit_module` are not trimmed yet.
+
+### Build specs (W4, built 2026-11-13)
+
+One small JSON object per thing to build, with a JSON Schema generated from a TypeScript type
+(`src/util/build-specs.ts`, `npm run specs:schema`, files in `docs/specs/`). The quest spec
+(`docs/quest-spec.schema.json`, `build_quest`) stays as it is.
+
+| Kind | Type | Builds with |
+|---|---|---|
+| `companion` | `CompanionSpec` | `build_companion` |
+| `key-npc` | `KeyNpcSpec` | `build_key_npc` |
+| `dialog` | `DialogSpec` | `create_dialog` |
+| `journal` | `JournalSpec` | `create_journal`, `add_journal_quest`, one `add_journal_entry` per entry |
+| `area-layout` | `AreaLayoutSpec` | `adventure_generate_layout` (its result then goes to `adventure_apply_layout`) |
+
+Specs hold real numbers, lists and enumerations (race 0-6, class 0-10, faction names, layout styles); the code
+converts them to the tools' string parameters. Use the schema for constrained decoding (JSON-schema or grammar mode
+of the local server) so the model cannot produce a malformed spec.
+
+`node dist/cli/spec.js` needs no module, game install or MCP client:
+
+```
+node dist/cli/spec.js kinds                      # the kinds and what each builds
+node dist/cli/spec.js schema key-npc             # the JSON Schema
+node dist/cli/spec.js validate key-npc npc.json  # or "-" for stdin
+```
+
+`validate` answers `{ ok: false, errors: [{ field, message }] }` (exit code 1), for example
+`{ "field": "classId", "message": "must be one of [0,...,10]" }` or
+`{ "field": "nodes[0].children[1].speaker", "message": "must be \"npc\" here ..." }`, so the retry prompt can be
+just that field and message. When the spec is valid it answers `{ ok: true, result: { calls: [{ tool, args }] } }`:
+the MCP tool calls to make, in order. Beyond the schema it checks that dialog lines alternate NPC/PC from an NPC
+root, that journal ids ascend and only the last entry ends the quest, and that domains/school match the class.
+It does not check the module (whether the area or the conversation exists); the tool reports that.
+
+`src/util/build-specs.test.ts` fails when a spec field is not a parameter of its tool, or when a tool gains a
+required parameter the spec does not supply. Not built: a spec for placed objects and encounters, and the driver
+(W2) that would call `validate` and then the tools.
 
 ## 6. Work packages
 
 | # | Package | Size | Acceptance |
 |---|---|---|---|
-| W1 | `MCP_TOOL_PROFILE`: register only the named groups; document the profiles | small | Server lists fewer than 40 tools with `quests,verify`; default unchanged; tests |
+| W1 | **DONE 2026-11-13.** `MCP_TOOL_PROFILE`: register only the named groups; document the profiles | small | Server lists fewer than 40 tools with `quests,verify`; default unchanged; tests |
 | W2 | Driver: a script that runs one phase at a time with a trimmed profile, a short phase prompt, schema-checked answers, retries and `phase_check` between phases | large | One module built end to end with a local model plus a human-written plot |
 | W3 | Short phase prompts: for each skill, a 2-4 KB version with the steps and the tool order, generated from or checked against the full skill (`skill-lint` already checks the full ones) | medium | Each phase prompt under 4 KB; lint passes |
-| W4 | Input schemas for companion, key NPC, dialog, journal, area style | medium | Each has a JSON schema generated from the TypeScript type like `quest:schema`; the driver validates against them |
-| W5 | Result trimming: a `brief` option (or client-side summariser) for `visualize_area`, `get_module_summary` and verifier output | small | Typical result under 4k tokens with the facts the phase needs |
+| W4 | **DONE 2026-11-13 (see below).** Input schemas for companion, key NPC, dialog, journal, area style | medium | Each has a JSON schema generated from the TypeScript type like `quest:schema`; the driver validates against them |
+| W5 | **DONE 2026-11-13 (see below).** Result trimming: a `brief` option (or client-side summariser) for `visualize_area`, `get_module_summary` and verifier output | small | Typical result under 4k tokens with the facts the phase needs |
 | W6 | Plot input: a plain form or a file format (title, premise, antagonist, areas, NPCs, quests) so a human or a larger model writes phase 1 once and the local model builds from it | medium | Phase 2 onwards starts from the file; `plan_adventure_shape` accepts it |
 | W7 | Evaluation: build the same two small modules with Claude and with the local model; compare `verify_all`, `run_live_verification`, and the manual quality notes | medium | A table of failures per phase; decides which phases stay on a local model |
 | W8 | Quest forms for the studio (S1-S3 of the quest plan) | medium | Already planned in `docs/quest-frontends-work-plan.md` |
