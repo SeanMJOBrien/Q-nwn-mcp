@@ -184,3 +184,73 @@ describe("set_project_scope", () => {
     }
   });
 });
+
+describe("story tools and phase prompts", () => {
+  const textOf = (r: unknown) => (r as { content: Array<{ text: string }> }).content[0].text;
+
+  it("write_story_section starts the story, adds and replaces sections; read_story returns them", async () => {
+    const { c, close } = await client();
+    try {
+      const none = await c.callTool({ name: "read_story", arguments: {} });
+      expect(none.isError).toBe(true);
+
+      const w1 = body(await c.callTool({ name: "write_story_section", arguments: { section: "Module", text: "- **Level:** 3" } }));
+      expect(w1).toMatchObject({ ok: true, section: "Module", action: "added" });
+      const w2 = body(await c.callTool({ name: "write_story_section", arguments: { section: "plot", text: "## Plot\n\n### Premise\nA." } }));
+      expect(w2).toMatchObject({ section: "Plot", action: "added", next: 'phase_check(phase: "plot", step: "end")' });
+      const w3 = body(await c.callTool({ name: "write_story_section", arguments: { section: "Plot", text: "### Premise\nB." } }));
+      expect(w3.action).toBe("replaced");
+
+      const story = await fs.readFile(path.join(advDir(), "Demo.md"), "utf8");
+      expect(story).toBe("# Demo\n\n## Module\n\n- **Level:** 3\n\n## Plot\n\n### Premise\nB.\n");
+
+      expect(textOf(await c.callTool({ name: "read_story", arguments: { sections: "Plot,Areas" } }))).toBe(
+        "## Plot\n\n### Premise\nB.\n\n(Not in the story yet: Areas. Sections present: Module, Plot)",
+      );
+      // the phase check now sees the section the tool wrote
+      expect(body(await c.callTool({ name: "phase_check", arguments: { phase: "areas", step: "start" } })).ok).toBe(true);
+    } finally {
+      await close();
+    }
+  });
+
+  it("write_story_section refuses an unknown section, empty text and a second ## heading, naming the field", async () => {
+    const { c, close } = await client();
+    try {
+      const bad = async (args: Record<string, string>) => {
+        const r = await c.callTool({ name: "write_story_section", arguments: args });
+        expect(r.isError).toBe(true);
+        return body(r).field;
+      };
+      expect(await bad({ section: "Monsters", text: "x" })).toBe("section");
+      expect(await bad({ section: "Plot", text: "## Plot\n" })).toBe("text");
+      expect(await bad({ section: "Plot", text: "a\n## Areas\nb" })).toBe("text");
+    } finally {
+      await close();
+    }
+  });
+
+  it("write_dm_guide writes the titled guide file", async () => {
+    const { c, close } = await client();
+    try {
+      expect((await c.callTool({ name: "write_dm_guide", arguments: { text: "short" } })).isError).toBe(true);
+      const r = body(await c.callTool({ name: "write_dm_guide", arguments: { text: `# Guide\n${"All of it. ".repeat(30)}` } }));
+      expect(r.ok).toBe(true);
+      expect(await fs.readFile(path.join(advDir(), "Demo-dm-guide.md"), "utf8")).toMatch(/^# Guide/);
+    } finally {
+      await close();
+    }
+  });
+
+  it("get_phase_prompt returns the short prompt with its profile", async () => {
+    const { c, close } = await client();
+    try {
+      const t = textOf(await c.callTool({ name: "get_phase_prompt", arguments: { phase: "quests" } }));
+      expect(t).toMatch(/^Phase: quests\nTool profile: MCP_TOOL_PROFILE=quests\n/);
+      expect(t).toContain("build_quest(");
+      expect(t.length).toBeLessThan(4500);
+    } finally {
+      await close();
+    }
+  });
+});

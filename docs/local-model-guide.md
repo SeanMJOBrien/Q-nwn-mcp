@@ -149,12 +149,12 @@ Give the client only the tools a task needs. Suggested profiles; counts are appr
 | `encounters` | `compose_encounter`, `suggest_encounter`, `forge_creature`, `place_encounter`, `create_treasure_system` | Fights and loot |
 | `verify` | `verify_*`, `validate_module`, `audit_module`, `phase_check`, `run_live_verification` | Check and test |
 
-**Built (W1, 2026-11-13).** `MCP_TOOL_PROFILE=quests,verify` (comma list of `read`, `quests`, `actors`, `areas`,
-`encounters`, `verify`; `all` or unset = every tool) registers only those tools plus a small always-on core
-(`load_module`, `get_module_summary`, `get_adventure_dir`, `set_project_scope`, `phase_check`, `repack_module`,
-`undo_last_change`). An unknown name stops the server with the list of valid ones. The profiles are exact names and
+**Built (W1, 2026-11-13).** `MCP_TOOL_PROFILE=quests,verify` (comma list of `read`, `plot`, `quests`, `actors`, `areas`,
+`encounters`, `loot`, `fix`, `verify`; `all` or unset = every tool) registers only those tools plus a small always-on core
+(`load_module`, `get_module_summary`, `get_phase_prompt`, `phase_check`, `read_story`, `write_story_section`,
+`repack_module`, `undo_last_change`). An unknown name stops the server with the list of valid ones. The profiles are exact names and
 `prefix*` globs in `src/tool-profiles.ts`; `src/register-all.ts` holds the registration list. Measured over stdio:
-all tools 208, `quests,verify` 37. `src/tool-profiles.test.ts` fails if a profile entry names a tool that no longer
+all tools 212, `quests,verify` 38. `src/tool-profiles.test.ts` fails if a profile entry names a tool that no longer
 exists, if `quests,verify` reaches 40 tools, or if one profile outgrows 60 tools. A new tool is in no profile until
 it is added there. Client config example: `"env": {"MCP_TOOL_PROFILE": "quests,verify"}`.
 
@@ -211,13 +211,60 @@ It does not check the module (whether the area or the conversation exists); the 
 required parameter the spec does not supply. Not built: a spec for placed objects and encounters, and the driver
 (W2) that would call `validate` and then the tools.
 
+### Short phase prompts and story tools (W3, built 2026-11-13)
+
+`docs/phase-prompts/<phase>.md`: one prompt per phase, 2.5-4 KB (the skills are 11-36 KB), with numbered steps,
+one example call per tool, a few rules and the format of the section to write. Front matter names the tool profile,
+the build specs and the story sections the phase reads and writes.
+
+| Phase | Profile (tools listed) | Prompt | Skill |
+|---|---|---|---|
+| plot | `plot` (13) | 2.5 KB | 11 KB |
+| areas | `areas` (45) | 3.6 KB | 33 KB |
+| environment | `areas` (45) | 3.1 KB | 19 KB |
+| actors | `actors` (26) | 3.6 KB | 29 KB |
+| quests | `quests` (19) | 3.1 KB | 13 KB |
+| challenges | `encounters` (27) | 4.0 KB | 36 KB |
+| affordances | `loot` (33) | 3.7 KB | 29 KB |
+| polish | `verify,fix` (38) | 2.7 KB | 22 KB |
+| rewards | `loot,quests` (41) | 3.4 KB | 35 KB |
+
+Four tools make a phase runnable from any MCP client (no file tools, no skill loading); the first three are in every
+profile:
+
+- `get_phase_prompt(phase)`: the prompt, with its profile, specs and sections.
+- `read_story(sections?)`: the named `## Section` blocks of the story file.
+- `write_story_section(section, text)`: adds or replaces one section, leaves the rest alone, and creates the story
+  file when there is none. It refuses an unknown section name, empty text and a second `## ` heading, naming the field.
+- `write_dm_guide(text)` (profile `loot`): the DM guide file that `create_dm_area` reads.
+
+New profiles: `plot`, `loot`, `fix`. `src/util/phase-prompts.test.ts` fails when a prompt exceeds 4,096 bytes, calls a
+tool or parameter that does not exist, calls a tool outside its declared profile, or lacks the start and end
+`phase_check` and its `write_story_section`. Every base-game resref named in the prompts was checked against the
+game's resource list (2026-11-13).
+
+What the short prompts leave out, compared with the skills (a module built from them is simpler):
+
+- areas: the hand-designed layout fallback, starter-store area, the `_start` clean-up and the portal dialog texts.
+- environment: sounds attached to objects, useable objects with flavour text, entrance waypoints.
+- actors: walk waypoints, non-standard looks, per-companion spell and gear choices.
+- quests: templates, skill checks, branches, spawns, searches (the full spec still accepts them).
+- challenges: patrol paths, visual variety, chain encounters; `compose_encounter` knows one boss role (necromancer),
+  other bosses are built with `build_key_npc`.
+- affordances: starting gold and level adjustment (a module script), the starter store, custom items, the
+  random-treasure system.
+- polish: the manual plot-versus-module audit; it works from `verify_all` findings only.
+- rewards: the XP budget calculation (a fixed table by level instead), class-specific reward items, the win-state script.
+
+Not tested: no small model has run these prompts yet. That is package W7.
+
 ## 6. Work packages
 
 | # | Package | Size | Acceptance |
 |---|---|---|---|
 | W1 | **DONE 2026-11-13.** `MCP_TOOL_PROFILE`: register only the named groups; document the profiles | small | Server lists fewer than 40 tools with `quests,verify`; default unchanged; tests |
 | W2 | Driver: a script that runs one phase at a time with a trimmed profile, a short phase prompt, schema-checked answers, retries and `phase_check` between phases | large | One module built end to end with a local model plus a human-written plot |
-| W3 | Short phase prompts: for each skill, a 2-4 KB version with the steps and the tool order, generated from or checked against the full skill (`skill-lint` already checks the full ones) | medium | Each phase prompt under 4 KB; lint passes |
+| W3 | **DONE 2026-11-13 (see below).** Short phase prompts: for each skill, a 2-4 KB version with the steps and the tool order, generated from or checked against the full skill (`skill-lint` already checks the full ones) | medium | Each phase prompt under 4 KB; lint passes |
 | W4 | **DONE 2026-11-13 (see below).** Input schemas for companion, key NPC, dialog, journal, area style | medium | Each has a JSON schema generated from the TypeScript type like `quest:schema`; the driver validates against them |
 | W5 | **DONE 2026-11-13 (see below).** Result trimming: a `brief` option (or client-side summariser) for `visualize_area`, `get_module_summary` and verifier output | small | Typical result under 4k tokens with the facts the phase needs |
 | W6 | Plot input: a plain form or a file format (title, premise, antagonist, areas, NPCs, quests) so a human or a larger model writes phase 1 once and the local model builds from it | medium | Phase 2 onwards starts from the file; `plan_adventure_shape` accepts it |

@@ -392,7 +392,7 @@ export function registerBlueprintTools(server: McpServer): void {
       resref: z.string().describe("New trap blueprint resref"),
       tag: z.string().describe("Trap tag"),
       name: z.string().describe("Trap display name"),
-      scriptOnEnter: z.string().describe("Script resref to run when PC enters the trap"),
+      scriptOnEnter: z.string().optional().describe("Script resref to run when a PC enters the trap. Omit it when add_skill_check supplies the effect (the usual way)"),
       sourceResref: z.string().optional().describe("Base trigger to clone from (e.g. 'nw_yourfeet')"),
       detectDC: optNumParam("Trap detection DC (default 15)"),
       disarmDC: optNumParam("Trap disarm DC (default 15)"),
@@ -437,7 +437,7 @@ export function registerBlueprintTools(server: McpServer): void {
           OnTrapTriggered: { type: "resref", value: "" },
           PortraitId: { type: "word", value: 0 },
           ScriptHeartbeat: { type: "resref", value: "" },
-          ScriptOnEnter: { type: "resref", value: scriptOnEnter },
+          ScriptOnEnter: { type: "resref", value: scriptOnEnter ?? "" },
           ScriptOnExit: { type: "resref", value: "" },
           ScriptUserDefine: { type: "resref", value: "" },
           Tag: { type: "cexostring", value: tag },
@@ -468,7 +468,7 @@ export function registerBlueprintTools(server: McpServer): void {
       setField(obj, "Tag", "cexostring", tag);
       setField(obj, "TemplateResRef", "resref", resrefLower);
       obj.LocalizedName = { type: "cexolocstring", value: { "0": name } };
-      setField(obj, "ScriptOnEnter", "resref", scriptOnEnter);
+      setField(obj, "ScriptOnEnter", "resref", scriptOnEnter ?? "");
       setField(obj, "TrapDetectDC", "byte", detectN);
       setField(obj, "DisarmDC", "byte", disarmN);
       setField(obj, "TrapDetectable", "byte", 1);

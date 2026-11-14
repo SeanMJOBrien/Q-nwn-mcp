@@ -38,7 +38,7 @@
 | Where does the pipeline flatten or drop the story it was meant to tell? | [story-vs-pipeline.md](story-vs-pipeline.md) |
 | How is a quest built without an LLM (CLI, manager console, studio), and what is left to do? | [quest-cli.md](quest-cli.md), [quest-frontends-work-plan.md](quest-frontends-work-plan.md) |
 | How could a local model (Qwen) drive this project, and what still needs an LLM? | [local-model-guide.md](local-model-guide.md) |
-| How do I show a small model fewer tools, shorter results, or a form to fill in? | [local-model-guide.md](local-model-guide.md) section 5 (`MCP_TOOL_PROFILE`, `brief`, build specs in `specs/`) |
+| How do I show a small model fewer tools, shorter results, or a form to fill in? | [local-model-guide.md](local-model-guide.md) section 5 (`MCP_TOOL_PROFILE`, `brief`, build specs in `specs/`, short phase prompts in `phase-prompts/`) |
 | Which bugs in TFN's quest scripts are confirmed, and what is the plan to port our quest fixes to the content studio? | [tfn-quest-findings.md](tfn-quest-findings.md) |
 | What happened when random caster abilities ran on a real headless server? | [random-abilities-runtime-findings.md](random-abilities-runtime-findings.md) |
 | How does the Special-Abilities caster system (the project-wide default) work, and how does a DM actually see/use the abilities in-game? | [special-abilities-system.md](special-abilities-system.md) |

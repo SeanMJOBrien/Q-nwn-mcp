@@ -33,6 +33,8 @@ import {
   skipFromRun,
   stopMessage,
 } from "../util/phase-check.js";
+import { loadPhasePrompt } from "../util/phase-prompts.js";
+import { pickSections, setSection, stripOwnHeading } from "../util/story-sections.js";
 import { computeConnectivity } from "./analysis-tools.js";
 import { parseStoryGraph, verifyStory } from "../util/story-graph.js";
 import { collectVerifyResults } from "./verify-tools.js";
@@ -253,6 +255,100 @@ export function registerPhaseTools(server: McpServer): void {
         },
         false,
       );
+    },
+  );
+
+  // ─── Story file access and short phase prompts (for clients with no file tools, and small models) ───
+
+  server.tool(
+    "read_story",
+    "Read the story file (adventure.md) of the loaded module: all `## Section` blocks, or only the named ones. Use it at the start of a phase to get the sections the phase needs.",
+    {
+      sections: z.string().optional().describe('Comma-separated section names, e.g. "Module,Plot". Omit for the whole story'),
+    },
+    { readOnlyHint: true, idempotentHint: true },
+    async ({ sections }) => {
+      const index = requireIndex();
+      const dir = await ensureAdventureDir(index);
+      const md = await readIfExists(advFile(dir, "story"));
+      if (md === null) {
+        return text({ ok: false, error: "There is no story file yet. Write the Module section first with write_story_section, or run adopt_module on an existing module." }, true);
+      }
+      const names = (sections ?? "").split(",").map((n) => n.trim()).filter(Boolean);
+      const picked = pickSections(md, names);
+      const note = picked.missing.length ? `\n\n(Not in the story yet: ${picked.missing.join(", ")}. Sections present: ${picked.available.join(", ")})` : "";
+      return { content: [{ type: "text" as const, text: `${picked.text}${note}` }] };
+    },
+  );
+
+  server.tool(
+    "write_story_section",
+    "Write one `## Section` of the story file (adventure.md): replaces the section when it exists, appends it otherwise, and leaves every other section untouched. Each phase writes its own section this way before phase_check(step: \"end\"). Give the section body only, without the `## Name` heading.",
+    {
+      section: z.string().describe("Section name: Module, Plot, Areas, Environment, Actors, Quests, Challenges, Affordances, Polish or Rewards"),
+      text: z.string().describe("The section body in markdown (sub-headings start at ###)"),
+    },
+    { idempotentHint: true },
+    async ({ section, text: body }) => {
+      const index = requireIndex();
+      const name = section.replace(/^#+\s*/, "").trim();
+      const known = ["Module", ...Object.values(OWN_SECTION)];
+      const canonical = known.find((k) => k.toLowerCase() === name.toLowerCase());
+      if (!canonical) return text({ ok: false, field: "section", error: `"${section}" is not a story section. Use one of: ${known.join(", ")}` }, true);
+      const clean = stripOwnHeading(canonical, body);
+      if (!clean) return text({ ok: false, field: "text", error: "The section text is empty." }, true);
+      if (/^##\s/m.test(clean)) return text({ ok: false, field: "text", error: "The text contains a `## ` heading. Write one section per call and start sub-headings at ###." }, true);
+      const dir = await ensureAdventureDir(index);
+      const storyPath = advFile(dir, "story");
+      const before = (await readIfExists(storyPath)) ?? `# ${index.moduleName}\n`;
+      const replaced = pickSections(before, [canonical]).missing.length === 0;
+      await fs.writeFile(storyPath, setSection(before, canonical, clean), "utf8");
+      const phase = (Object.keys(OWN_SECTION) as Phase[]).find((p) => OWN_SECTION[p] === canonical);
+      return text({
+        ok: true,
+        section: canonical,
+        action: replaced ? "replaced" : "added",
+        characters: clean.length,
+        file: storyPath,
+        ...(phase ? { next: `phase_check(phase: "${phase}", step: "end")` } : {}),
+      });
+    },
+  );
+
+  server.tool(
+    "write_dm_guide",
+    "Write the DM guide file of the loaded module (spoilers included; for the person running the game). create_dm_area then puts it, with the story, into the books in the DM chest.",
+    {
+      text: z.string().describe("The whole guide in markdown"),
+    },
+    { idempotentHint: true },
+    async ({ text: body }) => {
+      const index = requireIndex();
+      if (body.trim().length < 200) return text({ ok: false, field: "text", error: "The guide is too short to run a game from (under 200 characters)." }, true);
+      const dir = await ensureAdventureDir(index);
+      const guidePath = advFile(dir, "dmGuide");
+      await fs.writeFile(guidePath, `${body.trim()}\n`, "utf8");
+      return text({ ok: true, characters: body.trim().length, file: guidePath, next: "create_dm_area()" });
+    },
+  );
+
+  server.tool(
+    "get_phase_prompt",
+    "The short instructions for one adventure phase (under 4 KB): the steps, the tool order and the rules, written for a small model. Also names the tool profile the phase needs (MCP_TOOL_PROFILE), the build specs it uses and the story sections it reads and writes. Needs no module loaded.",
+    {
+      phase: z.enum(PHASES).describe("plot, areas, environment, actors, quests, challenges, affordances, polish or rewards"),
+    },
+    { readOnlyHint: true, idempotentHint: true },
+    async ({ phase }) => {
+      const prompt = loadPhasePrompt(phase as Phase);
+      const header = [
+        `Phase: ${prompt.phase}`,
+        `Tool profile: MCP_TOOL_PROFILE=${prompt.profile.join(",")}`,
+        ...(prompt.specs.length ? [`Specs: ${prompt.specs.join(", ")} (schemas in docs/specs/, quest: docs/quest-spec.schema.json)`] : []),
+        `Reads: ${prompt.reads.join(", ")}`,
+        `Writes: ${prompt.writes}`,
+      ].join("\n");
+      return { content: [{ type: "text" as const, text: `${header}\n\n${prompt.body}` }] };
     },
   );
 }

@@ -379,11 +379,9 @@ Find containers (chests, crates, barrels) placed by `/adventure-environment` and
 **Step 1:** For each area, call `get_area_placeables` to get the list of placeables with their tags and indices.
 
 **Step 2:** Identify container placeables by their blueprint resref or tag. Common container blueprints:
-- `plc_chest1`, `plc_chest2`, `plc_chest3` — wooden chests
-- `plc_footchest` — small footlocker
-- `nw_yourchest` — personal chest
-- `plc_crate1`, `plc_crate2` — wooden crates
-- `plc_barrel1`, `plc_barrel2` — barrels
+- `plc_chest1`, `plc_chest2`, `plc_chest3`, `plc_chest4` — chests
+- `plc_box1` to `plc_box4`, `x2_easy_crate1` to `x2_easy_crate3` — boxes and crates
+- `plc_barrel`, `plc_keg` — barrel, keg
 - `plc_cabinet` — cabinet
 
 Not all placeables with these resrefs are containers — check if they have `HasInventory: 1` or if they appear in the environment section as containers. When in doubt, check the `HasInventory` field via `get_resource` on the placeable blueprint.
