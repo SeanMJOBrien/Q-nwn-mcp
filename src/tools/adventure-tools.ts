@@ -31,6 +31,8 @@ import { snapshotGitForUndo } from "../util/undo.js";
 import { compileScript, jsonToGff, erfPack } from "../nim-tools.js";
 import { checkPlacementWalkable } from "../util/walkmesh.js";
 import { findOpenGround, loadAreaWalkGrid } from "../util/walkgrid.js";
+import { removeAreaFromModule } from "./paint-tools.js";
+import { buildAreaTransitions, buildTagToAreaMap } from "./tileset-tools.js";
 import { getTilesetInfo, getRotatedCorners, rotatedGroupDimensions, rotateGroupTileIndex } from "../util/tileset.js";
 import { generateLayout, groupHasUnsupportedDoors, groupHasCrossers, groupMatchesTerrain, resolveFloorTerrain, MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import type { LayoutStyle, SuggestedFeature } from "../util/layout-generator.js";
@@ -39,6 +41,99 @@ import type { TerrainZone, CrosserPath, FeatureTile } from "../util/zone-solver.
 import { getFeatureCollar } from "../util/feature-collars.js";
 
 export function registerAdventureTools(server: McpServer): void {
+  // ─── set_module_start ───────────────────────────────────────────────────
+
+  server.tool(
+    "set_module_start",
+    "Make an area the place where players start: sets the module's entry area and entry point (open, walkable ground near the area's centre unless x and y are given). Also removes the empty starter area `_start` that create_module makes, when nothing is placed in it and no transition uses it. Call it once, on the first story area, right after building it.",
+    {
+      area: z.string().describe("Resref of the area players start in"),
+      x: optNumParam("Entry X in metres (default: open ground near the centre)"),
+      y: optNumParam("Entry Y in metres"),
+      keepStarterArea: z.boolean().optional().describe("true keeps `_start` (for a starter store area); default false"),
+    },
+    { destructiveHint: true, idempotentHint: true },
+    async ({ area, x, y, keepStarterArea }) => {
+      const index = requireIndex();
+      const fail = (error: string, field?: string) => ({
+        isError: true,
+        content: [{ type: "text" as const, text: JSON.stringify({ success: false, ...(field ? { field } : {}), error }, null, 2) }],
+      });
+      const resref = area.toLowerCase();
+      const info = index.areas.get(resref);
+      if (!info) return fail(`There is no area "${resref}". Areas: ${[...index.areas.keys()].join(", ")}`, "area");
+      const ifo = index.parsedGff.get("module.ifo") as GffObj | undefined;
+      const ifoEntry = index.resources.get("module.ifo");
+      if (!ifo || !ifoEntry) return fail("module.ifo not found");
+      if ((x === undefined) !== (y === undefined)) return fail("give both x and y, or neither", x === undefined ? "x" : "y");
+
+      const resmanOpts = await buildResmanOptions(index);
+      let px: number;
+      let py: number;
+      let pz = 0;
+      if (x !== undefined && y !== undefined) {
+        px = toF(x);
+        py = toF(y);
+      } else {
+        const loaded = await loadAreaWalkGrid(resref, index, resmanOpts);
+        if (!loaded) return fail(`Walkmesh data unavailable for ${resref}; give x and y.`);
+        const w = info.width * 10;
+        const h = info.height * 10;
+        let spot: { x: number; y: number } | undefined;
+        for (const radius of [3, 2, 1]) {
+          [spot] = findOpenGround(loaded.walk, { radius, near: { x: w / 2, y: h / 2 }, bounds: { x1: 0, y1: 0, x2: w, y2: h }, maxResults: 1 });
+          if (spot) break;
+        }
+        if (!spot) return fail(`No open walkable ground found in ${resref}. Is the area painted?`);
+        px = spot.x;
+        py = spot.y;
+      }
+      const check = await checkPlacementWalkable(px, py, resref, index, resmanOpts);
+      if (!check.ok) {
+        return fail(`(${px}, ${py}) is not a usable start point: ${check.reason ?? "blocked"}.${x !== undefined ? " Omit x and y to let the tool choose." : ""}`, "x");
+      }
+      pz = check.z ?? 0;
+
+      const previous = getFieldStr(ifo, "Mod_Entry_Area").toLowerCase();
+      setField(ifo, "Mod_Entry_Area", "resref", resref);
+      setField(ifo, "Mod_Entry_X", "float", px);
+      setField(ifo, "Mod_Entry_Y", "float", py);
+      setField(ifo, "Mod_Entry_Z", "float", pz);
+      await beforeWrite(ifoEntry.filePath);
+      await jsonToGff(ifo as GffDocument, ifoEntry.filePath);
+      await afterWrite(ifoEntry.filePath);
+      markDirty(ifoEntry.filePath);
+
+      // The starter stub: remove it when it is empty and nothing leads into or out of it.
+      const STARTER = "_start";
+      let starter = "none";
+      if (index.areas.has(STARTER) && resref !== STARTER) {
+        const git = (index.parsedGff.get(`${STARTER}.git`) ?? {}) as GffObj;
+        const placed = ["Creature List", "Door List", "Placeable List", "StoreList", "TriggerList", "Encounter List"].reduce(
+          (n, list) => n + getFieldList(git, list).length,
+          0,
+        );
+        const tagToArea = buildTagToAreaMap(index);
+        const linked = [...index.areas.keys()].some((a) =>
+          buildAreaTransitions(index, a, tagToArea).some((t) => (a === STARTER) !== (t.targetArea === STARTER)),
+        );
+        if (keepStarterArea) starter = "kept (keepStarterArea)";
+        else if (placed > 0 || linked) starter = `kept: it has ${placed} placed object(s)${linked ? " and a transition" : ""}`;
+        else {
+          await removeAreaFromModule(index, STARTER);
+          starter = "removed (it was empty)";
+        }
+      }
+
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ success: true, startArea: resref, x: px, y: py, z: pz, previousStartArea: previous, starterArea: starter }, null, 2),
+        }],
+      };
+    },
+  );
+
 
   // ─── adventure_create_transition ───────────────────────────────────────
 

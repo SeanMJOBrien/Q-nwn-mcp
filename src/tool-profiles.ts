@@ -69,6 +69,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   areas: [
     "suggest_area_size",
+    "set_module_start",
     "create_area",
     "delete_area",
     "list_tilesets",

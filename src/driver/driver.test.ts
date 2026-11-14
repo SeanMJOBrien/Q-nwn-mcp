@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parseDriveArgs, parsePhases } from "../cli/drive.js";
 import { coerceArgs } from "./coerce.js";
 import { type ChatMessage, type ToolCall, slimSchema, toolCallsFromText } from "./llm.js";
-import { type HostTool, type ToolHost, runPhase, specErrors, trimContext } from "./run-phase.js";
+import { PHASES } from "../util/phase-check.js";
+import { loadPhasePrompt } from "../util/phase-prompts.js";
+import { type HostTool, type ToolHost, runPhase, specErrors, trimContext, withoutStartCheck } from "./run-phase.js";
 
 const str = { type: "string" };
 const tool = (name: string, properties: Record<string, { type: string; enum?: unknown[] }> = {}, required: string[] = []): HostTool => ({
@@ -185,6 +187,17 @@ describe("runPhase", () => {
     expect((await runPhase(host({ ok: true, skipped: true }), never, "areas")).status).toBe("skipped");
     const blocked = await runPhase(host({ ok: false, stop: "ERROR: missing ## Plot" }), never, "areas");
     expect(blocked).toMatchObject({ status: "blocked", reason: "ERROR: missing ## Plot" });
+  });
+});
+
+describe("withoutStartCheck", () => {
+  it("replaces step 1 in every phase prompt and leaves the end check", () => {
+    for (const phase of PHASES) {
+      const body = withoutStartCheck(loadPhasePrompt(phase).body, phase);
+      expect(body, phase).not.toContain('step: "start"');
+      expect(body, phase).toContain("1. (Already done for you: the start check passed.)");
+      expect(body, phase).toContain(`phase_check(phase: "${phase}", step: "end")`);
+    }
   });
 });
 

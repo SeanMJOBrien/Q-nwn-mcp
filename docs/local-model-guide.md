@@ -245,7 +245,8 @@ game's resource list (2026-11-13).
 
 What the short prompts leave out, compared with the skills (a module built from them is simpler):
 
-- areas: the hand-designed layout fallback, starter-store area, the `_start` clean-up and the portal dialog texts.
+- areas: the hand-designed layout fallback, the starter-store area and the portal dialog texts (the `_start` clean-up is
+  one call, `set_module_start`).
 - environment: sounds attached to objects, useable objects with flavour text, entrance waypoints.
 - actors: walk waypoints, non-standard looks, per-companion spell and gear choices.
 - quests: templates, skill checks, branches, spawns, searches (the full spec still accepts them).

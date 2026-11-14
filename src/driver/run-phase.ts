@@ -115,6 +115,12 @@ export function trimContext(messages: ChatMessage[], budget: number): void {
   }
 }
 
+/** The driver has already run the start check, so the model need not spend a turn on it. */
+export function withoutStartCheck(body: string, phase: Phase): string {
+  const line = new RegExp(`^1\\. \`phase_check\\(phase: "${phase}", step: "start"\\)\`.*$`, "m");
+  return body.replace(line, "1. (Already done for you: the start check passed.)");
+}
+
 function checkOk(text: string): { ok: boolean; skipped: boolean; errors: string[] } {
   try {
     const r = JSON.parse(text) as { ok?: boolean; skipped?: boolean; errors?: string[]; stop?: string; error?: string };
@@ -144,7 +150,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
 
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM },
-    { role: "user", content: `${prompt.body}\n\nBegin with step 1.` },
+    { role: "user", content: `${withoutStartCheck(prompt.body, phase)}\n\nBegin with step 2.` },
   ];
   let failedChecks = 0;
   let lastFailing = "";

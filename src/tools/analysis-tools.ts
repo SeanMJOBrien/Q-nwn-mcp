@@ -1,3 +1,4 @@
+import { DM_AREA_RESREF } from "../util/dm-books.js";
 import { briefModuleSummary, resolveBrief } from "../util/brief.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -20,7 +21,7 @@ import type { ModuleIndex } from "../types/module.js";
 export function computeConnectivity(
   index: ModuleIndex,
   start: string,
-): { graph: Record<string, string[]>; reachable: Set<string>; unreachable: string[] } {
+): { graph: Record<string, string[]>; reachable: Set<string>; unreachable: string[]; byDesign: string[] } {
   const tagToArea = buildTagToAreaMap(index);
   const graph: Record<string, string[]> = {};
   for (const [areaResref] of index.areas) {
@@ -38,7 +39,14 @@ export function computeConnectivity(
       }
     }
   }
-  return { graph, reachable, unreachable: [...index.areas.keys()].filter((a) => !reachable.has(a)) };
+  // The DM area is disconnected on purpose (the DM teleports there; no transition leads in or out): never a fault.
+  const cutOff = [...index.areas.keys()].filter((a) => !reachable.has(a));
+  return {
+    graph,
+    reachable,
+    unreachable: cutOff.filter((a) => a !== DM_AREA_RESREF),
+    byDesign: cutOff.filter((a) => a === DM_AREA_RESREF),
+  };
 }
 
 export function registerAnalysisTools(server: McpServer): void {
@@ -923,7 +931,7 @@ export function registerAnalysisTools(server: McpServer): void {
         return { isError: true, content: [{ type: "text", text: `Start area "${start || "(none)"}" not found in module.` }] };
       }
 
-      const { graph, reachable, unreachable } = computeConnectivity(index, start);
+      const { graph, reachable, unreachable, byDesign } = computeConnectivity(index, start);
 
       return {
         content: [
@@ -935,6 +943,7 @@ export function registerAnalysisTools(server: McpServer): void {
                 reachable: [...reachable],
                 unreachable,
                 graph,
+                ...(byDesign.length ? { disconnectedOnPurpose: byDesign, note: "The DM area has no transitions by design; it is not a fault." } : {}),
                 fullyConnected: unreachable.length === 0,
               },
               null,

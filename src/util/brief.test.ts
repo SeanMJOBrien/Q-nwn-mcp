@@ -90,6 +90,21 @@ describe("briefVerifyAll", () => {
     expect(b.errorsNotShown).toBe(1);
     expect(b.warningsByCode).toEqual([{ code: "w", count: 1 }]);
   });
+  it("lists one warning per code that has a repair, with its target, most frequent code first", () => {
+    const w = (target: string, code: string, fix?: string): VerifyResult => ({
+      target,
+      type: "dialog",
+      status: "warn",
+      errors: [],
+      warnings: [{ code, message: `${code} on ${target}`, ...(fix ? { fix } : {}) }],
+    });
+    const b = briefVerifyAll([w("m", "desc_empty", "set_module_description"), w("d1", "branch_ends", "add_dialog_return_links(dialog: d1)"), w("d2", "branch_ends", "x"), w("c", "no_fix")]);
+    expect(b.warningsWithFix).toEqual([
+      { target: "d1", type: "dialog", code: "branch_ends", message: "branch_ends on d1", fix: "add_dialog_return_links(dialog: d1)" },
+      { target: "m", type: "dialog", code: "desc_empty", message: "desc_empty on m", fix: "set_module_description" },
+    ]);
+  });
+
   it("a clean module is shippable with an empty list", () => {
     const b = briefVerifyAll([mk("a", [], ["w"])]);
     expect(b.shippable).toBe(true);

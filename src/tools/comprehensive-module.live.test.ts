@@ -147,6 +147,35 @@ describe.skipIf(!hasRealNwnData)(
     );
 
     it(
+      "set_module_start moves the entry point to walkable ground and removes the empty starter area",
+      async () => {
+        const refused = await call("set_module_start", { area: "no_such_area" });
+        expect(refused.success).toBe(false);
+        expect(refused.field).toBe("area");
+
+        const started = await call("set_module_start", { area: "livetest_dungeon" });
+        expect(started.success).toBe(true);
+        expect(started.startArea).toBe("livetest_dungeon");
+        expect(started.previousStartArea).toBe("_start");
+        expect(started.starterArea).toBe("removed (it was empty)");
+        expect(started.x as number).toBeGreaterThan(0);
+        expect(started.x as number).toBeLessThan(120);
+
+        // Calling it again changes nothing: the starter area is already gone.
+        const again = await call("set_module_start", { area: "livetest_dungeon" });
+        expect(again.success).toBe(true);
+        expect(again.starterArea).toBe("none");
+        expect(again.x).toBe(started.x);
+        expect(again.y).toBe(started.y);
+
+        // The old entry area can no longer be deleted by mistake, and the starter is really gone.
+        const gone = await client.callTool({ name: "delete_area", arguments: { area: "_start" } });
+        expect(gone.isError).toBe(true);
+      },
+      60_000,
+    );
+
+    it(
       "get_tileset_details returns real terrain/crosser/adjacency data",
       async () => {
         const details = await call("get_tileset_details", { tileset: "tdm01" });

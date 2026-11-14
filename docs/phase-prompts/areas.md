@@ -22,8 +22,9 @@ You build one area per location in the plot and connect them. The tools know the
    6. `place_tile_doors(area: "darkforest")`.
    7. `set_area_properties(area: "darkforest", musicDay: "1", musicNight: "3", musicBattle: "10", ambientSndDay: "33", skyBox: "1", dayNightCycle: true)` with values from the table.
 4. For each line in Connections, one call: `adventure_create_transition(areaA: "village", aX: "85", aY: "45", areaB: "darkforest", bX: "15", bY: "15", tag: "vil_for")`. Use the transition points from each layout result. If a point is refused, get one with `adventure_find_walkable(area: "village", count: "3", clearRadius: "2")`.
-5. `check_area_connectivity()`: `unreachable` must be empty.
-6. `write_story_section(section: "Areas", text: "...")`, then `phase_check(phase: "areas", step: "end")`.
+5. `set_module_start(area: "village")` with the area where the story opens. It sets the players' start point and removes the empty `_start` area.
+6. `check_area_connectivity()`: `unreachable` must be empty.
+7. `write_story_section(section: "Areas", text: "...")`, then `phase_check(phase: "areas", step: "end")`.
 
 ## Style by tileset
 

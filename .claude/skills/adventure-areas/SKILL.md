@@ -26,9 +26,8 @@ Fully autonomous. Make all decisions based on the plot document — do NOT ask t
 If the module was created by `create_module`, it contains a temporary `_start` area (MicroSet 3x3). Before building real areas, check whether `adventure.md`'s `## Plot` notes a "Starter" store (see `adventure-affordances/SKILL.md`'s "Optional: the Starter store" — a pre-story shop where the player spends a gold allowance on gear of their choosing before the adventure begins).
 
 **No Starter store planned:**
-1. Call `remove_object` to remove `_start` from the GIT if needed
-2. The first real area you create will become the new entry area — after creating it, update the IFO entry point: use `modify_gff_field` to set `Mod_Entry_Area` to the new area's resref, and set `Mod_Entry_X`/`Mod_Entry_Y` to a walkable position in that area
-3. Remove `_start` from `Mod_Area_list` in the IFO, and delete `_start.are`, `_start.git`, `_start.gic` from the temp dir
+1. Build the first story area (the one the plot opens in) as usual.
+2. Call `set_module_start(area: "<its resref>")`. It sets `Mod_Entry_Area` and `Mod_Entry_X/Y/Z` to open walkable ground near the area's centre (pass `x` and `y` to choose the spot yourself) and removes `_start` when it is empty and no transition uses it. Do not edit these fields with `modify_gff_field`.
 
 **Starter store planned:** the start area must be a real, dedicated area, kept — not deleted and
 folded into the first story area the way it is above. It houses the Starter store and nothing
@@ -62,7 +61,9 @@ else story-related (an overview/orientation line is fine; plot content is not �
    `adventure_create_transition` (Phase 7's standard mechanism) — the player steps through it
    once they've geared up, and that's where the plot actually opens.
 3. Do not remove `_start` from `Mod_Area_list` or delete its files — it remains a real, permanent
-   area for the life of the module.
+   area for the life of the module. Do not call `set_module_start` on the story area here: the
+   start stays in `_start`. (To move the entry point inside `_start`, call
+   `set_module_start(area: "_start")`.)
 
 ---
 
@@ -389,15 +390,13 @@ The solver prioritizes preserving crossers over exact corner matching. At a Pit/
   centre computed as `col*10+5, row*10+5` came back `Nonwalk (ID 7)`. On any decorated
   terrain, get positions from `adventure_find_walkable`, never from arithmetic. (The tile-centre fallback
   `col*10+5, row*10+5` is safe on plain floor/clearing tiles only; confirm with `probe_ground`.)
-- **Delete the template's `_start` area** once the real entry area exists and
-  `Mod_Entry_Area` points at it. `create_module` always leaves a `tms01` stub behind, and
-  it shows up as permanently unreachable in `check_area_connectivity`.
-- **Setting the module entry position needs care.** `modify_gff_field` cannot write float
-  fields (`Mod_Entry_X/Y/Z`) — the value arrives as a string and `nwn_gff` rejects it,
-  leaving the in-memory document dirty so later writes of `module.ifo` also fail. If it
-  happens: `load_module` on the module project directory (with `force: true`) to re-read it. Prefer choosing an
-  entry area whose default position is already walkable, verified with
-  `adventure_find_walkable` on a bounding box around it.
+- **Set the start with `set_module_start`, not by hand.** `create_module` always leaves a `tms01`
+  stub `_start` behind; left in place it shows up as permanently unreachable in
+  `check_area_connectivity`. `set_module_start(area)` moves the entry point to walkable ground in
+  the named area and removes the empty stub. `modify_gff_field` cannot write the float fields
+  `Mod_Entry_X/Y/Z` (the value arrives as a string, `nwn_gff` rejects it and later writes of
+  `module.ifo` fail; if that happened, `load_module` on the module project directory with
+  `force: true` re-reads it).
 
 ## Finish
 

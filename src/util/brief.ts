@@ -137,9 +137,10 @@ export interface BriefFinding {
 
 /**
  * The errors to work on next: one finding per distinct code first (most frequent code first),
- * then further instances, up to `max`. Warnings are counted, not listed.
+ * then further instances, up to `max`. Warnings are counted by code; one example per code that has a repair is listed
+ * with its target (`warningsWithFix`), the rest are not.
  */
-export function briefVerifyAll(results: VerifyResult[], max = 8) {
+export function briefVerifyAll(results: VerifyResult[], max = 8, maxWarnings = 5) {
   const errorCount = results.reduce((n, r) => n + r.errors.length, 0);
   const warningCount = results.reduce((n, r) => n + r.warnings.length, 0);
 
@@ -167,6 +168,20 @@ export function briefVerifyAll(results: VerifyResult[], max = 8) {
   const warnByCode = new Map<string, number>();
   for (const r of results) for (const w of r.warnings) warnByCode.set(w.code, (warnByCode.get(w.code) ?? 0) + 1);
 
+  // A few warnings that come with a repair, one per code (most frequent code first), each with its target,
+  // so a model reading only this short result can still name the right object and act on an easy one.
+  const firstWithFix = new Map<string, BriefFinding>();
+  for (const r of results) {
+    for (const w of r.warnings) {
+      if (w.fix && !firstWithFix.has(w.code)) {
+        firstWithFix.set(w.code, { target: r.target, type: r.type, code: w.code, message: w.message, fix: w.fix });
+      }
+    }
+  }
+  const warningsWithFix = [...firstWithFix.values()]
+    .sort((a, b) => (warnByCode.get(b.code) ?? 0) - (warnByCode.get(a.code) ?? 0))
+    .slice(0, maxWarnings);
+
   return {
     brief: true,
     shippable: errorCount === 0,
@@ -176,6 +191,7 @@ export function briefVerifyAll(results: VerifyResult[], max = 8) {
     errorsByCode: groups.map(([code, list]) => ({ code, count: list.length })),
     warningsByCode: [...warnByCode.entries()].sort((a, b) => b[1] - a[1]).map(([code, count]) => ({ code, count })),
     fixFirst,
+    ...(warningsWithFix.length ? { warningsWithFix } : {}),
     ...(errorCount > fixFirst.length ? { errorsNotShown: errorCount - fixFirst.length } : {}),
     next:
       errorCount === 0

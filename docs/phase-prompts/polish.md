@@ -12,7 +12,7 @@ You check the whole module and fix what the checkers report. You do not add new 
 
 1. `phase_check(phase: "polish", step: "start")`. Stop on `skipped` or on an error (repeat its `stop` text).
 2. `read_story(sections: "Module,Plot,Quests")` so you know what the module should contain.
-3. `verify_all()`. It answers `shippable`, `errorCount` and `fixFirst`: the errors to repair first, each with `target`, `code`, `message` and `fix`.
+3. `verify_all()`. It answers `shippable`, `errorCount` and `fixFirst`: the errors to repair first, each with `target`, `code`, `message` and `fix`. `warningsWithFix` lists a few warnings in the same form.
 4. For each entry in `fixFirst`: do what its `fix` says, with the tool it names. Then run the single checker for that target to confirm, for example `verify_dialog(resref: "dlg_elara")`, `verify_creature(resref: "elara")` or `verify_area(area: "village")`.
 5. Repeat steps 3 and 4 until `shippable` is true, or until the same error has come back twice. At most 5 rounds.
 6. `check_area_connectivity()`: `unreachable` must be empty.
@@ -30,7 +30,7 @@ You check the whole module and fix what the checkers report. You do not add new 
 ```
 
 - `target` is the thing that is wrong, `code` names the defect, `fix` is the repair.
-- An error blocks shipping. A warning is advice; fix a warning only when the fix is one tool call.
+- An error blocks shipping. A warning is advice: repair one from `warningsWithFix` only when its `fix` is a single tool call you have. Name a finding by its own `target`, never by another object.
 
 ## Rules
 
