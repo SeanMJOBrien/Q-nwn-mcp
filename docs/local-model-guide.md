@@ -258,12 +258,61 @@ What the short prompts leave out, compared with the skills (a module built from 
 
 Not tested: no small model has run these prompts yet. That is package W7.
 
+### The driver (W2, built 2026-11-13)
+
+`node dist/cli/drive.js` builds a module phase by phase with a model on an OpenAI-compatible endpoint (Ollama,
+llama.cpp, LM Studio, vLLM). It needs no Claude Code, no skills and no MCP client: it starts the MCP server itself.
+
+```
+export NIM_FOLDER_NWTOOLS=... NWN_FOLDER_DATA=... NWN_FOLDER_USER=...     # as for the MCP server
+node dist/cli/drive.js --module adventures/My-Module --endpoint http://localhost:11434/v1 --model qwen2.5:14b
+node dist/cli/drive.js --module adventures/My-Module --dry-run            # the plan; no model, no changes
+node dist/cli/drive.js --create "The Old Mill" --idea "Bandits hold a mill" --level 3 --party 4 --minutes 90 \
+     --endpoint http://localhost:11434/v1 --model qwen2.5:14b
+```
+
+For each phase, in order:
+
+1. `phase_check` start. A skipped phase is skipped; a missing section stops the run with the message.
+2. A fresh conversation: a six-line system prompt plus the short phase prompt. The model sees only the tools of the
+   phase's profile (13 to 45), with descriptions cut to 300 characters and parameter descriptions to 140. `load_module`,
+   `repack_module` and `get_phase_prompt` are never shown.
+3. Every tool call is checked before it runs: the tool must be in the phase; the arguments must be JSON; numbers,
+   lists and "true" are converted to what the tool takes; an unknown or missing parameter is refused by name; for
+   `build_key_npc`, `build_companion`, `create_dialog` and `adventure_generate_layout` the build spec is validated and
+   the failing field is named. A refused call costs no tool run.
+4. Tool results are cut to 6,000 characters; past 48,000 characters of conversation the oldest results are dropped.
+5. `phase_check` end decides. If the model stops without it, the driver runs it and hands back the first five
+   errors. After 3 failed checks (`--retries`) or 60 model turns (`--max-steps`) the phase is given up.
+6. A failed phase goes once to `--escalate-model` when one is given; otherwise the run stops there, because later
+   phases need it.
+
+A phase recorded as a success in the status file is skipped, so a stopped run is resumed by running the same
+command again (`--force` runs a phase again). `--phases quests,polish` limits the run. Transcripts go to
+`<adventure dir>/driver-log/<time>-<phase>.jsonl`, one line per model turn, tool call and refusal. Progress is
+printed on stderr and a JSON summary on stdout; exit code 0 = all done or skipped, 2 = a phase failed or was
+blocked, 1 = usage or connection error. The `.mod` is never built by the driver.
+
+Code: `src/cli/drive.ts`, `src/driver/run-phase.ts` (the loop; model and tool host are injected), `src/driver/llm.ts`
+(endpoint client; also recovers a tool call a model wrote into its text), `src/driver/coerce.ts`.
+
+Tested: the loop with a scripted model (success, refusals, early stop, giving up, step limit, skipped and blocked
+phases), and once end to end with a scripted HTTP endpoint, the real MCP server and a copy of The Salt Gate
+Conspiracy (polish phase: seven turns, two refusals before the call, success, resume skips it). The first request
+of that phase was 24,400 characters (about 6,000 tokens), most of it the 35 tool definitions.
+
+**Not tested: a real model.** How far a Qwen-class model gets through each phase is unknown until W7. Expect the
+areas phase (45 tools, the longest tool results) to be the hardest. Known limits: one tool call's result at a time is
+all the model sees of the module; the model must copy a whole layout result into `adventure_apply_layout`, which a
+small context may not hold (if that fails in practice, the driver should carry the layout itself); there is no
+constrained decoding yet (the endpoint's JSON-schema mode is not used; arguments are checked after the fact).
+
 ## 6. Work packages
 
 | # | Package | Size | Acceptance |
 |---|---|---|---|
 | W1 | **DONE 2026-11-13.** `MCP_TOOL_PROFILE`: register only the named groups; document the profiles | small | Server lists fewer than 40 tools with `quests,verify`; default unchanged; tests |
-| W2 | Driver: a script that runs one phase at a time with a trimmed profile, a short phase prompt, schema-checked answers, retries and `phase_check` between phases | large | One module built end to end with a local model plus a human-written plot |
+| W2 | **BUILT 2026-11-13, not yet run with a real model (see below).** Driver: a script that runs one phase at a time with a trimmed profile, a short phase prompt, schema-checked answers, retries and `phase_check` between phases | large | One module built end to end with a local model plus a human-written plot |
 | W3 | **DONE 2026-11-13 (see below).** Short phase prompts: for each skill, a 2-4 KB version with the steps and the tool order, generated from or checked against the full skill (`skill-lint` already checks the full ones) | medium | Each phase prompt under 4 KB; lint passes |
 | W4 | **DONE 2026-11-13 (see below).** Input schemas for companion, key NPC, dialog, journal, area style | medium | Each has a JSON schema generated from the TypeScript type like `quest:schema`; the driver validates against them |
 | W5 | **DONE 2026-11-13 (see below).** Result trimming: a `brief` option (or client-side summariser) for `visualize_area`, `get_module_summary` and verifier output | small | Typical result under 4k tokens with the facts the phase needs |

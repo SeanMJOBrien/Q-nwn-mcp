@@ -16,6 +16,7 @@
     "hooks:install": "./scripts/install-hooks.sh",
     "quest:schema": "ts-json-schema-generator --path src/util/quest-spec.ts --type QuestInput --tsconfig tsconfig.json --no-type-check -o docs/quest-spec.schema.json",
     "specs:schema": "mkdir -p docs/specs && ts-json-schema-generator --path src/util/build-specs.ts --type CompanionSpec --tsconfig tsconfig.json --no-type-check -o docs/specs/companion.schema.json && ts-json-schema-generator --path src/util/build-specs.ts --type KeyNpcSpec --tsconfig tsconfig.json --no-type-check -o docs/specs/key-npc.schema.json && ts-json-schema-generator --path src/util/build-specs.ts --type DialogSpec --tsconfig tsconfig.json --no-type-check -o docs/specs/dialog.schema.json && ts-json-schema-generator --path src/util/build-specs.ts --type JournalSpec --tsconfig tsconfig.json --no-type-check -o docs/specs/journal.schema.json && ts-json-schema-generator --path src/util/build-specs.ts --type AreaLayoutSpec --tsconfig tsconfig.json --no-type-check -o docs/specs/area-layout.schema.json",
+    "drive": "node dist/cli/drive.js",
     "quest:bundle": "node scripts/bundle-quest-cli.mjs"
   },
   "keywords": [
