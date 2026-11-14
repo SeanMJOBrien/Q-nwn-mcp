@@ -7,6 +7,7 @@
 import fs from "fs";
 import path from "path";
 import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
+import { plotSemanticErrors } from "./plot-spec.js";
 
 export interface SpecKind {
   /** Schema file name stem and TypeScript type. */
@@ -21,6 +22,7 @@ export const SPEC_KINDS: Record<string, SpecKind> = {
   dialog: { type: "DialogSpec", describes: "a new conversation (create_dialog)" },
   journal: { type: "JournalSpec", describes: "a plain journal quest with its entries (add_journal_quest + add_journal_entry)" },
   "area-layout": { type: "AreaLayoutSpec", describes: "a generated area layout (adventure_generate_layout)" },
+  plot: { type: "PlotSpec", describes: "the adventure's plot: places, people, quests (write_plot)" },
 };
 
 export interface SpecError {
@@ -118,6 +120,7 @@ function semanticErrors(kind: string, spec: any): SpecError[] {
       if (e.end && i !== spec.entries.length - 1) errors.push({ field: `entries[${i}].end`, message: "only the last entry may end the quest" });
     });
   }
+  if (kind === "plot") errors.push(...plotSemanticErrors(spec));
   if (kind === "companion" || kind === "key-npc") {
     if (spec.domains && spec.classId !== 2) errors.push({ field: "domains", message: "only a Cleric (classId 2) has domains; remove it" });
     if (spec.school !== undefined && spec.classId !== 10) errors.push({ field: "school", message: "only a Wizard (classId 10) has a school; remove it" });
@@ -164,6 +167,8 @@ export function specToToolCalls(kind: string, spec: any): ToolCall[] {
       return [{ tool: "create_dialog", args: toToolArgs(spec) }];
     case "area-layout":
       return [{ tool: "adventure_generate_layout", args: toToolArgs(spec) }];
+    case "plot":
+      return [{ tool: "write_plot", args: { spec: JSON.stringify(spec) } }];
     case "journal": {
       const { entries, ...quest } = spec;
       return [

@@ -230,6 +230,47 @@ describe("story tools and phase prompts", () => {
     }
   });
 
+  it("write_plot checks the spec, writes Module and Plot, and the plot phase check passes on it", async () => {
+    const { c, close } = await client();
+    try {
+      const spec = JSON.parse(await fs.readFile(path.join(import.meta.dirname, "..", "..", "docs", "specs", "plot.example.json"), "utf8"));
+
+      const notJson = await c.callTool({ name: "write_plot", arguments: { spec: "{title" } });
+      expect(notJson.isError).toBe(true);
+      expect(body(notJson).field).toBe("spec");
+
+      const wrong = await c.callTool({ name: "write_plot", arguments: { spec: JSON.stringify({ ...spec, quests: [{ ...spec.quests[0], giver: "Nobody" }] }) } });
+      expect(wrong.isError).toBe(true);
+      expect((body(wrong).fields as Array<{ field: string }>).map((f) => f.field)).toEqual(["quests[0].giver"]);
+
+      const dry = body(await c.callTool({ name: "write_plot", arguments: { spec: JSON.stringify(spec), dryRun: true } }));
+      expect(dry.dryRun).toBe(true);
+      expect(String(dry.plot)).toContain("### Story Graph");
+      expect((await c.callTool({ name: "read_story", arguments: {} })).isError).toBe(true); // nothing written
+
+      await c.callTool({ name: "write_story_section", arguments: { section: "Module", text: "- **Scope:** whole adventure" } });
+      const wrote = body(await c.callTool({ name: "write_plot", arguments: { spec: JSON.stringify(spec) } }));
+      expect(wrote).toMatchObject({ ok: true, locations: 3, npcs: 3, quests: 1, next: 'phase_check(phase: "plot", step: "end")' });
+      // the loaded module is "Demo", not the plot's title
+      expect((wrote.warnings as string[]).some((w) => w.includes('the loaded module is "Demo"'))).toBe(true);
+
+      const story = await fs.readFile(path.join(advDir(), "Demo.md"), "utf8");
+      expect(story).toContain("## Module\n\n- **Scope:** whole adventure\n- **Title:** The Mill on Blackwater\n- **Target Level:** 2\n");
+      expect(story).toContain("## Plot\n\n### Premise\n");
+
+      // writing it again replaces, never duplicates
+      await c.callTool({ name: "write_plot", arguments: { spec: JSON.stringify(spec) } });
+      const again = await fs.readFile(path.join(advDir(), "Demo.md"), "utf8");
+      expect(again).toBe(story);
+
+      const end = body(await c.callTool({ name: "phase_check", arguments: { phase: "plot", step: "end" } }));
+      expect(end).toMatchObject({ ok: true, status: "success", errorCount: 0 });
+      expect(body(await c.callTool({ name: "phase_check", arguments: { phase: "areas", step: "start" } })).ok).toBe(true);
+    } finally {
+      await close();
+    }
+  });
+
   it("write_dm_guide writes the titled guide file", async () => {
     const { c, close } = await client();
     try {

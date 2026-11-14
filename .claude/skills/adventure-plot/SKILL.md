@@ -43,6 +43,7 @@ Call `phase_check(phase: "plot", step: "start")`. If it returns an error, **STOP
 ### Phase 1b: Use the user's material, and plan the shape
 
 - **If the user gave a story, a setting, notes, or a pile of separate vignettes, build from that, not around it.** Split it into beats (a scene, an NPC, a place, a secret, an encounter, an item), keep the user's own names and wording, and map each beat onto a location, an event or a quest. Invent only to connect beats or fill what is missing, and say which parts are yours. Don't replace their NPCs or places with new ones.
+- **A plot the user already wrote:** when the user hands over a plot file (JSON under `docs/specs/plot.schema.json`), call `write_plot(spec: "<the file's content>")` instead of writing the section yourself. It checks the names against each other, writes `## Plot` with a story graph and sets the Module fields; then finish with the phase's end check.
 - **Plan the shape:** call `plan_adventure_shape(playMinutes: <Estimated Duration in minutes>, biome: <main biome>)`. It returns how many areas and events fit, which kinds (combat, ambush, boss, chain, social, obstacle, trap, discovery, friendly, rest) go in which area in story order, and the ground each area needs. Treat it as a starting plan: move events to fit the story, keep at least one friendly or discovery event early and a boss last. A **chain** is a multi-part encounter: a lookout or scout camp first, then the main force; it is built in `/adventure-quests` with a `spawn` on the first part's kill stage.
 
 ---

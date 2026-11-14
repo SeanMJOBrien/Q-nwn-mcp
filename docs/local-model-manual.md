@@ -52,6 +52,13 @@ node dist/cli/drive.js --create "The Old Mill" \
   --endpoint http://localhost:11434/v1 --model qwen2.5:14b
 ```
 
+A new module from a plot you wrote yourself (section 5a); no model writes the story:
+
+```
+node dist/cli/drive.js --plot my-plot.json \
+  --endpoint http://localhost:11434/v1 --model qwen2.5:14b
+```
+
 Work on a copy the first time. The driver changes the module project as it goes, and `--force` on a finished phase
 adds to what is already there.
 
@@ -81,6 +88,7 @@ It never builds the `.mod`. When the run is finished, build it yourself (section
 | `--phases a,b` | Run only these phases; they still run in pipeline order |
 | `--force` | Run a phase again although it is recorded as a success |
 | `--idea`, `--level`, `--party`, `--minutes`, `--tone` | Used to write the story's Module section when it has none |
+| `--plot <file.json>` | A plot file (section 5a). The driver writes the Module and Plot sections from it and skips the plot phase. Without `--module` or `--create` it creates a module with the plot's title |
 | `--max-steps <n>` | Model turns per phase (default 60) |
 | `--retries <n>` | Failed phase checks allowed per phase (default 3) |
 | `--context-chars <n>` | Conversation size in characters before old results are dropped (default 48000) |
@@ -104,11 +112,38 @@ Exit code: 0 = every phase done or skipped, 2 = a phase failed or was blocked, 1
 | 8 | polish | 35 | Runs the checkers and repairs what they report |
 | 9 | rewards | 38 | Sets quest rewards, the final item, the module description and the DM guide |
 
-The plot phase is the one most likely to need a stronger model or a person: it is the only fully creative one. You
-can write the Plot section yourself in the story file (`adventures/<Title>/<Title>.md`, format in
-`docs/phase-prompts/plot.md`) and start the driver at `--phases areas,...`.
+The plot phase is the one most likely to need a stronger model or a person: it is the only fully creative one.
+Write the plot as a file and pass it with `--plot` (next section).
 
 The areas phase is the hardest technically (most tools, longest results).
+
+## 5a. Writing the plot yourself
+
+Copy `docs/specs/plot.example.json` and change it. The file holds:
+
+| Field | Content |
+|---|---|
+| `title`, `premise`, `level`, `playMinutes`, `partySize`, `tone` | The basics. `premise` is two or three sentences |
+| `locations` | The places in story order; the first is where players start. Each has `name`, `tileset` (for example `ttf01` forest, `ttr01` rural, `tcn01` city, `tin01` house or inn, `tde01` dungeon, `tdm01` cave), `purpose` (hub, travel, adventure or boss), `events` (combat, ambush, boss, chain, social, obstacle, trap, discovery, friendly, rest) and `beat` (one sentence). `resref` is optional |
+| `connections` | Pairs of location names the party can walk between |
+| `npcs` | `name`, `location`, `role` (quest giver, merchant, companion or witness), `race`, `class`, `gender`, `motive`, `voice` |
+| `antagonists` | `name`, `who`, `location`, `motive`, `defeat` |
+| `quests` | `name`, `giver` (an NPC name), `stages` (two or more sentences, in order); `primary: true` on the main quest |
+| `challenges` | Optional: `location`, `enemies`, `obstacle` |
+| `merchant`, `finalReward` | The NPC who trades (optional) and the reward at the end |
+
+Check the file without running anything:
+
+```
+node dist/cli/spec.js validate plot my-plot.json
+node dist/cli/drive.js --plot my-plot.json --dry-run
+```
+
+An error names the field, for example `quests[0].giver: "Nobody" is not one of the npcs`. The dry run also prints
+notes, such as a location count that does not fit the play time; notes do not stop the run.
+
+A larger model can write the file for you: give it your idea and the schema (`node dist/cli/spec.js schema plot`).
+Inside an MCP session the same file goes to the `write_plot` tool.
 
 ## 6. Context size
 
@@ -203,7 +238,7 @@ items, patrol paths, the win-state script, class-specific reward items. The full
 |---|---|
 | A run with a real model | Not done. Nothing here is proven with one |
 | Comparison of a local-model build with a Claude build (W7) | Not done; needs the runs above |
-| Plot from a form or file, so a person writes phase 1 once (W6) | Not built. Today: write the Plot section by hand in the story file |
+| Plot from a file, so a person writes phase 1 once (W6) | Built 2026-11-14: `--plot <file>` (section 5a). A web form for it is not built |
 | Quest forms for the studio (W8) | Planned in `docs/quest-frontends-work-plan.md` |
 | Constrained decoding (the endpoint's JSON-schema mode) | Not used; arguments are checked after the model writes them |
 | Driver carries large results itself (the area layout) | Not built; the model has to copy the layout into the next call |

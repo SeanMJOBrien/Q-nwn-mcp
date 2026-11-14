@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { describe, expect, it } from "vitest";
 import { registerAll } from "../register-all.js";
 import { SPEC_KINDS, loadSpecSchema, specToToolCalls, validateSpec } from "./spec-validate.js";
@@ -47,7 +49,8 @@ const journal = {
   ],
 };
 const areaLayout = { tileset: "ttf01", width: 16, height: 16, style: { type: "forest", rooms: 3 }, transitionDirections: ["south"] };
-const examples: Record<string, unknown> = { companion, "key-npc": keyNpc, dialog, journal, "area-layout": areaLayout };
+const plot = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "..", "..", "docs", "specs", "plot.example.json"), "utf8"));
+const examples: Record<string, unknown> = { companion, "key-npc": keyNpc, dialog, journal, "area-layout": areaLayout, plot };
 
 describe("build specs", () => {
   const shapes = toolShapes();

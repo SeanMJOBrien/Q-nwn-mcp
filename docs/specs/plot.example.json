@@ -1,0 +1,98 @@
+{
+  "title": "The Mill on Blackwater",
+  "premise": "The miller of Blackwater has gone missing and goblins now hold the old mill. The village elder suspects the goblins serve someone in the caves under the mill. The party must clear the mill and stop whoever leads them.",
+  "level": 2,
+  "playMinutes": 60,
+  "partySize": 4,
+  "tone": "heroic",
+  "locations": [
+    {
+      "name": "Blackwater Village",
+      "resref": "blackwater",
+      "tileset": "ttr01",
+      "purpose": "hub",
+      "events": ["friendly", "social"],
+      "beat": "Elder Maren asks the party to find the miller and offers what the village can pay."
+    },
+    {
+      "name": "The Mill Road",
+      "resref": "millroad",
+      "tileset": "ttf01",
+      "purpose": "travel",
+      "events": ["ambush", "discovery"],
+      "beat": "Goblin scouts ambush the party; the miller's torn apron lies beside the road."
+    },
+    {
+      "name": "Caves under the Mill",
+      "resref": "millcaves",
+      "tileset": "tdm01",
+      "purpose": "boss",
+      "events": ["combat", "trap", "boss"],
+      "beat": "The party fights through the goblin warren to the shaman Grukk and frees the miller."
+    }
+  ],
+  "connections": [
+    ["Blackwater Village", "The Mill Road"],
+    ["The Mill Road", "Caves under the Mill"]
+  ],
+  "npcs": [
+    {
+      "name": "Elder Maren",
+      "location": "Blackwater Village",
+      "role": "quest giver",
+      "race": "human",
+      "class": "cleric",
+      "gender": "female",
+      "motive": "She wants the miller home before the harvest is lost.",
+      "voice": "Calm and plain, with short sentences."
+    },
+    {
+      "name": "Tobb the Pedlar",
+      "location": "Blackwater Village",
+      "role": "merchant",
+      "race": "halfling",
+      "class": "rogue",
+      "gender": "male",
+      "motive": "He wants to sell his stock and leave before the goblins come closer.",
+      "voice": "Fast and cheerful, always naming a price."
+    },
+    {
+      "name": "Sera Dunn",
+      "location": "Blackwater Village",
+      "role": "companion",
+      "race": "human",
+      "class": "fighter",
+      "gender": "female",
+      "motive": "The miller is her uncle and she will not wait for help.",
+      "voice": "Blunt and impatient."
+    }
+  ],
+  "antagonists": [
+    {
+      "name": "Grukk",
+      "who": "a goblin shaman",
+      "location": "Caves under the Mill",
+      "motive": "He needs the mill's grain to feed a growing warband.",
+      "defeat": "The party kills him in the deepest cave."
+    }
+  ],
+  "quests": [
+    {
+      "name": "The Missing Miller",
+      "primary": true,
+      "giver": "Elder Maren",
+      "stages": [
+        "Elder Maren asks the party to find the miller.",
+        "The party crosses the Mill Road and finds the miller's apron.",
+        "The party defeats Grukk in the caves and frees the miller.",
+        "The party returns to Elder Maren, who pays the reward."
+      ]
+    }
+  ],
+  "challenges": [
+    { "location": "The Mill Road", "enemies": "4 goblin scouts" },
+    { "location": "Caves under the Mill", "enemies": "6 goblins and the shaman Grukk", "obstacle": "a spike trap in the entry tunnel" }
+  ],
+  "merchant": "Tobb the Pedlar",
+  "finalReward": "300 gold and the miller's silver ring"
+}

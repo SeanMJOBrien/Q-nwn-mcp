@@ -17,7 +17,7 @@ You build one area per location in the plot and connect them. The tools know the
    1. `suggest_area_size(biome: "forest", events: "3")` with the location's biome and number of events. Add `shape: "linear"` when Travel is yes. For a house, inn or shop use `biome: "interior"` with `purpose: "inn"` (cabin, home, inn, tavern, shop or hall). Use the width and height it returns.
    2. `adventure_list_features(tileset: "ttf01", style: "forest")`. Choose 3 to 6 group names that fit the location, best first.
    3. `adventure_generate_layout(tileset: "ttf01", width: "16", height: "16", style: "{\"type\":\"forest\",\"rooms\":3,\"preferredFeatures\":[\"...\"]}", transitionCount: "2")`. `transitionCount` = the number of Connections of this location.
-   4. `create_area(resref: "darkforest", name: "The Dark Forest", width: "16", height: "16", tileset: "ttf01")`. Resref: lower case, no spaces, at most 16 characters.
+   4. `create_area(resref: "darkforest", name: "The Dark Forest", width: "16", height: "16", tileset: "ttf01")`. Use the location's **Resref** when the plot gives one; else lower case, no spaces, at most 16 characters.
    5. `adventure_apply_layout(area: "darkforest", layout: "<the whole result of step 3>")`. If it reports `solverWarnings`, generate again with fewer rooms or `"safeMode":true`.
    6. `place_tile_doors(area: "darkforest")`.
    7. `set_area_properties(area: "darkforest", musicDay: "1", musicNight: "3", musicBattle: "10", ambientSndDay: "33", skyBox: "1", dayNightCycle: true)` with values from the table.

@@ -317,12 +317,35 @@ constrained decoding yet (the endpoint's JSON-schema mode is not used; arguments
 | W3 | **DONE 2026-11-13 (see below).** Short phase prompts: for each skill, a 2-4 KB version with the steps and the tool order, generated from or checked against the full skill (`skill-lint` already checks the full ones) | medium | Each phase prompt under 4 KB; lint passes |
 | W4 | **DONE 2026-11-13 (see below).** Input schemas for companion, key NPC, dialog, journal, area style | medium | Each has a JSON schema generated from the TypeScript type like `quest:schema`; the driver validates against them |
 | W5 | **DONE 2026-11-13 (see below).** Result trimming: a `brief` option (or client-side summariser) for `visualize_area`, `get_module_summary` and verifier output | small | Typical result under 4k tokens with the facts the phase needs |
-| W6 | Plot input: a plain form or a file format (title, premise, antagonist, areas, NPCs, quests) so a human or a larger model writes phase 1 once and the local model builds from it | medium | Phase 2 onwards starts from the file; `plan_adventure_shape` accepts it |
+| W6 | **DONE 2026-11-14 (see below).** Plot input: a plain form or a file format (title, premise, antagonist, areas, NPCs, quests) so a human or a larger model writes phase 1 once and the local model builds from it | medium | Phase 2 onwards starts from the file; `plan_adventure_shape` accepts it |
 | W7 | Evaluation: build the same two small modules with Claude and with the local model; compare `verify_all`, `run_live_verification`, and the manual quality notes | medium | A table of failures per phase; decides which phases stay on a local model |
 | W8 | Quest forms for the studio (S1-S3 of the quest plan) | medium | Already planned in `docs/quest-frontends-work-plan.md` |
 
 Suggested order: W1, W5, then W4 and W3 for the quest and actor phases (the highest value per effort), then W2, then
 W6 and W7. The quest path (W8 aside) already needs no model.
+
+### W6: the plot from a file (built 2026-11-14)
+
+`PlotSpec` (`src/util/plot-spec.ts`, schema `docs/specs/plot.schema.json`, example `docs/specs/plot.example.json`) holds the
+plot as one JSON object: title, premise, level, play time, the locations in story order (name, resref, tileset, purpose,
+events, beat), connections, NPCs, antagonists, quests with stages, challenges, merchant and final reward. Names refer to
+each other, and the checks say which field is wrong: a connection, NPC, antagonist or challenge that names no location, a
+quest giver or merchant who is not an NPC, a location that cannot be reached from the first, two locations with one name
+or resref, two main quests.
+
+- `write_plot(spec, dryRun?)` (profile `plot`) writes `## Plot` in the format of the plot phase prompt, with each location's
+  `Resref` (the areas phase uses it) and a story graph (one beat per location, so `verify_story` and the plot phase check
+  have something to check), and sets Title, Target Level, Party Size and Estimated Duration in `## Module`.
+- The driver takes `--plot <file>`: it checks the file before starting anything, writes the plot, runs the plot phase
+  check itself and skips the plot phase. Without `--module` or `--create` it creates a module with the plot's title.
+- `node dist/cli/spec.js schema plot` and `validate plot <file>` work like the other spec kinds; the schema can drive a
+  form or constrained decoding on a larger model.
+- "`plan_adventure_shape` accepts it" is met as advice, not as a gate: `write_plot` compares the number of locations and
+  events with what `planAdventureShape` suggests for the play time and returns warnings (also for no boss event, no hub,
+  a main quest giver outside the first location).
+
+Tested: unit tests, the tool through an in-memory client, and the driver once for real on this machine (created a
+module from the example, wrote the plot, plot check `success`, areas phase started). Not built: a web form.
 
 ## 7. A workable split today, before any of the above
 

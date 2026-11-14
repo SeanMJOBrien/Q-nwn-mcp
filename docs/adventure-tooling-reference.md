@@ -207,3 +207,13 @@ area); the result's `starterArea` says which. In the `areas` profile and step 5 
 
 `check_area_connectivity` no longer lists the DM area (`dm_area`) under `unreachable`: it is cut off on purpose and is reported as
 `disconnectedOnPurpose`.
+
+## 17. `write_plot(spec, dryRun?)` and the plot file
+
+The plot as one JSON object (`PlotSpec`, `src/util/plot-spec.ts`; schema `docs/specs/plot.schema.json`; example `docs/specs/plot.example.json`).
+`write_plot` checks it (schema, then names against each other; an error names the `field`), writes `## Plot` in the standard format with each
+location's `Resref` and a `### Story Graph` of one beat per location, and sets Title, Target Level, Party Size and Estimated Duration in `## Module`
+(Idea and Difficulty only when absent; other lines such as Scope are kept). Warnings compare the plot with `planAdventureShape` for the play time.
+Writing again replaces both sections. The driver's `--plot <file>` calls it and then the plot phase's end check. Details:
+`docs/local-model-guide.md` (W6) and `docs/local-model-manual.md` §5a.
+

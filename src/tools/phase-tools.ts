@@ -34,10 +34,14 @@ import {
   stopMessage,
 } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
+import { moduleFields, type PlotSpec, plotWarnings, renderPlot, setModuleFields } from "../util/plot-spec.js";
+import { validateSpec } from "../util/spec-validate.js";
 import { pickSections, setSection, stripOwnHeading } from "../util/story-sections.js";
 import { computeConnectivity } from "./analysis-tools.js";
 import { parseStoryGraph, verifyStory } from "../util/story-graph.js";
 import { collectVerifyResults } from "./verify-tools.js";
+
+const key = (name: string) => name.trim().toLowerCase();
 
 function text(body: unknown, isError = false) {
   return { content: [{ type: "text" as const, text: JSON.stringify(body, null, 2) }], ...(isError ? { isError: true } : {}) };
@@ -311,6 +315,50 @@ export function registerPhaseTools(server: McpServer): void {
         characters: clean.length,
         file: storyPath,
         ...(phase ? { next: `phase_check(phase: "${phase}", step: "end")` } : {}),
+      });
+    },
+  );
+
+  server.tool(
+    "write_plot",
+    "Write the adventure's plot from one JSON object (schema: docs/specs/plot.schema.json, or `node dist/cli/spec.js schema plot`): the places in story order, how they connect, the people, the antagonists, the quests with their stages, the challenges and the final reward. Checks the object (answers with the failing `field`), then writes the story's `## Plot` section in the standard format with a story graph, and the title, level, party size and play time into `## Module`. Use it when a person or a stronger model has written the plot, so the later phases build from it. `dryRun: true` checks and returns the text without writing.",
+    {
+      spec: z.string().describe("The plot as a JSON object (PlotSpec)"),
+      dryRun: z.boolean().optional().describe("true: check and return the section text, write nothing"),
+    },
+    { idempotentHint: true },
+    async ({ spec, dryRun }) => {
+      const index = requireIndex();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(spec);
+      } catch (e) {
+        return text({ ok: false, field: "spec", error: `not valid JSON: ${(e as Error).message}` }, true);
+      }
+      const checked = validateSpec("plot", parsed);
+      if (!checked.ok) return text({ ok: false, error: "Fix these fields and call write_plot again.", fields: checked.errors.slice(0, 12) }, true);
+      const plot = parsed as PlotSpec;
+      const body = renderPlot(plot);
+      const warnings = plotWarnings(plot);
+      if (key(plot.title) !== key(index.moduleName)) warnings.push(`The plot's title is "${plot.title}" but the loaded module is "${index.moduleName}"; the story file keeps the module's name.`);
+      if (dryRun) return text({ ok: true, dryRun: true, warnings, plot: body });
+
+      const dir = await ensureAdventureDir(index);
+      const storyPath = advFile(dir, "story");
+      const before = (await readIfExists(storyPath)) ?? `# ${index.moduleName}\n`;
+      const moduleBody = pickSections(before, ["Module"]);
+      const oldModule = moduleBody.missing.length ? "" : stripOwnHeading("Module", moduleBody.text);
+      let md = setSection(before, "Module", setModuleFields(oldModule, moduleFields(plot)));
+      md = setSection(md, "Plot", body);
+      await fs.writeFile(storyPath, md, "utf8");
+      return text({
+        ok: true,
+        locations: plot.locations.length,
+        npcs: plot.npcs.length,
+        quests: plot.quests.length,
+        warnings,
+        file: storyPath,
+        next: 'phase_check(phase: "plot", step: "end")',
       });
     },
   );

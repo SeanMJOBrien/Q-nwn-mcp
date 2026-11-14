@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseDriveArgs, parsePhases } from "../cli/drive.js";
+import fs from "fs";
+import os from "os";
+import path from "path";
+import { parseDriveArgs, parsePhases, readPlotFile } from "../cli/drive.js";
 import { coerceArgs } from "./coerce.js";
 import { type ChatMessage, type ToolCall, slimSchema, toolCallsFromText } from "./llm.js";
 import { PHASES } from "../util/phase-check.js";
@@ -198,6 +201,33 @@ describe("withoutStartCheck", () => {
       expect(body, phase).toContain("1. (Already done for you: the start check passed.)");
       expect(body, phase).toContain(`phase_check(phase: "${phase}", step: "end")`);
     }
+  });
+});
+
+describe("readPlotFile", () => {
+  const example = path.join(import.meta.dirname, "..", "..", "docs", "specs", "plot.example.json");
+  it("reads a good plot and names the fields of a bad one", () => {
+    const good = readPlotFile(example);
+    expect("plot" in good && good.plot.title).toBe("The Mill on Blackwater");
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "plot-"));
+    try {
+      const bad = path.join(dir, "bad.json");
+      const spec = JSON.parse(fs.readFileSync(example, "utf8"));
+      spec.npcs[0].location = "Nowhere";
+      fs.writeFileSync(bad, JSON.stringify(spec));
+      const r = readPlotFile(bad);
+      expect("errors" in r && r.errors.map((e) => e.field)).toEqual(["npcs[0].location"]);
+      fs.writeFileSync(bad, "{not json");
+      const broken = readPlotFile(bad);
+      expect("errors" in broken && broken.errors[0].message).toContain("cannot read it as JSON");
+      expect("errors" in readPlotFile(path.join(dir, "missing.json"))).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it("--plot is a known option", () => {
+    expect(parseDriveArgs(["--plot", "p.json", "--dry-run"])).toMatchObject({ flags: { plot: "p.json" } });
   });
 });
 

@@ -1,0 +1,353 @@
+{
+  "$ref": "#/definitions/PlotSpec",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "EncounterKind": {
+      "enum": [
+        "combat",
+        "ambush",
+        "boss",
+        "chain",
+        "social",
+        "obstacle",
+        "trap",
+        "discovery",
+        "friendly",
+        "rest"
+      ],
+      "type": "string"
+    },
+    "PlotAntagonist": {
+      "additionalProperties": false,
+      "properties": {
+        "defeat": {
+          "description": "How the party stops them.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "location": {
+          "description": "Name of the location where the party meets them.",
+          "type": "string"
+        },
+        "motive": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "who": {
+          "description": "Who or what they are, e.g. \"a hobgoblin warlord\" or \"a corrupt harbour master\".",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "who",
+        "location",
+        "motive",
+        "defeat"
+      ],
+      "type": "object"
+    },
+    "PlotChallenge": {
+      "additionalProperties": false,
+      "properties": {
+        "enemies": {
+          "description": "Enemy kind and number, e.g. \"4 goblins and a goblin shaman\".",
+          "minLength": 1,
+          "type": "string"
+        },
+        "location": {
+          "description": "Name of the location.",
+          "type": "string"
+        },
+        "obstacle": {
+          "description": "A trap or obstacle here, e.g. \"a pit trap in the corridor\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "location",
+        "enemies"
+      ],
+      "type": "object"
+    },
+    "PlotClass": {
+      "enum": [
+        "barbarian",
+        "bard",
+        "cleric",
+        "druid",
+        "fighter",
+        "monk",
+        "paladin",
+        "ranger",
+        "rogue",
+        "sorcerer",
+        "wizard"
+      ],
+      "type": "string"
+    },
+    "PlotLocation": {
+      "additionalProperties": false,
+      "properties": {
+        "beat": {
+          "description": "One sentence: what happens here.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "events": {
+          "description": "What happens here, in order. Two to four per location is typical.",
+          "items": {
+            "$ref": "#/definitions/EncounterKind"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "name": {
+          "description": "Name of the place as players see it. Other parts of the spec refer to the location by this name.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "purpose": {
+          "description": "hub: where the party gets its task; travel: a road or wilderness to cross; adventure: where things happen; boss: the final fight.",
+          "enum": [
+            "hub",
+            "travel",
+            "adventure",
+            "boss"
+          ],
+          "type": "string"
+        },
+        "resref": {
+          "description": "Area resref to build it as: lower-case letters, digits and underscore, at most 16 characters. Default: made from the name.",
+          "pattern": "^[a-z0-9_]{1,16}$",
+          "type": "string"
+        },
+        "tileset": {
+          "description": "Tileset resref, e.g. ttf01 forest, ttr01 rural, tcn01 city, tin01 house or inn, tde01 dungeon, tdc01 crypt, tdm01 mine or cave.",
+          "pattern": "^[a-z]{3}[0-9]{2}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "tileset",
+        "purpose",
+        "events",
+        "beat"
+      ],
+      "type": "object"
+    },
+    "PlotNpc": {
+      "additionalProperties": false,
+      "properties": {
+        "class": {
+          "$ref": "#/definitions/PlotClass",
+          "description": "Class; a companion levels in it. Use \"fighter\" for an ordinary townsperson who never fights."
+        },
+        "gender": {
+          "enum": [
+            "male",
+            "female"
+          ],
+          "type": "string"
+        },
+        "location": {
+          "description": "Name of the location this person stands in.",
+          "type": "string"
+        },
+        "motive": {
+          "description": "One sentence: what this person wants.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "race": {
+          "$ref": "#/definitions/PlotRace"
+        },
+        "role": {
+          "enum": [
+            "quest giver",
+            "merchant",
+            "companion",
+            "witness"
+          ],
+          "type": "string"
+        },
+        "voice": {
+          "description": "One sentence: how this person talks.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "location",
+        "role",
+        "race",
+        "class",
+        "gender",
+        "motive",
+        "voice"
+      ],
+      "type": "object"
+    },
+    "PlotQuest": {
+      "additionalProperties": false,
+      "properties": {
+        "giver": {
+          "description": "Name of the NPC who gives the quest.",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "primary": {
+          "description": "true for the main quest. Exactly one quest is the main quest; with none marked, the first is.",
+          "type": "boolean"
+        },
+        "stages": {
+          "description": "The stages in order, one sentence each. The first is the task as given, the last is how it ends and who is told.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "giver",
+        "stages"
+      ],
+      "type": "object"
+    },
+    "PlotRace": {
+      "enum": [
+        "dwarf",
+        "elf",
+        "gnome",
+        "halfling",
+        "half-elf",
+        "half-orc",
+        "human"
+      ],
+      "type": "string"
+    },
+    "PlotSpec": {
+      "additionalProperties": false,
+      "description": "The plot of a short adventure (maps to `write_plot`).",
+      "properties": {
+        "antagonists": {
+          "items": {
+            "$ref": "#/definitions/PlotAntagonist"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "challenges": {
+          "items": {
+            "$ref": "#/definitions/PlotChallenge"
+          },
+          "type": "array"
+        },
+        "connections": {
+          "description": "Pairs of location names the party can walk between. Every location must be reachable from the first.",
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 2,
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "finalReward": {
+          "description": "The reward at the end: an item or gold.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "level": {
+          "description": "Character level the adventure is written for.",
+          "maximum": 20,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "locations": {
+          "description": "The places, in the order the story visits them. The first is where players start.",
+          "items": {
+            "$ref": "#/definitions/PlotLocation"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "type": "array"
+        },
+        "merchant": {
+          "description": "Name of the NPC who trades, when there is one.",
+          "type": "string"
+        },
+        "npcs": {
+          "description": "The people the party talks to.",
+          "items": {
+            "$ref": "#/definitions/PlotNpc"
+          },
+          "type": "array"
+        },
+        "partySize": {
+          "description": "Number of characters in the party, companions included. Default 4.",
+          "maximum": 6,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "playMinutes": {
+          "description": "Target play time in minutes.",
+          "maximum": 600,
+          "minimum": 20,
+          "type": "integer"
+        },
+        "premise": {
+          "description": "Two or three sentences: what is wrong, who is behind it, what the party must do.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "quests": {
+          "items": {
+            "$ref": "#/definitions/PlotQuest"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "title": {
+          "description": "Title of the adventure.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "tone": {
+          "description": "A word or two: heroic, grim, mystery, comic.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "premise",
+        "level",
+        "playMinutes",
+        "locations",
+        "npcs",
+        "antagonists",
+        "quests",
+        "finalReward"
+      ],
+      "type": "object"
+    }
+  }
+}

@@ -33,7 +33,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "adopt_module",
     "set_project_scope",
   ],
-  plot: ["plan_adventure_shape", "verify_story", "list_tilesets", "suggest_area_size", "set_project_scope"],
+  plot: ["write_plot", "plan_adventure_shape", "verify_story", "list_tilesets", "suggest_area_size", "set_project_scope"],
   quests: [
     "build_quest",
     "remove_quest",

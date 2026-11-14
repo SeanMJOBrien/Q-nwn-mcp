@@ -17,6 +17,9 @@
  *   --api-key <key>          bearer token, if the endpoint wants one (or OPENAI_API_KEY)
  *   --phases <a,b,...>       phases to run, in pipeline order (default: all nine)
  *   --force                  run a phase again although it is recorded as a success
+ *   --plot <file.json>       a plot written by a person or a stronger model (docs/specs/plot.schema.json): the driver
+ *                            writes the Module and Plot sections from it and no model runs the plot phase. Without
+ *                            --module or --create, a new module is created with the plot's title
  *   --idea <text> --level <n> --party <n> --minutes <n> --tone <word>
  *                            write the story's Module section when the story has none
  *   --max-steps <n>          model turns per phase (default 60)
@@ -41,10 +44,12 @@ import { type PhaseResult, type ToolHost, runPhase } from "../driver/run-phase.j
 import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
 import { PHASES, type Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
+import { type PlotSpec, plotWarnings } from "../util/plot-spec.js";
+import { validateSpec } from "../util/spec-validate.js";
 
 const VALUE_FLAGS = new Set([
   "module", "create", "endpoint", "model", "api-key", "phases", "idea", "level", "party", "minutes", "tone",
-  "max-steps", "retries", "context-chars", "escalate-model", "escalate-endpoint", "escalate-api-key", "log",
+  "max-steps", "retries", "context-chars", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot",
 ]);
 const BOOL_FLAGS = new Set(["force", "dry-run", "help"]);
 
@@ -96,6 +101,14 @@ async function main(): Promise<void> {
   } catch (e) {
     finish(1, { ok: false, error: (e as Error).message });
   }
+  let plot: PlotSpec | undefined;
+  if (flags.plot) {
+    const read = readPlotFile(flags.plot);
+    if ("errors" in read) finish(1, { ok: false, error: `--plot ${flags.plot}: the plot has errors`, fields: read.errors });
+    plot = read.plot;
+    if (!flags.module && !flags.create) flags.create = plot.title;
+  }
+  const plotInfo = plot ? { plot: { file: flags.plot, locations: plot.locations.length, quests: plot.quests.length, warnings: plotWarnings(plot) } } : {};
   if (!flags.module && !flags.create) finish(1, { ok: false, error: "give --module <project dir | .mod> or --create <title>" });
   if (!dryRun && (!endpoint || !model)) finish(1, { ok: false, error: "give --endpoint and --model (or DRIVE_ENDPOINT and DRIVE_MODEL)" });
 
@@ -134,11 +147,11 @@ async function main(): Promise<void> {
 
     if (dryRun && !flags.module) {
       // Nothing to load: describe the plan from the prompts alone.
-      await stop(0, { ok: true, dryRun: true, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name))) });
+      await stop(0, { ok: true, dryRun: true, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name))) });
     }
 
     if (flags.create) {
-      if (dryRun) await stop(0, { ok: true, dryRun: true, wouldCreate: flags.create, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name))) });
+      if (dryRun) await stop(0, { ok: true, dryRun: true, wouldCreate: flags.create, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name))) });
       const filename = flags.create.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const made = await host.callTool("create_module", { name: flags.create, filename });
       if (made.isError) await stop(1, { ok: false, error: `create_module: ${made.text.slice(0, 500)}` });
@@ -161,8 +174,20 @@ async function main(): Promise<void> {
         dryRun: true,
         adventureDir: dirInfo.dir,
         storyExists: dirInfo.files.story?.exists ?? false,
+        ...plotInfo,
         phases: phases.map((p) => ({ ...planRow(p, allTools.map((t) => t.name)), recorded: done.has(p) ? "success (would skip)" : "not done" })),
       });
+    }
+
+    // A plot from a file: written by the driver, checked by phase_check; no model runs the plot phase.
+    if (plot) {
+      const wrote = await host.callTool("write_plot", { spec: JSON.stringify(plot) });
+      if (wrote.isError) await stop(1, { ok: false, error: `write_plot: ${wrote.text.slice(0, 800)}` });
+      for (const w of (JSON.parse(wrote.text) as { warnings?: string[] }).warnings ?? []) say(`plot: note: ${w}`);
+      const end = JSON.parse((await host.callTool("phase_check", { phase: "plot", step: "end" })).text) as { ok?: boolean; errors?: string[]; error?: string };
+      if (!end.ok) await stop(2, { ok: false, stoppedAt: "plot", error: "The plot from --plot did not pass the plot phase check.", errors: end.errors ?? [end.error] });
+      done.add("plot");
+      say(`plot: written from ${flags.plot} (${plot.locations.length} locations, ${plot.quests.length} quests)`);
     }
 
     // The story's Module section: the facts every phase reads.
@@ -249,6 +274,18 @@ async function main(): Promise<void> {
   } catch (e) {
     await stop(1, { ok: false, error: (e as Error).message });
   }
+}
+
+/** Reads and checks a plot file. Errors name the failing field. */
+export function readPlotFile(file: string): { plot: PlotSpec } | { errors: Array<{ field: string; message: string }> } {
+  let spec: unknown;
+  try {
+    spec = JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (e) {
+    return { errors: [{ field: "", message: `cannot read it as JSON: ${(e as Error).message}` }] };
+  }
+  const checked = validateSpec("plot", spec);
+  return checked.ok ? { plot: spec as PlotSpec } : { errors: checked.errors };
 }
 
 function planRow(phase: Phase, toolNames: string[]) {
