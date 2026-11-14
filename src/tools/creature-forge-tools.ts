@@ -587,7 +587,8 @@ export function registerCreatureForgeTools(server: McpServer): void {
 
   server.tool(
     "forge_creature",
-    "Make a creature level itself correctly at spawn. Writes a LEGAL level-1 build (every feat checked against feat.2da " +
+    "Limitation: gear uses each base item's default model variant, so same-type gear looks identical across NPCs (randomised gear appearance is TODO #35). " +
+      "Make a creature level itself correctly at spawn. Writes a LEGAL level-1 build (every feat checked against feat.2da " +
       "requirements; package feat order), fits alignment to the class, then sets the levelling plan: at spawn " +
       "LevelUpHenchman takes it to `level` (or the party's average level + `levelRel`), it buys gear from the module's " +
       "stores within a gold allowance that grows with level (role share x `gearWealth`, default 0.5; proficiency-checked, since the " +

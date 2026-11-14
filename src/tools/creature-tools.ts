@@ -183,7 +183,8 @@ export function registerCreatureTools(server: McpServer): void {
       "Checks proficiency the same way equip_npc_by_role does — a RightHand/LeftHand item the creature's FeatList has no " +
       "baseitems.2da ReqFeat for, or Chest armor above the creature's Armor Proficiency tier (e.g. a Rogue in anything above " +
       "AC bonus 3), is skipped by default rather than silently equipped at a real mechanical penalty. Pass force:true to " +
-      "equip it anyway. Prefer equip_npc_by_role when you also want a wealth-budget check and a weapon recommendation.",
+      "equip it anyway. Prefer equip_npc_by_role when you also want a wealth-budget check and a weapon recommendation. "+
+      "Limitation: gear uses each base item's default model variant, so same-type gear looks identical across NPCs (randomised gear appearance is TODO #35).",
     {
       area: z.string().describe("Area resref"),
       tag: z.string().describe("Creature tag"),

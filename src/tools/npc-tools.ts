@@ -691,6 +691,7 @@ export function registerNpcTools(server: McpServer): void {
   server.tool(
     "equip_npc_by_role",
     "DEPRECATED: use forge_creature (docs/creature-tools.md); this tool still works. Equip a creature (blueprint or placed instance) with caller-supplied gear, validated against its baked FeatList proficiencies before equipping — never guesses a real item resref itself (source items with list_blueprints/resman_search first, exactly as documented). " +
+      "Limitation: gear uses each base item's default model variant, so same-type gear looks identical across NPCs (randomised gear appearance is TODO #35). " +
       "Rejects (or with force:true, equips anyway and warns) a weapon/shield the creature has none of the baseitems.2da ReqFeat proficiency feats for, and Chest-slot armor whose AC-Bonus-derived weight tier has no matching Armor Proficiency feat. " +
       "Reports a get_wealth_budget reference figure for the given level/role, recommends a weapon type from a curated per-class preference list when no righthand item was supplied (deterministically varied by the creature's own tag/resref, so same-class NPCs don't all converge on one weapon), and runs verify_creature as its own last step so gear validity and legitimacy are confirmed in one call.",
     {
