@@ -76,6 +76,18 @@ interior behind a door.
 7. Dress interiors heavily (**~73 per 100 tiles**, so ~22 objects in a 30-tile keep room set) and
    exteriors lightly (**~5 per 100 tiles**).
 
+Worked tool sequence for step 1 and the link in step 5:
+
+```
+create_area(width: "24", height: "21", tileset: "tno01", defaultTerrain: "Grass")
+adventure_list_features(tileset: "tno01", style: "castle")  // groups safe for the solver
+paint_group(area: "...", feature: "?", x: "0", y: "0")   // lists valid group names; copy one exactly
+paint_group(area: "...", feature: "<gatehouse group>", x: "10", y: "0")
+visualize_area(area: "...")                              // confirm the groups landed
+place_door(...) ; link_doors(...)                        // gatehouse door to the keep interior
+verify_area(area: "...") ; check_area_connectivity()
+```
+
 ## Pitfalls
 
 - **Don't build a big keep interior.** 30 tiles is the median. Rooms behind doors, not one hall.
