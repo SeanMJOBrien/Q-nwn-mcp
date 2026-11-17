@@ -8,7 +8,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { jsonToGff, type ResmanOptions } from "../nim-tools.js";
-import { afterRemove } from "./project-sync.js";
+import { removeResource } from "./project-sync.js";
 import {
   buildDialogDocument,
   makeEntry,
@@ -21,6 +21,7 @@ import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr, setField } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 import { findSimpleWalkableSpots, placeCreatureCore } from "./creature-placer.js";
+import { withEndMark } from "./dialog-hub.js";
 import {
   getGitDoc,
   getVarTableEntries,
@@ -33,6 +34,7 @@ import { applyDefaultItemModels } from "./item-models.js";
 import {
   ACQUIRE_WRAPPER,
   generateAcquireWrapper,
+  wrapperOriginal,
   generateHeartbeatWrapper,
   HEARTBEAT_WRAPPER,
 } from "./quest-script.js";
@@ -52,6 +54,12 @@ interface Copy {
   obj: GffObj;
   /** "bp:<key>" or "git:<area>". */
   where: string;
+  /**
+   * Where the event script fields live when not on `obj`: an area's variables are read by the engine from the .git's
+   * top-level VarTable (The Frozen North: 249 .git files carry one, 0 of 504 .are files), while OnEnter is an .are field.
+   */
+  scriptObj?: GffObj;
+  scriptWhere?: string;
 }
 
 interface Participant {
@@ -280,12 +288,23 @@ export class QuestBuilder {
     const key = `area:${resref.toLowerCase()}`;
     const known = this.participants.get(key);
     if (known) return known;
-    const are = this.doc(`${resref.toLowerCase()}.are`);
+    const area = resref.toLowerCase();
+    const are = this.doc(`${area}.are`) as GffObj | undefined;
     if (!are) throw new QuestBuildError(`area ${resref} not found`);
+    const git = this.git(area);
+    // Before 2026-11-16 the builder wrote area variables to the .are, where the engine never reads them; a rebuild strips
+    // the quest variables there and the handler it chained moves to the .git with the rest.
+    const oldOrig = getVarTableEntries(are).find((e) => e.name === "MCP_Q_ORIG_ENTER");
+    if (oldOrig) {
+      if (!getVarTableEntries(git).some((e) => e.name === "MCP_Q_ORIG_ENTER")) mergeVarTable(git, [oldOrig]);
+      removeVarTableEntry(are, "MCP_Q_ORIG_ENTER");
+      this.markBp(`${area}.are`, are as GffDocument);
+      this.markGit(area);
+    }
     const p: Participant = {
       label: resref,
       kind: "area",
-      copies: [{ obj: are as GffObj, where: `bp:${resref.toLowerCase()}.are` }],
+      copies: [{ obj: git, where: `git:${area}`, scriptObj: are, scriptWhere: `bp:${area}.are` }],
       slots: new Map(),
     };
     this.participants.set(key, p);
@@ -413,7 +432,53 @@ export class QuestBuilder {
     if (r?.item) vars.push({ name: `${base}_reward_item`, type: "string", value: r.item });
     if (this.spec.bounty && s.end === true) vars.push({ name: `${base}_bounty_end`, type: "int", value: 1 });
     if (s.script) vars.push({ name: `${base}_self_script`, type: "string", value: s.script });
+    // Event-stage options (a search keeps its own quest_search_none text).
+    if (s.none && s.do !== "search") vars.push({ name: `${base}_none`, type: "string", value: s.none });
+    if (s.early) vars.push({ name: `${base}_early`, type: "int", value: 1 });
+    if (s.respawn) vars.push({ name: `${base}_respawn`, type: "int", value: s.respawn });
     this.setVars(p, vars);
+  }
+
+  /**
+   * A map-note waypoint at a destination (escort, trigger), tagged <tag>_s<n>_mark: updated in place on a rebuild,
+   * removed with the quest.
+   */
+  private placeMarker(s: Stage): void {
+    const want = s.marker ?? (s.do === "escort" && s.x !== undefined && s.y !== undefined);
+    if (!want || s.x === undefined || s.y === undefined || !s.area) return;
+    const area = s.area.toLowerCase();
+    if (!this.index.areas.has(area)) return;
+    const tag = `${this.spec.tag}_s${s.n}_mark`.slice(0, 32);
+    const note = typeof want === "string" ? want : this.spec.name;
+    if (this.dryRun) {
+      this.report.placed.push(`map note "${note}" would be placed in ${area} at (${s.x}, ${s.y})`);
+      return;
+    }
+    const list = getFieldList(this.git(area), "WaypointList");
+    let wp = list.find((w) => getFieldStr(w, "Tag") === tag);
+    if (!wp) {
+      wp = {
+        __struct_id: GIT_STRUCT_WAYPOINT,
+        Appearance: { type: "byte", value: 1 },
+        Description: { type: "cexolocstring", value: {} },
+        LinkedTo: { type: "cexostring", value: "" },
+        Tag: { type: "cexostring", value: tag },
+        TemplateResRef: { type: "resref", value: "" },
+        XOrientation: { type: "float", value: 0 },
+        YOrientation: { type: "float", value: 1 },
+        ZPosition: { type: "float", value: 0 },
+      } as unknown as GffObj;
+      list.push(wp);
+    }
+    const before = JSON.stringify(wp);
+    setField(wp, "LocalizedName", "cexolocstring", { "0": note });
+    setField(wp, "HasMapNote", "byte", 1);
+    setField(wp, "MapNote", "cexolocstring", { "0": note });
+    setField(wp, "MapNoteEnabled", "byte", 1);
+    setField(wp, "XPosition", "float", s.x);
+    setField(wp, "YPosition", "float", s.y);
+    if (JSON.stringify(wp) !== before) this.markGit(area);
+    this.report.placed.push(`map note "${note}" in ${area} at (${s.x}, ${s.y})`);
   }
 
   private setEvent(p: Participant, slot: number, scriptField: string, script: string, origVar: string): void {
@@ -428,10 +493,12 @@ export class QuestBuilder {
         }
       }
       mergeVarTable(c.obj, [{ name: "quest_event", type: "int", value: slot }]);
-      const orig = getFieldStr(c.obj, scriptField);
+      const so = c.scriptObj ?? c.obj;
+      const orig = getFieldStr(so, scriptField);
       if (orig !== script) {
         if (orig) mergeVarTable(c.obj, [{ name: origVar, type: "string", value: orig }]);
-        setField(c.obj, scriptField, "resref", script);
+        setField(so, scriptField, "resref", script);
+        if (c.scriptWhere) this.touch({ obj: so, where: c.scriptWhere });
       }
       // Keep the saved original handler last, as on a first build, so an identical rebuild writes the same table.
       const saved = getVarTableEntries(c.obj).find((e) => e.name === origVar);
@@ -446,14 +513,14 @@ export class QuestBuilder {
   // --- removing an earlier build of this quest
 
   /** Objects whose event stage belonged to the quest being stripped (their handler is restored on a remove). */
-  private readonly eventOwners: GffObj[] = [];
+  private readonly eventOwners: Array<{ obj: GffObj; scriptObj: GffObj }> = [];
   /** Resources a remove deletes (a conversation or item the quest created, an emptied journal). */
   private readonly toDelete = new Set<string>();
 
   stripPrevious(): number {
     const tag = this.spec.tag;
     let removed = 0;
-    const strip = (obj: GffObj, touch: () => void) => {
+    const strip = (obj: GffObj, touch: () => void, scriptObj: GffObj = obj) => {
       const names = questVarsFor(obj, tag);
       if (names.length === 0) return;
       const slots = names.filter((n) => /^quest\d{1,2}$/.test(n)).map((n) => Number(n.slice(5)));
@@ -461,7 +528,7 @@ export class QuestBuilder {
       const ev = getVarTableEntries(obj).find((e) => e.name.toLowerCase() === "quest_event");
       if (ev && slots.includes(Number(ev.value))) {
         removeVarTableEntry(obj, "quest_event");
-        this.eventOwners.push(obj);
+        this.eventOwners.push({ obj, scriptObj });
       }
       removed += names.length;
       touch();
@@ -478,6 +545,16 @@ export class QuestBuilder {
       } catch {
         continue;
       }
+      // An area's own variables: the .git's top-level VarTable (its OnEnter is on the .are).
+      const are = this.doc(`${area}.are`) as GffObj | undefined;
+      strip(
+        git,
+        () => {
+          this.markGit(area);
+          if (are) this.markBp(`${area}.are`, are as GffDocument); // a remove puts the old OnEnter back there
+        },
+        are ?? git,
+      );
       for (const list of ["Creature List", "Placeable List", "TriggerList"]) {
         let objs: GffObj[];
         try {
@@ -526,12 +603,12 @@ export class QuestBuilder {
   ];
 
   private restoreHandlers(): void {
-    for (const obj of this.eventOwners) {
+    for (const { obj, scriptObj } of this.eventOwners) {
       if (getVarTableEntries(obj).some((e) => e.name.toLowerCase() === "quest_event")) continue; // another quest's
       for (const h of QuestBuilder.HANDLERS) {
-        if (!h.script.includes(getFieldStr(obj, h.field))) continue;
+        if (!h.script.includes(getFieldStr(scriptObj, h.field))) continue;
         const saved = getVarTableEntries(obj).find((e) => e.name === h.origVar);
-        setField(obj, h.field, "resref", saved ? String(saved.value) : "");
+        setField(scriptObj, h.field, "resref", saved ? String(saved.value) : "");
         if (saved) removeVarTableEntry(obj, h.origVar);
       }
     }
@@ -544,6 +621,11 @@ export class QuestBuilder {
       if (/\.(utc|uti|utp|are|utt)$/.test(key) && has(doc as GffObj)) return true;
     }
     for (const area of this.areas()) {
+      try {
+        if (has(this.git(area))) return true;
+      } catch {
+        /* no .git */
+      }
       for (const list of ["Creature List", "Placeable List", "TriggerList", "Item List"]) {
         try {
           const git = this.git(area);
@@ -621,7 +703,7 @@ export class QuestBuilder {
       }
       if (!git.WaypointList) continue;
       const wps = getFieldList(git, "WaypointList");
-      const kept = wps.filter((w) => !new RegExp(`^${tag}_s\\d+_spawn$`).test(getFieldStr(w, "Tag")));
+      const kept = wps.filter((w) => !new RegExp(`^${tag}_s\\d+_(spawn|mark)$`).test(getFieldStr(w, "Tag")));
       if (kept.length !== wps.length) {
         (git.WaypointList as { value: GffObj[] }).value = kept;
         this.markGit(area);
@@ -641,15 +723,7 @@ export class QuestBuilder {
   /** Writes the changes of a remove, then deletes what the quest created. */
   async commitRemove(): Promise<void> {
     await this.commit();
-    for (const key of this.toDelete) {
-      const entry = this.index.resources.get(key);
-      if (entry?.filePath) {
-        await fs.rm(entry.filePath, { force: true });
-        await afterRemove(entry.filePath);
-      }
-      this.index.resources.delete(key);
-      this.index.parsedGff.delete(key);
-    }
+    for (const key of this.toDelete) if (this.index.resources.has(key)) await removeResource(this.index, key);
   }
 
   // --- journal
@@ -735,7 +809,12 @@ export class QuestBuilder {
     // The shared [Leave] reply outlives a quest's strip, so it sits before the quest's own replies on a rebuild;
     // creating it first on the first build gives both builds the same node order (an identical rebuild writes nothing).
     const dlgReplies = getFieldList(dlg, "ReplyList");
-    if (!dlgReplies.some((r) => getFieldStr(r, "Comment") === HUB_LEAVE)) this.reply({ dlg }, "[Leave]", HUB_LEAVE);
+    if (!dlgReplies.some((r) => getFieldStr(r, "Comment") === HUB_LEAVE)) {
+      const leave = this.reply({ dlg }, "[Leave]", HUB_LEAVE);
+      // A dialog the quest creates: its greeting (the fallback root) offers [Leave], so the shared reply is never an
+      // orphan node even when every quest line ends the talk on purpose (a rescue).
+      if (created) this.linkER({ dlg }, 0, leave);
+    }
     const d = {
       dlg,
       resref,
@@ -786,6 +865,12 @@ export class QuestBuilder {
     links.push(l);
   }
 
+  /** Index of the dialog's shared [Leave] reply (created by dialogFor). */
+  private hubLeave(d: { dlg: GffObj }): number {
+    const i = getFieldList(d.dlg, "ReplyList").findIndex((r) => getFieldStr(r, "Comment") === HUB_LEAVE);
+    return i >= 0 ? i : this.reply(d, "[Leave]", HUB_LEAVE);
+  }
+
   private leave(d: { dlg: GffObj }, e: number, c: string): void {
     this.linkER(d, e, this.reply(d, "[Leave]", c));
   }
@@ -815,6 +900,9 @@ export class QuestBuilder {
       const dec = this.entry(d, s.decline ?? "Perhaps another time.", `${c}decline`);
       this.linkER(d, offer, yes);
       this.linkER(d, offer, no);
+      // Dialog rule: every main line has an exit. The offer used to get one only from a later add_dialog_return_links,
+      // which a rebuild then dropped (an orphaned "[Leave.]" and dialog_no_exit_reply on the Quest Test Range).
+      this.linkER(d, offer, this.hubLeave(d));
       this.linkRE(d, yes, acc);
       this.linkRE(d, no, dec);
       this.root(d, offer, 3, { target });
@@ -841,6 +929,7 @@ export class QuestBuilder {
       const adv = this.entry(d, thanks, `${c}advance`, "q_act", { target, leave: s.leave === false ? "0" : "1" });
       if (s.leave !== false) d.ends.add(adv);
       this.linkER(d, plea, free);
+      this.linkER(d, plea, this.hubLeave(d));
       this.linkRE(d, free, adv);
       this.root(d, plea, 1, { target });
       return;
@@ -851,6 +940,7 @@ export class QuestBuilder {
       const start = this.entry(d, "Lead the way.", `${c}start`, "q_act", { escort: target });
       d.ends.add(start);
       this.linkER(d, plea, go);
+      this.linkER(d, plea, this.hubLeave(d));
       this.linkRE(d, go, start);
       this.root(d, plea, 1, { target, escort: "offer" });
       const under = this.entry(d, "I'm right behind you.", `${c}underway`);
@@ -872,6 +962,7 @@ export class QuestBuilder {
       if (chk.dc !== undefined) rollParams.dc = String(chk.dc);
       if (chk.difficulty) rollParams.difficulty = chk.difficulty.replace(" ", "");
       if (generic) rollParams.who = chk.save ? "speaker" : "best";
+      if (chk.retry) rollParams.again = "1";
       const tryIt = this.reply(
         d,
         chk.prompt ?? `[${what}] Hear me out.`,
@@ -892,8 +983,18 @@ export class QuestBuilder {
       this.linkER(d, intro, tryIt);
       this.linkRE(d, tryIt, pass, "q_chk", { roll: key, roll_result: "pass" });
       this.linkRE(d, tryIt, fail, "q_chk", { roll: key, roll_result: "fail" });
+      if (s.check.else === "fight") {
+        // The fight is a real choice, not only the price of a failed roll: a non-hostile target otherwise needs the
+        // radial menu's force-attack, which players do not find (Quest Test Range, the squatter).
+        const attack = this.reply(d, "[Attack] Then we do this the hard way.", `${c}attack`);
+        const turn = this.entry(d, s.check.fail ?? "So be it!", `${c}turn`, "q_act", { hostile: "1" });
+        d.ends.add(turn);
+        this.linkER(d, intro, attack);
+        this.linkRE(d, attack, turn);
+      }
       this.leave(d, intro, `${c}leave`);
-      this.root(d, intro, 1, { target, roll: key, roll_result: "none" });
+      // With retry the line stays on offer after a failed roll; without, one roll per player.
+      this.root(d, intro, 1, chk.retry ? { target } : { target, roll: key, roll_result: "none" });
       return;
     }
     const actParams: ScriptParams = { target };
@@ -996,6 +1097,13 @@ export class QuestBuilder {
   private finishDialogs(): void {
     for (const d of this.dialogs.values()) {
       this.wireHub(d);
+      // Lines that end the talk on purpose (a fight, a rescue, an escort starting) carry the end mark verify_dialog and
+      // add_dialog_return_links read, appended so the quest's ownership comment stays.
+      const entries = getFieldList(d.dlg, "EntryList");
+      for (const e of d.ends) {
+        if (getFieldList(entries[e], "RepliesList").length === 0)
+          setField(entries[e], "Comment", "cexostring", withEndMark(getFieldStr(entries[e], "Comment")));
+      }
       d.roots.sort((a, b) => a.rank - b.rank);
       const start = getFieldList(d.dlg, "StartingList");
       const links = d.roots.map((r) => makeLink(r.entry, r.cond, r.params));
@@ -1132,6 +1240,7 @@ export class QuestBuilder {
           if (s.arrive) vars.push({ name: `quest${slot}_escort_arrive`, type: "string", value: s.arrive });
           if (s.leave) vars.push({ name: `quest${slot}_escort_leave`, type: "int", value: 1 });
           this.setVars(npc, vars);
+          this.placeMarker(s);
         }
         if (s.do === "deliver") await this.ensureItemExists(s);
         this.stageDialog(npc, s, slot);
@@ -1155,6 +1264,10 @@ export class QuestBuilder {
         this.writeStageVars(target, s, slot);
         owner = target;
         this.setEvent(target, slot, "ScriptDeath", "q_ondeath", "MCP_Q_ORIG_DEATH");
+        if (s.respawn && !target.copies.some((c) => c.where.startsWith("bp:")))
+          this.report.warnings.push(
+            `stage ${s.n}: ${s.target} has no blueprint in the module, so a respawned copy (made from the blueprint) would not carry the quest; create the blueprint in the module first`,
+          );
         by = s.target as string;
         break;
       }
@@ -1184,6 +1297,7 @@ export class QuestBuilder {
         this.writeStageVars(trig, s, slot);
         owner = trig;
         this.setEvent(trig, slot, "ScriptOnEnter", "q_trigger", "MCP_Q_ORIG_ENTER");
+        this.placeMarker(s);
         by = trig.label;
         break;
       }
@@ -1217,7 +1331,7 @@ export class QuestBuilder {
           if (s.examine.fail) vars.push({ name: "quest_search_bonus_fail", type: "string", value: s.examine.fail });
         }
         this.setVars(plc, vars);
-        for (const c of plc.copies) setField(c.obj, "Useable", "byte", 1);
+        for (const c of plc.copies) { setField(c.obj, "Useable", "byte", 1); setField(c.obj, "Static", "byte", 0); }
         by = s.target as string;
         break;
       }
@@ -1235,7 +1349,7 @@ export class QuestBuilder {
         this.writeStageVars(plc, s, slot);
         owner = plc;
         this.setEvent(plc, slot, "OnUsed", "q_onused", "MCP_Q_ORIG_USED");
-        for (const c of plc.copies) setField(c.obj, "Useable", "byte", 1);
+        for (const c of plc.copies) { setField(c.obj, "Useable", "byte", 1); setField(c.obj, "Static", "byte", 0); }
         by = s.target as string;
         break;
       }
@@ -1348,7 +1462,13 @@ export class QuestBuilder {
           setField(copy, "Dropable", "byte", 1);
           list.value.push(copy);
         }
-        if (holder.kind === "placeable") setField(c.obj, "HasInventory", "byte", 1);
+        if (holder.kind === "placeable") {
+          // A container the player must open: place_placeable clears Useable by default, which left the item
+          // unreachable (Quest Test Range, Mara's crate). Static placeables can't be used at all.
+          setField(c.obj, "HasInventory", "byte", 1);
+          setField(c.obj, "Useable", "byte", 1);
+          setField(c.obj, "Static", "byte", 0);
+        }
       }
       this.touch(c);
     }
@@ -1402,7 +1522,11 @@ export class QuestBuilder {
       return;
     }
     const current = getFieldStr(ifo, field);
-    if (current === wrapper) return;
+    if (current === wrapper) {
+      // Already wired: regenerate it so a runtime upgrade reaches it too (an old q_mod_acquire never recorded early pickups).
+      if (!this.dryRun) await refreshWrapper(this.index, wrapper, generate);
+      return;
+    }
     if (!this.dryRun) {
       const r = await writeAndCompileScript(this.index, wrapper, generate(current), true);
       if (!r.compiled) throw new QuestBuildError(`${wrapper} failed to compile: ${r.compilerOutput}`);
@@ -1502,4 +1626,21 @@ export async function removeQuest(index: ModuleIndex, resman: ResmanOptions, tag
   await b.cleanupAfterRemove();
   await b.commitRemove();
   return removed;
+}
+
+/**
+ * Rewrites a module-event wrapper (q_mod_acquire, q_mod_tick) from the current generator, keeping the original handler its
+ * header names. Returns TRUE when the file changed. Used by build_quest and create_quest_system.
+ */
+export async function refreshWrapper(index: ModuleIndex, wrapper: string, generate: (orig: string) => string): Promise<boolean> {
+  const entry = index.resources.get(`${wrapper}.nss`);
+  if (!entry?.filePath) return false;
+  const old = await fs.readFile(entry.filePath, "utf8").catch(() => "");
+  const orig = wrapperOriginal(old);
+  if (orig === undefined) return false; // not ours, or hand-written: leave it
+  const fresh = generate(orig);
+  if (fresh === old) return false;
+  const r = await writeAndCompileScript(index, wrapper, fresh, true);
+  if (!r.compiled) throw new QuestBuildError(`${wrapper} failed to compile: ${r.compilerOutput}`);
+  return true;
 }

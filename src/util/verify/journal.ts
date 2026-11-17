@@ -7,7 +7,7 @@ import type { GffObj } from "../../types/gff.js";
 import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
 import { flattenDialog } from "../dialog-walker.js";
-import { collectQuestVarAwards } from "../quest-vars.js";
+import { collectQuestVarAwards, findEarlyKillableTargets } from "../quest-vars.js";
 import { checkScriptRef, listOf, loadScriptSources, type Report } from "./common.js";
 import { findStoryDefects } from "./story-consequences.js";
 
@@ -33,6 +33,17 @@ export async function verifyJournal(report: Report, index: ModuleIndex, doc: Gff
   for (const [tag, byStage] of collectQuestVarAwards(index)) {
     if (!scriptedAwards.has(tag)) scriptedAwards.set(tag, new Set());
     for (const stage of byStage.keys()) scriptedAwards.get(tag)!.add(stage);
+  }
+
+  for (const k of findEarlyKillableTargets(index)) {
+    report.warn(
+      "kill_before_accept",
+      `${k.creature} in ${k.area} is hostile from the start and advances ${k.quest} stage ${k.stage}: killed before the quest gets there, the kill is lost`,
+      "Categories",
+      k.quest.startsWith("b_")
+        ? `rebuild ${k.quest} with spawn: {resref, area, x, y} so the target appears when the bounty is taken (a bounty can't be early), and remove the placed copy`
+        : `rebuild ${k.quest} with early: true on that stage (the kill then counts later), spawn the target when the quest is accepted (spawn), or place it where the party only goes afterwards`,
+    );
   }
 
   for (const [i, category] of categories.entries()) {

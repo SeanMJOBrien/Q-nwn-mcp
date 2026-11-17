@@ -36,4 +36,22 @@ describe("project sync guard", () => {
   it("the hooked writers import the sync", () => {
     for (const f of HOOKED) expect(fs.readFileSync(path.join(TOOLS, f), "utf8"), f).toContain("project-sync");
   });
+  it("resources leave the module only through removeResource, which prunes the project at once", () => {
+    const allowed: Record<string, string> = {
+      "util/project-sync.ts": "removeResource itself",
+      "module-loader.ts": "a source file that fails to parse is left out of the index at load time",
+      "tools/quest-tools.ts": "a dry run's placeholder runtime entry, never written to disk or the project",
+    };
+    for (const f of Object.keys(NOT_MODULE_RESOURCES)) {
+      if (NOT_MODULE_RESOURCES[f].includes("_probe")) allowed[`tools/${f}`] = NOT_MODULE_RESOURCES[f];
+    }
+    const src = path.dirname(TOOLS);
+    const walk = (d: string): string[] =>
+      fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+    const offenders = walk(src)
+      .filter((f) => f.endsWith(".ts") && !f.includes(".test."))
+      .map((f) => path.relative(src, f).split(path.sep).join("/"))
+      .filter((rel) => !(rel in allowed) && /\bresources\.delete\(/.test(fs.readFileSync(path.join(src, rel), "utf8")));
+    expect(offenders).toEqual([]);
+  });
 });

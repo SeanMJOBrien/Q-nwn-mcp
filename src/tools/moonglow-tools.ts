@@ -19,7 +19,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { MOONGLOW_BIN, MOONGLOW_PLUGINS, NWN_FOLDER_DATA, NWN_FOLDER_USER, GFF_EXTENSIONS } from "../config.js";
 import { requireIndex } from "../module-loader.js";
 import { gffToJson } from "../nim-tools.js";
-import { afterRemove, afterWrite } from "../util/project-sync.js";
+import { afterWrite, removeResource } from "../util/project-sync.js";
 import { markDirty } from "../util/dirty-state.js";
 
 const execFileAsync = promisify(execFile);
@@ -158,9 +158,7 @@ export function registerMoonglowTools(server: McpServer): void {
         for (const name of before.keys()) {
           if (after.has(name)) continue;
           changed.push(`${name} (deleted)`);
-          index.resources.delete(name.toLowerCase());
-          index.parsedGff.delete(name.toLowerCase());
-          await afterRemove(path.join(index.tempDir, name));
+          await removeResource(index, name, path.join(index.tempDir, name));
         }
       }
 

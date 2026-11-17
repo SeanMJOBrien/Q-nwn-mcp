@@ -1141,6 +1141,36 @@ export function verifyItem(report: Report, index: ModuleIndex, obj: GffObj): voi
 
 // ─── Placeables ───────────────────────────────────────────────────────────
 
+/**
+ * A placeable holding items must be openable: HasInventory 1, Useable 1, not Static. place_placeable clears Useable by
+ * default, which left a quest item in a crate nobody could open (Quest Test Range, 2026-11-16). Also run on every placed
+ * placeable by verify_all.
+ */
+export function verifyPlaceableInventory(report: Report, index: ModuleIndex, obj: GffObj): void {
+  const hasInventory = getFieldNum(obj, "HasInventory") === 1;
+  const items = listOf(obj, "ItemList");
+  if (items.length > 0 && !hasInventory) {
+    report.error(
+      "inventory_not_enabled",
+      `Placeable holds ${items.length} item(s) but HasInventory is 0 — the contents are unreachable`,
+      "HasInventory",
+      "add_items_to_container sets this automatically",
+    );
+  }
+  if (items.length > 0 && (getFieldNum(obj, "Useable") !== 1 || getFieldNum(obj, "Static") === 1)) {
+    report.warn(
+      "container_unusable",
+      `Placeable holds ${items.length} item(s) but is ${getFieldNum(obj, "Static") === 1 ? "Static" : "not Useable"} — the player can't open it`,
+      "Useable",
+      "add_items_to_container sets Useable; or modify_gff_field Useable = 1 and Static = 0",
+    );
+  }
+  for (const [i, item] of items.entries()) {
+    const ref = getFieldStr(item, "InventoryRes") || getFieldStr(item, "TemplateResRef");
+    checkResourceRef(report, index, ref, "uti", `ItemList.${i}.InventoryRes`, "warning");
+  }
+}
+
 export function verifyPlaceable(report: Report, index: ModuleIndex, obj: GffObj): void {
   if (!getFieldStr(obj, "Tag")) {
     report.warn("missing_tag", "Placeable has no Tag", "Tag");
@@ -1166,19 +1196,7 @@ export function verifyPlaceable(report: Report, index: ModuleIndex, obj: GffObj)
     }
   }
 
-  const hasInventory = getFieldNum(obj, "HasInventory") === 1;
-  const items = listOf(obj, "ItemList");
-  if (items.length > 0 && !hasInventory) {
-    report.error(
-      "inventory_not_enabled",
-      `Placeable holds ${items.length} item(s) but HasInventory is 0 — the contents are unreachable`,
-      "HasInventory",
-      "add_items_to_container sets this automatically",
-    );
-  }
-  for (const [i, item] of items.entries()) {
-    checkResourceRef(report, index, getFieldStr(item, "InventoryRes"), "uti", `ItemList.${i}.InventoryRes`, "warning");
-  }
+  verifyPlaceableInventory(report, index, obj);
 
   for (const field of ["OnUsed", "OnOpen", "OnClosed", "OnDeath", "OnHeartbeat", "OnDisturbed"]) {
     if (hasField(obj, field)) checkScriptRef(report, index, getFieldStr(obj, field), field);

@@ -88,7 +88,17 @@
           ],
           "type": "object"
         },
+        "early": {
+          "type": "boolean"
+        },
+        "from_creature": {
+          "description": "fetch: the creature (tag) carrying the item, or the placed container (tag) holding it.",
+          "type": "string"
+        },
         "giver": {
+          "type": "string"
+        },
+        "in": {
           "type": "string"
         },
         "item": {
@@ -106,13 +116,26 @@
         "level": {
           "type": "number"
         },
+        "marker": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
         "name": {
+          "type": "string"
+        },
+        "none": {
+          "description": "Defaults for every stage that takes them and leaves them out (templates included): see StageInput.",
           "type": "string"
         },
         "npc": {
           "type": "string"
         },
         "priority": {
+          "type": "number"
+        },
+        "respawn": {
           "type": "number"
         },
         "reward": {
@@ -201,6 +224,10 @@
         "prompt": {
           "description": "PC line offering the check.",
           "type": "string"
+        },
+        "retry": {
+          "description": "Dialog check: the player may try again (a fresh roll each time the line is picked) instead of one roll per player. With else \"fight\" a failure still starts the fight; with else \"end\" the line stays on offer.",
+          "type": "boolean"
         },
         "save": {
           "enum": [
@@ -295,6 +322,10 @@
         "do": {
           "$ref": "#/definitions/StageKind"
         },
+        "early": {
+          "description": "kill, pickup, explore, trigger, use: doing it before the quest reaches this stage still counts. The deed is remembered on the party, and the stage completes (journal and reward) as soon as the quest arrives at the stage before it, e.g. on accepting. A spawn or script of the stage runs at the deed itself.",
+          "type": "boolean"
+        },
         "end": {
           "anyOf": [
             {
@@ -340,6 +371,13 @@
         "leave": {
           "type": "boolean"
         },
+        "marker": {
+          "description": "escort, trigger: put a map-note waypoint at the destination. Default on for an escort with x/y, off for a trigger. A string is the note text (default \"<quest name>\").",
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
         "missing": {
           "type": "string"
         },
@@ -347,7 +385,7 @@
           "type": "number"
         },
         "none": {
-          "description": "search: text when the placeable is used before the quest reaches this stage.",
+          "description": "Text the player sees when this stage's event happens before the quest reaches it (kill, pickup, explore, trigger, use, search): \"Nothing to do here yet.\" instead of silence. On an early stage it is shown when the deed is recorded.",
           "type": "string"
         },
         "offer": {
@@ -369,6 +407,10 @@
         },
         "reply": {
           "type": "string"
+        },
+        "respawn": {
+          "description": "kill: a fresh copy of the target appears this many seconds after it dies (6-3600), for repeatable or test quests.",
+          "type": "number"
         },
         "reward": {
           "$ref": "#/definitions/StageReward"

@@ -61,7 +61,7 @@ explore, use, deliver, rescue, escort) and with which NPC, creature, item, place
 `build_quest` writes everything a quest needs: the journal, the giver's (and other NPCs') dialog lines merged into their
 existing conversations, stage variables on every object involved, event wiring, quest items, placed kill targets and
 rewards. It writes the quest scripts itself the first time. **Don't write quest scripts, journal entries or quest dialog
-nodes by hand.** After `build_quest`, run `verify_dialog` on each touched dialog; a `dialog_branch_ends` warning means an answer ends the talk instead of returning to the NPC's options (`add_dialog_return_links`). The full field reference is `docs/quest-system.md`; this phase covers what to decide.
+nodes by hand.** After `build_quest`, run `verify_dialog` on each touched dialog; a `dialog_branch_ends` warning means an answer ends the talk instead of returning to the NPC's options (`add_dialog_return_links`); `dialog_orphan_nodes` (leftovers of a rebuild) is fixed with `prune_dialog_orphans`. The full field reference is `docs/quest-system.md`; this phase covers what to decide.
 
 **1. Write a short spec per quest.** Only `name`, `giver` and each stage's `do` and `journal` are required:
 
@@ -87,7 +87,17 @@ nodes by hand.** After `build_quest`, run `verify_dialog` on each touched dialog
   tag), `search` (placeable + `check`), `deliver` (`item`, `to`), `rescue` (`target`), `escort` (`target`, destination
   `area`), `custom` (your own script advances it).
 - **A template** replaces the stage list for common shapes: `fetch`, `kill`, `bounty`, `deliver`, `rescue`, `escort`,
-  `investigate` (`clues`), `persuade-or-fight`. Give the journal lines in order with `journal: [...]`.
+  `investigate` (`clues`), `persuade-or-fight`. Give the journal lines in order with `journal: [...]`. `fetch` takes the
+  holder like a pickup stage (`in` or `from_creature`). An unknown or misspelt field is refused with its name: fix the spelling,
+  don't drop the field.
+- **Out-of-order play:** players often kill the target or walk into the place before talking to the giver. On kill, pickup,
+  explore, trigger and use stages give `early: true` (the deed counts once the quest is accepted) or at least `none: "<hint>"`
+  (a floating line instead of silence); both work as quest-level defaults. `verify_journal`'s `kill_before_accept` names a
+  hostile placed target that would otherwise be lost; for a bounty, spawn the target on accept instead.
+- **Markers and repeats:** an escort with a destination point gets a map note automatically (`marker` text, or false); a
+  trigger stage takes `marker: true`. `respawn: <seconds>` brings a kill target back (repeatable or test quests).
+  `check.retry: true` lets a player try a dialog check again.
+- **Rebuilding:** the spec is kept in the module project as `quests/<tag>.json`; change it and pass it to `build_quest`.
 - **Searches and clues:** `search` on a placeable (`target`) with `check: {skill, dc}`: the party member best at the skill
   (often a companion) rolls, each player gets 2 tries, and a required clue is found anyway once tries run out. Add `item` /
   `itemName` to hand over what is found, and `examine: {skill, dc, var, pass}` for a second check by whoever knows most

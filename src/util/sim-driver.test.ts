@@ -33,4 +33,16 @@ describe("sim driver", () => {
     expect(w).toContain("return SimCondResult(SimCondBody());");
     expect(withSimResult("void main(){}")).toBe("void main(){}");
   });
+  it("an event step runs with SIM_EVENT set; a giveItem step creates the item on the stand-in", () => {
+    const s = generateSimDriver({
+      steps: [
+        { npc: "qtr_glade", script: "q_onenter", event: true },
+        { giveItem: "q_moonpetal_i2" },
+      ],
+    });
+    expect(s).toMatch(/SetLocalInt\(GetModule\(\), "SIM_EVENT", 1\);\s+ExecuteScript\("q_onenter", oNpc\);\s+DeleteLocalInt\(GetModule\(\), "SIM_EVENT"\);/);
+    expect(s).toContain('CreateItemOnObject("q_moonpetal_i2", oActor, 1)');
+    expect(validateSimSpec({ steps: [{ giveItem: "q_x", script: "q_act" }] })).toEqual(["step 1: a step gives an item or runs a script, not both"]);
+    expect(validateSimSpec({ steps: [{ giveItem: "q_x" }] })).toEqual([]);
+  });
 });

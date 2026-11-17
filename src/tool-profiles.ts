@@ -55,6 +55,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "add_dialog_node",
     "edit_dialog_node",
     "add_dialog_return_links",
+    "prune_dialog_orphans",
     "place_creature",
     "randomize_npc_appearance",
     "create_creature_blueprint",
@@ -146,6 +147,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   fix: [
     "check_area_connectivity",
     "add_dialog_return_links",
+    "prune_dialog_orphans",
     "edit_dialog_node",
     "build_quest",
     "fix_object_heights",

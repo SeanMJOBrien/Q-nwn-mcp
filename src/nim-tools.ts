@@ -259,6 +259,9 @@ export async function compileScript(
   args.push(nssPath);
   try {
     const output = await run("nwn_script_comp", args);
+    // Like jsonToGff: every compile into the module's temp dir reaches the project here, so no caller
+    // (compile_script, transition writers, quest/companion generators) can leave the .ncs out of it.
+    if (outPath) await afterWrite(outPath);
     return { success: true, output };
   } catch (err: unknown) {
     const e = err as { message?: string };
