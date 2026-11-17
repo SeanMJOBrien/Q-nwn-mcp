@@ -1709,6 +1709,28 @@ describe("verifyTrigger", () => {
     verifyTrigger(report, makeIndex(), obj);
     expect(report.errors.map((e) => e.code)).toContain("zero_area_geometry");
   });
+
+  it("flags trigger vertices whose struct ID is not the toolset's 3 (the engine ignores them)", () => {
+    const point = (id: number, x: number, y: number) => ({
+      __struct_id: id,
+      PointX: { type: "float", value: x },
+      PointY: { type: "float", value: y },
+      PointZ: { type: "float", value: 0 },
+    });
+    const square = (id: number) =>
+      ({
+        Tag: { type: "cexostring", value: "trig" },
+        Geometry: { type: "list", value: [point(id, -4, -4), point(id, 4, -4), point(id, 4, 4), point(id, -4, 4)] },
+      }) as unknown as GffObj;
+
+    const bad = new Report("t", "utt");
+    verifyTrigger(bad, makeIndex(), square(0));
+    expect(bad.errors.map((e) => e.code)).toContain("geometry_struct_id");
+
+    const good = new Report("t", "utt");
+    verifyTrigger(good, makeIndex(), square(3));
+    expect(good.errors.map((e) => e.code)).not.toContain("geometry_struct_id");
+  });
 });
 
 // ─── Doors ────────────────────────────────────────────────────────────────

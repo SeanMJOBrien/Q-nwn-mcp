@@ -4,12 +4,21 @@
  * Vertices are relative to the trigger's own position. `width` runs across the route and `depth` along it;
  * `bearing` is the compass direction the route runs (0 = north, 90 = east, clockwise), so at bearing 0 the
  * width spans X and the depth spans Y. Vertices are wound counter-clockwise, as toolset-drawn triggers are.
+ *
+ * Each vertex is a GFF struct with ID 3 (TRIGGER_POINT_STRUCT_ID), as in every toolset-made trigger (2,533 points in
+ * The Frozen North). The engine ignores vertices with another struct ID: a trigger written with ID 0 loaded, but nothing
+ * was ever inside it and DM mode did not draw it (Ilya's trigger on the Quest Test Range, engine-checked 2026-11-17).
  */
 
 import type { GffObj } from "../types/gff.js";
 
 /** Default half-height above the walk plane, so the trigger is clickable. */
 export const TRIGGER_GEOMETRY_Z = 0.025;
+
+/** GFF struct ID of a placed trigger's Geometry vertex (toolset value; the engine skips any other). */
+export const TRIGGER_POINT_STRUCT_ID = 3;
+/** GFF struct ID of a placed encounter's Geometry vertex (toolset value, 6,227 points in The Frozen North). */
+export const ENCOUNTER_POINT_STRUCT_ID = 1;
 
 /** Below this a transition trigger is hard to find and easy to walk past (area-connections skill). */
 export const MIN_TRANSITION_WIDTH = 2;
@@ -42,7 +51,7 @@ export function rectTriggerGeometry(width: number, depth: number, bearing = 0, z
   return {
     type: "list",
     value: rectTriggerPoints(width, depth, bearing).map((p) => ({
-      __struct_id: 0,
+      __struct_id: TRIGGER_POINT_STRUCT_ID,
       PointX: { type: "float", value: p.x },
       PointY: { type: "float", value: p.y },
       PointZ: { type: "float", value: z },

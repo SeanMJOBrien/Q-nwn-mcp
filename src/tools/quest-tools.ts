@@ -129,7 +129,7 @@ export async function buildQuestFromJson(spec: string, dryRun?: boolean): Promis
       }
       const report = await builder.build();
       if (systemWritten) report.notes.push("quest runtime written (create_quest_system)");
-      const specFile = await questSpecFile(index, normalized.tag);
+      const specFile = dryRun ? null : await questSpecFile(index, normalized.tag); // a dry run changes nothing
       if (specFile) {
         await fs.mkdir(path.dirname(specFile), { recursive: true });
         await fs.writeFile(specFile, `${JSON.stringify(input, null, 2)}\n`);

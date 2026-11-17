@@ -5,6 +5,7 @@
  */
 
 import { EQUIP_SLOT_MAP } from "../equip-slots.js";
+import { ENCOUNTER_POINT_STRUCT_ID, TRIGGER_POINT_STRUCT_ID } from "../trigger-geometry.js";
 import { getVarTableEntries } from "../git-helpers.js";
 import { tableFromConstantColumn } from "../npc-stat-block.js";
 import { WEAPON_INVESTMENT_CLASS_IDS } from "../npc-weapon-preferences.js";
@@ -1210,7 +1211,7 @@ export function verifyPlaceable(report: Report, index: ModuleIndex, obj: GffObj)
  * non-degenerate vertices is invisible to the engine's entry detection AND to
  * the toolset — it silently does nothing.
  */
-function verifyGeometry(report: Report, obj: GffObj, xField: string, yField: string): void {
+function verifyGeometry(report: Report, obj: GffObj, xField: string, yField: string, pointStructId: number): void {
   const geometry = listOf(obj, "Geometry");
   if (geometry.length === 0) {
     report.error(
@@ -1226,6 +1227,19 @@ function verifyGeometry(report: Report, obj: GffObj, xField: string, yField: str
       "degenerate_geometry",
       `Geometry has only ${geometry.length} vertices — at least 3 are needed to enclose an area`,
       "Geometry",
+    );
+    return;
+  }
+
+  // The engine skips vertices whose struct ID differs from the toolset's (trigger 3, encounter 1): the object loads
+  // but its region is empty — nothing is ever inside it and DM mode does not draw it (engine-checked 2026-11-17).
+  const wrongIds = geometry.filter((p) => (p as { __struct_id?: number }).__struct_id !== pointStructId).length;
+  if (wrongIds > 0) {
+    report.error(
+      "geometry_struct_id",
+      `${wrongIds} of ${geometry.length} Geometry vertices have a struct ID other than ${pointStructId} — the engine ignores them, so the region can never be entered and DM mode does not draw it`,
+      "Geometry",
+      `set each vertex's __struct_id to ${pointStructId} (a quest trigger: rebuild the quest with build_quest)`,
     );
     return;
   }
@@ -1246,7 +1260,7 @@ export function verifyTrigger(report: Report, index: ModuleIndex, obj: GffObj): 
   if (!getFieldStr(obj, "Tag")) {
     report.warn("missing_tag", "Trigger has no Tag", "Tag");
   }
-  verifyGeometry(report, obj, "PointX", "PointY");
+  verifyGeometry(report, obj, "PointX", "PointY", TRIGGER_POINT_STRUCT_ID);
 
   for (const field of [
     "ScriptOnEnter",
@@ -1277,7 +1291,7 @@ export function verifyEncounter(report: Report, index: ModuleIndex, obj: GffObj)
     report.warn("missing_tag", "Encounter has no Tag", "Tag");
   }
   // UTE geometry uses X/Y, not PointX/PointY — a genuine NWN schema difference.
-  verifyGeometry(report, obj, "X", "Y");
+  verifyGeometry(report, obj, "X", "Y", ENCOUNTER_POINT_STRUCT_ID);
 
   const creatures = listOf(obj, "CreatureList");
   if (creatures.length === 0) {

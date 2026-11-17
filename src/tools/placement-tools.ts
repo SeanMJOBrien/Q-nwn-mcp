@@ -20,7 +20,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { GIT_STRUCT_ID } from "../config.js";
 import { checkPositionWalkable, checkPlacementWalkable } from "../util/walkmesh.js";
-import { MIN_TRANSITION_DEPTH, MIN_TRANSITION_WIDTH, rectTriggerGeometry } from "../util/trigger-geometry.js";
+import { ENCOUNTER_POINT_STRUCT_ID, MIN_TRANSITION_DEPTH, MIN_TRANSITION_WIDTH, rectTriggerGeometry } from "../util/trigger-geometry.js";
 import { resolveBlueprint, getGitDoc, writeBackGit, updateAreaCounts, degToRad } from "../util/git-helpers.js";
 import { getFieldStr, getFieldNum, getFieldLocStr, getFieldList, setField } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
@@ -630,10 +630,10 @@ export function registerPlacementTools(server: McpServer): void {
         obj.Geometry = {
           type: "list",
           value: [
-            { __struct_id: 0, X: { type: "float", value: -s }, Y: { type: "float", value: -s }, Z: { type: "float", value: 0.0 } },
-            { __struct_id: 0, X: { type: "float", value:  s }, Y: { type: "float", value: -s }, Z: { type: "float", value: 0.0 } },
-            { __struct_id: 0, X: { type: "float", value:  s }, Y: { type: "float", value:  s }, Z: { type: "float", value: 0.0 } },
-            { __struct_id: 0, X: { type: "float", value: -s }, Y: { type: "float", value:  s }, Z: { type: "float", value: 0.0 } },
+            { __struct_id: ENCOUNTER_POINT_STRUCT_ID, X: { type: "float", value: -s }, Y: { type: "float", value: -s }, Z: { type: "float", value: 0.0 } },
+            { __struct_id: ENCOUNTER_POINT_STRUCT_ID, X: { type: "float", value:  s }, Y: { type: "float", value: -s }, Z: { type: "float", value: 0.0 } },
+            { __struct_id: ENCOUNTER_POINT_STRUCT_ID, X: { type: "float", value:  s }, Y: { type: "float", value:  s }, Z: { type: "float", value: 0.0 } },
+            { __struct_id: ENCOUNTER_POINT_STRUCT_ID, X: { type: "float", value: -s }, Y: { type: "float", value:  s }, Z: { type: "float", value: 0.0 } },
           ],
         };
       }
