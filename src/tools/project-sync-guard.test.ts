@@ -21,6 +21,7 @@ const NOT_MODULE_RESOURCES: Record<string, string> = {
   "creature-catalog-tools.ts": "writes the catalog files under adventures/_catalog and the repo's src/data and docs, never into the module",
   "treasure-catalog-tools.ts": "writes the catalog files under adventures/_catalog and the repo's src/data and docs; import_treasure_item writes through jsonToGff, which syncs the project",
   "module-tools.ts": "create_module assembles a new module in its own directory before loading it",
+  "creature-spec-tools.ts": "creatures/<resref>.json, the spec kept in the module project for a rebuild (like quests/<tag>.json); every resource goes through jsonToGff, which syncs the project",
 };
 for (const f of ["gear-tools.ts", "random-abilities-tools.ts", "reward-tools.ts", "spec-ability-tools.ts", "spec-assert-tools.ts", "spec-check-tools.ts", "systest-tools.ts"]) {
   NOT_MODULE_RESOURCES[f] = "removes its own _<tool>_probe scripts, which the project sync ignores";

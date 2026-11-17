@@ -152,7 +152,15 @@ Place **0-3 area-wide sounds** per area for broad atmosphere. These are not tied
 
 ### Phase 5: Place Waypoints
 
-Place **2-5 waypoints** per area with map notes.
+Place waypoints with map notes (map pins) per area. **Rule (user, 2026-11-17): every place a player must find gets a pin**, however many that is:
+
+- every door, trigger or portal that leads to another area (A below);
+- the entrance doors of a large structure — keep, gatehouse, temple, tower, any building whose door is small against its walls or faces away from the approach ("Keep Door", "Temple Entrance");
+- each shop or merchant (added by `/adventure-affordances` when it places the store) and each inn or tavern;
+- each quest giver and key NPC's usual spot (added by `/adventure-actors` / `/adventure-quests` if they place them later);
+- landmarks (B below).
+
+Put the pin on the walkable approach side, 1-2 m in front of the door or NPC, not inside a wall: `probe_ground(area, x, y, buffer: "0.5")` first, then `place_waypoint(area, tag, name, x, y, mapNote: "Keep Door")`. The text names the place or where it leads, never a spoiler ("Keep Door", not "Way to the cabal's lair").
 
 #### A. Entrance Waypoints
 

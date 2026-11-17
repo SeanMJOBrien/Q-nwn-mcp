@@ -151,7 +151,8 @@ Rural Winter (79%), Frozen Wastes (64%), Rural (37%), Underdark (36%), Castle Ex
   most common cause of a zone the player can see but not reach.
 - Confirm both halves of every transition exist and point at each other. A one-way link strands
   the player.
-- Confirm the landing point is walkable **and** that a path exists from it to the rest of the area.
+- Confirm the landing point is walkable **and** that a path exists from it to the rest of the area: `check_path(fromTag: <landing waypoint>, toTag: <next transition or NPC>)`. Do not judge this from heights: a portal on a castle wall-top is walkable but cut off (Salt Gate, 2026-11-17). `verify_all` reports `object_unreachable` / `area_unreachable` for the whole module.
+- **Map pin at every transition** (user rule 2026-11-17): a waypoint with `mapNote` 1-2 m in front of each door, trigger or portal on the walkable side, text = where it leads ("To the Keep", "Keep Door"). A door into a large structure (keep, gatehouse, tower) always gets one: its door is easy to miss on the map.
 
 ## Pitfalls
 

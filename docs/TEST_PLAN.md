@@ -170,9 +170,11 @@ Steps: `verify_area` on an area whose `.gic` has fewer entries than its `.git`.
 Expected: error `gic_out_of_sync`. *Rationale: desynced objects work in-game but are
 invisible in the toolset, so a human reviewer cannot see or fix them.*
 
-**TC-A05 — Interactive objects sit in the main walkable zone** · P1 · [manual]
-Steps: place a creature on an unreachable ledge; `verify_area(checkWalkable: true)`.
-Expected: warning `object_outside_main_zone`. *This is the "sentries on the castle roof"
+**TC-A05 — Objects the player must reach are walkable from the start** · P1 · [manual; graph logic auto in `walk-graph.test.ts`]
+Steps: place a creature on an unreachable ledge; `verify_area(checkWalkable: true)` (or `verify_all`, on by default).
+Expected: warning `object_unreachable` with the region's height and the closest reachable ground. (Replaced the tile-level,
+height-blind `object_outside_main_zone` on 2026-11-17; on Salt Gate it found the portal on a wall-top, a wall-top trap and a
+hold wing with no doorway.) *This is the "sentries on the castle roof"
 defect — the NPC exists, is valid, and can never be reached.*
 
 **TC-A06 — Area scripts resolve** · P2 · [auto]

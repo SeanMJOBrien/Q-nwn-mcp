@@ -23,6 +23,7 @@ export const SPEC_KINDS: Record<string, SpecKind> = {
   journal: { type: "JournalSpec", describes: "a plain journal quest with its entries (add_journal_quest + add_journal_entry)" },
   "area-layout": { type: "AreaLayoutSpec", describes: "a generated area layout (adventure_generate_layout)" },
   plot: { type: "PlotSpec", describes: "the adventure's plot: places, people, quests (write_plot)" },
+  creature: { type: "CreatureSpec", describes: "one creature described in names: class, package, feats, look, gear (build_creature)" },
 };
 
 export interface SpecError {
@@ -169,6 +170,8 @@ export function specToToolCalls(kind: string, spec: any): ToolCall[] {
       return [{ tool: "adventure_generate_layout", args: toToolArgs(spec) }];
     case "plot":
       return [{ tool: "write_plot", args: { spec: JSON.stringify(spec) } }];
+    case "creature":
+      return [{ tool: "build_creature", args: { spec: JSON.stringify(spec) } }];
     case "journal": {
       const { entries, ...quest } = spec;
       return [

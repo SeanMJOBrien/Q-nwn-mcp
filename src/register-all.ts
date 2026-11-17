@@ -27,6 +27,8 @@ import { registerDialogWriteTools } from "./tools/dialog-write-tools.js";
 import { registerEncounterComposerTools } from "./tools/encounter-composer-tools.js";
 import { registerEncounterTools } from "./tools/encounter-tools.js";
 import { registerFactionTools } from "./tools/faction-tools.js";
+import { registerPathTools } from "./tools/path-tools.js";
+import { registerCreatureSpecTools } from "./tools/creature-spec-tools.js";
 import { registerGearTools } from "./tools/gear-tools.js";
 import { registerItemTools } from "./tools/item-tools.js";
 import { registerJournalTools } from "./tools/journal-tools.js";
@@ -84,6 +86,8 @@ export function registerAll(server: McpServer): void {
   registerDialogWriteTools(server);
   registerModuleTools(server);
   registerFactionTools(server);
+  registerPathTools(server);
+  registerCreatureSpecTools(server);
   registerBulkTools(server);
   registerUndoTools(server);
   registerRewardTools(server);

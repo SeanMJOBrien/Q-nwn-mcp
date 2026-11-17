@@ -10,8 +10,16 @@ import type { GffObj } from "../../types/gff.js";
 import { getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
 import { getTilesetInfo } from "../tileset.js";
-import { computeWalkableZones, loadAreaWalkmeshData } from "../walkmesh.js";
-import { checkScriptRef, listOf, type Report } from "./common.js";
+import {
+  areaObjects,
+  computeModuleReachability,
+  isMarkedUnreachableOk,
+  locateObject,
+  type ModuleReachability,
+  type PlacedObject,
+} from "../area-walk-graph.js";
+import { closestApproach, describeComponent } from "../walk-graph.js";
+import { checkScriptRef, isBaseGameScript, listOf, type Report } from "./common.js";
 
 /** GIT object lists, with the position field names each uses. */
 export const GIT_OBJECT_LISTS = [
@@ -32,6 +40,8 @@ export interface AreaVerifyOptions {
   /** Run the walkmesh reachability pass (slower — needs .wok extraction). */
   checkWalkable?: boolean;
   resmanOpts?: ResmanOptions;
+  /** Module reachability computed once for all areas (verify_all); computed here when absent. */
+  reachability?: ModuleReachability;
 }
 
 export async function verifyArea(
@@ -157,37 +167,90 @@ export async function verifyArea(
   // ─── Walkability / reachability ─────────────────────────────────────────
   if (opts.checkWalkable && opts.resmanOpts) {
     try {
-      const walkData = await loadAreaWalkmeshData(areaResref, index, opts.resmanOpts);
-      const zones = await computeWalkableZones(areaResref, index, opts.resmanOpts, walkData);
-      if (zones && zones.length > 0) {
-        // Objects a player must interact with need to sit in a walkable zone.
-        const INTERACTIVE = new Set(["creature", "placeable", "store", "door"]);
-        // ZoneInfo.tiles is a Set of tile indices (y * width + x).
-        const largest = zones.reduce((a, b) => (b.tiles.size > a.tiles.size ? b : a));
-
-        for (const obj of placed) {
-          if (!INTERACTIVE.has(obj.label)) continue;
-          const tileX = Math.floor(obj.x / TILE_SIZE);
-          const tileY = Math.floor(obj.y / TILE_SIZE);
-          if (!largest.tiles.has(tileY * width + tileX)) {
-            report.warn(
-              "object_outside_main_zone",
-              `${obj.label} "${obj.tag}" at (${obj.x.toFixed(1)}, ${obj.y.toFixed(1)}) is not in the area's largest walkable zone — the player may be unable to reach it`,
-              undefined,
-              "adventure_find_walkable to get a guaranteed-reachable position, then move_object",
-            );
-          }
-        }
-
-        if (zones.length > 1) {
-          report.warn(
-            "area_fragmented",
-            `Area has ${zones.length} disconnected walkable zones — parts of it may be unreachable without a transition`,
-          );
-        }
-      }
+      const reach = opts.reachability ?? (await computeModuleReachability(index, opts.resmanOpts));
+      checkReachability(report, index, areaResref, reach);
     } catch {
       // Walkmesh unavailable — skip rather than reporting a false defect.
     }
+  }
+}
+
+/** Objects a player must be able to walk to. */
+function mustBeReachable(o: PlacedObject): boolean {
+  const str = (f: string) => getFieldStr(o.obj, f);
+  const num = (f: string) => getFieldNum(o.obj, f);
+  switch (o.kind) {
+    case "creature":
+      // Hostiles without a conversation may stand out of reach on purpose (archers on a wall).
+      return str("Conversation") !== "" || num("FactionID") !== 1;
+    case "placeable":
+      // Something to do there: a container, a transition, a conversation or a module script. A usable prop with none of
+      // these (a torch bracket on a wall-walk) is decoration.
+      return (
+        num("HasInventory") === 1 ||
+        str("LinkedTo") !== "" ||
+        str("Conversation") !== "" ||
+        (str("OnUsed") !== "" && !isBaseGameScript(str("OnUsed")))
+      );
+    case "door":
+      return true;
+    case "waypoint":
+      return num("HasMapNote") === 1 || /^wp_(at|rt)_/i.test(o.tag);
+    case "trigger":
+      return str("LinkedTo") !== "" || str("ScriptOnEnter") !== "";
+    default:
+      return false;
+  }
+}
+
+/**
+ * object_unreachable: an object the player must reach stands on ground that no walking route from the module start
+ * reaches (a portal on a wall-top, an NPC on a roof), or on no walkable ground at all. area_unreachable: nothing in the
+ * area can be walked to from the start (every way in starts somewhere unreachable).
+ */
+function checkReachability(report: Report, index: ModuleIndex, areaResref: string, reach: ModuleReachability): void {
+  if (!reach.start) return;
+  const g = reach.graphs.get(areaResref);
+  if (!g) return; // no walkmesh data, or not reached at all (below)
+  const reachable = reach.reachable.get(areaResref);
+  if (!reachable || reachable.size === 0) {
+    const git = index.parsedGff.get(`${areaResref}.git`) as GffObj | undefined;
+    const isDmArea = git ? listOf(git, "WaypointList").some((w) => getFieldStr(w, "Tag").toUpperCase() === "DM_AREA") : false;
+    if (!isDmArea) {
+      report.warn(
+        "area_unreachable",
+        "No walking route from the module start reaches this area: every door, trigger or portal into it starts on ground the player cannot walk to (or nothing leads in)",
+        undefined,
+        "check_area_connectivity, then check_path from the module start to each transition into this area",
+      );
+    }
+    return;
+  }
+  const mainComp = [...reachable].reduce((m, c) => (g.components[c].area > g.components[m].area ? c : m));
+  for (const o of areaObjects(index, areaResref)) {
+    if (!mustBeReachable(o) || isMarkedUnreachableOk(o.obj)) continue;
+    const label = `${o.kind} "${o.tag}" at (${o.x.toFixed(1)}, ${o.y.toFixed(1)}, z ${o.z.toFixed(1)})`;
+    const hit = locateObject(g, o, reachable);
+    if (!hit) {
+      report.warn(
+        "object_unreachable",
+        `${label} has no walkable ground within reach — the player cannot get to it`,
+        undefined,
+        "probe_ground at the spot, then move_object onto walkable ground (adventure_find_walkable)",
+      );
+      continue;
+    }
+    if (reachable.has(hit.component)) continue;
+    const comp = describeComponent(g, hit.component);
+    const gap = closestApproach(g, hit.component, mainComp);
+    const gapText = gap
+      ? `; the nearest reachable ground is ${gap.distance} m away at (${gap.b.x}, ${gap.b.y}) with a ${Math.abs(gap.a.z - gap.b.z).toFixed(1)} m height difference`
+      : "";
+    report.warn(
+      "object_unreachable",
+      `${label} stands on ground the player cannot walk to from the module start (region ${comp.region}, height ${comp.height}, ${comp.groundArea} m²)${gapText}. No ramp, stair or transition joins it`,
+      undefined,
+      "check_path from the landing point to this object, then move_object onto reachable ground, or set the local int PATH_UNREACHABLE_OK = 1 if it is out of reach on purpose",
+    );
   }
 }

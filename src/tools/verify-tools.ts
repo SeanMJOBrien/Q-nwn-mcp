@@ -25,6 +25,7 @@ import type { GffObj } from "../types/gff.js";
 import { getFieldStr } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
 import { GIT_OBJECT_LISTS, verifyArea } from "../util/verify/area.js";
+import { computeModuleReachability } from "../util/area-walk-graph.js";
 import {
   verifyCreature,
   verifyDoor,
@@ -207,10 +208,11 @@ export async function collectVerifyResults(
     results.push(report.result());
   }
 
-  // Areas.
+  // Areas. The walking reachability is computed once for the module (it follows transitions between areas).
+  const reachability = checkWalkable ? await computeModuleReachability(index, resmanOpts).catch(() => undefined) : undefined;
   for (const areaResref of index.areas.keys()) {
     const report = new Report(areaResref, "are");
-    await verifyArea(report, index, areaResref, { checkWalkable, resmanOpts });
+    await verifyArea(report, index, areaResref, { checkWalkable, resmanOpts, reachability });
     results.push(report.result());
   }
 
@@ -389,7 +391,7 @@ export function registerVerifyTools(server: McpServer): void {
 
   server.tool(
     "verify_area",
-    "Verify an area (.are/.git/.gic). Checks tile count against dimensions, tile IDs against the tileset, area scripts, object positions within bounds, and GIC/GIT sync. Pass checkWalkable:true to additionally confirm interactive objects sit in the area's main walkable zone (catches NPCs placed somewhere the player cannot reach).",
+    "Verify an area (.are/.git/.gic). Checks tile count against dimensions, tile IDs against the tileset, area scripts, object positions within bounds, and GIC/GIT sync. Pass checkWalkable:true to also check, on the walkmesh, that every object the player must reach (NPCs, usable placeables, doors, transitions, map pins, script triggers) stands on ground a walking route from the module start reaches: object_unreachable (e.g. a portal on a wall-top with no stair), area_unreachable. A deliberately unreachable object carries the local int PATH_UNREACHABLE_OK = 1.",
     {
       area: z.string().describe("Area resref"),
       checkWalkable: z
@@ -517,14 +519,17 @@ export function registerVerifyTools(server: McpServer): void {
     "verify_all",
     "Run every applicable checker across the whole module: all blueprints, all areas, all dialogs, the journal, module info, factions, and the co-op reward rules. Returns a per-target breakdown plus a rollup. Use this as the final acceptance gate before shipping a generated module.",
     {
-      checkWalkable: z.boolean().optional().describe("Include the per-area walkmesh reachability pass (slower)"),
+      checkWalkable: z
+        .boolean()
+        .optional()
+        .describe("Walking reachability from the module start on the walkmesh: object_unreachable, area_unreachable (default true; needs game data, skipped without it; false to skip)"),
       coop: COOP_PARAM,
       brief: z.boolean().optional().describe("Short result (counts plus the first errors to fix, each with its fix) for small models (default: on when MCP_TOOL_PROFILE is set). false = full result"),
     },
     READ_ONLY,
     async ({ checkWalkable, coop, brief }) => {
       const index = requireIndex();
-      const results = await collectVerifyResults(index, { checkWalkable, coop });
+      const results = await collectVerifyResults(index, { checkWalkable: checkWalkable ?? true, coop });
       if (resolveBrief(brief)) return payload(briefVerifyAll(results));
       const failed = results.filter((r) => r.status === "fail");
       const warned = results.filter((r) => r.status === "warn");

@@ -48,6 +48,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "list_items",
   ],
   actors: [
+    "build_creature",
     "build_key_npc",
     "build_companion",
     "create_companion_system",
@@ -83,6 +84,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "create_area_transition",
     "check_area_connectivity",
     "probe_ground",
+    "check_path",
     "fix_object_heights",
     "move_object",
     "remove_object",
@@ -146,6 +148,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   fix: [
     "check_area_connectivity",
+    "check_path",
     "add_dialog_return_links",
     "prune_dialog_orphans",
     "edit_dialog_node",
@@ -157,6 +160,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   verify: [
     "verify_*",
+    "check_path",
     "validate_module",
     "audit_module",
     "run_live_verification",

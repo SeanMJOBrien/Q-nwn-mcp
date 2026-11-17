@@ -241,6 +241,9 @@ Call `get_area_placeables` on the area where the store is documented. Confirm th
 
 If the store was placed but `OpenStore()` in the script uses `GetNearestObjectByTag("str_resref")`, verify the store tag matches exactly what the script looks for.
 
+**Step 4: Map pins (user rule 2026-11-17)**
+For each area, call `get_area_waypoints` and `get_area_doors` / `get_area_triggers`. Every door or trigger leading to another area, every entrance door of a large structure, every merchant and every quest giver needs a waypoint with a map note within about 5 m of it. Add the missing ones with `place_waypoint(..., mapNote: "...")` on the walkable approach side (`probe_ground` first); text names the place or destination, no spoilers.
+
 ---
 
 ### Phase 8: Plot vs Module Consistency
@@ -330,7 +333,7 @@ Never skip Blocking or Breaking issues. Minor issues can be documented without f
 **This is the last thing the phase does, after every fix.**
 
 ```
-verify_all(checkWalkable: true)
+verify_all()   # walking reachability is on by default: object_unreachable / area_unreachable
 ```
 
 `validate_module` checks cross-references — does the script this creature names exist.
@@ -407,7 +410,7 @@ Three things the checker cannot tell you, which matter when reading its findings
 - **One fix, one verify.** After each structural fix (door link, dialog change, script write), re-check the specific thing you fixed before moving on.
 - **Don't place new content.** Polish fixes existing content — it does not add new areas, creatures, placeables, or NPCs. That's `/adventure-rewards`'s job if new reward items are needed.
 - **Quest XP is not set here.** Condition on quest completion scripts may call `GiveXPToCreature` — leave these amounts as-is. `/adventure-rewards` handles final XP balancing.
-- **Faction validation.** Use `get_faction_details` to verify faction relationships. If a custom faction is needed but missing, use `create_faction` to add it. Use `set_faction_reputation` to fix incorrect faction relationships.
+- **Faction validation.** Use `get_faction_details` to verify faction relationships. If a custom faction is needed but missing, use `create_faction` to add it. Use `set_faction_reputation` to fix incorrect faction relationships; any call also repairs a table `verify_faction` flags `replist_layout`.
 - **Bulk cleanup.** Use `bulk_remove_objects(tagPattern: "temp_*", listName: "...", dryRun: true)` to find and remove orphaned objects. Always dry-run first.
 - **Undo safety net.** If a fix goes wrong, use `undo_last_change` to revert. Check `undo_history` to review recent mutations.
 

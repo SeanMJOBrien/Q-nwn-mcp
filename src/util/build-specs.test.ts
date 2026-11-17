@@ -50,7 +50,26 @@ const journal = {
 };
 const areaLayout = { tileset: "ttf01", width: 16, height: 16, style: { type: "forest", rooms: 3 }, transitionDirections: ["south"] };
 const plot = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "..", "..", "docs", "specs", "plot.example.json"), "utf8"));
-const examples: Record<string, unknown> = { companion, "key-npc": keyNpc, dialog, journal, "area-layout": areaLayout, plot };
+const creature = {
+  resref: "seamus",
+  name: "Seamus Worlan",
+  role: "companion",
+  race: "human",
+  gender: "male",
+  class: "fighter",
+  level: 6,
+  build: "fixed",
+  feats: ["Power Attack", "Cleave", "Weapon Focus (Bastard Sword)"],
+  look: { phenotype: "large", scale: 107, hair: "brown", skin: "lightly tanned" },
+  gear: {
+    armor: { base: "chainmail", color: "copper" },
+    weapon: { base: "bastard sword", properties: ["attack bonus +1"] },
+    offhand: { base: "large shield", properties: ["ac bonus +1"] },
+  },
+  place: { area: "saltmerehbr", x: 60, y: 70 },
+  companion: { introduction: "Seamus Worlan, sellsword.", backstory: "Six winters at Ashfang Ford." },
+};
+const examples: Record<string, unknown> = { companion, "key-npc": keyNpc, dialog, journal, "area-layout": areaLayout, plot, creature };
 
 describe("build specs", () => {
   const shapes = toolShapes();

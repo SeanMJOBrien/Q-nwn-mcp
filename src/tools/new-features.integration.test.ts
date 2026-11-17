@@ -375,12 +375,10 @@ describe("faction tools", () => {
       expect(factionList).toHaveLength(4);
       expect((factionList[3].FactionName as { value: string }).value).toBe("Thieves Guild");
 
-      // Should have added 6 rep entries: one for each existing faction, in
-      // BOTH directions (see faction-tools.ts's real bug fix, branch
-      // systest-live-run-and-generalized-spec — a real engine read a
-      // friendly 100 default for a missing reverse-direction entry).
+      // The whole table in the toolset's layout: 4 factions x 3 opinion-holders (faction 0 holds none).
       const repList = (fac.RepList as { value: GffObj[] }).value;
-      expect(repList.length).toBe(8); // 2 original + 6 new (3 existing x 2 directions)
+      expect(repList.length).toBe(12);
+      expect((repList[0].FactionRep as { value: number }).value).toBe(0); // the seeded (0,1) value survives
     } finally {
       await cleanup();
     }
@@ -402,22 +400,18 @@ describe("faction tools", () => {
 
       const parsed = parseResult(result) as Record<string, unknown>;
       expect(parsed.success).toBe(true);
-      // (0,1) already existed (seeded at rep 0) and is updated; the reverse
-      // (1,0) didn't exist yet and is created — both now set to the same
-      // value, per the bilateral-reputation fix (see faction-tools.ts).
-      expect((parsed as { action: { forward: string; reverse: string } }).action).toEqual({
-        forward: "updated",
-        reverse: "created",
-      });
+      // (0,1) (faction 1's opinion of the PCs) already existed and is updated; the PC faction holds no opinion of
+      // faction 1, so that direction is skipped.
+      const action = (parsed as { action: { forward: string; reverse: string } }).action;
+      expect(action.forward).toBe("updated");
+      expect(action.reverse).toMatch(/^skipped/);
 
-      // Verify the rep value changed in both directions
       const fac = facDoc as GffObj;
       const repList = (fac.RepList as { value: GffObj[] }).value;
       expect((repList[0].FactionRep as { value: number }).value).toBe(50);
-      const reverseEntry = repList.find(
-        (e) => (e.FactionID1 as { value: number }).value === 1 && (e.FactionID2 as { value: number }).value === 0,
-      );
-      expect((reverseEntry?.FactionRep as { value: number }).value).toBe(50);
+      expect((repList[0].FactionRep as { type: string }).type).toBe("dword");
+      const towardPc = repList.filter((e) => (e.FactionID2 as { value: number }).value === 0);
+      expect(towardPc).toHaveLength(0);
     } finally {
       await cleanup();
     }

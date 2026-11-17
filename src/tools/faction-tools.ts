@@ -12,7 +12,8 @@ import { numParam, optNumParam, toI } from "../util/params.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
-import { getFieldStr, getFieldNum, getFieldList, setField } from "../types/gff.js";
+import { getFieldStr, getFieldNum, getFieldList } from "../types/gff.js";
+import { canonicalRepList, mutualReputation, newFactionReputation } from "../util/faction-replist.js";
 import type { GffObj, GffDocument } from "../types/gff.js";
 
 /** Find the .fac document and resource entry from the module index. */
@@ -34,10 +35,11 @@ export function registerFactionTools(server: McpServer): void {
 
   server.tool(
     "create_faction",
-    "Add a new faction to the module's .fac file with bilateral reputation entries (both directions) for all " +
-      "existing factions. LIMITATION (confirmed on the live engine): a faction added this way never takes part in reputation " +
-      "lookups, so creatures in it will not be hostile or friendly as its .fac data says (GetReputation/GetIsEnemy ignore it). " +
-      "For ordinary friend/foe use the standard factions (1 Hostile, 2 Commoner, 3 Merchant, 4 Defender); verify_creature warns custom_faction_unreliable.",
+    "Add a new faction to the module's .fac file with reputation both ways toward every existing faction " +
+      "(defaultReputation, 50 = neutral), and rewrite the reputation table in the toolset's layout, which the engine needs " +
+      "(engine-checked: a custom faction written this way takes part in GetReputation/GetIsEnemy). Use it for a side the " +
+      "standard factions do not fit, e.g. a prisoner the Hostile guards must not attack; then set_faction_reputation for " +
+      "pairs that differ and set the creature's FactionID to the returned factionId.",
     {
       name: z.string().describe("Faction display name"),
       parentId: optNumParam("Parent faction ID (default 4294967295 = no parent)"),
@@ -73,41 +75,14 @@ export function registerFactionTools(server: McpServer): void {
         FactionGlobal: { type: "word", value: globalN },
       });
 
-      // Add bilateral reputation entries for all existing factions — BOTH
-      // directions, and as `dword`, NOT `int`.
-      //
-      // Two real, compounding bugs found live (branch
-      // systest-live-run-and-generalized-spec), building a module with two
-      // factions meant to be mutually hostile and finding GetReputation()/
-      // GetIsEnemy() always reported a friendly 100 for BOTH directions no
-      // matter what was written here:
-      //  1. This loop wrote only the new->existing direction, leaving the
-      //     reverse (existing->new) entry completely absent from the .fac.
-      //     Fixing direction alone did NOT fix the live behavior.
-      //  2. The real root cause: every pre-existing, toolset-authored
-      //     RepList entry carries FactionRep as a `dword`; this code wrote
-      //     it as `int`. GFF struct fields are looked up by (label, type)
-      //     together, not label alone — the engine's loader asking for a
-      //     `dword`-typed FactionRep simply does not find an `int`-typed one
-      //     with the same label, so every entry this function ever wrote was
-      //     silently invisible to the live engine regardless of its FactionID
-      //     values or direction, falling back to a friendly default (100).
-      // Confirmed fixed end-to-end: after correcting both, a real headless
-      // engine run's GetIsEnemy() check passed for the first time.
-      for (let i = 0; i < newFactionId; i++) {
-        repList.push({
-          __struct_id: repList.length,
-          FactionID1: { type: "dword", value: newFactionId },
-          FactionID2: { type: "dword", value: i },
-          FactionRep: { type: "dword", value: defaultRepN },
-        });
-        repList.push({
-          __struct_id: repList.length,
-          FactionID1: { type: "dword", value: i },
-          FactionID2: { type: "dword", value: newFactionId },
-          FactionRep: { type: "dword", value: defaultRepN },
-        });
-      }
+      // Rebuild the whole RepList in the toolset's layout (util/faction-replist.ts). Appending rows at the end, as this
+      // tool used to, left the engine ignoring the new faction (engine-checked 2026-11-17).
+      fac.obj.RepList = {
+        type: "list",
+        value: canonicalRepList(factionList.length, repList, {
+          overrides: newFactionReputation(newFactionId, factionList.length, defaultRepN),
+        }),
+      };
 
       await jsonToGff(fac.doc, fac.filePath);
 
@@ -120,7 +95,7 @@ export function registerFactionTools(server: McpServer): void {
             name,
             parentId: parentIdN,
             global: globalN,
-            reputationEntriesAdded: newFactionId * 2,
+            reputationRows: factionList.length * (factionList.length - 1),
             defaultReputation: defaultRepN,
           }, null, 2),
         }],
@@ -134,7 +109,9 @@ export function registerFactionTools(server: McpServer): void {
     "set_faction_reputation",
     "Modify reputation between two factions, in BOTH directions (NWN's reputation table is directional per " +
       "(FactionID1, FactionID2) pair — setting only one direction leaves the engine reading a friendly 100 default " +
-      "for the other, confirmed live). Creates either entry if it doesn't already exist. Only the standard factions (0-4) take part in live reputation checks; entries for a custom faction (5+) have no effect in play.",
+      "for the other, confirmed live). Rewrites the whole table in the toolset's layout (which also repairs a .fac written " +
+      "by an older create_faction); custom factions (5+) work in play. The PC faction (0) holds no opinions, so only the " +
+      "other faction's opinion of the PCs is set when one side is 0.",
     {
       faction1: numParam("First faction ID"),
       faction2: numParam("Second faction ID"),
@@ -159,35 +136,16 @@ export function registerFactionTools(server: McpServer): void {
         return { isError: true, content: [{ type: "text", text: `Invalid faction2 ID: ${f2}. Valid range: 0-${factionList.length - 1}` }] };
       }
 
-      // Two real, compounding bugs found live (branch
-      // systest-live-run-and-generalized-spec) — see create_faction's own
-      // comment above for the full story. Summary: (1) NWN's reputation
-      // table is directional per (FactionID1, FactionID2) pair, so both
-      // (f1,f2) and (f2,f1) need setting/creating, not just whichever
-      // direction the caller happened to name first; (2) FactionRep must be
-      // written as `dword`, matching every real toolset-authored entry —
-      // GFF struct fields are looked up by (label, type) together, so an
-      // `int`-typed FactionRep is invisible to the engine's loader even
-      // though the label matches, silently falling back to a friendly
-      // default (100) regardless of direction or FactionID values.
-      const upsertRep = (id1: number, id2: number): "updated" | "created" => {
-        for (const entry of repList) {
-          if (getFieldNum(entry, "FactionID1") === id1 && getFieldNum(entry, "FactionID2") === id2) {
-            setField(entry, "FactionRep", "dword", rep);
-            return "updated";
-          }
-        }
-        repList.push({
-          __struct_id: repList.length,
-          FactionID1: { type: "dword", value: id1 },
-          FactionID2: { type: "dword", value: id2 },
-          FactionRep: { type: "dword", value: rep },
-        });
-        return "created";
+      // Both directions (the table is directional), every value a dword, and the whole list rewritten in the toolset's
+      // layout, which also repairs a .fac an older create_faction left in the appended layout.
+      const has = (a: number, b: number) =>
+        repList.some((e) => getFieldNum(e, "FactionID1") === a && getFieldNum(e, "FactionID2") === b);
+      const forwardAction = f2 === 0 ? "skipped (the PC faction holds no opinions)" : has(f1, f2) ? "updated" : "created";
+      const reverseAction = f1 === 0 ? "skipped (the PC faction holds no opinions)" : has(f2, f1) ? "updated" : "created";
+      fac.obj.RepList = {
+        type: "list",
+        value: canonicalRepList(factionList.length, repList, { overrides: mutualReputation(f1, f2, rep) }),
       };
-
-      const forwardAction = upsertRep(f1, f2);
-      const reverseAction = f2 !== f1 ? upsertRep(f2, f1) : forwardAction;
 
       await jsonToGff(fac.doc, fac.filePath);
 

@@ -80,7 +80,9 @@ For each NPC described in the plot's `### Key NPCs` section:
    leader who talks before it fights) is built with `forge_creature` (see "Creature forge" at
    the top of this skill) on its blueprint and its placed copy: `gearRole: "elite"` for a boss
    or named leader, `"standard"` otherwise, and `originalSpawn: "nw_c2_default9"`. For a standard
-   PC race, `build_key_npc` does the blueprint, forge, placement and verify in one call.
+   PC race, `build_key_npc` does the blueprint, forge, placement and verify in one call. When the plot describes the
+   character in detail (chosen feats, look, named gear), use `build_creature` with a spec in names instead (see the
+   creature-forge skill: package, `build: "spawn"` vs `"fixed"`, colours, item properties in words).
 
 ---
 

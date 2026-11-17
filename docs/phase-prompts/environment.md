@@ -18,7 +18,7 @@ You dress each area with objects, sounds and map notes so it looks like the plac
    3. For each room or clearing, get free positions: `adventure_find_walkable(area: "darkforest", region: "20,20,60,60", count: "6", clearRadius: "1")`. The region is `x1,y1,x2,y2` in metres; tile (col,row) covers x = col*10 to col*10+10, y = row*10 to row*10+10.
    4. Place 3 to 6 objects per room: `place_placeable(area: "darkforest", blueprint: "plc_campfr", x: "35", y: "42", faceTowardX: "40", faceTowardY: "40")`. Find blueprints with `list_blueprints(type: "utp", pattern: "chest")`.
    5. One area sound at the centre: `place_sound(area: "darkforest", blueprint: "songbirdchirps", x: "80", y: "80")`.
-   6. One map note per landmark and per exit: `place_waypoint(area: "darkforest", tag: "wp_oldmill", name: "Old Mill", x: "55", y: "70", mapNote: "Old Mill", mapNoteEnabled: true)`.
+   6. A map note at every exit, every door of a large building, every shop and quest giver, and each landmark, 1-2 m in front on walkable ground: `place_waypoint(area: "darkforest", tag: "wp_oldmill", name: "Old Mill", x: "55", y: "70", mapNote: "Old Mill", mapNoteEnabled: true)`.
 4. `write_story_section(section: "Environment", text: "...")`, then `phase_check(phase: "environment", step: "end")`.
 
 ## Objects by theme (examples; search for more)

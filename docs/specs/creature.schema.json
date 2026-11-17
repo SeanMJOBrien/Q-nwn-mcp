@@ -1,0 +1,331 @@
+{
+  "$ref": "#/definitions/CreatureSpec",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "ColorValue": {
+      "description": "A colour: a palette index (0-175) or a colour name (see src/data/color-names.json for the names per palette).",
+      "type": [
+        "number",
+        "string"
+      ]
+    },
+    "CompanionLinesSpec": {
+      "additionalProperties": false,
+      "description": "Recruit dialog lines for a companion.",
+      "properties": {
+        "accept": {
+          "type": "string"
+        },
+        "backstory": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "farewell": {
+          "type": "string"
+        },
+        "introduction": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "partyFull": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "introduction",
+        "backstory"
+      ],
+      "type": "object"
+    },
+    "CreatureGearSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "amulet": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "armor": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "belt": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "boots": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "cloak": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "gloves": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "helmet": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "leftRing": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "offhand": {
+          "$ref": "#/definitions/GearItemSpec",
+          "description": "Off hand: a shield or a second weapon."
+        },
+        "rightRing": {
+          "$ref": "#/definitions/GearItemSpec"
+        },
+        "weapon": {
+          "$ref": "#/definitions/GearItemSpec",
+          "description": "Main hand."
+        }
+      },
+      "type": "object"
+    },
+    "CreatureLookSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "hair": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "head": {
+          "description": "Head model number. Default: a random head of the race and gender.",
+          "type": "integer"
+        },
+        "phenotype": {
+          "description": "\"normal\" or \"large\" (phenotype.2da label), or a row.",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "scale": {
+          "description": "Visual size in percent of normal, applied at spawn. Default: a small random variation (95-105).",
+          "maximum": 200,
+          "minimum": 50,
+          "type": "number"
+        },
+        "skin": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "tattoo1": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "tattoo2": {
+          "$ref": "#/definitions/ColorValue"
+        }
+      },
+      "type": "object"
+    },
+    "CreatureSpec": {
+      "additionalProperties": false,
+      "description": "One creature, described in names (maps to `build_creature`).",
+      "properties": {
+        "alignment": {
+          "description": "e.g. \"lawful good\", \"chaotic neutral\", \"true neutral\". Default: neutral, moved to fit the class.",
+          "type": "string"
+        },
+        "build": {
+          "description": "spawn (default): a level-1 build that levels itself at spawn with the package (requested feats go into the level-1 slots; the package picks the rest). fixed: built at its level now with the requested feats first (non-casters).",
+          "enum": [
+            "spawn",
+            "fixed"
+          ],
+          "type": "string"
+        },
+        "class": {
+          "description": "Base class name: barbarian, bard, cleric, druid, fighter, monk, paladin, ranger, rogue, sorcerer, wizard.",
+          "type": "string"
+        },
+        "companion": {
+          "$ref": "#/definitions/CompanionLinesSpec",
+          "description": "Required for role companion."
+        },
+        "conversation": {
+          "description": "Resref of an existing dialog to attach (npc and enemy).",
+          "type": "string"
+        },
+        "domains": {
+          "description": "Cleric only: two domain names, e.g. [\"War\", \"Strength\"]. Default: the package's domains.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "faction": {
+          "description": "Default by role: companion and npc commoner, enemy hostile. A standard faction name or a custom faction's name.",
+          "type": "string"
+        },
+        "feats": {
+          "description": "Feat names, e.g. \"Power Attack\", \"Cleave\", \"Weapon Focus (Bastard Sword)\". Prerequisites are added and reported.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gear": {
+          "$ref": "#/definitions/CreatureGearSpec",
+          "description": "Items to make and equip. With any gear given, the creature keeps exactly this gear (no shopping at spawn)."
+        },
+        "gender": {
+          "enum": [
+            "male",
+            "female"
+          ],
+          "type": "string"
+        },
+        "level": {
+          "description": "Level the creature has in play.",
+          "maximum": 40,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "look": {
+          "$ref": "#/definitions/CreatureLookSpec"
+        },
+        "name": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "package": {
+          "description": "Feat and skill progression (packages.2da): a package name of the class (\"Fighter, Weapon Master (Katana)\", \"Fighter, Gladiator\"), \"auto\" (the class package whose feat list holds the most requested feats) or omitted (the class's default package; \"auto\" when feats are given).",
+          "type": "string"
+        },
+        "place": {
+          "$ref": "#/definitions/PlacementSpec"
+        },
+        "powerLevel": {
+          "description": "Default \"standard\"; \"tougher\" and \"epic\" are for a real boss.",
+          "enum": [
+            "low",
+            "standard",
+            "tougher",
+            "epic"
+          ],
+          "type": "string"
+        },
+        "race": {
+          "description": "Player race name: dwarf, elf, gnome, halfling, half-elf, half-orc, human.",
+          "type": "string"
+        },
+        "resref": {
+          "description": "Blueprint resref, also the tag: lower-case letters, digits and underscore, at most 16 characters.",
+          "pattern": "^[a-z0-9_]{1,16}$",
+          "type": "string"
+        },
+        "role": {
+          "description": "companion: recruitable henchman (Commoner faction, henchman AI, recruit dialog). npc: a friendly character. enemy: hostile.",
+          "enum": [
+            "companion",
+            "npc",
+            "enemy"
+          ],
+          "type": "string"
+        },
+        "school": {
+          "description": "Wizard only: school name, e.g. \"Evocation\" (\"General\" for none). Default: the package's school.",
+          "type": "string"
+        },
+        "spells": {
+          "description": "Casters: spell names always picked first at their level (a signature spell), e.g. [\"Fireball\"].",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "resref",
+        "name",
+        "role",
+        "race",
+        "gender",
+        "class",
+        "level"
+      ],
+      "type": "object"
+    },
+    "GearItemSpec": {
+      "additionalProperties": false,
+      "description": "One item to make and equip.",
+      "properties": {
+        "base": {
+          "description": "What it is: a base item name (\"bastard sword\", \"large shield\", \"helmet\", \"cloak\") or, for `armor`, an armor name (\"padded\", \"leather\", \"studded leather\", \"hide\", \"chain shirt\", \"scale mail\", \"chainmail\", \"breastplate\", \"splint mail\", \"banded mail\", \"half plate\", \"full plate\", \"clothing\").",
+          "minLength": 1,
+          "type": "string"
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ColorValue"
+            },
+            {
+              "$ref": "#/definitions/ItemColors"
+            }
+          ],
+          "description": "Colour of the item's parts. A plain value sets both metal colours (armour, helmet, shield)."
+        },
+        "name": {
+          "description": "Display name; default the base item's name (with the properties' bonus, e.g. \"Bastard Sword +1\").",
+          "type": "string"
+        },
+        "properties": {
+          "description": "Item properties in words: \"<property> [<subtype>] [<value>]\", e.g. \"attack bonus +1\", \"enhancement +2\", \"ac bonus +1\", \"ability bonus strength +2\", \"damage bonus fire 1d6\", \"keen\".",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "base"
+      ],
+      "type": "object"
+    },
+    "ItemColors": {
+      "additionalProperties": false,
+      "properties": {
+        "cloth1": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "cloth2": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "leather1": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "leather2": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "metal1": {
+          "$ref": "#/definitions/ColorValue"
+        },
+        "metal2": {
+          "$ref": "#/definitions/ColorValue"
+        }
+      },
+      "type": "object"
+    },
+    "PlacementSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "area": {
+          "description": "Area resref.",
+          "type": "string"
+        },
+        "bearing": {
+          "description": "Compass facing in degrees (0 north, 90 east).",
+          "type": "number"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "area",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    }
+  }
+}

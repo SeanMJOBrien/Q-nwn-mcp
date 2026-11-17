@@ -903,13 +903,15 @@ void CL_ReLevel(object oCreature, int nTarget)
 }
 
 // Slight size variation: the creature's visual scale is drawn once (kept in MCP_SCALE, so a rebuilt copy and a hand-set value agree)
-// and applied. MCP_NO_SCALE = 1 on a creature leaves it at its normal size.
+// and applied. A scale set on the creature (build_creature look.scale) is applied even when the random range is off.
+// MCP_NO_SCALE = 1 on a creature leaves it at its normal size.
 void CL_ApplyScale(object oCreature)
 {
-    if (CL_SCALE_RANGE <= 0.0 || GetLocalInt(oCreature, "MCP_NO_SCALE")) return;
+    if (GetLocalInt(oCreature, "MCP_NO_SCALE")) return;
     float fScale = GetLocalFloat(oCreature, "MCP_SCALE");
     if (fScale <= 0.0)
     {
+        if (CL_SCALE_RANGE <= 0.0) return;
         fScale = 1.0 - CL_SCALE_RANGE + 2.0 * CL_SCALE_RANGE * IntToFloat(Random(1001)) / 1000.0;
         SetLocalFloat(oCreature, "MCP_SCALE", fScale);
     }

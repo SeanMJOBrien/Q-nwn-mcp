@@ -276,12 +276,17 @@ export async function verifyCreature(
   if (faction < 0) {
     report.error("invalid_faction", `FactionID ${faction} is negative`, "FactionID");
   } else if (faction > 4 && faction < 4294967295) {
-    report.warn(
-      "custom_faction_unreliable",
-      `FactionID ${faction} is a custom faction. Live engine tests show a faction added with create_faction never takes part in reputation lookups (GetReputation, GetIsEnemy), so it will not be hostile or friendly to anyone as its .fac says`,
-      "FactionID",
-      "use a standard faction: 1 Hostile, 2 Commoner, 3 Merchant, 4 Defender (PC 0 only for the player's own side)",
-    );
+    // A custom faction works in play when the .fac is in the toolset's layout (verify_faction checks that); here only
+    // check that the faction exists.
+    const count = moduleFactionCount(index);
+    if (count !== null && faction >= count) {
+      report.error(
+        "invalid_faction",
+        `FactionID ${faction} is not in the module's faction table (${count} factions, IDs 0-${count - 1})`,
+        "FactionID",
+        "create_faction, or use a standard faction: 1 Hostile, 2 Commoner, 3 Merchant, 4 Defender",
+      );
+    }
   }
 
   // ─── Classes ────────────────────────────────────────────────────────────
@@ -547,12 +552,16 @@ export async function verifyCreature(
   // ID — confirmed false-positive on real Commoner/Animal/Outsider creatures.
   if (classList.length === 1 && twoDARow(index, "classes", classIds[0])?.PlayerClass !== "0") {
     const startingPackage = getFieldNum(obj, "StartingPackage");
-    if (startingPackage !== classIds[0]) {
+    // A themed package of the same class (packages.2da ClassID equal to the class, e.g. 25 "Fighter, Gladiator") is a
+    // deliberate choice and valid for LevelUpHenchman; only a package of another class is wrong.
+    const packageClass = Number(twoDARow(index, "packages", startingPackage)?.ClassID);
+    const sameClass = startingPackage === classIds[0] || (Number.isInteger(packageClass) && packageClass === classIds[0]);
+    if (!sameClass) {
       report.warn(
         "starting_package_mismatch",
-        `StartingPackage is ${startingPackage}, but this creature's class is ${classIds[0]} — packages.2da row ` +
-          "should equal class ID for each base class's iconic package, or LevelUpHenchman()/the toolset's own " +
-          "level-up logic will make picks for the wrong class",
+        `StartingPackage is ${startingPackage}, but this creature's class is ${classIds[0]} — the package must be one ` +
+          "of the class (packages.2da ClassID; row = class ID is the class's iconic package), or LevelUpHenchman()/the " +
+          "toolset's own level-up logic will make picks for the wrong class",
         "StartingPackage",
         `create_creature_blueprint or build_npc_stat_block with startingPackage:${classIds[0]}`,
       );
@@ -1476,4 +1485,14 @@ export function verifySound(report: Report, index: ModuleIndex, obj: GffObj): vo
     report.warn("implausible_volume", `Volume ${volume} is outside the 0-127 range`, "Volume");
   }
   void index;
+}
+
+/** Number of factions in the module's .fac, or null when the index has none. */
+function moduleFactionCount(index: ModuleIndex): number | null {
+  for (const [key, entry] of index.resources) {
+    if (entry.extension !== "fac") continue;
+    const doc = index.parsedGff.get(key) as GffObj | undefined;
+    if (doc) return listOf(doc, "FactionList").length;
+  }
+  return null;
 }
