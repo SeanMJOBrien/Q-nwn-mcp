@@ -16,6 +16,7 @@ export const LEGACY_ADVENTURE_FILES = {
   scope: "project-scope.json",
   dmGuide: "dm-guide.md",
   progress: "build-progress.md",
+  areas: "build-areas.json",
 } as const;
 
 export type AdventureFileKind = keyof typeof LEGACY_ADVENTURE_FILES;
@@ -27,6 +28,7 @@ const NEW_SUFFIX: Record<AdventureFileKind, string> = {
   scope: "-scope.json",
   dmGuide: "-dm-guide.md",
   progress: "-progress.md",
+  areas: "-areas.json",
 };
 
 /** File name of one adventure file inside adventure directory `dir` (`adventures/<Title-With-Dashes>`): `<Title-With-Dashes>.md` etc. */

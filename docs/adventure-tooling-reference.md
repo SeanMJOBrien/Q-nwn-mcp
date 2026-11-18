@@ -270,3 +270,37 @@ leftRing, rightRing; each `base`, `name`, `properties` in words, `color`), `powe
   (Bastard Sword) not (as predicted), specified items equipped; fixed build — all four feats. A Cleric (War/Healing) and an Evoker spawned and
   levelled.
 
+## 20. `build_area`, `dress_area`, `get_area_card`, `get_result` (2026-11-18)
+
+- **`build_area(spec)`**: one area in one call. spec `{"resref","name","tileset","connections"}`, optional `style`,
+  `biome`, `purpose`, `events`, `travel`, `width`, `height`, `rooms`, `features`, `safeMode`, `seed`, `genericDoor`.
+  It runs:
+  - `suggest_area_size`; sizes below 9x9 are raised to the generator's minimum;
+  - `adventure_list_features`: groups sharing a word with the name or purpose first, then the smallest;
+  - `adventure_generate_layout`, `create_area`, `adventure_apply_layout`, `place_tile_doors`;
+  - `set_area_properties`, with music, sound and sky from `src/util/area-recipes.ts`.
+
+  Each layout transition point is moved to the nearest ground with 2 m clear, because a cave point can fall on rock.
+  The points are kept in `<Title>-areas.json`. On a failure the answer names the step and the field. A second call
+  reuses an empty area it made. An area that is already laid out is refused: `delete_area` it first.
+- **`dress_area(area, props?, pins?, extraPins?, near?)`** does three things:
+  - puts a map pin at every exit that has none ("To <area name>", 2-8 m toward the middle of the area, then the
+    nearest open ground within 10 m);
+  - puts a pin at each point given in `extraPins`;
+  - spreads the props over open ground, at least 4 m from exits, doors, people, containers and pins, or puts them
+    around `near`. A prop with `x`/`y` is placed there.
+
+  A blueprint that does not exist is reported once, not retried at other spots.
+- **`get_area_card(area?)`**: a few lines per area. They cover:
+  - size and tileset;
+  - exits and where they lead;
+  - the free transition points from `build_area`;
+  - doors, map pins, containers with item counts, people, the number of hostiles, stores and triggers;
+  - up to 5 spots of open ground at least 3 m from placed objects.
+
+  Without `area`, one line per area.
+- **`get_result(id, path?, offset?)`**: one part of a long result. With a profile, or with `MCP_RESULT_LIMIT` set, a
+  result over the limit is answered with an outline and a `resultId`. The outline gives the scalars, each list's
+  length and first entry, and each nested object's keys. The last 40 results are kept. `get_progress`, `phase_check`,
+  `read_story`, `get_phase_prompt`, `get_adventure_dir` and `get_area_card` are never cut.
+

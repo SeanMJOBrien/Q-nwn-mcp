@@ -20,7 +20,8 @@ export interface HostTool {
 
 export interface ToolHost {
   listTools(): Promise<HostTool[]>;
-  callTool(name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }>;
+  /** `footer`: the server's progress line, kept apart so `text` stays parseable JSON; the model sees both. */
+  callTool(name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean; footer?: string }>;
 }
 
 export interface RunPhaseOptions {
@@ -34,6 +35,8 @@ export interface RunPhaseOptions {
   contextChars?: number;
   /** Called for every event, for the log. */
   onEvent?: (event: Record<string, unknown>) => void;
+  /** Replaces the phase prompt as the first message (a repair pass after step mode). */
+  intro?: string;
 }
 
 export interface PhaseResult {
@@ -44,10 +47,12 @@ export interface PhaseResult {
   /** Why it stopped, when not a success. */
   reason?: string;
   errors: string[];
+  /** Step mode: steps the model could not finish (the phase check may still pass without them). */
+  openSteps?: string[];
 }
 
 /** Tools the driver runs itself; never shown to the model. */
-const DRIVER_ONLY = new Set(["load_module", "repack_module", "get_phase_prompt"]);
+export const DRIVER_ONLY = new Set(["load_module", "repack_module", "get_phase_prompt"]);
 
 /** Tools whose arguments have a build spec: checked before the call so the error names the field. */
 const SPEC_FOR_TOOL: Record<string, string> = {
@@ -66,7 +71,7 @@ const SYSTEM = [
   "Do not explain your plan. When the final phase_check answers ok, reply with the single word DONE.",
 ].join("\n");
 
-function parseArgs(call: ToolCall): Record<string, unknown> | string {
+export function parseArgs(call: ToolCall): Record<string, unknown> | string {
   if (typeof call.arguments !== "string") return call.arguments ?? {};
   const text = call.arguments.trim();
   if (!text) return {};
@@ -102,7 +107,7 @@ export function specErrors(tool: string, args: Record<string, unknown>): Array<{
   return validateSpec(kind, spec).errors.filter((e) => !e.message.startsWith("is not a field of this spec"));
 }
 
-function clip(text: string, max: number): string {
+export function clip(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max)}\n[... ${text.length - max} more characters not shown]`;
 }
 
@@ -136,13 +141,39 @@ export function planText(open: ProgressStep[], heading: string): string {
   return `${heading ? `\n\n${heading}:` : ""}\n${lines.join("\n")}`;
 }
 
-function checkOk(text: string): { ok: boolean; skipped: boolean; errors: string[] } {
+export function checkOk(text: string): { ok: boolean; skipped: boolean; errors: string[] } {
   try {
     const r = JSON.parse(text) as { ok?: boolean; skipped?: boolean; errors?: string[]; stop?: string; error?: string };
     return { ok: r.ok === true, skipped: r.skipped === true, errors: r.errors ?? [r.stop ?? r.error ?? "phase check failed"].filter(Boolean) };
   } catch {
     return { ok: false, skipped: false, errors: [text.slice(0, 300)] };
   }
+}
+
+/**
+ * One tool call of the model: arguments parsed, coerced to the schema and checked against the build spec before the
+ * call (a refusal names the field), then run. `text` is what the model sees (with the server's progress line).
+ */
+export async function runTool(
+  call: ToolCall,
+  byName: Map<string, HostTool>,
+  host: ToolHost,
+  log: (event: Record<string, unknown>) => void,
+): Promise<{ text: string; isError: boolean; refused: boolean; args?: Record<string, unknown>; raw?: string }> {
+  const refuse = (error: string, extra: Record<string, unknown> = {}) => {
+    log({ event: "refused", tool: call.name, error, ...extra });
+    return { text: JSON.stringify({ ok: false, error, ...extra }), isError: true, refused: true };
+  };
+  const tool = byName.get(call.name);
+  if (!tool) return refuse(`There is no tool "${call.name}" here. Tools: ${[...byName.keys()].join(", ")}`);
+  const parsed = parseArgs(call);
+  if (typeof parsed === "string") return refuse(parsed);
+  const { args, errors } = coerceArgs(tool.inputSchema, parsed);
+  const problems = errors.length ? errors : specErrors(call.name, args);
+  if (problems.length) return refuse("Fix these fields and call the tool again.", { fields: problems.slice(0, 6) });
+  const out = await host.callTool(call.name, args);
+  log({ event: "tool", tool: call.name, args, isError: out.isError, result: out.text.slice(0, 800) });
+  return { text: out.footer ? `${out.text}\n\n${out.footer}` : out.text, isError: out.isError, refused: false, args, raw: out.text };
 }
 
 export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options: RunPhaseOptions = {}): Promise<PhaseResult> {
@@ -180,7 +211,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
 
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM },
-    { role: "user", content: `${withoutStartCheck(prompt.body, phase)}${planText(planAtStart, "Steps open in this phase now (get_progress)")}\n\nBegin with step 2.` },
+    { role: "user", content: options.intro ?? `${withoutStartCheck(prompt.body, phase)}${planText(planAtStart, "Steps open in this phase now (get_progress)")}\n\nBegin with step 2.` },
   ];
   // phase_check judges the phase; get_progress may still list steps it does not check (a map pin, an NPC). The model
   // is told once and may then finish.
@@ -230,31 +261,10 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
 
     for (const call of reply.tool_calls) {
       result.toolCalls++;
-      const answer = (text: string) => messages.push({ role: "tool", tool_call_id: call.id, content: clip(text, maxResult) });
-      const refuse = (error: string, extra: Record<string, unknown> = {}) => {
-        log({ event: "refused", tool: call.name, error, ...extra });
-        answer(JSON.stringify({ ok: false, error, ...extra }));
-      };
-      const tool = byName.get(call.name);
-      if (!tool) {
-        refuse(`There is no tool "${call.name}" in this phase. Tools: ${[...byName.keys()].join(", ")}`);
-        continue;
-      }
-      const parsed = parseArgs(call);
-      if (typeof parsed === "string") {
-        refuse(parsed);
-        continue;
-      }
-      const { args, errors } = coerceArgs(tool.inputSchema, parsed);
-      const problems = errors.length ? errors : specErrors(call.name, args);
-      if (problems.length) {
-        refuse("Fix these fields and call the tool again.", { fields: problems.slice(0, 6) });
-        continue;
-      }
-
-      const out = await host.callTool(call.name, args);
-      log({ event: "tool", tool: call.name, args, isError: out.isError, result: out.text.slice(0, 800) });
-      answer(out.text);
+      const out = await runTool(call, byName, host, log);
+      messages.push({ role: "tool", tool_call_id: call.id, content: clip(out.text, maxResult) });
+      if (out.refused || !out.args) continue;
+      const args = out.args;
 
       const signature = `${call.name} ${JSON.stringify(args)}`;
       if (out.isError && signature === lastFailing) sameFailures++;
@@ -266,7 +276,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
       }
 
       if (call.name === "phase_check" && args.phase === phase && args.step === "end") {
-        const end = checkOk(out.text);
+        const end = checkOk(out.raw ?? out.text);
         if (end.ok) {
           if (await accept()) return { ...result, status: "success", errors: [] };
           continue;

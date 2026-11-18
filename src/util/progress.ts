@@ -21,7 +21,60 @@ export interface ProgressItem {
   call?: string;
   /** Why it is not done, when the state says more than "not yet". */
   detail?: string;
+  /** Area resrefs the step is about (for the step's facts: get_area_card). */
+  areas?: string[];
+  /** The location, NPC or quest the step is about, as the plot names it. */
+  subject?: string;
+  /** The few tools the step needs (a step-mode driver shows only these, plus the always-on ones). */
+  tools?: string[];
 }
+
+/** Tools every step may use besides its own. */
+export const STEP_BASE_TOOLS = ["get_progress", "get_area_card", "get_result", "read_story", "undo_last_change"];
+
+/** The tools one step needs, by its id. */
+export function stepTools(id: string): string[] {
+  const [phase] = id.split(".");
+  if (id.endsWith(".section")) return ["write_story_section"];
+  if (id.endsWith(".check")) return ["phase_check"];
+  if (id === "start.scope") return ["set_project_scope"];
+  if (id === "start.module") return ["write_story_section"];
+  if (phase === "plot") return ["write_plot", "plan_adventure_shape", "list_tilesets", "suggest_area_size"];
+  if (phase === "areas") {
+    if (id.startsWith("areas.link.")) return ["adventure_create_transition", "link_doors", "get_area_doors", "adventure_find_walkable", "probe_ground"];
+    if (id === "areas.start") return ["set_module_start", "adventure_find_walkable"];
+    return ["build_area", "adventure_list_features", "delete_area", "visualize_area"];
+  }
+  if (phase === "environment") {
+    if (id.endsWith(".pins")) return ["dress_area", "place_waypoint", "probe_ground", "get_area_doors"];
+    return ["dress_area", "place_placeable", "list_blueprints", "adventure_find_walkable", "probe_ground"];
+  }
+  if (phase === "actors") return ["build_key_npc", "build_creature", "list_creature_samples", "adventure_find_walkable", "get_dialog_tree", "verify_creature"];
+  if (phase === "quests") return ["build_quest", "get_dialog_tree", "list_creatures", "list_items", "get_journal", "verify_quest_completability"];
+  if (phase === "challenges") {
+    if (id.includes(".trap.")) return ["create_trap_blueprint", "place_trigger", "add_skill_check", "adventure_find_walkable"];
+    if (id.includes(".boss.")) return ["build_key_npc", "compose_encounter", "list_creature_samples", "adventure_find_walkable", "get_area_creatures"];
+    return ["suggest_encounter", "compose_encounter", "place_creature", "place_encounter", "list_creature_samples", "adventure_find_walkable", "get_area_creatures"];
+  }
+  if (phase === "affordances") {
+    if (id.startsWith("affordances.store")) return ["create_store_blueprint", "place_store", "adventure_find_walkable", "get_dialog_tree", "add_dialog_node", "list_creatures"];
+    return ["add_items_to_container", "list_treasure_samples", "import_treasure_item", "list_blueprints", "get_wealth_budget", "get_area_placeables"];
+  }
+  if (id === "polish.verify") return ["verify_all", "check_area_connectivity", "add_dialog_return_links", "prune_dialog_orphans", "fix_object_heights", "move_object", "remove_object"];
+  if (id === "rewards.dmguide") return ["write_dm_guide"];
+  if (id === "rewards.dmarea") return ["create_dm_area"];
+  return [];
+}
+
+/** The last `n` lines of a progress file's Notes: the decisions a new conversation must keep. */
+export function recentNotes(progressFile: string | null, n = 6): string[] {
+  if (!progressFile) return [];
+  const notes = (parseSections(progressFile).get("Notes") ?? "").split("\n").map((l) => l.trim()).filter((l) => l.startsWith("- "));
+  return notes.slice(-n).map((l) => l.slice(2));
+}
+
+/** A JSON spec written as a tool-call argument: `"{\"a\":1}"`. */
+const specArg = (o: Record<string, unknown>) => JSON.stringify(JSON.stringify(o));
 
 export interface PlotOutline {
   locations: Array<{ name: string; resref: string; tileset?: string; purpose?: string }>;
@@ -201,8 +254,17 @@ export function buildChecklist(
   facts: ModuleFacts,
 ): { items: ProgressItem[]; outline: PlotOutline | null } {
   const items: ProgressItem[] = [];
-  const add = (phase: ProgressPhase, id: string, label: string, done: boolean, call?: string, detail?: string) =>
-    items.push({ id, phase, label, done, ...(call ? { call } : {}), ...(detail && !done ? { detail } : {}) });
+  const add = (phase: ProgressPhase, id: string, label: string, done: boolean, call?: string, detail?: string, about: { areas?: string[]; subject?: string } = {}) => {
+    const tools = stepTools(id);
+    items.push({
+      id, phase, label, done,
+      ...(call ? { call } : {}),
+      ...(detail && !done ? { detail } : {}),
+      ...(about.areas?.length ? { areas: about.areas } : {}),
+      ...(about.subject ? { subject: about.subject } : {}),
+      ...(tools.length ? { tools } : {}),
+    });
+  };
   const sections = story ? parseSections(story) : new Map<string, string>();
   const has = (s: string) => (sections.get(s) ?? "").trim().length > 0;
   const skipped = (p: Phase) => status?.[p]?.status === "skipped";
@@ -254,11 +316,13 @@ export function buildChecklist(
     for (const l of locs) {
       const a = facts.areas.get(l.resref);
       const ts = l.tileset ?? a?.tileset ?? "<tileset>";
-      add("areas", `areas.${l.resref}.create`, `${l.name}: area ${l.resref} created`, !!a,
-        `suggest_area_size(...), then create_area(resref: "${l.resref}", name: "${l.name}", width: "<w>", height: "<h>", tileset: "${ts}")`);
+      const links = (outline?.connections ?? []).filter(([x, y]) => resrefOf(x) === l.resref || resrefOf(y) === l.resref).length;
+      const build = `build_area(spec: ${specArg({ resref: l.resref, name: l.name, tileset: ts, connections: Math.max(1, links) })})`;
+      const about = { areas: [l.resref], subject: l.name };
+      add("areas", `areas.${l.resref}.create`, `${l.name}: area ${l.resref} created`, !!a, build, undefined, about);
       add("areas", `areas.${l.resref}.tiles`, `${l.name}: terrain laid out`, !!a && a.distinctTiles > 1,
-        `adventure_generate_layout(tileset: "${ts}", width: "${a?.width ?? "<w>"}", height: "${a?.height ?? "<h>"}", style: "..."), then adventure_apply_layout(area: "${l.resref}", layoutId: "<the returned layoutId>")`,
-        a ? "every tile is the same: no layout applied yet" : undefined);
+        a ? `${build} (lays out the existing empty area)` : build,
+        a ? "every tile is the same: no layout applied yet" : undefined, about);
     }
     for (const [x, y] of outline?.connections ?? []) {
       const ra = resrefOf(x);
@@ -266,12 +330,13 @@ export function buildChecklist(
       if (!ra || !rb) continue;
       const linked = (facts.graph[ra] ?? []).includes(rb) || (facts.graph[rb] ?? []).includes(ra);
       add("areas", `areas.link.${ra}.${rb}`, `${x} <-> ${y} connected`, linked,
-        `link_doors(...) between door tags, or adventure_create_transition(sourceArea: "${ra}", targetArea: "${rb}", ...)`);
+        `adventure_create_transition(areaA: "${ra}", aX: "<x>", aY: "<y>", areaB: "${rb}", bX: "<x>", bY: "<y>", tag: "<tag>") at the free transition points get_area_card shows, or link_doors(...) between door tags`,
+        undefined, { areas: [ra, rb] });
     }
     if (locs.length) {
       const first = locs[0].resref;
       const okStart = facts.entryArea !== "" && facts.entryArea !== "_start" && facts.areas.has(facts.entryArea) && !facts.areas.has("_start");
-      add("areas", "areas.start", "module start set in a story area (the empty _start area removed)", okStart, `set_module_start(area: "${first}", x: "<x>", y: "<y>")`);
+      add("areas", "areas.start", "module start set in a story area (the empty _start area removed)", okStart, `set_module_start(area: "${first}", x: "<x>", y: "<y>")`, undefined, { areas: [first] });
     }
     section("areas");
     endCheck("areas");
@@ -282,18 +347,19 @@ export function buildChecklist(
     for (const l of locs) {
       const a = facts.areas.get(l.resref);
       if (!a) continue;
+      const about = { areas: [l.resref], subject: l.name };
       add("environment", `environment.${l.resref}.props`, `${l.name}: dressed with props (at least 5)`, a.props >= 5,
-        `place_placeable(area: "${l.resref}", ...)`, `${a.props} placed`);
+        `dress_area(area: "${l.resref}", props: "[\\"<blueprint>\\", ...]") places them on open ground, or place_placeable(area: "${l.resref}", ...) one by one`, `${a.props} placed`, about);
       add("environment", `environment.${l.resref}.pins`, `${l.name}: map pins at doors, shops and key places`, a.mapPins > 0,
-        `place_waypoint(area: "${l.resref}", ..., mapNote: "Keep Door")`);
+        `dress_area(area: "${l.resref}") pins every exit; place_waypoint(area: "${l.resref}", ..., mapNote: "Bram's Smithy") for a shop or quest giver`, undefined, about);
       if (fightAreas.has(l.resref) && a.containers) {
         add("environment", `environment.${l.resref}.container`, `${l.name}: a container (chest, crate, barrel) for loot`, a.containers.length > 0,
-          `place_placeable(area: "${l.resref}", blueprint: "plc_chest1", ...)`);
+          `place_placeable(area: "${l.resref}", blueprint: "plc_chest1", ...)`, undefined, about);
       }
       for (const tag of targets.containers.get(l.resref) ?? []) {
         const there = (a.containers ?? []).some((c) => c.tag.toLowerCase() === tag);
         if (a.containers) add("environment", `environment.${l.resref}.c.${tag}`, `${l.name}: container ${tag} (named in ## Environment) is placed`, there,
-          `place_placeable(area: "${l.resref}", ...) with tag ${tag}, or correct the Environment section`);
+          `place_placeable(area: "${l.resref}", ...) with tag ${tag}, or correct the Environment section`, undefined, about);
       }
     }
     section("environment");
@@ -306,7 +372,7 @@ export function buildChecklist(
       const where = resrefOf(n.location);
       const placedIn = [...facts.areas].filter(([, a]) => a.creatures.some((c) => nameMatches(n.name, c.name))).map(([r]) => r);
       add("actors", `actors.${norm(n.name).replace(/ /g, "_")}`, `${n.name} placed${where ? ` in ${where}` : ""}`, placedIn.length > 0,
-        `build_key_npc(...) or build_creature(spec: "{...}") with place in "${where ?? "<area>"}"`);
+        `build_key_npc(...) or build_creature(spec: "{...}") with place in "${where ?? "<area>"}"`, undefined, { areas: where ? [where] : [], subject: n.name });
     }
     section("actors");
     endCheck("actors");
@@ -317,7 +383,7 @@ export function buildChecklist(
     for (const q of outline?.quests ?? []) {
       const built = facts.journalQuests.some((j) => nameMatches(q.name, j));
       add("quests", `quests.${norm(q.name).replace(/ /g, "_")}`, `quest "${q.name}" built (journal + dialog)`, built,
-        `build_quest(spec: "{...}")${q.giver ? `, giver ${q.giver}` : ""}`);
+        `build_quest(spec: "{...}")${q.giver ? `, giver ${q.giver}` : ""}`, undefined, { subject: q.name });
     }
     section("quests");
     endCheck("quests");
@@ -329,17 +395,18 @@ export function buildChecklist(
       const a = facts.areas.get(r);
       const name = locs.find((l) => l.resref === r)?.name ?? r;
       const hostile = !!a && (a.encounters > 0 || a.creatures.some((c) => c.hostile));
-      add("challenges", `challenges.${r}`, `${name}: enemies placed`, hostile, `suggest_encounter(...) then place_creature(area: "${r}", ...)`);
+      const about = { areas: [r], subject: name };
+      add("challenges", `challenges.${r}`, `${name}: enemies placed`, hostile, `suggest_encounter(...) then place_creature(area: "${r}", ...)`, undefined, about);
       const t = targets.fights.get(r);
       for (const b of t?.bosses ?? []) {
         const placed = !!a && a.creatures.some((c) => c.hostile && ((b.resref && (c.resref === b.resref || c.tag?.toLowerCase() === b.resref)) || nameMatches(b.name, c.name)));
         add("challenges", `challenges.${r}.boss.${norm(b.name).replace(/ /g, "_")}`, `${name}: boss ${b.name} placed (hostile)`, placed,
-          `build_key_npc(..., area: "${r}", faction: "hostile") or compose_encounter(..., area: "${r}")`);
+          `build_key_npc(..., area: "${r}", faction: "hostile") or compose_encounter(..., area: "${r}")`, undefined, { areas: [r], subject: b.name });
       }
       for (const tag of t?.traps ?? []) {
         if (!a?.triggerTags) continue;
         add("challenges", `challenges.${r}.trap.${tag}`, `${name}: trap ${tag} placed`, a.triggerTags.some((x) => x.toLowerCase() === tag),
-          `place_trigger(area: "${r}", blueprint: "${tag}", ...), then add_skill_check(area: "${r}", tag: "${tag}", kind: "trigger", ...)`);
+          `place_trigger(area: "${r}", blueprint: "${tag}", ...), then add_skill_check(area: "${r}", tag: "${tag}", kind: "trigger", ...)`, undefined, about);
       }
     }
     section("challenges");
@@ -354,18 +421,18 @@ export function buildChecklist(
     }
     for (const [r, tag] of targets.stores) {
       const a = facts.areas.get(r);
-      if (a?.storeTags) add("affordances", `affordances.store.${tag}`, `store ${tag} (named in ## Affordances) is in ${r}`, a.storeTags.some((x) => x.toLowerCase() === tag), `place_store(area: "${r}", blueprint: "${tag}", ...)`);
+      if (a?.storeTags) add("affordances", `affordances.store.${tag}`, `store ${tag} (named in ## Affordances) is in ${r}`, a.storeTags.some((x) => x.toLowerCase() === tag), `place_store(area: "${r}", blueprint: "${tag}", ...)`, undefined, { areas: [r] });
     }
     for (const l of locs) {
       const a = facts.areas.get(l.resref);
       if (!a?.containers?.length || /boss/.test(l.purpose ?? "")) continue; // the boss room's chest is the rewards phase's
       add("affordances", `affordances.${l.resref}.loot`, `${l.name}: loot in at least one container`, a.containers.some((c) => c.items > 0),
-        `add_items_to_container(area: "${l.resref}", containerTag: "${a.containers[0].tag}", items: "[...]")`);
+        `add_items_to_container(area: "${l.resref}", containerTag: "${a.containers[0].tag}", items: "[...]")`, undefined, { areas: [l.resref], subject: l.name });
     }
     for (const [r, tag] of targets.loot) {
       const c = facts.areas.get(r)?.containers?.find((x) => x.tag.toLowerCase() === tag);
       if (facts.areas.get(r)?.containers) add("affordances", `affordances.${r}.c.${tag}`, `container ${tag} in ${r} holds the loot ## Affordances names`, !!c && c.items > 0,
-        `add_items_to_container(area: "${r}", containerTag: "${tag}", items: "[...]")`);
+        `add_items_to_container(area: "${r}", containerTag: "${tag}", items: "[...]")`, undefined, { areas: [r] });
     }
     section("affordances");
     endCheck("affordances");

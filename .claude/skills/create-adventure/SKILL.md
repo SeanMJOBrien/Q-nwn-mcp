@@ -206,7 +206,7 @@ Each sub-skill writes its completion status to `adventure-status.json` in the ad
 - If `"failed"`: rollback the phase, re-run the sub-skill, or halt.
 - **Compile errors are the most common "partial" case.** If a script failed to compile, the dialog/quest that references it is broken. Fix the script or remove the reference before proceeding.
 
-**`get_progress` says where the build stands** (every step ticked from the module's state, the next step with its call, saved as `<Title>-progress.md`): call it when resuming and between phases. **Each sub-skill calls `phase_check(phase, step: "start")` first and `phase_check(phase, step: "end")` last.** The tool checks the required `adventure.md` sections, runs the phase's verifiers and writes its entry to `adventure-status.json`, so no skill edits that file by hand.
+**`get_progress` says where the build stands** (every step ticked from the module's state, the next step with its call, the user's goal and the decisions recorded with `get_progress(note: ...)`, saved as `<Title>-progress.md`): call it when resuming and between phases, and record each creative decision as a note. `get_area_card(area)` gives an area's facts in a few lines; a long result answered with a `resultId` is read in parts with `get_result`. **Each sub-skill calls `phase_check(phase, step: "start")` first and `phase_check(phase, step: "end")` last.** The tool checks the required `adventure.md` sections, runs the phase's verifiers and writes its entry to `adventure-status.json`, so no skill edits that file by hand.
 
 ## Sub-Skills
 

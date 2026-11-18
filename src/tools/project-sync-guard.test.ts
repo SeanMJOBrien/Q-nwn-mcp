@@ -15,6 +15,7 @@ const NOT_MODULE_RESOURCES: Record<string, string> = {
   "database-tools.ts": "campaign databases and scratch files outside the module",
   "package-tools.ts": "2DA files written to an output directory, not into the module",
   "phase-tools.ts": "adventure-status.json, project-scope.json, adventure.md in the adventure directory",
+  "area-build-tools.ts": "<Title>-areas.json (build_area's transition points) in the adventure directory",
   "dm-area-tools.ts": "copies the area template and syncs each copy with afterWrite",
   "tileset-tools.ts": "HTML reports",
   "verify-server-tools.ts": "throwaway staging directories and the verify server's own files",

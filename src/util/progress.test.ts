@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { type PlotSpec, renderPlot } from "./plot-spec.js";
-import { type AreaFacts, buildChecklist, type ModuleFacts, nameMatches, nextStep, parsePlotOutline, renderProgress } from "./progress.js";
+import { type AreaFacts, buildChecklist, type ModuleFacts, nameMatches, nextStep, parsePlotOutline, recentNotes, renderProgress, stepTools } from "./progress.js";
 
 const spec = JSON.parse(readFileSync("docs/specs/plot.example.json", "utf8")) as PlotSpec;
 const story = (extra = "") => `# The Mill\n\n## Module\n- **Title:** The Mill\n\n## Plot\n${renderPlot(spec)}\n${extra}`;
@@ -29,16 +29,20 @@ describe("build progress checklist", () => {
     const { items } = buildChecklist(story(), { plot: { status: "success" } }, facts());
     const next = nextStep(items);
     expect(next?.id).toBe("areas.blackwater.create");
-    expect(next?.call).toContain('create_area(resref: "blackwater"');
-    expect(next?.call).toContain('tileset: "ttr01"');
+    expect(next?.call).toContain("build_area(spec:");
+    expect(next?.call).toContain('\\"resref\\":\\"blackwater\\"');
+    expect(next?.call).toContain('\\"tileset\\":\\"ttr01\\"');
     expect(next?.readFirst).toBe('get_phase_prompt(phase: "areas")');
+    expect(next?.areas).toEqual(["blackwater"]);
+    expect(next?.tools).toContain("build_area");
   });
 
-  it("an area that exists but has one tile everywhere asks for the layout, by layoutId", () => {
+  it("an area that exists but has one tile everywhere asks for the layout (build_area reuses the empty area)", () => {
     const { items } = buildChecklist(story(), { plot: { status: "success" } }, facts({ areas: new Map([["blackwater", area()]]) }));
     const next = nextStep(items);
     expect(next?.id).toBe("areas.blackwater.tiles");
-    expect(next?.call).toContain('adventure_apply_layout(area: "blackwater", layoutId:');
+    expect(next?.call).toContain("build_area(spec:");
+    expect(next?.call).toContain("existing empty area");
     expect(next?.readFirst).toBeUndefined();
   });
 
@@ -123,5 +127,23 @@ describe("build progress checklist", () => {
     expect(byId.get("affordances.millcaves.c.box_cave2")?.done).toBe(false);
     // the boss area's chest is left to the rewards phase
     expect(byId.has("affordances.millcaves.loot")).toBe(false);
+  });
+
+  it("keeps the latest decisions from the Notes for a new conversation", () => {
+    const { items } = buildChecklist(story(), undefined, facts());
+    let md = renderProgress("The Mill", items, null, "night-time road");
+    md = renderProgress("The Mill", items, md, "bandits instead of goblins");
+    const notes = recentNotes(md);
+    expect(notes.length).toBe(2);
+    expect(notes[1]).toContain("bandits instead of goblins");
+  });
+
+  it("names a small tool set for each kind of step", () => {
+    expect(stepTools("areas.millroad.create")).toContain("build_area");
+    expect(stepTools("areas.link.a.b")).toContain("adventure_create_transition");
+    expect(stepTools("environment.millroad.pins")).toContain("dress_area");
+    expect(stepTools("challenges.millcaves.trap.trap_spike_01")).toContain("place_trigger");
+    expect(stepTools("areas.section")).toEqual(["write_story_section"]);
+    for (const id of ["areas.x.create", "actors.maren", "quests.q", "affordances.x.loot"]) expect(stepTools(id).length).toBeLessThanOrEqual(8);
   });
 });

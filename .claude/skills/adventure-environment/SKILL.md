@@ -160,6 +160,8 @@ Place waypoints with map notes (map pins) per area. **Rule (user, 2026-11-17): e
 - each quest giver and key NPC's usual spot (added by `/adventure-actors` / `/adventure-quests` if they place them later);
 - landmarks (B below).
 
+**`dress_area(area, props, extraPins, near)`** does the routine part in one call: a map pin at every exit that has none ("To <area name>", on the walkable side), pins at the points you name (`extraPins: [{"text":"Bram's Smithy","x":40,"y":60}]`), and props spread over open ground away from exits, doors and people (`near: "x,y"` gathers them instead). Every placement passes the usual walkability and collision checks; failures are listed. Hand-place furniture groups (table with chairs, a camp) with `place_placeable` as below. `get_area_card(area)` shows the area's exits, pins, objects and open ground in a few lines.
+
 Put the pin on the walkable approach side, 1-2 m in front of the door or NPC, not inside a wall: `probe_ground(area, x, y, buffer: "0.5")` first, then `place_waypoint(area, tag, name, x, y, mapNote: "Keep Door")`. The text names the place or where it leads, never a spoiler ("Keep Door", not "Way to the cabal's lair").
 
 #### A. Entrance Waypoints

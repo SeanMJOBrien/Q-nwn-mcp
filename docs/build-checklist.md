@@ -16,6 +16,10 @@ How to work through it:
 3. A tool that answers `isError` / `success: false` says which argument to change. Change it; do not repeat the same call.
 4. Numbers and lists can be values or text: `width: 16` and `width: "16"` both work.
 5. Never build the `.mod` (`repack_module`) unless the user asks.
+6. Need an area's facts (exits, free transition points, pins, open ground)? `get_area_card(area: "<resref>")`, a few
+   lines, instead of `visualize_area`. A long result answered with a `resultId`: `get_result(id, path)` gives one part.
+7. Record each creative decision with `get_progress(note: "...")`; every `get_progress` answer repeats the goal and
+   the latest decisions.
 
 ---
 
@@ -30,16 +34,16 @@ Module: ______________________   Folder: `adventures/______________________/`
 - [ ] `## Plot` written with locations (each with a **Resref** and **Tileset**), connections, key NPCs, quests: `write_plot(spec: "{...}")`
 - [ ] `phase_check(phase: "plot", step: "end")` passes
 
-## Areas — `get_phase_prompt(phase: "areas")`  (repeat the three lines for each location)
-- [ ] Location ____________: `suggest_area_size(...)`, then `create_area(resref, name, width, height, tileset)`
-- [ ] Terrain laid out: `adventure_generate_layout(tileset, width, height, style)` → `adventure_apply_layout(area: "<resref>", layoutId: "<returned id>")` (`area` is the resref, never the layoutId; create the area first)
-- [ ] Each connection in the plot has a door or transition: `link_doors(...)` / `adventure_create_transition(...)`
+## Areas — `get_phase_prompt(phase: "areas")`  (repeat the two lines for each location)
+- [ ] Location ____________ created: `build_area(spec: "{\"resref\":\"...\",\"name\":\"...\",\"tileset\":\"ttr01\",\"connections\":2}")` (size, features, layout, terrain, tile doors and music in one call)
+- [ ] Terrain laid out: done by `build_area` (by hand: `adventure_generate_layout` → `create_area` → `adventure_apply_layout(area: "<resref>", layoutId: "<returned id>")`)
+- [ ] Each connection in the plot has a door or transition: `adventure_create_transition(...)` at the free transition points `get_area_card(area)` lists, or `link_doors(...)`
 - [ ] Module start in the first story area, `_start` removed: `set_module_start(area, x, y)`
 - [ ] `## Areas` written, `phase_check(phase: "areas", step: "end")` passes (every area reachable)
 
 ## Environment — `get_phase_prompt(phase: "environment")`
-- [ ] Each area dressed (at least 5 props): `place_placeable(...)` after `probe_ground(...)`
-- [ ] Each area has map pins at its doors, shops, quest givers and destinations: `place_waypoint(..., mapNote: "Keep Door")`
+- [ ] Each area dressed (at least 5 props): `dress_area(area, props: "[...]")`, or `place_placeable(...)` after `probe_ground(...)`
+- [ ] Each area has map pins at its doors, shops, quest givers and destinations: `dress_area(area)` pins every exit; `extraPins` or `place_waypoint(..., mapNote: "Keep Door")` for the rest
 - [ ] Each fight area has a container for loot; every container the `## Environment` section names is placed
 - [ ] `## Environment` written, phase check passes
 

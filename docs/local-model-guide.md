@@ -352,6 +352,35 @@ or resref, two main quests.
 Tested: unit tests, the tool through an in-memory client, and the driver once for real on this machine (created a
 module from the example, wrote the plot, plot check `success`, areas phase started). Not built: a web form.
 
+## 6a. Context and drift (built 2026-11-18)
+
+A small model loses three things as a conversation grows:
+- **The instructions:** the phase prompt scrolls out of view.
+- **Its place:** which area or step it was on.
+- **Facts from earlier results:** a transition point or a layoutId it saw before the result was dropped. It then
+  makes them up.
+
+The cure is to keep the state in the module and its files, never in the conversation, and to show the model only
+what the current step needs, at the end of the conversation where it pays most attention. Six pieces:
+
+| # | Piece | Where | What it does |
+|---|---|---|---|
+| 1 | Progress line | `src/util/result-shaping.ts`, `progressFooter` in `phase-tools.ts` | Every tool result ends with `[progress 14/71 · areas · next: <step> → <call>]` as its own text item. Recomputed after a tool that may change the module, reused after a read-only one. On with a profile, or `MCP_PROGRESS_FOOTER=1`; off for a one-feature or NWScript-only scope |
+| 2 | Step mode | `src/driver/run-steps.ts`, `drive --mode step` (default) | One fresh conversation per open checklist step. The step card holds the goal, the decisions, the step and its call, the facts (area cards, the plot's block for the subject), the phase's rules (the prompt without its Steps list) and only the step's tools (`stepTools` in `progress.ts`, plus `get_progress`, `get_area_card`, `get_result`, `read_story`, `undo_last_change`). A step still open after 2 tries is left open (`openSteps`). A failed phase check gets one repair pass in phase mode (`runPhase` with `intro`). Plot, polish and rewards stay in phase mode |
+| 3 | One call per area | `build_area`, `dress_area` (`src/tools/area-build-tools.ts`) | `build_area(spec)` does seven calls in one: size, features, layout, area, terrain, tile doors, music. It moves each transition point to ground with 2 m clear and keeps the points in `<Title>-areas.json`. `dress_area` pins every exit ("To <area>"), adds the extra pins it is given and spreads props on open ground. Both run the existing tools in-process (`src/util/tool-registry.ts`), so every walkability and collision check still applies |
+| 4 | Results by id | `src/util/result-store.ts`, `get_result` | A result over the limit (6000 with a profile, `MCP_RESULT_LIMIT`) is kept on the server and answered with an outline: the scalars, each list's length and first entry, each nested object's keys. `get_result(id, path)` returns one part. A model whose old results were dropped asks again instead of guessing. `get_progress`, `phase_check`, `read_story` and `get_area_card` are never cut |
+| 5 | Area cards | `get_area_card` | A few lines per area: size, exits and where they lead, free transition points, doors, map pins, containers, people, stores, triggers and open ground away from placed objects. With no area, one line per area |
+| 6 | Goal and decisions | `get_progress` (`goal`, `decisions`), `recentNotes` | Every answer repeats the user's goal (from the scope) and the last 6 notes. `get_progress(note: "bandits, not goblins")` records a decision, so it survives a new conversation |
+
+Checked on real game data (2026-11-18), with a scratch module:
+- `build_area` built a `ttr01` village and a `tdm01` cave in one call each.
+- The cave's layout transition point was on rock until `build_area` moved it to open ground; after that,
+  `adventure_create_transition` accepted it.
+- `dress_area` placed every prop that exists, refused the unknown one by name, and pinned the exit in each area.
+- A 113,351-character `visualize_area` came back as a 1,318-character outline, and `get_result` returned its objects.
+
+Step mode is tested with a scripted model only.
+
 ## 7. A workable split today, before any of the above
 
 1. A human or a larger model writes the plot and the quest list (phase 1 and the design half of phase 5).

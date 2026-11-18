@@ -42,6 +42,7 @@
 | How do I show a small model fewer tools, shorter results, or a form to fill in? | [local-model-guide.md](local-model-guide.md) section 5 (`MCP_TOOL_PROFILE`, `brief`, build specs in `specs/`, short phase prompts in `phase-prompts/`) |
 | How does a model keep track of where a build stands, step by step? | `get_progress` (fills [build-checklist.md](build-checklist.md) per module as `<Title>-progress.md`) |
 | How do I build a module with a local model and no Claude (the driver)? | [local-model-manual.md](local-model-manual.md) (how to use it), [local-model-guide.md](local-model-guide.md) (design and measurements) |
+| How does a small model keep its place and its facts in a long build (progress line, step mode, `build_area`, area cards, `get_result`)? | [local-model-guide.md](local-model-guide.md) section 6a, [adventure-tooling-reference.md](adventure-tooling-reference.md) section 20 |
 | Which bugs in TFN's quest scripts are confirmed, and what is the plan to port our quest fixes to the content studio? | [tfn-quest-findings.md](tfn-quest-findings.md) |
 | What happened when random caster abilities ran on a real headless server? | [random-abilities-runtime-findings.md](random-abilities-runtime-findings.md) |
 | How does the Special-Abilities caster system (the project-wide default) work, and how does a DM actually see/use the abilities in-game? | [special-abilities-system.md](special-abilities-system.md) |

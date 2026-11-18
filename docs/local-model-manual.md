@@ -67,12 +67,28 @@ adds to what is already there.
 For each phase, in order:
 
 1. It checks that the story sections the phase needs exist. If not, the run stops and says which are missing.
-2. It starts a new conversation with a short instruction sheet for that phase and only that phase's tools.
+2. **Step mode** (the default for areas, environment, actors, quests, challenges and affordances): it asks
+   `get_progress` for the phase's open steps and gives each step its own short, new conversation. That conversation
+   gets a step card and only the few tools the step needs (usually 5 to 10). The card holds:
+   - your goal and the decisions so far;
+   - the one step and the call that does it;
+   - the facts the step needs, read from the module: the plot's paragraph for that place or person, and the area
+     cards;
+   - the phase's rules.
+   The progress is kept in the module, so starting a new conversation loses nothing, and the model cannot drift away
+   from a step it has just been handed. A step still open after two tries is left open and the run moves on.
+   **Phase mode** (plot, polish, rewards, or `--mode phase`): one conversation per phase, with the short instruction
+   sheet and all the phase's tools.
 3. It checks every tool call before running it and refuses a bad one with the name of the wrong field.
-4. It lets the phase check decide when the phase is done. If the model stops early, it runs the check and hands the
-   first five errors back.
+4. It lets the phase check decide when the phase is done. In step mode, a failed check gets one repair pass in phase
+   mode with the errors. In phase mode, if the model stops early, the driver runs the check and hands the first five
+   errors back.
 5. It gives up on a phase after 3 failed checks or 60 model turns, and stops the run, because later phases depend on
    earlier ones.
+
+Every tool result ends with a progress line, for example
+`[progress 14/71 · areas · next: The Mill Road: terrain laid out → build_area(...)]`. A result longer than 6,000
+characters comes back as an outline with a `resultId`; the model fetches the part it needs with `get_result`.
 
 It never builds the `.mod`. When the run is finished, build it yourself (section 9).
 
@@ -92,6 +108,8 @@ It never builds the `.mod`. When the run is finished, build it yourself (section
 | `--max-steps <n>` | Model turns per phase (default 60) |
 | `--retries <n>` | Failed phase checks allowed per phase (default 3) |
 | `--context-chars <n>` | Conversation size in characters before old results are dropped (default 48000) |
+| `--mode step\|phase` | `step` (default): one conversation per checklist step where a phase has steps. `phase`: one conversation per phase |
+| `--step-turns <n>` | Model turns per step in step mode (default 12) |
 | `--escalate-model <name>` | A stronger model that gets one attempt at a phase the first model failed. With `--escalate-endpoint` and `--escalate-api-key` it can be on another server |
 | `--log <dir>` | Where transcripts go (default: `<adventure dir>/driver-log`) |
 | `--dry-run` | Show the plan only |
@@ -115,7 +133,8 @@ Exit code: 0 = every phase done or skipped, 2 = a phase failed or was blocked, 1
 The plot phase is the one most likely to need a stronger model or a person: it is the only fully creative one.
 Write the plot as a file and pass it with `--plot` (next section).
 
-The areas phase is the hardest technically (most tools, longest results).
+The areas phase is the hardest technically. In step mode each area is one `build_area` call (size, layout, terrain,
+doors and music together) and each connection is one `adventure_create_transition` call at points the area card lists.
 
 ## 5a. Writing the plot yourself
 
@@ -160,6 +179,21 @@ estimates from character counts, not counted with your model's tokenizer.
 
 Ollama does not report an overflow: it drops the oldest text, which is the instructions. A model that suddenly ignores
 the steps late in a phase has probably run out of context.
+
+Step mode needs much less. A step card is 1,000-3,000 characters and a step offers 5-10 tools, so a step usually
+stays under 8,000 tokens. With step mode, 32768 is enough.
+
+### In your own chat client (no driver)
+
+When the MCP server runs with a tool profile (`MCP_TOOL_PROFILE`), it adds the same aids to every tool result:
+- the progress line at the end;
+- long results kept on the server behind a `resultId` (the model reads a part with `get_result`).
+
+Switch them on or off yourself with `MCP_PROGRESS_FOOTER=1|0` and `MCP_RESULT_LIMIT=<characters>` (`0` = no limit).
+Some tools help most in a long chat:
+- `get_area_card(area)` gives an area's facts in a few lines.
+- `get_progress` repeats your goal and decisions.
+- `get_progress(note: "...")` records a decision so it survives a new chat.
 
 ## 7. When a phase fails
 
@@ -271,7 +305,8 @@ items, patrol paths, the win-state script, class-specific reward items. The full
 | Plot from a file, so a person writes phase 1 once (W6) | Built 2026-11-14: `--plot <file>` (section 5a). A web form for it is not built |
 | Quest forms for the studio (W8) | Planned in `docs/quest-frontends-work-plan.md` |
 | Constrained decoding (the endpoint's JSON-schema mode) | Not used; arguments are checked after the model writes them |
-| Driver carries large results itself (the area layout) | Not built; the model has to copy the layout into the next call |
+| Driver carries large results itself (the area layout) | Done another way: layouts go by `layoutId`, `build_area` does the whole area in one call, and long results are kept on the server (`get_result`) |
+| Step mode with a real model | Built 2026-11-18 and tested with a scripted model only |
 | Short results for the other checkers and `audit_module` | Not built |
 | Specs for placed objects and encounters | Not built |
 | Bosses other than a necromancer from `compose_encounter` | Built with `build_key_npc` instead |

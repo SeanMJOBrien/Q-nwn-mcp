@@ -4,9 +4,12 @@
  *
  *   node dist/cli/drive.js --module <project dir | file.mod> --endpoint http://localhost:11434/v1 --model qwen2.5:14b
  *
- * For each phase it gives the model the short phase prompt (docs/phase-prompts) and only that phase's tools,
- * repairs and checks the arguments, and lets `phase_check` decide when the phase is done. Every phase starts
- * with a fresh conversation. A phase already recorded as a success is skipped, so a run can be resumed.
+ * Step mode (the default for areas, environment, actors, quests, challenges and affordances; src/driver/run-steps.ts):
+ * one short, fresh conversation per open step of get_progress's checklist, with a step card (goal, decisions, the step
+ * and its call, the facts from the module, the phase's rules) and only that step's few tools. Phase mode (plot,
+ * polish, rewards, or --mode phase): the short phase prompt and the phase's tools in one conversation. Either way the
+ * arguments are repaired and checked and `phase_check` decides when the phase is done. A phase already recorded as a
+ * success is skipped, so a run can be resumed.
  * The .mod is never built here; that stays a separate, explicit step.
  *
  * Options:
@@ -25,6 +28,9 @@
  *   --max-steps <n>          model turns per phase (default 60)
  *   --retries <n>            failed phase checks tolerated per phase (default 3)
  *   --context-chars <n>      conversation budget in characters (default 48000)
+ *   --mode step|phase        step (default): one conversation per checklist step where the phase has steps;
+ *                            phase: one conversation per phase
+ *   --step-turns <n>         model turns per step in step mode (default 12)
  *   --escalate-model <name> [--escalate-endpoint <url>] [--escalate-api-key <key>]
  *                            a stronger model that gets one attempt at a phase the first model failed
  *   --log <dir>              where the transcripts go (default: <adventure dir>/driver-log)
@@ -41,6 +47,8 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { JsonSchemaObject } from "../driver/coerce.js";
 import { type Chat, openAiChat } from "../driver/llm.js";
 import { type PhaseResult, type ToolHost, runPhase } from "../driver/run-phase.js";
+import { runPhaseSteps, STEP_PHASES } from "../driver/run-steps.js";
+import { FOOTER_PREFIX } from "../util/result-shaping.js";
 import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
 import { PHASES, type Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
@@ -49,7 +57,7 @@ import { validateSpec } from "../util/spec-validate.js";
 
 const VALUE_FLAGS = new Set([
   "module", "create", "endpoint", "model", "api-key", "phases", "idea", "level", "party", "minutes", "tone",
-  "max-steps", "retries", "context-chars", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot",
+  "max-steps", "retries", "context-chars", "mode", "step-turns", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot",
 ]);
 const BOOL_FLAGS = new Set(["force", "dry-run", "help"]);
 
@@ -111,12 +119,17 @@ async function main(): Promise<void> {
   const plotInfo = plot ? { plot: { file: flags.plot, locations: plot.locations.length, quests: plot.quests.length, warnings: plotWarnings(plot) } } : {};
   if (!flags.module && !flags.create) finish(1, { ok: false, error: "give --module <project dir | .mod> or --create <title>" });
   if (!dryRun && (!endpoint || !model)) finish(1, { ok: false, error: "give --endpoint and --model (or DRIVE_ENDPOINT and DRIVE_MODEL)" });
+  const mode = (flags.mode ?? "step").toLowerCase();
+  if (mode !== "step" && mode !== "phase") finish(1, { ok: false, error: "--mode is step or phase" });
 
   // One server for the whole run, with every tool: the driver decides per phase which ones the model sees.
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
   env.MCP_TOOL_PROFILE = "";
   env.MCP_BRIEF_RESULTS = "1";
+  // The progress line on every result, and long results kept behind an id (src/util/result-shaping.ts).
+  env.MCP_PROGRESS_FOOTER = env.MCP_PROGRESS_FOOTER || "1";
+  env.MCP_RESULT_LIMIT = env.MCP_RESULT_LIMIT || "6000";
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [path.join(import.meta.dirname, "..", "index.js")],
@@ -134,7 +147,9 @@ async function main(): Promise<void> {
         content?: Array<{ type: string; text?: string }>;
         isError?: boolean;
       };
-      return { text: (r.content ?? []).map((c) => c.text ?? "").join("\n"), isError: r.isError === true };
+      const parts = (r.content ?? []).map((c) => c.text ?? "");
+      const footer = parts.filter((t) => t.startsWith(FOOTER_PREFIX)).join("\n");
+      return { text: parts.filter((t) => !t.startsWith(FOOTER_PREFIX)).join("\n"), isError: r.isError === true, ...(footer ? { footer } : {}) };
     },
   };
   const stop = async (code: number, summary: Record<string, unknown>): Promise<never> => {
@@ -163,11 +178,11 @@ async function main(): Promise<void> {
 
     if (dryRun && !flags.module) {
       // Nothing to load: describe the plan from the prompts alone.
-      await stop(0, { ok: true, dryRun: true, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name))) });
+      await stop(0, { ok: true, dryRun: true, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name), mode)) });
     }
 
     if (flags.create) {
-      if (dryRun) await stop(0, { ok: true, dryRun: true, wouldCreate: flags.create, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name))) });
+      if (dryRun) await stop(0, { ok: true, dryRun: true, wouldCreate: flags.create, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name), mode)) });
       const filename = flags.create.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const made = await host.callTool("create_module", { name: flags.create, filename });
       if (made.isError) await stop(1, { ok: false, error: `create_module: ${made.text.slice(0, 500)}` });
@@ -191,7 +206,7 @@ async function main(): Promise<void> {
         adventureDir: dirInfo.dir,
         storyExists: dirInfo.files.story?.exists ?? false,
         ...plotInfo,
-        phases: phases.map((p) => ({ ...planRow(p, allTools.map((t) => t.name)), recorded: done.has(p) ? "success (would skip)" : "not done" })),
+        phases: phases.map((p) => ({ ...planRow(p, allTools.map((t) => t.name), mode), recorded: done.has(p) ? "success (would skip)" : "not done" })),
       });
     }
 
@@ -243,6 +258,7 @@ async function main(): Promise<void> {
       maxSteps: flags["max-steps"] ? Number(flags["max-steps"]) : undefined,
       retries: flags.retries ? Number(flags.retries) : undefined,
       contextChars: flags["context-chars"] ? Number(flags["context-chars"]) : undefined,
+      stepTurns: flags["step-turns"] ? Number(flags["step-turns"]) : undefined,
     };
 
     const results: Array<PhaseResult & { model?: string }> = [];
@@ -254,16 +270,20 @@ async function main(): Promise<void> {
       }
       const attempt = async (who: Chat, name: string, suffix: string) => {
         const file = path.join(logDir, `${stamp}-${phase}${suffix}.jsonl`);
-        say(`${phase}: started with ${name}`);
-        const r = await runPhase(host, who, phase, {
+        const stepMode = mode === "step" && STEP_PHASES.includes(phase);
+        say(`${phase}: started with ${name}${stepMode ? " (one conversation per step)" : ""}`);
+        const run = stepMode ? runPhaseSteps : runPhase;
+        const r = await run(host, who, phase, {
           ...options,
           onEvent: (e) => {
             fs.appendFileSync(file, `${JSON.stringify(e)}\n`);
             if (e.event === "tool") say(`  ${phase}: ${String(e.tool)}${e.isError ? "  -> error" : ""}`);
             if (e.event === "refused") say(`  ${phase}: ${String(e.tool)}  -> refused before the call`);
+            if (e.event === "step") say(`  ${phase}: step: ${String(e.step)}`);
+            if (e.event === "step_left_open") say(`  ${phase}: left open after its tries: ${String(e.step)}`);
           },
         });
-        say(`${phase}: ${r.status}${r.reason ? ` (${r.reason})` : ""}, ${r.steps} turns, ${r.toolCalls} tool calls`);
+        say(`${phase}: ${r.status}${r.reason ? ` (${r.reason})` : ""}, ${r.steps} turns, ${r.toolCalls} tool calls${r.openSteps?.length ? `, ${r.openSteps.length} steps left open` : ""}`);
         return r;
       };
       let r = await attempt(chat, model as string, "");
@@ -308,12 +328,13 @@ export function readPlotFile(file: string): { plot: PlotSpec } | { errors: Array
   return checked.ok ? { plot: spec as PlotSpec } : { errors: checked.errors };
 }
 
-function planRow(phase: Phase, toolNames: string[]) {
+function planRow(phase: Phase, toolNames: string[], mode: string) {
   const prompt = loadPhasePrompt(phase);
   const profile = resolveToolProfile(prompt.profile.join(","));
   return {
     phase,
     profile: prompt.profile.join(","),
+    runs: mode === "step" && STEP_PHASES.includes(phase) ? "one conversation per step" : "one conversation",
     tools: toolNames.filter((n) => isToolAllowed(n, profile)).length,
     promptBytes: Buffer.byteLength(prompt.body, "utf8"),
     reads: prompt.reads,

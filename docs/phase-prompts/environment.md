@@ -13,12 +13,11 @@ You dress each area with objects, sounds and map notes so it looks like the plac
 1. `phase_check(phase: "environment", step: "start")`. Stop on `skipped` or on an error (repeat its `stop` text).
 2. `read_story(sections: "Plot,Areas")`.
 3. For each area:
-   1. `visualize_area(area: "darkforest")`. Read the map, the `zones`, the `features` and the transition objects.
-   2. `get_area_placeables(area: "darkforest")`. Do not place a tag that is already there.
-   3. For each room or clearing, get free positions: `adventure_find_walkable(area: "darkforest", region: "20,20,60,60", count: "6", clearRadius: "1")`. The region is `x1,y1,x2,y2` in metres; tile (col,row) covers x = col*10 to col*10+10, y = row*10 to row*10+10.
-   4. Place 3 to 6 objects per room: `place_placeable(area: "darkforest", blueprint: "plc_campfr", x: "35", y: "42", faceTowardX: "40", faceTowardY: "40")`. Find blueprints with `list_blueprints(type: "utp", pattern: "chest")`.
-   5. One area sound at the centre: `place_sound(area: "darkforest", blueprint: "songbirdchirps", x: "80", y: "80")`.
-   6. A map note at every exit, every door of a large building, every shop and quest giver, and each landmark, 1-2 m in front on walkable ground: `place_waypoint(area: "darkforest", tag: "wp_oldmill", name: "Old Mill", x: "55", y: "70", mapNote: "Old Mill", mapNoteEnabled: true)`.
+   1. `get_area_card(area: "darkforest")`: size, exits, pins, objects and open ground in a few lines (`visualize_area` for the full map).
+   2. `dress_area(area: "darkforest", props: "[\"plc_campfr\",\"plc_box1\",\"plc_barrel\",\"plc_chest1\",\"plc_box1\"]")`: pins every exit and spreads 5 or more props on open ground. `near: "40,52"` gathers them around a point; `{"blueprint":"plc_chest1","x":61,"y":44}` puts one at a place. Find blueprints with `list_blueprints(type: "utp", pattern: "chest")`.
+   3. Groups by hand when needed: free spots from `adventure_find_walkable(area: "darkforest", region: "20,20,60,60", count: "6", clearRadius: "1")`, then `place_placeable(area: "darkforest", blueprint: "plc_campfr", x: "35", y: "42", faceTowardX: "40", faceTowardY: "40")`.
+   4. One area sound at the centre: `place_sound(area: "darkforest", blueprint: "songbirdchirps", x: "80", y: "80")`.
+   5. A pin at each door of a large building, shop, quest giver and landmark, 1-2 m in front: `dress_area(area: "darkforest", extraPins: "[{\"text\":\"Old Mill\",\"x\":55,\"y\":70}]")`.
 4. `write_story_section(section: "Environment", text: "...")`, then `phase_check(phase: "environment", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Objects by theme (examples; search for more)

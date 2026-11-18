@@ -18,6 +18,8 @@ export const CORE_TOOLS: string[] = [
   "write_story_section",
   "repack_module",
   "undo_last_change",
+  "get_area_card",
+  "get_result",
 ];
 
 export const TOOL_PROFILES: Record<string, string[]> = {
@@ -73,6 +75,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   // Build the areas only: size, create, lay out, connect, start point. Dressing them is `dress`.
   areas: [
+    "build_area",
     "suggest_area_size",
     "set_module_start",
     "create_area",
@@ -97,6 +100,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   // Dress built areas (environment phase): props, sounds, map pins.
   dress: [
+    "dress_area",
     "place_placeable",
     "place_sound",
     "place_waypoint",

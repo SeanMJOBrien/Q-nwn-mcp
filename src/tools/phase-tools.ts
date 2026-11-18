@@ -17,7 +17,7 @@ import { defaultFocus, FOCUS, guideFor, type Focus } from "../util/focus.js";
 import type { GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import { DM_AREA_RESREF } from "../util/dm-books.js";
-import { type AreaFacts, buildChecklist, type ModuleFacts, nextStep, type PhaseStatus, renderProgress } from "../util/progress.js";
+import { type AreaFacts, buildChecklist, type ModuleFacts, nextStep, type PhaseStatus, type ProgressItem, recentNotes, renderProgress } from "../util/progress.js";
 import {
   clearScopeFields,
   filterForPhase,
@@ -107,6 +107,61 @@ export function gatherModuleFacts(index: ReturnType<typeof requireIndex>, scopeR
   const jrl = (index.parsedGff.get("module.jrl") ?? {}) as GffObj;
   const journalQuests = getFieldList(jrl, "Categories").flatMap((c) => [getFieldLocStr(c, "Name"), getFieldStr(c, "Tag")].filter(Boolean));
   return { areas, graph, entryArea, journalQuests, dmAreaResref: DM_AREA_RESREF, dmGuideWritten, scopeRecorded };
+}
+
+/** The checklist of the loaded module, the user's goal and the recent decisions (nothing is written). */
+export async function computeProgress(index: ReturnType<typeof requireIndex>) {
+  const dir = await ensureAdventureDir(index);
+  const story = await readIfExists(advFile(dir, "story"));
+  let status: Record<string, PhaseStatus> | undefined;
+  try {
+    const raw = await readIfExists(advFile(dir, "status"));
+    status = raw ? (JSON.parse(raw) as { phases?: Record<string, PhaseStatus> }).phases : undefined;
+  } catch {
+    status = undefined;
+  }
+  const scopeRaw = await readIfExists(advFile(dir, "scope"));
+  let scope: { kind?: string; scope?: string } | undefined;
+  try {
+    scope = scopeRaw ? (JSON.parse(scopeRaw) as { kind?: string; scope?: string }) : undefined;
+  } catch {
+    scope = undefined;
+  }
+  const facts = gatherModuleFacts(index, scopeRaw !== null, (await readIfExists(advFile(dir, "dmGuide"))) !== null);
+  const { items } = buildChecklist(story, status, facts);
+  const progressPath = advFile(dir, "progress");
+  const previous = await readIfExists(progressPath);
+  return { dir, items, next: nextStep(items), scope, goal: scope?.scope, decisions: recentNotes(previous), progressPath, previous };
+}
+
+const clipLine = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 3)}...` : s);
+
+/** One "you are here" line for the end of a tool result (util/result-shaping.ts). */
+export function footerLine(items: ProgressItem[]): string {
+  const next = nextStep(items);
+  const done = items.filter((i) => i.done).length;
+  if (!next) return `[progress ${done}/${items.length} · every step done]`;
+  return `[progress ${done}/${items.length} · ${next.phase} · next: ${clipLine(next.label, 80)} → ${clipLine(next.call ?? "", 200)}]`;
+}
+
+let footerCache: { mod: string; line: string | null } | undefined;
+
+/**
+ * The progress line for the loaded module, or null (no module, or a scope that does not build an adventure). Reused
+ * after a read-only tool; recomputed after one that may have changed the module.
+ */
+export async function progressFooter(changed: boolean): Promise<string | null> {
+  let index: ReturnType<typeof requireIndex>;
+  try {
+    index = requireIndex();
+  } catch {
+    return null;
+  }
+  if (!changed && footerCache?.mod === index.modPath) return footerCache.line;
+  const p = await computeProgress(index);
+  const line = p.scope?.kind === "one_feature" || p.scope?.kind === "nwscript_only" ? null : footerLine(p.items);
+  footerCache = { mod: index.modPath, line };
+  return line;
 }
 
 export function registerPhaseTools(server: McpServer): void {
@@ -304,7 +359,7 @@ export function registerPhaseTools(server: McpServer): void {
 
   server.tool(
     "get_progress",
-    "Where the build of this module stands and the ONE next step, with the exact call. Ticks every step of the whole process (goal, story, each area created and laid out, each connection, start point, props and map pins per area, each key NPC, each quest, enemies, store, verify, DM guide and area) from the module's real state, and saves the checklist as the module's progress file (<Title>-progress.md in its folder). Call it at the start of a session, after each step, and whenever unsure what to do next. `note` adds a line to the file's Notes (decisions, open questions) that later sessions read.",
+    "Where the build of this module stands and the ONE next step, with the exact call, plus the user's goal and the decisions recorded so far (keep to them). Ticks every step of the whole process (goal, story, each area created and laid out, each connection, start point, props and map pins per area, each key NPC, each quest, enemies, store, verify, DM guide and area) from the module's real state, and saves the checklist as the module's progress file (<Title>-progress.md in its folder). Call it at the start of a session, after each step, and whenever unsure what to do next. `note` adds a line to the file's Notes (decisions, open questions) that later sessions read: record each creative decision (\"bandits, not goblins\") so it survives a new conversation.",
     {
       note: z.string().optional().describe("One line to add to the Notes, e.g. a decision or what to ask the user"),
       full: z.boolean().optional().describe("true: return every step, not only the open ones of the current phase"),
@@ -313,25 +368,17 @@ export function registerPhaseTools(server: McpServer): void {
     { idempotentHint: true },
     async ({ note, full, phase }) => {
       const index = requireIndex();
-      const dir = await ensureAdventureDir(index);
-      const story = await readIfExists(advFile(dir, "story"));
-      let status: Record<string, PhaseStatus> | undefined;
-      try {
-        const raw = await readIfExists(advFile(dir, "status"));
-        status = raw ? (JSON.parse(raw) as { phases?: Record<string, PhaseStatus> }).phases : undefined;
-      } catch {
-        status = undefined;
-      }
-      const facts = gatherModuleFacts(index, (await readIfExists(advFile(dir, "scope"))) !== null, (await readIfExists(advFile(dir, "dmGuide"))) !== null);
-      const { items } = buildChecklist(story, status, facts);
-      const progressPath = advFile(dir, "progress");
-      const md = renderProgress(index.moduleName, items, await readIfExists(progressPath), note);
-      await fs.writeFile(progressPath, md, "utf8");
-      const next = nextStep(items);
+      const p = await computeProgress(index);
+      const { items, next } = p;
+      const md = renderProgress(index.moduleName, items, p.previous, note);
+      await fs.writeFile(p.progressPath, md, "utf8");
+      const decisions = note ? recentNotes(md) : p.decisions;
       const done = items.filter((i) => i.done).length;
       const open = items.filter((i) => !i.done && (full || i.phase === (phase?.toLowerCase() || next?.phase)));
       return text({
         module: index.moduleName,
+        ...(p.goal ? { goal: p.goal } : {}),
+        ...(decisions.length ? { decisions } : {}),
         done,
         total: items.length,
         phase: next?.phase ?? "done",
@@ -339,10 +386,22 @@ export function registerPhaseTools(server: McpServer): void {
           ? { step: next.label, call: next.call, ...(next.detail ? { why: next.detail } : {}), ...(next.readFirst ? { readFirst: next.readFirst } : {}) }
           : "Every step is done.",
         [full ? "steps" : "openInThisPhase"]: (full ? items : open).map((i) => `${i.done ? "[x]" : "[ ]"} ${i.label}`),
-        ...(phase && !full ? { open: open.map((i) => ({ id: i.id, step: i.label, call: i.call, ...(i.detail ? { why: i.detail } : {}) })) } : {}),
-        progressFile: progressPath,
+        ...(phase && !full
+          ? {
+              open: open.map((i) => ({
+                id: i.id,
+                step: i.label,
+                call: i.call,
+                ...(i.detail ? { why: i.detail } : {}),
+                ...(i.areas ? { areas: i.areas } : {}),
+                ...(i.subject ? { subject: i.subject } : {}),
+                ...(i.tools ? { tools: i.tools } : {}),
+              })),
+            }
+          : {}),
+        progressFile: p.progressPath,
         rule:
-          "Do the next step, then call get_progress again. Do not ask the user which part to do next; ask only for creative " +
+          "Do the next step, then call get_progress again. Keep to the goal and the decisions above. Do not ask the user which part to do next; ask only for creative " +
           "choices or before building the .mod (only when the user asks).",
       });
     },
