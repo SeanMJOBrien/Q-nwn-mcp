@@ -6,6 +6,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadModule } from "../module-loader.js";
 import { jsonToGff, erfPack } from "../nim-tools.js";
 import { NWN_FOLDER_USER, TEMP_BASE } from "../config.js";
+import { adventureBase, slugTitle } from "../util/adventure-dir.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 
 /** Directory containing template binary files (ITP palettes, FAC factions).
@@ -226,10 +227,36 @@ export function registerModuleTools(server: McpServer): void {
       const modPath = path.join(NWN_FOLDER_USER, "modules", `${safeName}.mod`);
 
       // Check if module already exists
+      // An existing module is never overwritten and is not loaded here: say how to continue it instead (a caller that
+      // read the old plain-text answer as success went on with no module loaded).
+      let exists = false;
       try {
         await fs.access(modPath);
-        return { content: [{ type: "text", text: `Module already exists: ${modPath}` }] };
+        exists = true;
       } catch { /* good — doesn't exist */ }
+      if (exists) {
+        const projectDir = path.join(adventureBase(), slugTitle(name));
+        let project: string | undefined;
+        try {
+          await fs.access(path.join(projectDir, "project.json"));
+          project = projectDir;
+        } catch { /* no project for it */ }
+        const cont = project ?? modPath;
+        return {
+          isError: true,
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              ok: false,
+              exists: true,
+              error: `Module already exists: ${modPath}${project ? ` (its project, with every edit: ${project})` : ""}.`,
+              modPath,
+              ...(project ? { project } : {}),
+              next: `To continue it: load_module(modPath: "${cont}"). To start over, delete ${modPath}${project ? ` and ${project}` : ""}, or create_module with another filename.`,
+            }, null, 2),
+          }],
+        };
+      }
 
       // Create a temp assembly directory
       const assemblyDir = path.join(TEMP_BASE, `_create_${safeName}_${Date.now()}`);

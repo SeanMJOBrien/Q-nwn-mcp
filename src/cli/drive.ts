@@ -194,8 +194,19 @@ async function main(): Promise<void> {
       if (dryRun) await stop(0, { ok: true, dryRun: true, ...(setup.length ? { setup } : {}), wouldCreate: flags.create, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name), mode)) });
       const filename = flags.create.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const made = await host.callTool("create_module", { name: flags.create, filename });
-      if (made.isError) await stop(1, { ok: false, error: `create_module: ${made.text.slice(0, 500)}` });
-      say(`created module "${flags.create}"`);
+      let existing: { exists?: boolean; project?: string; modPath?: string } = {};
+      try {
+        existing = JSON.parse(made.text) as typeof existing;
+      } catch { /* a plain-text answer */ }
+      if (made.isError && existing.exists) {
+        // Made by an earlier run: continue it, from its project when there is one (every edit is there).
+        const from = existing.project ?? existing.modPath ?? "";
+        const loaded = await host.callTool("load_module", { modPath: from });
+        if (loaded.isError) await stop(1, { ok: false, error: `load_module: ${loaded.text.slice(0, 500)}` });
+        say(`continuing the existing module "${flags.create}" from ${from} (delete it and its project to start over)`);
+      } else if (made.isError) {
+        await stop(1, { ok: false, error: `create_module: ${made.text.slice(0, 500)}` });
+      } else say(`created module "${flags.create}"`);
     } else {
       const loaded = await host.callTool("load_module", { modPath: flags.module });
       if (loaded.isError) await stop(1, { ok: false, error: `load_module: ${loaded.text.slice(0, 500)}` });
