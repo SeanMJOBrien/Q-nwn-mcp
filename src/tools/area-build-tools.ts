@@ -18,6 +18,7 @@ import type { GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import { adventurePath, ensureAdventureDir } from "../util/adventure-dir.js";
 import { AREA_RECIPES, pickFeatures } from "../util/area-recipes.js";
+import { isContainerPlaceable } from "../util/containers.js";
 import { MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import { getKeptResult, keptIds, shapeLongText, valueAtPath } from "../util/result-store.js";
 import { callTool } from "../util/tool-registry.js";
@@ -101,7 +102,7 @@ function areaFacts(index: ReturnType<typeof requireIndex>, resref: string): Area
     props: plcs.length,
     propPoints: plcs.map((p) => ({ x: getFieldNum(p, "X"), y: getFieldNum(p, "Y") })),
     containers: plcs
-      .filter((p) => getFieldNum(p, "HasInventory") === 1)
+      .filter((p) => isContainerPlaceable(p))
       .map((p) => ({ x: r1(getFieldNum(p, "X")), y: r1(getFieldNum(p, "Y")), tag: getFieldStr(p, "Tag"), items: getFieldList(p, "ItemList").length })),
     friendly: creatures
       .filter((c) => getFieldNum(c, "FactionID") !== 1)

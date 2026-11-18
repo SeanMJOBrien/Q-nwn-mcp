@@ -20,7 +20,8 @@ You give the party what it needs to get through the adventure: one shop and loot
    4. `get_dialog_tree(dialog: "dlg_merchant")` to find the greeting (entry 0), then `add_dialog_node(dialog: "dlg_merchant", parentType: "entry", parentIndex: "0", text: "Show me what you have for sale.", script: "a_str_general")`.
    5. `verify_dialog(resref: "dlg_merchant")` and `verify_store(resref: "str_general")`: no errors.
 5. Loot, for each container from Environment: `add_items_to_container(area: "oldcrypt", containerTag: "chest_crypt1", items: "[{\"resref\":\"nw_it_mpotion001\",\"quantity\":2}]")`. 1 to 3 items per container.
-6. `write_story_section(section: "Affordances", text: "...")`, then `phase_check(phase: "affordances", step: "end")`. Then `get_progress()`: what is still open, and the next step.
+6. `set_starting_gold(level: "3")` with the target level: each player starts at that level with its gold.
+7. `write_story_section(section: "Affordances", text: "...")`, then `phase_check(phase: "affordances", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Items (base game)
 

@@ -65,6 +65,7 @@ Module: ______________________   Folder: `adventures/______________________/`
 - [ ] The merchant's store placed (when the plot has one): `create_store_blueprint(...)`, `place_store(...)`
 - [ ] Loot in at least one container per area (not the boss room: rewards fills it): `add_items_to_container(...)`
 - [ ] Every store and container loot the `## Affordances` section names is in the module
+- [ ] Players start at the target level with its gold: `set_starting_gold(level: "3")`
 - [ ] `## Affordances` written, phase check passes
 
 ## Polish — `get_phase_prompt(phase: "polish")`

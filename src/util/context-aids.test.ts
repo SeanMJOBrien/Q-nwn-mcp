@@ -128,3 +128,35 @@ describe("dress_area spread and area cards", () => {
     expect(card).toContain("open ground: (40, 60)");
   });
 });
+
+describe("starting gold and containers", async () => {
+  const { startKitSource, xpForLevel, START_KIT_MARK } = await import("../tools/start-kit-tools.js");
+  const { isContainerPlaceable } = await import("./containers.js");
+  const { buildChecklist } = await import("./progress.js");
+
+  it("writes a once-per-player script that tops up to the wealth and chains the old handler", () => {
+    const src = startKitSource(3, 2700, true, "x2_mod_def_enter");
+    expect(START_KIT_MARK.exec(src)?.slice(1)).toEqual(["3", "2700"]);
+    expect(src).toContain(`const int START_XP = ${xpForLevel(3)};`);
+    expect(xpForLevel(3)).toBe(3000);
+    expect(src).toContain('const string PREVIOUS_ENTER = "x2_mod_def_enter";');
+    expect(src).toContain("GiveGoldToCreature(oPC, nShort)");
+    expect(startKitSource(3, 100, false, "")).toContain("const int START_XP = 0;");
+  });
+
+  it("an empty placed chest is still a container", () => {
+    const f = (v: Record<string, unknown>) => Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === "number" ? { type: "byte", value: x } : { type: "resref", value: x }]));
+    expect(isContainerPlaceable(f({ TemplateResRef: "plc_chest1", Tag: "Chest", HasInventory: 0 }))).toBe(true);
+    expect(isContainerPlaceable(f({ TemplateResRef: "plc_well", Tag: "Well", HasInventory: 0 }))).toBe(false);
+    expect(isContainerPlaceable(f({ TemplateResRef: "plc_well", Tag: "Well", HasInventory: 1 }))).toBe(true);
+  });
+
+  it("the checklist asks for starting gold at the story's level", () => {
+    const story = "# M\n\n## Module\n- **Target Level:** 3\n";
+    const base = { areas: new Map(), graph: {}, entryArea: "", journalQuests: [], dmAreaResref: "dm_area", dmGuideWritten: false, scopeRecorded: true };
+    const open = buildChecklist(story, undefined, { ...base, startingGold: false }).items.find((i) => i.id === "affordances.gold");
+    expect(open?.done).toBe(false);
+    expect(open?.call).toBe('set_starting_gold(level: "3")');
+    expect(buildChecklist(story, undefined, { ...base, startingGold: true }).items.find((i) => i.id === "affordances.gold")?.done).toBe(true);
+  });
+});

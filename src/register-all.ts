@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerAdventureTools } from "./tools/adventure-tools.js";
 import { registerAreaBuildTools } from "./tools/area-build-tools.js";
+import { registerStartKitTools } from "./tools/start-kit-tools.js";
 import { registerAnalysisTools } from "./tools/analysis-tools.js";
 import { registerAreaTools } from "./tools/area-tools.js";
 import { registerBlueprintTools } from "./tools/blueprint-tools.js";
@@ -122,5 +123,6 @@ export function registerAll(server: McpServer): void {
   // ── Adventure creator tools ─────────────────────────────────────────────
   registerAdventureTools(server);
   registerAreaBuildTools(server);
+  registerStartKitTools(server);
   registerWebTools(server);
 }

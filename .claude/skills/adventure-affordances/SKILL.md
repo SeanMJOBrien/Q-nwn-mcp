@@ -425,6 +425,8 @@ Examples:
 
 ### Phase 10: Write Module Start Script
 
+**Use `set_starting_gold(level: "<target level>")`.** It writes `a_mod_enter` on `Mod_OnClientEntr`: once per player it raises XP to the start of the level and tops gold up to the wealth for that level (DMG wealth by level, 2,700 gp at level 3; `gold` overrides), counting what the character already carries, and it calls any handler that was already on OnClientEnter first. `get_progress` ticks the step once OnClientEnter gives gold. The manual steps below are the fallback.
+
 Write a `Mod_OnClientEntr` script that runs once per player to give starting gold and adjust level.
 
 **Step 1: Check existing module scripts.**

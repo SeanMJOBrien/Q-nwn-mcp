@@ -7,6 +7,7 @@
  *                 entry to adventure-status.json.
  */
 
+import { readFileSync } from "fs";
 import fs from "fs/promises";
 import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -16,6 +17,7 @@ import { adventureFileNames, adventurePath as advFile, ensureAdventureDir } from
 import { defaultFocus, FOCUS, guideFor, type Focus } from "../util/focus.js";
 import type { GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
+import { isContainerPlaceable } from "../util/containers.js";
 import { DM_AREA_RESREF } from "../util/dm-books.js";
 import { type AreaFacts, buildChecklist, type ModuleFacts, nextStep, type PhaseStatus, type ProgressItem, recentNotes, renderProgress } from "../util/progress.js";
 import {
@@ -97,7 +99,7 @@ export function gatherModuleFacts(index: ReturnType<typeof requireIndex>, scopeR
       storeTags: getFieldList(git, "StoreList").map((st) => getFieldStr(st, "Tag")),
       triggerTags: getFieldList(git, "TriggerList").map((t) => getFieldStr(t, "Tag")),
       containers: getFieldList(git, "Placeable List")
-        .filter((pl) => getFieldNum(pl, "HasInventory") === 1)
+        .filter((pl) => isContainerPlaceable(pl))
         .map((pl) => ({ tag: getFieldStr(pl, "Tag"), items: getFieldList(pl, "ItemList").length })),
     });
   }
@@ -106,7 +108,17 @@ export function gatherModuleFacts(index: ReturnType<typeof requireIndex>, scopeR
   const graph = start ? computeConnectivity(index, start).graph : {};
   const jrl = (index.parsedGff.get("module.jrl") ?? {}) as GffObj;
   const journalQuests = getFieldList(jrl, "Categories").flatMap((c) => [getFieldLocStr(c, "Name"), getFieldStr(c, "Tag")].filter(Boolean));
-  return { areas, graph, entryArea, journalQuests, dmAreaResref: DM_AREA_RESREF, dmGuideWritten, scopeRecorded };
+  // Starting gold: the OnClientEnter handler pays it (set_starting_gold, or a hand-written GiveGoldToCreature).
+  const onEnter = getFieldStr((index.parsedGff.get("module.ifo") ?? {}) as GffObj, "Mod_OnClientEntr").toLowerCase();
+  let startingGold = false;
+  if (onEnter) {
+    try {
+      startingGold = /GiveGoldToCreature\s*\(/.test(readFileSync(path.join(index.tempDir, `${onEnter}.nss`), "utf8"));
+    } catch {
+      startingGold = false;
+    }
+  }
+  return { areas, graph, entryArea, journalQuests, dmAreaResref: DM_AREA_RESREF, dmGuideWritten, scopeRecorded, startingGold };
 }
 
 /** The checklist of the loaded module, the user's goal and the recent decisions (nothing is written). */
@@ -540,6 +552,7 @@ export function registerPhaseTools(server: McpServer): void {
         ...(prompt.specs.length ? [`Specs: ${prompt.specs.join(", ")} (schemas in docs/specs/, quest: docs/quest-spec.schema.json)`] : []),
         `Reads: ${prompt.reads.join(", ")}`,
         `Writes: ${prompt.writes}`,
+        "Example names in the steps (village, darkforest, oldcrypt, dlg_merchant, chest_crypt1, boss_harl...) stand for your own: use the resrefs, tags and dialogs from the story, get_area_card and the tool answers.",
       ].join("\n");
       return { content: [{ type: "text" as const, text: `${header}\n\n${prompt.body}` }] };
     },

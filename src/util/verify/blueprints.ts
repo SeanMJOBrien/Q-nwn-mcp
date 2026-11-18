@@ -795,7 +795,10 @@ export async function verifyCreature(
 
     if (!reqFeats.some((f) => featIds.has(f))) {
       const slotName = slot === EQUIP_SLOT_MAP.righthand ? "RightHand" : "LeftHand";
-      report.error(
+      // A BioWare palette creature (nw_goblina...) ships this way and works in the engine: a penalty, not a fault, so
+      // it must not block a phase that places stock monsters.
+      const stock = /^(nw_|x0_|x1_|x2_|x3_)/i.test(getFieldStr(obj, "TemplateResRef"));
+      (stock ? report.warn.bind(report) : report.error.bind(report))(
         "weapon_proficiency_mismatch",
         `${slotName} carries BaseItem ${baseItem}, but FeatList has none of the feats that grant proficiency with it (feat.2da rows: ${reqFeats.join(", ")}) — it will be used at a real combat penalty`,
         "Equip_ItemList",

@@ -141,6 +141,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "verify_creature",
   ],
   loot: [
+    "set_starting_gold",
     "get_wealth_budget",
     "create_store_blueprint",
     "place_store",

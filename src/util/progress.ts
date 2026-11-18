@@ -57,6 +57,7 @@ export function stepTools(id: string): string[] {
     return ["suggest_encounter", "compose_encounter", "place_creature", "place_encounter", "list_creature_samples", "adventure_find_walkable", "get_area_creatures"];
   }
   if (phase === "affordances") {
+    if (id === "affordances.gold") return ["set_starting_gold", "get_wealth_budget"];
     if (id.startsWith("affordances.store")) return ["create_store_blueprint", "place_store", "adventure_find_walkable", "get_dialog_tree", "add_dialog_node", "list_creatures"];
     return ["add_items_to_container", "list_treasure_samples", "import_treasure_item", "list_blueprints", "get_wealth_budget", "get_area_placeables"];
   }
@@ -165,6 +166,8 @@ export interface ModuleFacts {
   dmAreaResref: string;
   dmGuideWritten: boolean;
   scopeRecorded: boolean;
+  /** The OnClientEnter handler gives starting gold (set_starting_gold's script, or a hand-written GiveGoldToCreature). */
+  startingGold?: boolean;
 }
 
 export interface PhaseStatus {
@@ -433,6 +436,10 @@ export function buildChecklist(
       const c = facts.areas.get(r)?.containers?.find((x) => x.tag.toLowerCase() === tag);
       if (facts.areas.get(r)?.containers) add("affordances", `affordances.${r}.c.${tag}`, `container ${tag} in ${r} holds the loot ## Affordances names`, !!c && c.items > 0,
         `add_items_to_container(area: "${r}", containerTag: "${tag}", items: "[...]")`, undefined, { areas: [r] });
+    }
+    if (facts.startingGold !== undefined) {
+      const level = /\*\*(?:Target )?Level:\*\*\s*(\d+)/i.exec(sections.get("Module") ?? "")?.[1] ?? "<level>";
+      add("affordances", "affordances.gold", `players start at level ${level} with the gold for it`, facts.startingGold, `set_starting_gold(level: "${level}")`);
     }
     section("affordances");
     endCheck("affordances");
