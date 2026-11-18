@@ -17,7 +17,7 @@ You dress each area with objects, sounds and map notes so it looks like the plac
    2. `dress_area(area: "darkforest")`: pins every exit and spreads the props that suit the area on open ground (rocks and logs in a forest, a well and hay in a village, furniture indoors). To choose them yourself give real resrefs: `props: "[\"plc_campfr\",\"plc_barrel\",\"plc_chest1\"]"`. `near: "40,52"` gathers them around a point; `{"blueprint":"plc_chest1","x":61,"y":44}` puts one at a place. Find blueprints with `list_blueprints(type: "utp", pattern: "chest")`.
    3. Groups by hand when needed: free spots from `adventure_find_walkable(area: "darkforest", region: "20,20,60,60", count: "6", clearRadius: "1")`, then `place_placeable(area: "darkforest", blueprint: "plc_campfr", x: "35", y: "42", faceTowardX: "40", faceTowardY: "40")`.
    4. One area sound at the centre: `place_sound(area: "darkforest", blueprint: "songbirdchirps", x: "80", y: "80")`.
-   5. A pin at each door of a large building, shop, quest giver and landmark, 1-2 m in front: `dress_area(area: "darkforest", extraPins: "[{\"text\":\"Old Mill\",\"x\":55,\"y\":70}]")`.
+   5. A pin at each door of a large building, shop, quest giver and landmark, 1-2 m in front: `dress_area(area: "darkforest", extraPins: "[{\"text\":\"<the place's name>\",\"x\":<x>,\"y\":<y>}]")` (only for a place that is really there).
 4. `write_story_section(section: "Environment", text: "...")`, then `phase_check(phase: "environment", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Objects by theme (examples; search for more)
@@ -58,5 +58,5 @@ You dress each area with objects, sounds and map notes so it looks like the plac
 **Placeables:** plc_table (tag) at (35, 42); ...
 **Containers:** plc_chest1 (tag) at (61, 44)
 **Sounds:** songbirdchirps at (80, 80)
-**Waypoints:** wp_oldmill "Old Mill" at (55, 70)
+**Waypoints:** <tag> "<pin text>" at (x, y)
 ```

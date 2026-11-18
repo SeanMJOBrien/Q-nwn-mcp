@@ -134,6 +134,11 @@ interface StyleConfig {
   secondaryCrosserChance: number;
 }
 
+/** The layout styles (adventure_generate_layout style.type, build_area style). */
+export function layoutStyles(): string[] {
+  return Object.keys(STYLE_PRESETS);
+}
+
 const STYLE_PRESETS: Record<string, StyleConfig> = {
   // ─── Interior styles ───
   dungeon: {

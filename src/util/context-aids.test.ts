@@ -95,6 +95,8 @@ describe("build_area spec and recipes", () => {
     expect("spec" in small && [small.spec.width, small.spec.height]).toEqual([9, 32]);
     const both = checkAreaSpec({ resref: "millroad", name: "Road", tileset: "ttf01", features: ["A"], preferredFeatures: ["B"] });
     expect("spec" in both && both.spec.features).toEqual(["A"]);
+    const style = checkAreaSpec({ resref: "gate", name: "Gate", tileset: "ttr01", style: "castle_exterior" });
+    expect("errors" in style && style.errors[0]).toMatchObject({ field: "style" });
     const word = checkAreaSpec({ resref: "millroad", name: "Road", tileset: "ttf01", size: "enormous" });
     expect("errors" in word && word.errors.map((e) => e.field)).toEqual(["size"]);
   });

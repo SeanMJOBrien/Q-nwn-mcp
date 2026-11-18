@@ -104,8 +104,11 @@ For each phase, in order:
 4. It lets the phase check decide when the phase is done. For areas and environment the check also requires every
    checklist step of the phase (each plot location built and laid out, each connection made, the start moved off
    `_start`; each area dressed and pinned), so a phase where nothing was built cannot pass on its story section.
-   The Areas and Environment sections are written by the driver itself (`write_story_section(draft: true)`), from what
-   the module really holds; a small model writing them invented positions and objects. In step mode, a failed check gets one repair pass in phase
+   Steps that leave no choice are done by the driver itself before the model is asked: each area's `build_area` (the
+   spec comes from the plot), `dress_area` with the tileset's props, the exit pins and a chest, and the Areas,
+   Environment and Actors sections (`write_story_section(draft: true)`, from what the module really holds). The model
+   gets a step only when it is still open after that. A conversation ends when the model repeats the same failing call
+   5 times. In step mode, a failed check gets one repair pass in phase
    mode with the errors. In phase mode, if the model stops early, the driver runs the check and hands the first five
    errors back.
 5. It gives up on a phase after 3 failed checks or 60 model turns, and stops the run, because later phases depend on

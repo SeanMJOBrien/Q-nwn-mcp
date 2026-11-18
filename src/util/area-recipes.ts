@@ -57,6 +57,23 @@ function words(text: string): string[] {
     .filter((w) => w.length >= 3 && !["the", "and", "with", "under", "of"].includes(w));
 }
 
+/** What each recipe tileset is for, in a few words (the plot check names them when a location's tileset has none). */
+export const RECIPE_LABELS: Record<string, string> = {
+  ttr01: "village, farmland, rural road",
+  ttf01: "forest",
+  ttf02: "forest (deep)",
+  tcn01: "city, town, market",
+  tin01: "house, inn, shop interior",
+  tni01: "interior (elven)",
+  tde01: "dungeon",
+  tdc01: "crypt",
+  tds01: "sewer",
+  tdm01: "cave, mine",
+  ttd01: "desert",
+  tno01: "castle, keep, gatehouse (outside)",
+  tts01: "winter, frozen land",
+};
+
 /**
  * Words in an area's name or purpose that stand for feature groups with other names: a "village" has no group called
  * village, but houses, an inn, a well and farms (The Mill on Blackwater's village got a Crystal, 2026-11-18).

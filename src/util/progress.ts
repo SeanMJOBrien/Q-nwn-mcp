@@ -8,6 +8,7 @@
  * now?" always has one concrete answer. Pure: the tool gathers ModuleFacts, this file decides.
  */
 
+import { AREA_RECIPES } from "./area-recipes.js";
 import { OWN_SECTION, PHASES, type Phase, parseSections } from "./phase-check.js";
 
 export type ProgressPhase = "start" | Phase | "ship";
@@ -27,11 +28,17 @@ export interface ProgressItem {
   subject?: string;
   /** The few tools the step needs (a step-mode driver shows only these, plus the always-on ones). */
   tools?: string[];
+  /**
+   * A call that does the whole step with no choice left to make (a build_area spec from the plot, dress_area with the
+   * tileset's kit, a section drafted from the module): the step-mode driver runs it itself and asks the model only if
+   * the step is still open after it. A small model given these steps invented props, sections and copied examples.
+   */
+  auto?: { tool: string; args: Record<string, unknown> };
 }
 
 /** Tools every step may use besides its own. */
 /** Phases whose story section write_story_section drafts from the module (draft: true). */
-export const DRAFTED_SECTIONS: readonly Phase[] = ["areas", "environment"];
+export const DRAFTED_SECTIONS: readonly Phase[] = ["areas", "environment", "actors"];
 
 export const STEP_BASE_TOOLS = ["get_progress", "get_area_card", "get_result", "read_story", "undo_last_change"];
 
@@ -260,7 +267,15 @@ export function buildChecklist(
   facts: ModuleFacts,
 ): { items: ProgressItem[]; outline: PlotOutline | null } {
   const items: ProgressItem[] = [];
-  const add = (phase: ProgressPhase, id: string, label: string, done: boolean, call?: string, detail?: string, about: { areas?: string[]; subject?: string } = {}) => {
+  const add = (
+    phase: ProgressPhase,
+    id: string,
+    label: string,
+    done: boolean,
+    call?: string,
+    detail?: string,
+    about: { areas?: string[]; subject?: string; auto?: ProgressItem["auto"] } = {},
+  ) => {
     const tools = stepTools(id);
     items.push({
       id, phase, label, done,
@@ -269,6 +284,7 @@ export function buildChecklist(
       ...(about.areas?.length ? { areas: about.areas } : {}),
       ...(about.subject ? { subject: about.subject } : {}),
       ...(tools.length ? { tools } : {}),
+      ...(about.auto && !done ? { auto: about.auto } : {}),
     });
   };
   const sections = story ? parseSections(story) : new Map<string, string>();
@@ -292,6 +308,8 @@ export function buildChecklist(
       `story section "## ${OWN_SECTION[p]}" written`,
       has(OWN_SECTION[p]),
       DRAFTED_SECTIONS.includes(p) ? `write_story_section(section: "${OWN_SECTION[p]}", draft: true)` : `write_story_section(section: "${OWN_SECTION[p]}", text: "...")`,
+      undefined,
+      DRAFTED_SECTIONS.includes(p) ? { auto: { tool: "write_story_section", args: { section: OWN_SECTION[p], draft: true } } } : {},
     );
 
   // start
@@ -329,8 +347,11 @@ export function buildChecklist(
       const a = facts.areas.get(l.resref);
       const ts = l.tileset ?? a?.tileset ?? "<tileset>";
       const links = (outline?.connections ?? []).filter(([x, y]) => resrefOf(x) === l.resref || resrefOf(y) === l.resref).length;
-      const build = `build_area(spec: ${specArg({ resref: l.resref, name: l.name, tileset: ts, connections: Math.max(1, links) })})`;
-      const about = { areas: [l.resref], subject: l.name };
+      const specObj = { resref: l.resref, name: l.name, tileset: ts, connections: Math.max(1, links) };
+      const build = `build_area(spec: ${specArg(specObj)})`;
+      // A tileset with a recipe needs nothing more from the model: the driver runs the call itself.
+      const auto = AREA_RECIPES[ts] ? { tool: "build_area", args: { spec: JSON.stringify(specObj) } } : undefined;
+      const about = { areas: [l.resref], subject: l.name, auto };
       add("areas", `areas.${l.resref}.create`, `${l.name}: area ${l.resref} created`, !!a, build, undefined, about);
       add("areas", `areas.${l.resref}.tiles`, `${l.name}: terrain laid out`, !!a && a.distinctTiles > 1,
         a ? `${build} (lays out the existing empty area)` : build,
@@ -360,13 +381,15 @@ export function buildChecklist(
       const a = facts.areas.get(l.resref);
       if (!a) continue;
       const about = { areas: [l.resref], subject: l.name };
+      const dressAuto = { auto: { tool: "dress_area", args: { area: l.resref } } };
       add("environment", `environment.${l.resref}.props`, `${l.name}: dressed with props (at least 5)`, a.props >= 5,
-        `dress_area(area: "${l.resref}") places props that suit the area on open ground (or give props: real resrefs from list_blueprints)`, `${a.props} placed`, about);
+        `dress_area(area: "${l.resref}") places props that suit the area on open ground (or give props: real resrefs from list_blueprints)`, `${a.props} placed`, { ...about, ...(a.props < 5 ? dressAuto : {}) });
       add("environment", `environment.${l.resref}.pins`, `${l.name}: map pins at doors, shops and key places`, a.mapPins > 0,
-        `dress_area(area: "${l.resref}") pins every exit; place_waypoint(area: "${l.resref}", ..., mapNote: "Bram's Smithy") for a shop or quest giver`, undefined, about);
+        `dress_area(area: "${l.resref}") pins every exit; for a shop or quest giver standing here: place_waypoint(area: "${l.resref}", ..., mapNote: "<its name>")`, undefined, { ...about, auto: { tool: "dress_area", args: { area: l.resref, props: "[]" } } });
       if (fightAreas.has(l.resref) && a.containers) {
         add("environment", `environment.${l.resref}.container`, `${l.name}: a container (chest, crate, barrel) for loot`, a.containers.length > 0,
-          `place_placeable(area: "${l.resref}", blueprint: "plc_chest1", ...)`, undefined, about);
+          `dress_area(area: "${l.resref}", props: "[\\"plc_chest1\\"]", pins: "none")`, undefined,
+          { ...about, auto: { tool: "dress_area", args: { area: l.resref, props: JSON.stringify(["plc_chest1"]), pins: "none" } } });
       }
       for (const tag of targets.containers.get(l.resref) ?? []) {
         const there = (a.containers ?? []).some((c) => c.tag.toLowerCase() === tag);

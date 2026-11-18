@@ -183,3 +183,40 @@ export async function findSimpleWalkableSpots(
 
   return spots;
 }
+
+/**
+ * The checks placeCreatureCore makes before it writes (walkable ground, nothing within the collision radius), without
+ * writing: so a tool that builds a creature can refuse a bad spot before it saves anything (build_key_npc built and
+ * forged the blueprint first, then failed to place it, and every retry answered "already exists").
+ */
+export async function checkCreatureSpot(
+  index: ModuleIndex,
+  resmanOpts: ResmanOptions,
+  area: string,
+  x: number,
+  y: number,
+  opts: { walkBuffer?: number; collisionRadius?: number } = {},
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const a = area.toLowerCase();
+  if (!index.parsedGff.has(`${a}.git`)) return { ok: false, error: `No area ${a}. Areas: ${[...index.areas.keys()].join(", ")}` };
+  const walk = await checkPlacementWalkable(x, y, a, index, resmanOpts, opts.walkBuffer);
+  if (!walk.ok) return { ok: false, error: `Position (${x}, ${y}) is not safe for placement: ${walk.reason}` };
+  const radius = opts.collisionRadius ?? 0.75;
+  if (radius > 0) {
+    const hit = checkCollision(getGitDoc(index, a).obj, x, y, radius);
+    if (hit.collision) return { ok: false, error: `Position (${x}, ${y}) is ${hit.distance} m from '${hit.nearbyTag}' (minimum ${radius} m)` };
+  }
+  return { ok: true };
+}
+
+/** Where a creature built from `resref` stands, if any area holds one. */
+export function findPlacedCreature(index: ModuleIndex, resref: string): { area: string; x: number; y: number } | null {
+  const want = resref.toLowerCase();
+  for (const [area] of index.areas) {
+    const git = index.parsedGff.get(`${area}.git`) as GffObj | undefined;
+    if (!git) continue;
+    const c = getFieldList(git, "Creature List").find((o) => getFieldStr(o, "TemplateResRef").toLowerCase() === want);
+    if (c) return { area, x: getFieldNum(c, "XPosition"), y: getFieldNum(c, "YPosition") };
+  }
+  return null;
+}

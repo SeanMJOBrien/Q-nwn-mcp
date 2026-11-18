@@ -21,7 +21,7 @@ import { AREA_RECIPES, pickFeatures } from "../util/area-recipes.js";
 import { isContainerPlaceable } from "../util/containers.js";
 import { notFoundText } from "../util/blueprint-hint.js";
 import { DM_AREA_RESREF } from "../util/dm-books.js";
-import { MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
+import { layoutStyles, MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import { getKeptResult, keptIds, shapeLongText, valueAtPath } from "../util/result-store.js";
 import { callTool } from "../util/tool-registry.js";
 import { findOpenGround, loadAreaWalkGrid } from "../util/walkgrid.js";
@@ -280,6 +280,8 @@ export function checkAreaSpec(raw: unknown): { spec: AreaSpec } | { errors: Arra
   const tileset = (str("tileset") ?? "").toLowerCase();
   if (tileset && !AREA_RECIPES[tileset] && (!str("style") || !str("biome")))
     errors.push({ field: "style", message: `tileset ${tileset} has no recipe: give style and biome too (recipes: ${Object.keys(AREA_RECIPES).join(", ")})` });
+  const styles = layoutStyles();
+  if (str("style") && !styles.includes((str("style") as string).toLowerCase())) errors.push({ field: "style", message: `one of ${styles.join(", ")}` });
   for (const k of ["events", "width", "height", "rooms", "connections"]) {
     const v = num(k);
     if (v !== undefined && (!Number.isInteger(v) || v < 0)) errors.push({ field: k, message: "a whole number" });
@@ -578,7 +580,7 @@ export function registerAreaBuildTools(server: McpServer): void {
       area: z.string().describe("Area resref"),
       props: z.string().optional().describe('JSON list of placeable blueprints, or of {"blueprint","x","y","bearing"}'),
       pins: z.string().optional().describe('"auto" (default): a pin at every exit; "none": no exit pins'),
-      extraPins: z.string().optional().describe('JSON list of {"text":"Bram\'s Smithy","x":40,"y":60}: a pin near each point (a shop, a quest giver)'),
+      extraPins: z.string().optional().describe('JSON list of {"text":"<the place\'s name>","x":<x>,"y":<y>}: a pin near each point, only for a shop or quest giver that is really there'),
       near: z.string().optional().describe('"x,y": place the props around this point'),
     },
     { destructiveHint: false },
@@ -679,12 +681,17 @@ function storyAreas(index: ReturnType<typeof requireIndex>): string[] {
  * The `## Areas` or `## Environment` section in the format of docs/phase-prompts/areas.md / environment.md, read
  * from the module: what is really there, so later phases and the DM guide read facts.
  */
-export async function draftStorySection(index: ReturnType<typeof requireIndex>, section: "Areas" | "Environment"): Promise<string> {
+export async function draftStorySection(index: ReturnType<typeof requireIndex>, section: "Areas" | "Environment" | "Actors"): Promise<string> {
   const built = await readBuiltAreas(index);
   const out: string[] = [];
   for (const r of storyAreas(index)) {
     const f = areaFacts(index, r);
     if (!f) continue;
+    if (section === "Actors") {
+      const lines = actorLines(index, r);
+      if (lines.length) out.push(`### ${f.name} (\`${r}\`)`, ...lines, "");
+      continue;
+    }
     out.push(`### ${f.name} (\`${r}\`)`);
     if (section === "Areas") {
       const b = built[r];
@@ -711,4 +718,35 @@ export async function draftStorySection(index: ReturnType<typeof requireIndex>, 
     out.push("");
   }
   return out.join("\n").trim();
+}
+
+/** The Actors section lines of one area (docs/phase-prompts/actors.md format) from its placed creatures. */
+function actorLines(index: ReturnType<typeof requireIndex>, area: string): string[] {
+  const git = index.parsedGff.get(`${area}.git`) as GffObj | undefined;
+  if (!git) return [];
+  const key: string[] = [];
+  const companions: string[] = [];
+  const ambient = new Map<string, number>();
+  for (const c of getFieldList(git, "Creature List")) {
+    const name = `${getFieldLocStr(c, "FirstName")} ${getFieldLocStr(c, "LastName")}`.trim() || getFieldStr(c, "Tag");
+    const tag = getFieldStr(c, "Tag");
+    const dlg = getFieldStr(c, "Conversation");
+    const hostile = getFieldNum(c, "FactionID") === 1;
+    const where = fmtAt(getFieldNum(c, "XPosition"), getFieldNum(c, "YPosition"));
+    if (getFieldStr(c, "ScriptHeartbeat").toLowerCase().startsWith("x0_ch_hen")) {
+      const cls = getFieldList(c, "ClassList").map((k) => `class ${getFieldNum(k, "Class")} ${getFieldNum(k, "ClassLevel")}`).join(", ");
+      companions.push(`${name} (\`${tag}\`)${cls ? `, ${cls}` : ""}${dlg ? `, dialog \`${dlg}\`` : ""}, at ${where}`);
+    } else if (dlg || hostile) {
+      if (hostile && !dlg) continue; // plain enemies belong to the Challenges section
+      key.push(`${name} (\`${tag}\`)${dlg ? `, dialog \`${dlg}\`` : ""}, at ${where}${hostile ? ", hostile" : ""}`);
+    } else {
+      const r = getFieldStr(c, "TemplateResRef") || tag;
+      ambient.set(r, (ambient.get(r) ?? 0) + 1);
+    }
+  }
+  const out: string[] = [];
+  if (key.length) out.push(`**Key NPCs:** ${key.join("; ")}`);
+  if (companions.length) out.push(`**Companions:** ${companions.join("; ")}`);
+  if (ambient.size) out.push(`**Ambient:** ${[...ambient].map(([r, n]) => `${r} x${n}`).join(", ")}`);
+  return out;
 }

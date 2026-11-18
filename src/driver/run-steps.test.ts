@@ -18,7 +18,7 @@ function fakeModule(log: string[]) {
     const steps = ["blackwater", "millroad"]
       .filter((r) => !built.has(r))
       .map((r) => ({ id: `areas.${r}.create`, step: `${r} created`, call: `build_area(spec: "{\\"resref\\":\\"${r}\\"}")`, areas: [r], subject: r === "blackwater" ? "Blackwater Village" : "The Mill Road", tools: ["build_area"] }));
-    if (!section) steps.push({ id: "areas.section", step: "story section written", call: "write_story_section(...)", areas: [], subject: "", tools: ["write_story_section"] });
+    if (!section) steps.push({ id: "areas.section", step: "story section written", call: "write_story_section(...)", areas: [], subject: "", tools: ["write_story_section"], auto: { tool: "write_story_section", args: { section: "Areas", draft: true } } } as never);
     return steps;
   };
   const host: ToolHost = {
@@ -95,6 +95,47 @@ describe("step mode", () => {
     expect(r.openSteps).toEqual(["areas.blackwater.create", "areas.millroad.create"]);
     expect(r.status).not.toBe("success");
     expect(log.filter((l) => l.startsWith("phase_check")).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("runs a step's auto call itself and asks the model only when the step stays open", async () => {
+    const log: string[] = [];
+    const host = fakeModule(log);
+    const base = host.callTool;
+    host.callTool = async (name, args) => {
+      if (name === "get_progress") {
+        const r = JSON.parse((await base(name, args)).text) as { open: Array<Record<string, unknown>> };
+        for (const o of r.open) if (String(o.id).endsWith(".create")) o.auto = { tool: "build_area", args: { spec: JSON.stringify({ resref: String(o.id).split(".")[1] }) } };
+        return { text: JSON.stringify(r), isError: false };
+      }
+      return base(name, args);
+    };
+    let turns = 0;
+    const chat = async (): Promise<ChatMessage> => {
+      turns++;
+      return { role: "assistant", content: "DONE" };
+    };
+    const r = await runPhaseSteps(host, chat, "areas");
+    expect(r.status).toBe("success");
+    expect(turns).toBe(0);
+    expect(log.filter((l) => l.startsWith("build_area"))).toHaveLength(2);
+  });
+
+  it("ends a step conversation when the model repeats the same failing call", async () => {
+    const log: string[] = [];
+    const host = fakeModule(log);
+    const base = host.callTool;
+    let builds = 0;
+    host.callTool = async (name, args) => {
+      if (name !== "build_area") return base(name, args);
+      builds++;
+      return { text: JSON.stringify({ ok: false, error: "no" }), isError: true };
+    };
+    const chat = async (): Promise<ChatMessage> => ({ role: "assistant", content: "", tool_calls: [call("build_area", { spec: '{"resref":"blackwater"}' })] });
+    await runPhaseSteps(host, chat, "areas", { stepTries: 1, stepTurns: 12, maxSteps: 1 });
+    // 5 identical failures end the first step's conversation, well before its 12 turns
+    // each area step's conversation ends after 5 identical failures (not its 12 turns); the repair pass has 1 turn
+    expect(builds).toBe(5 + 5 + 1);
+
   });
 
   it("stops the run on a setup error instead of letting the model retry", async () => {

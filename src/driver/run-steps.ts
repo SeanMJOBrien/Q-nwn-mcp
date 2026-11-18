@@ -11,10 +11,9 @@
 
 import type { Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
-import { DRAFTED_SECTIONS, STEP_BASE_TOOLS } from "../util/progress.js";
-import { OWN_SECTION } from "../util/phase-check.js";
+import { STEP_BASE_TOOLS } from "../util/progress.js";
 import type { Chat, ChatMessage, ToolSpec } from "./llm.js";
-import { checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, type ToolHost, trimContext } from "./run-phase.js";
+import { checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, STUCK_REPEATS, type ToolHost, trimContext } from "./run-phase.js";
 
 export interface RunStepsOptions extends RunPhaseOptions {
   /** Model turns per step (default 12). */
@@ -36,6 +35,8 @@ export interface OpenStep {
   areas?: string[];
   subject?: string;
   tools?: string[];
+  /** A call the driver runs itself before asking the model (progress.ts `auto`). */
+  auto?: { tool: string; args: Record<string, unknown> };
 }
 
 interface ProgressAnswer {
@@ -177,6 +178,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
   let runs = 0;
   let plot: string | undefined;
   const refused = new Map<string, string>();
+  const autoTried = new Set<string>();
 
   while (runs < maxRuns) {
     const p = await progress();
@@ -185,12 +187,14 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
     const step = open[0];
     runs++;
 
-    // A section the module can write itself (Areas, Environment): the driver drafts it from the real state; a small
-    // model writing it invents positions and objects.
-    if (step.id === `${phase}.section` && DRAFTED_SECTIONS.includes(phase) && toolByName.has("write_story_section")) {
-      const r = await host.callTool("write_story_section", { section: OWN_SECTION[phase], draft: true });
-      log({ event: "driver_step", id: step.id, tool: "write_story_section", isError: r.isError, result: r.text.slice(0, 300) });
-      if (!r.isError) {
+    // A step with no choice left (a build_area spec from the plot, dress_area with the tileset's kit, a section drafted
+    // from the module): the driver runs its call once itself, and asks the model only if the step is still open.
+    if (step.auto && !autoTried.has(step.id) && toolByName.has(step.auto.tool)) {
+      autoTried.add(step.id);
+      runs--; // not a model conversation
+      const r = await host.callTool(step.auto.tool, step.auto.args);
+      log({ event: "driver_step", id: step.id, tool: step.auto.tool, args: step.auto.args, isError: r.isError, result: r.text.slice(0, 300) });
+      if (!((await progress()).open ?? []).some((o) => o.id === step.id)) {
         log({ event: "step_done", id: step.id });
         continue;
       }
@@ -227,7 +231,9 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
       { role: "user", content: card },
     ];
     let lastFailing = "";
-    for (let turn = 0; turn < stepTurns; turn++) {
+    let sameFailures = 0;
+    let stuck = false;
+    for (let turn = 0; turn < stepTurns && !stuck; turn++) {
       trimContext(messages, budget);
       const reply = await chat(messages, specs);
       result.steps++;
@@ -240,9 +246,14 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
         messages.push({ role: "tool", tool_call_id: call.id, content: clip(out.text, maxResult) });
         const signature = `${call.name} ${JSON.stringify(out.args ?? call.arguments)}`;
         if (out.isError && signature === lastFailing) {
+          sameFailures++;
           messages.push({ role: "user", content: `That is the same failing call to ${call.name}. Change the field its error names, or reply DONE if the step cannot be done.` });
-        }
+        } else sameFailures = 0;
         lastFailing = out.isError ? signature : "";
+        if (sameFailures >= STUCK_REPEATS) {
+          log({ event: "stuck", id: step.id, tool: call.name, repeats: sameFailures + 1 });
+          stuck = true;
+        }
         if (out.isError) for (const r of refusedFields(call.name, out.raw ?? out.text, out.args)) refused.set(r.key, r.line);
       }
     }

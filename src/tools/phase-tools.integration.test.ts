@@ -286,11 +286,26 @@ describe("story tools and phase prompts", () => {
       const noAreas = await c.callTool({ name: "write_story_section", arguments: { section: "Areas", draft: true } });
       expect(noAreas.isError).toBe(true);
       expect(body(noAreas).error).toContain("no story areas yet");
+      expect(body(await c.callTool({ name: "write_story_section", arguments: { section: "Actors", draft: true } })).error).toContain("no creatures are placed");
       const wrongSection = await c.callTool({ name: "write_story_section", arguments: { section: "Quests", draft: true } });
       expect(body(wrongSection).field).toBe("draft");
       const env = body(await c.callTool({ name: "phase_check", arguments: { phase: "environment", step: "end" } }));
       expect(env.status).toBe("partial");
       expect(env.errors as string[]).toContain("Blackwater Village: area blackwater does not exist; the areas phase must build it first.");
+    } finally {
+      await close();
+    }
+  });
+
+  it("plot end refuses a location on a tileset build_area has no recipe for, naming the ones it has", async () => {
+    await fs.writeFile(path.join(tempDir, "adventure.md"), "## Module\nm\n## Plot\n### Locations\n#### 1. Village Hub\n- **Resref:** villagehub\n- **Tileset:** trm02\n#### 2. Old Mill\n- **Resref:** oldmill\n- **Tileset:** ttr01\n");
+    const { c, close } = await client();
+    try {
+      const r = body(await c.callTool({ name: "phase_check", arguments: { phase: "plot", step: "end" } }));
+      expect(r.status).toBe("partial");
+      const errors = r.errors as string[];
+      expect(errors.some((e) => e.startsWith("Location Village Hub uses tileset trm02") && e.includes("ttr01 (village"))).toBe(true);
+      expect(errors.some((e) => e.includes("Old Mill"))).toBe(false);
     } finally {
       await close();
     }

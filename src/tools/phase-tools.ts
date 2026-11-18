@@ -20,7 +20,8 @@ import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types
 import { isContainerPlaceable } from "../util/containers.js";
 import { DM_AREA_RESREF } from "../util/dm-books.js";
 import { draftStorySection } from "./area-build-tools.js";
-import { type AreaFacts, buildChecklist, type ModuleFacts, nextStep, type PhaseStatus, type ProgressItem, recentNotes, renderProgress } from "../util/progress.js";
+import { AREA_RECIPES, RECIPE_LABELS } from "../util/area-recipes.js";
+import { type AreaFacts, buildChecklist, parsePlotOutline, type ModuleFacts, nextStep, type PhaseStatus, type ProgressItem, recentNotes, renderProgress } from "../util/progress.js";
 import {
   clearScopeFields,
   filterForPhase,
@@ -28,6 +29,7 @@ import {
   missingSections,
   OWN_SECTION,
   parseScope,
+  parseSections,
   PHASES,
   type Phase,
   type PhaseEntry,
@@ -348,6 +350,17 @@ export function registerPhaseTools(server: McpServer): void {
         }
       }
 
+      // Plot: every location on a tileset build_area knows (a recipe); a small model put all five areas on trm02, the
+      // first entry of list_tilesets, and then guessed a style for each (The Old Mill, 2026-11-18).
+      if (p === "plot") {
+        const outline = parsePlotOutline(parseSections(md).get("Plot") ?? "");
+        const known = Object.entries(RECIPE_LABELS).map(([t, l]) => `${t} (${l})`).join(", ");
+        for (const l of outline.locations) {
+          if (!l.tileset) errorList.push(`Location ${l.name} names no tileset: add "- **Tileset:** <one of ${known}>".`);
+          else if (!AREA_RECIPES[l.tileset.toLowerCase()]) errorList.push(`Location ${l.name} uses tileset ${l.tileset}, which build_area has no recipe for: use one of ${known}.`);
+        }
+      }
+
       // The story graph (if the plot wrote one) is checked when the story is written and again at the polish pass.
       if (p === "plot" || p === "polish") {
         for (const f of verifyStory(parseStoryGraph(md), new Set(index.areas.keys()))) {
@@ -425,6 +438,7 @@ export function registerPhaseTools(server: McpServer): void {
                 ...(i.areas ? { areas: i.areas } : {}),
                 ...(i.subject ? { subject: i.subject } : {}),
                 ...(i.tools ? { tools: i.tools } : {}),
+                ...(i.auto ? { auto: i.auto } : {}),
               })),
             }
           : {}),
@@ -461,11 +475,11 @@ export function registerPhaseTools(server: McpServer): void {
 
   server.tool(
     "write_story_section",
-    "Write one `## Section` of the story file (adventure.md): replaces the section when it exists, appends it otherwise, and leaves every other section untouched. Each phase writes its own section this way before phase_check(step: \"end\"). Give the section body only, without the `## Name` heading. For Areas and Environment pass draft: true instead of writing it: the tool writes the section from what the module really holds (sizes, features, exits; placeables, containers, sounds, map pins), and any text you give is added below.",
+    "Write one `## Section` of the story file (adventure.md): replaces the section when it exists, appends it otherwise, and leaves every other section untouched. Each phase writes its own section this way before phase_check(step: \"end\"). Give the section body only, without the `## Name` heading. For Areas, Environment and Actors pass draft: true instead of writing it: the tool writes the section from what the module really holds (sizes, features, exits; placeables, containers, sounds, map pins; key NPCs, companions, ambient creatures), and any text you give is added below.",
     {
       section: z.string().describe("Section name: Module, Plot, Areas, Environment, Actors, Quests, Challenges, Affordances, Polish or Rewards"),
       text: z.string().optional().describe("The section body in markdown (sub-headings start at ###); with draft, notes added below the drafted part"),
-      draft: z.boolean().optional().describe("Areas or Environment only: write the section from the module's real state"),
+      draft: z.boolean().optional().describe("Areas, Environment or Actors only: write the section from the module's real state"),
     },
     { idempotentHint: true },
     async ({ section, text: given, draft }) => {
@@ -476,9 +490,12 @@ export function registerPhaseTools(server: McpServer): void {
       if (!canonical) return text({ ok: false, field: "section", error: `"${section}" is not a story section. Use one of: ${known.join(", ")}` }, true);
       let body = given ?? "";
       if (draft) {
-        if (canonical !== "Areas" && canonical !== "Environment") return text({ ok: false, field: "draft", error: "draft works for the Areas and Environment sections only; write this one with text." }, true);
+        if (canonical !== "Areas" && canonical !== "Environment" && canonical !== "Actors") return text({ ok: false, field: "draft", error: "draft works for the Areas, Environment and Actors sections only; write this one with text." }, true);
         const drafted = await draftStorySection(index, canonical);
-        if (!drafted) return text({ ok: false, field: "draft", error: "The module has no story areas yet: build them first (build_area)." }, true);
+        if (!drafted) {
+          const what = canonical === "Actors" ? "no creatures are placed in the story areas yet: place them first" : "the module has no story areas yet: build them first (build_area)";
+          return text({ ok: false, field: "draft", error: `Nothing to draft: ${what}.` }, true);
+        }
         body = given?.trim() ? `${drafted}\n\n${stripOwnHeading(canonical, given)}` : drafted;
       }
       const clean = stripOwnHeading(canonical, body);

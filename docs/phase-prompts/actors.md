@@ -15,15 +15,14 @@ You create the friendly people of the adventure: key NPCs with a conversation, c
 2. `read_story(sections: "Module,Plot,Areas,Environment")`. List the key NPCs with their location, role, motive and voice.
 3. For each area with an NPC: `visualize_area(area: "village")`, then `adventure_find_walkable(area: "village", count: "8", clearRadius: "2")` for positions. `get_area_creatures(area: "village")`: skip tags already placed.
 4. For each key NPC that is not a companion:
-   1. Conversation first: `create_dialog(resref: "dlg_elara", nodes: "[...]")` (shape below).
-   2. Person: `build_key_npc(resref: "elara", name: "Elara Voss", area: "village", x: "45", y: "62", race: "6", classId: "4", level: "3", gender: "1", faction: "commoner", conversation: "dlg_elara")`.
-   3. `verify_dialog(resref: "dlg_elara")`: no errors.
+   1. Person: `build_key_npc(resref: "<npc>", name: "<the plot's name>", area: "<area>", x: "<x>", y: "<y>", race: "6", classId: "4", level: "3", gender: "1", faction: "commoner", conversation: "<npc>")` with the plot's names and a spot from `adventure_find_walkable(area: "<area>")`. A conversation resref that does not exist yet gets a greeting dialog (at most 16 characters: use the NPC's resref). Once it answers success, the NPC is done: do not call it again.
+   2. `verify_dialog(resref: "<npc>")`: no errors.
 5. Companions (at most 3; skip when the plot has none):
    1. Once: `create_companion_system()`.
-   2. Each: `build_companion(resref: "cmp_borin", name: "Borin", area: "village", x: "50", y: "60", race: "0", classId: "2", level: "3", gender: "0", introduction: "...", backstory: "...")`. Level = the adventure's target level.
-   3. `verify_creature(resref: "cmp_borin", henchman: true)`: no errors.
+   2. Each: `build_companion(resref: "<cmp_name>", name: "<the plot's name>", area: "<area>", x: "<x>", y: "<y>", race: "0", classId: "2", level: "3", gender: "0", introduction: "...", backstory: "...")`. Level = the adventure's target level.
+   3. `verify_creature(resref: "<cmp_name>", henchman: true)`: no errors.
 6. Animals (2 to 5 per outdoor area, 0 to 1 indoors): `create_creature_blueprint(resref: "amb_deer", tag: "amb_deer", name: "Deer", sourceResref: "nw_deer", faction: "2")` once per kind, then `place_creature(area: "darkforest", blueprint: "amb_deer", x: "65", y: "95")`.
-7. `write_story_section(section: "Actors", text: "...")`, then `phase_check(phase: "actors", step: "end")`. Then `get_progress()`: what is still open, and the next step.
+7. `write_story_section(section: "Actors", draft: true)` (written from the placed creatures), then `phase_check(phase: "actors", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Numbers
 
@@ -56,7 +55,7 @@ You create the friendly people of the adventure: key NPCs with a conversation, c
 
 ```
 ### <Area name> (`resref`)
-**Key NPCs:** Elara Voss (`elara`), dialog `dlg_elara`, at (45, 62), quest giver
-**Companions:** Borin (`cmp_borin`), cleric 3, at (50, 60)
-**Ambient:** amb_deer x3
+**Key NPCs:** <Name> (`tag`), dialog `<dlg>`, at (x, y)
+**Companions:** <Name> (`tag`), class 2 3, at (x, y)
+**Ambient:** <blueprint> x<count>
 ```

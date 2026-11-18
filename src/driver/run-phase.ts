@@ -52,6 +52,9 @@ export interface PhaseResult {
   openSteps?: string[];
 }
 
+/** Identical failing calls in a row (after the first) that end a conversation: the model is stuck. */
+export const STUCK_REPEATS = 4;
+
 /** Tools the driver runs itself; never shown to the model. */
 export const DRIVER_ONLY = new Set(["load_module", "repack_module", "get_phase_prompt"]);
 
@@ -161,8 +164,8 @@ export async function runTool(
   host: ToolHost,
   log: (event: Record<string, unknown>) => void,
 ): Promise<{ text: string; isError: boolean; refused: boolean; args?: Record<string, unknown>; raw?: string }> {
-  const refuse = (error: string, extra: Record<string, unknown> = {}) => {
-    log({ event: "refused", tool: call.name, error, ...extra });
+  const refuse = (error: string, extra: Record<string, unknown> = {}, args?: Record<string, unknown>) => {
+    log({ event: "refused", tool: call.name, error, ...extra, ...(args ? { args } : {}) });
     return { text: JSON.stringify({ ok: false, error, ...extra }), isError: true, refused: true };
   };
   const tool = byName.get(call.name);
@@ -171,7 +174,7 @@ export async function runTool(
   if (typeof parsed === "string") return refuse(parsed);
   const { args, errors } = coerceArgs(tool.inputSchema, parsed);
   const problems = errors.length ? errors : specErrors(call.name, args);
-  if (problems.length) return refuse("Fix these fields and call the tool again.", { fields: problems.slice(0, 6) });
+  if (problems.length) return { ...refuse("Fix these fields and call the tool again.", { fields: problems.slice(0, 6) }, args), args };
   const out = await host.callTool(call.name, args);
   log({ event: "tool", tool: call.name, args, isError: out.isError, result: out.text.slice(0, 800) });
   // A missing tool or game folder: no argument fixes it, so the run stops here instead of the model retrying.
@@ -269,17 +272,21 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
       result.toolCalls++;
       const out = await runTool(call, byName, host, log);
       messages.push({ role: "tool", tool_call_id: call.id, content: clip(out.text, maxResult) });
-      if (out.refused || !out.args) continue;
-      const args = out.args;
-
-      const signature = `${call.name} ${JSON.stringify(args)}`;
+      // The same failing call again and again (refused before the call or failed in it): warn once, then stop. A
+      // repair pass sent one refused create_dialog 50 times (The Old Mill, 2026-11-18).
+      const signature = `${call.name} ${JSON.stringify(out.args ?? call.arguments)}`;
       if (out.isError && signature === lastFailing) sameFailures++;
       else sameFailures = 0;
       lastFailing = out.isError ? signature : "";
-      if (sameFailures >= 2) {
+      if (sameFailures === 2) {
         messages.push({ role: "user", content: `You repeated the same failing call to ${call.name}. Read its error and change the arguments, or go on to the next step.` });
-        sameFailures = 0;
       }
+      if (sameFailures >= STUCK_REPEATS) {
+        log({ event: "stuck", tool: call.name, repeats: sameFailures + 1 });
+        return { ...result, reason: `stuck: the same failing call to ${call.name} ${sameFailures + 1} times in a row` };
+      }
+      if (out.refused || !out.args) continue;
+      const args = out.args;
 
       if (call.name === "phase_check" && args.phase === phase && args.step === "end") {
         const end = checkOk(out.raw ?? out.text);
