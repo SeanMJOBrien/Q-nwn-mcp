@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# UpdateMCP: bring this nwn-mcp checkout up to date and rebuild it.
+#
+#   ./UpdateMCP            pull the current branch, install packages, build
+#   ./UpdateMCP --check    only show whether an update is waiting (changes nothing)
+#
+# Run it from anywhere; it works on the folder it lives in. Afterwards, reconnect the MCP server in your client
+# (Claude Code: /mcp; other clients: restart the client or its MCP connection) so it loads the new build.
+
+set -euo pipefail
+
+cd "$(dirname "$0")"
+REPO="$(pwd)"
+
+say()  { printf '%s\n' "$*"; }
+fail() { printf 'UpdateMCP: %s\n' "$*" >&2; exit 1; }
+
+command -v git >/dev/null || fail "git is not installed."
+command -v npm >/dev/null || fail "npm (Node.js) is not installed. Install Node.js 20 or newer, then run this again."
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || fail "$REPO is not a git checkout."
+
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+[ "$NODE_MAJOR" -ge 20 ] || fail "Node.js 20 or newer is needed (found $(node -v 2>/dev/null || echo none))."
+
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+[ "$BRANCH" != "HEAD" ] || fail "the checkout is not on a branch (detached HEAD). Run: git checkout master"
+BEFORE="$(git rev-parse --short HEAD)"
+
+say "nwn-mcp in $REPO, branch $BRANCH, at $BEFORE"
+say "Fetching..."
+git fetch --quiet origin || fail "could not reach the remote (check the network or your git login)."
+
+UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+[ -n "$UPSTREAM" ] || fail "branch $BRANCH has no upstream. Run: git branch --set-upstream-to=origin/$BRANCH"
+BEHIND="$(git rev-list --count "HEAD..$UPSTREAM")"
+AHEAD="$(git rev-list --count "$UPSTREAM..HEAD")"
+
+if [ "${1:-}" = "--check" ]; then
+  if [ "$BEHIND" -gt 0 ]; then
+    say "$BEHIND new commit(s) on $UPSTREAM:"
+    git log --oneline "HEAD..$UPSTREAM"
+  else
+    say "Up to date with $UPSTREAM."
+  fi
+  exit 0
+fi
+
+# Local edits to tracked files would block or tangle the pull: stop and say which.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  say "You have local changes to these files:"
+  git status --short --untracked-files=no
+  fail "commit or stash them first (git stash), then run UpdateMCP again."
+fi
+[ "$AHEAD" -eq 0 ] || say "Note: $AHEAD local commit(s) not on $UPSTREAM; pulling only if it can fast-forward."
+
+if [ "$BEHIND" -gt 0 ]; then
+  say "Pulling $BEHIND new commit(s):"
+  git log --oneline "HEAD..$UPSTREAM"
+  git pull --ff-only --quiet || fail "the pull cannot fast-forward (your branch and $UPSTREAM have both changed). Ask for help or run: git pull --rebase"
+else
+  say "Already up to date with $UPSTREAM; rebuilding anyway."
+fi
+
+say "Installing packages..."
+npm install --no-audit --no-fund --loglevel=error || fail "npm install failed (see above)."
+
+say "Building..."
+npm run build --silent || fail "the build failed (see above). The previous build in dist/ may be incomplete; fix and run again."
+
+AFTER="$(git rev-parse --short HEAD)"
+say ""
+if [ "$BEFORE" != "$AFTER" ]; then say "Updated $BEFORE -> $AFTER and rebuilt."; else say "Rebuilt $AFTER."; fi
+say "Now reconnect the MCP server in your client (Claude Code: /mcp; other clients: restart the MCP connection)."
