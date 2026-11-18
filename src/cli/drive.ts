@@ -53,6 +53,8 @@ import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
 import { PHASES, type Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
 import { type PlotSpec, plotWarnings } from "../util/plot-spec.js";
+import { loadSettingsFile } from "../util/settings-file.js";
+import { SetupError, setupProblems } from "../util/setup-check.js";
 import { validateSpec } from "../util/spec-validate.js";
 
 const VALUE_FLAGS = new Set([
@@ -122,6 +124,13 @@ async function main(): Promise<void> {
   const mode = (flags.mode ?? "step").toLowerCase();
   if (mode !== "step" && mode !== "phase") finish(1, { ok: false, error: "--mode is step or phase" });
 
+  // The tools and game folders, before a model is asked anything: a missing tool otherwise fails every step.
+  loadSettingsFile();
+  const setup = setupProblems();
+  if (setup.length && !dryRun) {
+    finish(1, { ok: false, error: "The machine is not set up for building modules; nothing was run.", setup, fix: "Set the paths in nwn-mcp.env (see nwn-mcp.env.example) or the environment, then run again." });
+  }
+
   // One server for the whole run, with every tool: the driver decides per phase which ones the model sees.
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
@@ -178,11 +187,11 @@ async function main(): Promise<void> {
 
     if (dryRun && !flags.module) {
       // Nothing to load: describe the plan from the prompts alone.
-      await stop(0, { ok: true, dryRun: true, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name), mode)) });
+      await stop(0, { ok: true, dryRun: true, ...(setup.length ? { setup } : {}), ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name), mode)) });
     }
 
     if (flags.create) {
-      if (dryRun) await stop(0, { ok: true, dryRun: true, wouldCreate: flags.create, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name), mode)) });
+      if (dryRun) await stop(0, { ok: true, dryRun: true, ...(setup.length ? { setup } : {}), wouldCreate: flags.create, ...plotInfo, phases: phases.map((p) => planRow(p, allTools.map((t) => t.name), mode)) });
       const filename = flags.create.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
       const made = await host.callTool("create_module", { name: flags.create, filename });
       if (made.isError) await stop(1, { ok: false, error: `create_module: ${made.text.slice(0, 500)}` });
@@ -203,6 +212,7 @@ async function main(): Promise<void> {
       await stop(0, {
         ok: true,
         dryRun: true,
+        ...(setup.length ? { setup } : {}),
         adventureDir: dirInfo.dir,
         storyExists: dirInfo.files.story?.exists ?? false,
         ...plotInfo,
@@ -312,6 +322,9 @@ async function main(): Promise<void> {
         : { next: "All requested phases are done. The .mod is not built: build it with repack_module when you want to play." }),
     });
   } catch (e) {
+    if (e instanceof SetupError) {
+      await stop(1, { ok: false, error: e.message, setup: setupProblems(), fix: "Fix the setup (nwn-mcp.env or the environment), then run the same command again: finished phases are skipped." });
+    }
     await stop(1, { ok: false, error: (e as Error).message });
   }
 }

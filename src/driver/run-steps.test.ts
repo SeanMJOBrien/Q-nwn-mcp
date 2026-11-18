@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ChatMessage, ToolCall } from "./llm.js";
 import type { HostTool, ToolHost } from "./run-phase.js";
-import { plotBlock, promptSections, runPhaseSteps, stepCard } from "./run-steps.js";
+import { SetupError } from "../util/setup-check.js";
+import { plotBlock, promptSections, refusedFields, runPhaseSteps, stepCard } from "./run-steps.js";
 
 const str = { type: "string" };
 const tool = (name: string, properties: Record<string, { type: string }> = {}): HostTool => ({ name, description: name, inputSchema: { type: "object", properties, required: [] } });
@@ -94,6 +95,52 @@ describe("step mode", () => {
     expect(r.openSteps).toEqual(["areas.blackwater.create", "areas.millroad.create", "areas.section"]);
     expect(r.status).not.toBe("success");
     expect(log.filter((l) => l.startsWith("phase_check")).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("stops the run on a setup error instead of letting the model retry", async () => {
+    const log: string[] = [];
+    const host = fakeModule(log);
+    const base = host.callTool;
+    host.callTool = async (name, args) =>
+      name === "build_area" ? { text: JSON.stringify({ ok: false, error: "adventure_generate_layout: nwn_resman_extract failed: spawn /x/nwn_resman_extract ENOENT" }), isError: true } : base(name, args);
+    let turns = 0;
+    const chat = async (): Promise<ChatMessage> => {
+      turns++;
+      return { role: "assistant", content: "", tool_calls: [call("build_area", { spec: '{"resref":"blackwater"}' })] };
+    };
+    await expect(runPhaseSteps(host, chat, "areas")).rejects.toBeInstanceOf(SetupError);
+    expect(turns).toBe(1);
+  });
+
+  it("puts the field errors of earlier steps on the next step's card", async () => {
+    const lines = refusedFields("build_area", JSON.stringify({ ok: false, fields: [{ field: "features", message: "a list of feature group names" }, { field: "size", message: "is not a field; fields: resref, name" }] }), { spec: '{"features":"rural","size":"medium"}' });
+    expect(lines.map((l) => l.line)).toEqual(['build_area features: a list of feature group names (was "rural")', 'build_area size: is not a field (was "medium")']);
+    expect(refusedFields("build_area", "not json")).toEqual([]);
+
+    const log: string[] = [];
+    const host = fakeModule(log);
+    const base = host.callTool;
+    let refusedOnce = false;
+    host.callTool = async (name, args) => {
+      if (name === "build_area" && !refusedOnce) {
+        refusedOnce = true;
+        return { text: JSON.stringify({ ok: false, fields: [{ field: "features", message: "a list of feature group names" }] }), isError: true };
+      }
+      return base(name, args);
+    };
+    const cards: string[] = [];
+    const chat = async (messages: ChatMessage[]): Promise<ChatMessage> => {
+      const card = String(messages[1]?.content ?? "");
+      if (messages.length === 2) cards.push(card);
+      const done = messages.some((m) => m.role === "tool" && !m.content.includes('"ok":false'));
+      if (done) return { role: "assistant", content: "DONE" };
+      const r = /YOUR STEP: (\w+) created/.exec(card)?.[1];
+      if (r) return { role: "assistant", content: "", tool_calls: [call("build_area", { spec: JSON.stringify({ resref: r, features: "rural" }) })] };
+      return { role: "assistant", content: "", tool_calls: [call("write_story_section", { section: "Areas", text: "x" })] };
+    };
+    await runPhaseSteps(host, chat, "areas");
+    expect(cards[0]).not.toContain("Refused earlier");
+    expect(cards[1]).toContain('Refused earlier in this phase (do not repeat these mistakes):\n- build_area features: a list of feature group names (was "rural")');
   });
 
   it("splits a phase prompt into its sections and finds the plot block of a subject", () => {

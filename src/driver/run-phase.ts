@@ -8,6 +8,7 @@
 import { type Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
 import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
+import { isSetupError, SetupError } from "../util/setup-check.js";
 import { validateSpec } from "../util/spec-validate.js";
 import { coerceArgs, type JsonSchemaObject } from "./coerce.js";
 import type { Chat, ChatMessage, ToolCall, ToolSpec } from "./llm.js";
@@ -173,6 +174,11 @@ export async function runTool(
   if (problems.length) return refuse("Fix these fields and call the tool again.", { fields: problems.slice(0, 6) });
   const out = await host.callTool(call.name, args);
   log({ event: "tool", tool: call.name, args, isError: out.isError, result: out.text.slice(0, 800) });
+  // A missing tool or game folder: no argument fixes it, so the run stops here instead of the model retrying.
+  if (isSetupError(out.text)) {
+    log({ event: "setup_error", tool: call.name, error: out.text.slice(0, 400) });
+    throw new SetupError(call.name, out.text);
+  }
   return { text: out.footer ? `${out.text}\n\n${out.footer}` : out.text, isError: out.isError, refused: false, args, raw: out.text };
 }
 

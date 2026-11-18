@@ -76,6 +76,17 @@ async function exists(file: string): Promise<boolean> {
 }
 
 /**
+ * The adventure directory of a loaded module if it already exists, never creating one: the folder around the module's
+ * `build/` (a project loaded from its folder), else `<adventures>/<Title-With-Dashes>`.
+ */
+export async function findAdventureDir(index: { moduleName: string; modPath: string }): Promise<string | null> {
+  const buildDir = index.modPath ? path.dirname(index.modPath) : "";
+  const candidates = [...(path.basename(buildDir) === "build" ? [path.dirname(buildDir)] : []), path.join(adventureBase(), slugTitle(index.moduleName ?? ""))];
+  for (const dir of candidates) if (await exists(dir)) return dir;
+  return null;
+}
+
+/**
  * The adventure directory for a loaded module (created when missing). Any adventure file an earlier run left in the
  * module's temp dir is moved here unless the directory already has its own copy.
  */

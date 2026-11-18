@@ -271,6 +271,25 @@ describe("story tools and phase prompts", () => {
     }
   });
 
+  it("areas and environment end fail while the plot's areas are not built, whatever the story sections say", async () => {
+    const { c, close } = await client();
+    try {
+      const spec = JSON.parse(await fs.readFile(path.join(import.meta.dirname, "..", "..", "docs", "specs", "plot.example.json"), "utf8"));
+      await c.callTool({ name: "write_plot", arguments: { spec: JSON.stringify(spec) } });
+      await c.callTool({ name: "write_story_section", arguments: { section: "Areas", text: "### Start (_start)\n- **Tileset:** tms01" } });
+      await c.callTool({ name: "write_story_section", arguments: { section: "Environment", text: "### Start\n**Placeables:** none" } });
+      const areas = body(await c.callTool({ name: "phase_check", arguments: { phase: "areas", step: "end" } }));
+      expect(areas.status).toBe("partial");
+      expect((areas.errors as string[]).some((e) => e.startsWith("Step not done: Blackwater Village: area blackwater created"))).toBe(true);
+      expect((areas.errors as string[]).some((e) => e.includes("<-> The Mill Road connected"))).toBe(true);
+      const env = body(await c.callTool({ name: "phase_check", arguments: { phase: "environment", step: "end" } }));
+      expect(env.status).toBe("partial");
+      expect(env.errors as string[]).toContain("Blackwater Village: area blackwater does not exist; the areas phase must build it first.");
+    } finally {
+      await close();
+    }
+  });
+
   it("write_dm_guide writes the titled guide file", async () => {
     const { c, close } = await client();
     try {

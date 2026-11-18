@@ -1,5 +1,9 @@
 import path from "path";
 import os from "os";
+import { loadSettingsFile } from "./util/settings-file.js";
+
+// nwn-mcp.env (or NWN_MCP_ENV) fills any variable the environment leaves unset; read before the constants below.
+loadSettingsFile();
 
 /** Path where user-facing reports are saved. When unset, reports go to the module's temp directory. */
 export const MCP_FOLDER_USERREPORTS = process.env.MCP_FOLDER_USERREPORTS || "";

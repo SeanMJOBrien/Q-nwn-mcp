@@ -51,7 +51,7 @@ You build one area per location in the plot and connect them. The tools know the
 - One transition call connects both directions. Never call it twice for the same pair.
 - A transition `tag` is unique and at most 11 characters.
 - Do not paint tiles by hand and do not set fog amounts.
-- By hand, always pass `preferredFeatures` in the style; without it the area has no buildings or landmarks. In `build_area` the field is `features` (picked for you when left out).
+- `build_area` picks the feature groups (buildings, landmarks) itself: leave `features` out, or give a list of group names from `adventure_list_features`. Size is `width`/`height` (9-32 tiles), or leave it out. By hand, pass `preferredFeatures` in the layout style.
 
 ## Format of the section
 

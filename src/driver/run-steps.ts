@@ -78,6 +78,39 @@ export function plotBlock(plot: string, subject: string): string | undefined {
   return undefined;
 }
 
+/**
+ * The field errors in a failed tool result (`fields: [{field, message}]`, as build_area and the driver's spec check
+ * answer), each with the value the model gave, as lines for later step cards.
+ */
+export function refusedFields(tool: string, text: string, args?: Record<string, unknown>): Array<{ key: string; line: string }> {
+  let body: { fields?: Array<{ field?: string; message?: string }> };
+  try {
+    body = JSON.parse(text) as typeof body;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(body.fields)) return [];
+  let spec: Record<string, unknown> = {};
+  const raw = args?.spec;
+  if (raw && typeof raw === "object") spec = raw as Record<string, unknown>;
+  else if (typeof raw === "string") {
+    try {
+      spec = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      spec = {};
+    }
+  }
+  return body.fields
+    .filter((f) => f.field && f.message)
+    .map((f) => {
+      const field = f.field as string;
+      const given = spec[field] ?? args?.[field];
+      const was = given === undefined ? "" : ` (was ${clip(JSON.stringify(given), 60)})`;
+      const message = (f.message as string).replace(/; fields: .*/, "");
+      return { key: `${tool}.${field}.${message}`, line: `${tool} ${field}: ${message}${was}` };
+    });
+}
+
 /** The step card: everything the step needs and nothing else. */
 export function stepCard(o: {
   phase: Phase;
@@ -88,6 +121,8 @@ export function stepCard(o: {
   facts: string[];
   rules: string;
   format?: string;
+  /** Field errors earlier steps of this phase were refused with, so a fresh conversation does not repeat them. */
+  refused?: string[];
 }): string {
   const lines: string[] = [];
   if (o.goal) lines.push(`Adventure goal (the user's words): ${o.goal}`);
@@ -96,6 +131,7 @@ export function stepCard(o: {
   lines.push("", `YOUR STEP: ${o.step.step}`, `Do it with: ${o.step.call ?? "(see the rules)"}`);
   if (o.step.why) lines.push(`Why it is open: ${o.step.why}`);
   if (o.facts.length) lines.push("", "Facts:", ...o.facts);
+  if (o.refused?.length) lines.push("", "Refused earlier in this phase (do not repeat these mistakes):", ...o.refused.map((r) => `- ${r}`));
   if (o.format) lines.push("", o.format);
   if (o.rules) lines.push("", `Rules for this phase:\n${o.rules}`);
   lines.push("", "When the step is done, reply DONE.");
@@ -139,6 +175,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
   const attempts = new Map<string, number>();
   let runs = 0;
   let plot: string | undefined;
+  const refused = new Map<string, string>();
 
   while (runs < maxRuns) {
     const p = await progress();
@@ -170,7 +207,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
       const t = toolByName.get(n) as HostTool;
       return { name: t.name, description: t.description, parameters: t.inputSchema as Record<string, unknown> };
     });
-    const card = stepCard({ phase, step, openCount: open.length, goal: p.goal, decisions: p.decisions, facts, rules: isSection ? "" : rules, format: isSection ? format : undefined });
+    const card = stepCard({ phase, step, openCount: open.length, goal: p.goal, decisions: p.decisions, facts, rules: isSection ? "" : rules, format: isSection ? format : undefined, refused: [...refused.values()].slice(-8) });
     log({ event: "step", id: step.id, step: step.step, tools: names, cardChars: card.length });
 
     const messages: ChatMessage[] = [
@@ -194,6 +231,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
           messages.push({ role: "user", content: `That is the same failing call to ${call.name}. Change the field its error names, or reply DONE if the step cannot be done.` });
         }
         lastFailing = out.isError ? signature : "";
+        if (out.isError) for (const r of refusedFields(call.name, out.raw ?? out.text, out.args)) refused.set(r.key, r.line);
       }
     }
 

@@ -52,6 +52,8 @@ Each GFF resource is the `nwn_gff` JSON form (`-k json -p`, pretty, stable key o
 
 At write time record size and mtime of each temp file. Before the next write of that resource, if the file changed underneath, refuse and name the fix ("reload from the project") (B4). Direct edits are made to the project JSON, then `load_module` rebuilds the cache.
 
+**The project's own files are watched too (2026-11-18).** A second program can write the project while a server holds an older copy in memory: another server, the command-line runner (`node dist/cli/tool.js`, [tool-cli.md](tool-cli.md)), a script, an edit by hand. At load (and after each of its own writes) the server records size and mtime of every file under `src/`; before any write it compares them, and when one changed, was added or was removed, it writes nothing and answers with the files and the fix: `load_module(modPath: "<project>", force: true)`, which is safe because the server's own edits are already in the project. Seen on The Glowing Deep: a patch made outside the MCP while the server held Haiku's copy, whose next edit would have put the old files back (`util/project-sync.ts`, `refuseIfProjectChanged`).
+
 ## Hand-edited generated scripts
 
 A generated include that a person patched starts with `// hand-edited: <reason>`. Generators (`create_*_system`, `create_creature_level_system`, quest runtime) refuse to overwrite a file with this header unless `force: true`, and say which header line blocked them. `verify_all`'s stale-script check (`generated_script_stale`) skips marked files and reports them as `hand_edited` info.

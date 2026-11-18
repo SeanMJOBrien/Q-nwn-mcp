@@ -340,7 +340,11 @@ verify_all()   # walking reachability is on by default: object_unreachable / are
 `verify_all` checks the things a reference check cannot see: dialogs missing the fields
 the engine silently requires, dangling dialog link indices, weapons with no model,
 creatures with no perception handler, objects placed outside the walkable zone, quests
-with no End entry, and rewards that reach only one player in co-op.
+with no End entry, and rewards that reach only one player in co-op. It also reads the story and
+DM guide against the module: `guide_weapon_mismatch` (the text has a creature fight with a weapon
+it does not carry) and `story_unknown_tag` (a ``Name (`tag`)`` that names nothing built). Fix the
+text with `write_dm_guide` / `write_story_section` (or give the creature the weapon), then rebuild
+the DM books with `create_dm_area()`.
 
 **The module is shippable only when `shippable: true` (zero errors).**
 

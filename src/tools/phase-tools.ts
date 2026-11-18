@@ -331,6 +331,22 @@ export function registerPhaseTools(server: McpServer): void {
         }
       }
 
+      // Areas and environment: every checklist step of the phase must be done, so a phase that built nothing (a missing
+      // tool, a model that answered DONE) cannot pass on its story section alone.
+      if (p === "areas" || p === "environment") {
+        const facts = gatherModuleFacts(index, true, false);
+        const { items, outline } = buildChecklist(md, undefined, facts);
+        if (p === "environment") {
+          for (const l of outline?.locations ?? []) {
+            if (!facts.areas.has(l.resref)) errorList.push(`${l.name}: area ${l.resref} does not exist; the areas phase must build it first.`);
+          }
+        }
+        for (const it of items) {
+          if (it.phase !== p || it.done || it.id.endsWith(".section") || it.id.endsWith(".check")) continue;
+          errorList.push(`Step not done: ${it.label}${it.detail ? ` (${it.detail})` : ""}${it.call ? ` — ${it.call}` : ""}`);
+        }
+      }
+
       // The story graph (if the plot wrote one) is checked when the story is written and again at the polish pass.
       if (p === "plot" || p === "polish") {
         for (const f of verifyStory(parseStoryGraph(md), new Set(index.areas.keys()))) {

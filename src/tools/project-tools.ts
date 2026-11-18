@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireIndex } from "../module-loader.js";
 import { ensureAdventureDir } from "../util/adventure-dir.js";
 import { exportProject } from "../util/project.js";
+import { trackProject } from "../util/project-sync.js";
 
 export function registerProjectTools(server: McpServer): void {
   server.tool(
@@ -17,6 +18,7 @@ export function registerProjectTools(server: McpServer): void {
       const index = requireIndex();
       const projectDir = dir ?? (await ensureAdventureDir(index));
       const summary = await exportProject(index, projectDir);
+      await trackProject(projectDir);
       return { content: [{ type: "text" as const, text: JSON.stringify(summary, null, 2) }] };
     },
   );

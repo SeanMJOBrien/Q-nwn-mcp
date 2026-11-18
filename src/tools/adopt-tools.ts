@@ -17,6 +17,7 @@ import { filterForPhase, PHASES, type Phase } from "../util/phase-check.js";
 import { parseStoryGraph, verifyStory } from "../util/story-graph.js";
 import type { VerifyResult } from "../util/verify/common.js";
 import { collectVerifyResults } from "./verify-tools.js";
+import { trackProject } from "../util/project-sync.js";
 
 function text(body: unknown, isError = false) {
   return { content: [{ type: "text" as const, text: JSON.stringify(body, null, 2) }], ...(isError ? { isError: true } : {}) };
@@ -85,6 +86,7 @@ export function registerAdoptTools(server: McpServer): void {
       // The module becomes a project (docs/module-projects.md): every resource as JSON beside the story files.
       const hadProject = await isProjectDir(dir);
       const project = await exportProject(index, dir);
+      await trackProject(dir);
       return text({
         ok: true,
         file,

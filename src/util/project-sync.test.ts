@@ -30,6 +30,27 @@ afterEach(async () => {
 });
 
 describe("project sync", () => {
+  it("refuses to write while another program has changed the project, until it is reloaded", async () => {
+    const { afterWrite, beforeWrite, trackAll, projectChangesOutside } = await import("./project-sync.js");
+    const f = path.join(index.tempDir, "a.nss");
+    await fs.writeFile(f, "v1");
+    index.resources.set("a.nss", { resref: "a", extension: "nss", filePath: f, sizeBytes: 2 });
+    await afterWrite(f); // creates the project and records it
+    await trackAll(index); // a load of the module: baseline of the project
+    await beforeWrite(f); // nothing changed: allowed
+    await afterWrite(f); // its own write does not count as an outside change
+    expect(await projectChangesOutside()).toEqual({ changed: [], added: [], removed: [] });
+    const proj = path.join(dir, "adv", "Demo");
+    await new Promise((r) => setTimeout(r, 15));
+    await fs.writeFile(path.join(proj, "src/nss/a.nss"), "patched elsewhere");
+    await fs.writeFile(path.join(proj, "src/nss/z.nss"), "new elsewhere");
+    expect(await projectChangesOutside()).toEqual({ changed: ["src/nss/a.nss"], added: ["src/nss/z.nss"], removed: [] });
+    await expect(beforeWrite(f)).rejects.toThrow(/changed outside this server.*load_module/s);
+    expect(await fs.readFile(path.join(proj, "src/nss/a.nss"), "utf-8")).toBe("patched elsewhere");
+    await trackAll(index); // load_module again
+    await expect(beforeWrite(f)).resolves.toBeUndefined();
+  });
+
   it("first write creates the project, later writes update one resource", async () => {
     const { afterWrite } = await import("./project-sync.js");
     const f = path.join(index.tempDir, "a.nss");

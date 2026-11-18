@@ -10,6 +10,7 @@ import { lenientShape } from "./lenient-args.js";
 type Shape = Record<string, z.ZodType>;
 type Handler = (args: Record<string, unknown>, extra: unknown) => unknown;
 interface Recorded {
+  description: string;
   shape: Shape;
   annotations?: { readOnlyHint?: boolean };
   handler: Handler;
@@ -31,10 +32,10 @@ export function recordTools<T extends { tool: (...args: any[]) => unknown }>(ser
       if (prop === "tool") {
         return (name: string, ...rest: unknown[]) => {
           const args = [...rest];
-          if (typeof args[0] === "string") args.shift();
+          const description = typeof args[0] === "string" ? (args.shift() as string) : "";
           const shape = (args.length > 1 && typeof args[0] === "object" ? args.shift() : {}) as Shape;
           const annotations = (args.length > 1 ? args.shift() : undefined) as Recorded["annotations"];
-          registry.set(name, { shape, annotations, handler: args[0] as Handler });
+          registry.set(name, { description, shape, annotations, handler: args[0] as Handler });
           return target.tool(name, ...rest);
         };
       }
@@ -46,6 +47,13 @@ export function recordTools<T extends { tool: (...args: any[]) => unknown }>(ser
 
 export function isReadOnlyTool(name: string): boolean {
   return registry.get(name)?.annotations?.readOnlyHint === true;
+}
+
+/** Every recorded tool, sorted by name. */
+export function recordedTools(): Array<{ name: string; description: string; params: string[] }> {
+  return [...registry.entries()]
+    .map(([name, r]) => ({ name, description: r.description, params: Object.keys(r.shape) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function hasTool(name: string): boolean {

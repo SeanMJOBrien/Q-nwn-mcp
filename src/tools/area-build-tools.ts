@@ -209,13 +209,62 @@ interface AreaSpec {
   safeMode?: boolean;
   seed?: number | string;
   genericDoor?: string;
+  /** What checkAreaSpec changed in the given spec (aliases, a string for a list, a size word, a clamped size). */
+  adjusted?: string[];
+}
+
+/** Size words small models use instead of width/height, in tiles. */
+const SIZE_WORDS: Record<string, number> = { tiny: 9, small: 9, medium: 12, large: 16, huge: 20 };
+/** Field names small models use for a spec field. */
+const SPEC_ALIASES: Record<string, string> = { preferredFeatures: "features", feature: "features", featureGroups: "features", type: "style" };
+
+/**
+ * Turn what a small model writes into the spec's shape before checking it: a field alias, a string where a list goes,
+ * size: "medium" for width and height, a width outside 9-32 brought into range. Each change is reported back.
+ */
+function normaliseAreaSpec(o: Record<string, unknown>): { o: Record<string, unknown>; adjusted: string[] } {
+  const out: Record<string, unknown> = { ...o };
+  const adjusted: string[] = [];
+  for (const [alias, field] of Object.entries(SPEC_ALIASES)) {
+    if (out[alias] === undefined) continue;
+    if (out[field] === undefined) {
+      out[field] = out[alias];
+      adjusted.push(`${alias} read as ${field}`);
+    } else adjusted.push(`${alias} ignored (${field} is given)`);
+    delete out[alias];
+  }
+  if (typeof out.features === "string") {
+    out.features = out.features.split(",").map((f) => f.trim()).filter(Boolean);
+    adjusted.push("features given as text, read as a list");
+  }
+  if (out.size !== undefined) {
+    const word = String(out.size).toLowerCase().trim();
+    const m = /^(\d+)\s*x\s*(\d+)$/.exec(word);
+    const n = SIZE_WORDS[word] ?? (/^\d+$/.test(word) ? Number(word) : undefined);
+    if (m || n !== undefined) {
+      if (out.width === undefined) out.width = m ? Number(m[1]) : n;
+      if (out.height === undefined) out.height = m ? Number(m[2]) : n;
+      adjusted.push(`size "${out.size}" read as ${out.width}x${out.height} tiles`);
+      delete out.size;
+    }
+  }
+  for (const k of ["width", "height"]) {
+    const v = out[k] === undefined ? undefined : Number(out[k]);
+    if (v === undefined || !Number.isInteger(v)) continue;
+    const c = Math.min(32, Math.max(MIN_SINGLE_ROOM_AREA_SIZE, v));
+    if (c !== v) {
+      out[k] = c;
+      adjusted.push(`${k} ${v} raised or lowered to ${c} (areas are ${MIN_SINGLE_ROOM_AREA_SIZE}-32 tiles)`);
+    }
+  }
+  return { o: out, adjusted };
 }
 
 const SPEC_FIELDS = ["resref", "name", "tileset", "style", "biome", "purpose", "events", "travel", "width", "height", "rooms", "features", "connections", "safeMode", "seed", "genericDoor"];
 
 export function checkAreaSpec(raw: unknown): { spec: AreaSpec } | { errors: Array<{ field: string; message: string }> } {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { errors: [{ field: "spec", message: "must be a JSON object" }] };
-  const o = raw as Record<string, unknown>;
+  const { o, adjusted } = normaliseAreaSpec(raw as Record<string, unknown>);
   const errors: Array<{ field: string; message: string }> = [];
   for (const k of Object.keys(o)) if (!SPEC_FIELDS.includes(k)) errors.push({ field: k, message: `is not a field; fields: ${SPEC_FIELDS.join(", ")}` });
   const str = (k: string) => (typeof o[k] === "string" ? (o[k] as string).trim() : undefined);
@@ -254,6 +303,7 @@ export function checkAreaSpec(raw: unknown): { spec: AreaSpec } | { errors: Arra
       ...(o.safeMode !== undefined ? { safeMode: o.safeMode === true || o.safeMode === "true" } : {}),
       ...(o.seed !== undefined ? { seed: o.seed as number | string } : {}),
       ...(str("genericDoor") ? { genericDoor: str("genericDoor") } : {}),
+      ...(adjusted.length ? { adjusted } : {}),
     },
   };
 }
@@ -264,7 +314,7 @@ async function buildArea(spec: AreaSpec) {
   const style = spec.style ?? recipe?.style ?? "rural";
   const biome = spec.biome ?? recipe?.biome ?? "rural";
   const done: string[] = [];
-  const notes: string[] = [];
+  const notes: string[] = [...(spec.adjusted ?? [])];
   const fail = (step: string, error: string) =>
     json({ ok: false, failedAt: step, error, done, next: done.includes("create_area") ? "Fix the field the error names and call build_area again: it reuses the empty area it created." : "Fix the field the error names and call build_area again." }, true);
 
@@ -305,11 +355,16 @@ async function buildArea(spec: AreaSpec) {
 
   // 2. feature groups
   let features = spec.features;
-  if (!features?.length && !spec.safeMode) {
+  if (!spec.safeMode) {
     const listed = await callTool("adventure_list_features", { tileset: spec.tileset, style });
     const groups = (listed.json?.features as Array<{ name: string; columns?: number; rows?: number }> | undefined) ?? [];
-    features = pickFeatures(groups, `${spec.name} ${spec.purpose ?? ""}`, 4);
     done.push("adventure_list_features");
+    // A name that is no feature group of the tileset (a model's "village", "forest") becomes a word for choosing groups.
+    const byLower = new Map(groups.map((g) => [g.name.toLowerCase(), g.name]));
+    const known = (features ?? []).map((f) => byLower.get(f.toLowerCase())).filter((f): f is string => !!f);
+    const words = (features ?? []).filter((f) => !byLower.has(f.toLowerCase()));
+    if (groups.length && words.length) notes.push(`${words.join(", ")}: no feature group of ${spec.tileset} by that name; used as words for choosing groups`);
+    features = known.length ? known : groups.length ? pickFeatures(groups, `${spec.name} ${spec.purpose ?? ""} ${words.join(" ")}`, 4) : features;
   }
 
   // 3. layout
@@ -486,7 +541,7 @@ function parseList<T>(raw: string | undefined, field: string): T[] | { error: st
 export function registerAreaBuildTools(server: McpServer): void {
   server.tool(
     "build_area",
-    'Build one area from a short spec, in one call: picks the size (suggest_area_size) and feature groups (adventure_list_features) when not given, generates the layout, creates the area, applies the terrain, places the tile doors and sets music, sound and sky for the tileset. spec: {"resref":"millroad","name":"The Mill Road","tileset":"ttr01","connections":2} plus optional style, biome, purpose (inn, shop, home... for interiors), events (number of encounters/conversations, default 2), travel (true = long road), width, height, rooms, features (group names), safeMode, seed, genericDoor. Answers with the transition points for connecting it (also kept for get_area_card). On a failure it names the step and field; call it again: an empty area it created is reused.',
+    'Build one area from a short spec, in one call: picks the size (suggest_area_size) and feature groups (adventure_list_features) when not given, generates the layout, creates the area, applies the terrain, places the tile doors and sets music, sound and sky for the tileset. spec: {"resref":"millroad","name":"The Mill Road","tileset":"ttr01","connections":2} plus optional style, biome, purpose (inn, shop, home... for interiors), events (number of encounters/conversations, default 2), travel (true = long road), width, height (9-32 tiles; or size: small, medium, large), rooms, features (group names from adventure_list_features; other words only steer the choice), safeMode, seed, genericDoor. Answers with the transition points for connecting it (also kept for get_area_card). On a failure it names the step and field; call it again: an empty area it created is reused.',
     {
       spec: z.string().describe('The area as a JSON object, e.g. {"resref":"millroad","name":"The Mill Road","tileset":"ttr01","connections":2}'),
     },

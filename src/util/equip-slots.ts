@@ -1,3 +1,5 @@
+import type { GffObj } from "../types/gff.js";
+
 /**
  * Equipment slot constants shared between blueprint creation and creature equipment tools.
  */
@@ -18,3 +20,10 @@ export const EQUIP_SLOT_MAP: Record<string, number> = {
 export const EQUIP_SLOT_NAMES: Record<number, string> = Object.fromEntries(
   Object.entries(EQUIP_SLOT_MAP).map(([name, id]) => [id, name]),
 );
+
+/** Equipped items in the wearable slots (claws, bite and hide are the creature's body, not gear). */
+export function hasWornGear(obj: GffObj): boolean {
+  const body = new Set([EQUIP_SLOT_MAP.cweapon_l, EQUIP_SLOT_MAP.cweapon_r, EQUIP_SLOT_MAP.cweapon_b, EQUIP_SLOT_MAP.hide]);
+  const list = (obj.Equip_ItemList as { value?: GffObj[] } | undefined)?.value ?? [];
+  return list.some((e) => !body.has(e.__struct_id as number));
+}

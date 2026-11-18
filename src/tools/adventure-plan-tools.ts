@@ -12,6 +12,7 @@ import { BIOMES } from "../util/area-size.js";
 import { planAdventureShape } from "../util/adventure-shape.js";
 import { toI } from "../util/params.js";
 import { parseStoryGraph, verifyStory } from "../util/story-graph.js";
+import { checkGuideFacts, storyTexts } from "../util/verify/guide-facts.js";
 
 export function registerAdventurePlanTools(server: McpServer): void {
   server.tool(
@@ -33,7 +34,7 @@ export function registerAdventurePlanTools(server: McpServer): void {
 
   server.tool(
     "verify_story",
-    "Check the story graph in adventure.md (lines like `- beat B1 | title: … | act: setup | area: village | leads: B2, B3 | gives: clue | needs: clue` and `- thread T1 | title: … | planted: B1 | paid: B7`): every beat reachable from the first, every lead and area exists, an ending exists, every needed clue is given (warns when only one beat gives it), and every thread's payoff can be reached from where it is planted. No graph is a warning, not an error.",
+    "Check the story graph in adventure.md (lines like `- beat B1 | title: … | act: setup | area: village | leads: B2, B3 | gives: clue | needs: clue` and `- thread T1 | title: … | planted: B1 | paid: B7`): every beat reachable from the first, every lead and area exists, an ending exists, every needed clue is given (warns when only one beat gives it), and every thread's payoff can be reached from where it is planted. Also checks the story and DM guide against the module: a weapon the text gives a creature that it does not carry (guide_weapon_mismatch), a Name (`tag`) the module lacks (story_unknown_tag). No graph is a warning, not an error.",
     {},
     { readOnlyHint: true, idempotentHint: true },
     async () => {
@@ -46,6 +47,7 @@ export function registerAdventurePlanTools(server: McpServer): void {
       }
       const graph = parseStoryGraph(md);
       const findings = verifyStory(graph, new Set(index.areas.keys()));
+      for (const f of checkGuideFacts(index, await storyTexts(index))) findings.push({ level: "warning", code: f.code, message: f.message });
       const errors = findings.filter((f) => f.level === "error");
       return {
         content: [

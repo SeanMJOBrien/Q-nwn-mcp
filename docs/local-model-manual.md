@@ -18,6 +18,13 @@ the first runs as a trial and keep the logs (section 8).
   export NWN_FOLDER_USER=/home/qlippoth/nwn-data/user
   ```
 
+  Or put the same three lines (without `export`) in `nwn-mcp.env` in the repository ([tool-cli.md](tool-cli.md),
+  "Settings"). The driver checks them before it asks the model anything: every path must exist, the tools folder must
+  hold `nwn_erf`, `nwn_gff`, `nwn_resman_extract`, `nwn_resman_cat`, `nwn_script_comp`, `nwn_tlk` and `nwn_twoda`
+  (plus `libnwnscriptcomp.so` / `.dylib` beside the compiler), and the game folder must hold `data/nwn_base.key`. On a
+  problem it stops with `setup: [...]` naming each one; `--dry-run` lists the same problems without stopping. Copy the
+  whole tools folder; on macOS clear the quarantine flag afterwards (`xattr -dr com.apple.quarantine <folder>`).
+
 - A model endpoint that supports tool calls. For Ollama:
 
   ```
@@ -79,8 +86,14 @@ For each phase, in order:
    from a step it has just been handed. A step still open after two tries is left open and the run moves on.
    **Phase mode** (plot, polish, rewards, or `--mode phase`): one conversation per phase, with the short instruction
    sheet and all the phase's tools.
-3. It checks every tool call before running it and refuses a bad one with the name of the wrong field.
-4. It lets the phase check decide when the phase is done. In step mode, a failed check gets one repair pass in phase
+3. It checks every tool call before running it and refuses a bad one with the name of the wrong field. A field error
+   a step was refused with is listed on the cards of the phase's later steps ("Refused earlier in this phase"), so a
+   fresh conversation does not make the same mistake. A tool that fails because of the machine's setup (a missing
+   tool: `spawn ... ENOENT`, a game folder not set) stops the whole run at once with the setup problems; changing
+   arguments cannot fix that.
+4. It lets the phase check decide when the phase is done. For areas and environment the check also requires every
+   checklist step of the phase (each plot location built and laid out, each connection made, the start moved off
+   `_start`; each area dressed and pinned), so a phase where nothing was built cannot pass on its story section. In step mode, a failed check gets one repair pass in phase
    mode with the errors. In phase mode, if the model stops early, the driver runs the check and hands the first five
    errors back.
 5. It gives up on a phase after 3 failed checks or 60 model turns, and stops the run, because later phases depend on

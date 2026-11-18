@@ -1,4 +1,5 @@
 import { withLenientArgs } from "./util/lenient-args.js";
+import { setupProblems } from "./util/setup-check.js";
 import { SERVER_INSTRUCTIONS } from "./util/no-module-guide.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -30,6 +31,7 @@ const transport = new StdioServerTransport();
 await server.connect(transport);
 
 // Log to stderr (stdout is reserved for MCP protocol)
+for (const problem of setupProblems()) console.error(`setup: ${problem}`);
 console.error(
   `${profile ? `NWN MCP server started (tool profile: ${profile.names.join(",")})` : "NWN MCP server started"}${shaping.footer ? ", progress line on" : ""}${shaping.limit ? `, long results kept above ${shaping.limit} characters` : ""}`,
 );

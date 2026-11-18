@@ -820,7 +820,7 @@ export function registerNpcTools(server: McpServer): void {
 
       const recommendedWeapon =
         !equipMap.righthand && resolvedClassId !== undefined
-          ? pickWeaponPreference(resolvedClassId, creatureSeed(creature))
+          ? pickWeaponPreference(resolvedClassId, creatureSeed(creature), getFieldNum(creature, "Race"))
           : undefined;
       const budget =
         resolvedLevel !== undefined ? budgetBreakdown(resolvedLevel, (role as GearRole) ?? "pc") : undefined;

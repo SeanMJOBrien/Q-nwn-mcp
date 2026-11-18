@@ -223,6 +223,28 @@ describe("verifyCreature", () => {
     expect(await codes({ Lootable: { type: "byte", value: 0 } }, "x0_ch_hen_conv")).not.toContain("lootable_flag_off");
     const marked = { Lootable: { type: "byte", value: 0 }, VarTable: { type: "list", value: [{ __struct_id: 0, Name: { type: "cexostring", value: "LOOT_INTENTIONAL" }, Type: { type: "dword", value: 1 }, Value: { type: "int", value: 1 } }] } };
     expect(await codes(marked)).not.toContain("lootable_flag_off");
+    // a bite or claws is the creature's body, not gear: a dog is not flagged
+    const bite = { Lootable: { type: "byte", value: 0 }, Equip_ItemList: { type: "list", value: [{ __struct_id: 0x8000 << 1, TemplateResRef: { type: "resref", value: "nw_it_crewpb005" } }] } };
+    const report = new Report("t", "utc");
+    await verifyCreature(report, makeIndex(), makeCreature("nw_c2_default", bite));
+    expect(report.warnings.map((w) => w.code)).not.toContain("lootable_flag_off");
+  });
+
+  it("checks the voice gender only for male and female creatures, and the skill cap only for PC classes", async () => {
+    const soundset = twoDA(["RESREF", "GENDER"], [[27, { RESREF: "c_dog", GENDER: "0" }]]);
+    const classes = twoDA(["PlayerClass"], [[12, { PlayerClass: "0" }]]);
+    const codes = async (extra: Record<string, unknown>) => {
+      const report = new Report("t", "utc");
+      await verifyCreature(report, makeIndex({ twodaTables: new Map([["soundset", soundset], ["classes", classes]]) }), makeCreature("nw_c2_default", extra));
+      return report.warnings.map((w) => w.code);
+    };
+    expect(await codes({ SoundSetFile: { type: "word", value: 27 }, Gender: { type: "byte", value: 1 } })).toContain("soundset_gender_mismatch");
+    expect(await codes({ SoundSetFile: { type: "word", value: 27 }, Gender: { type: "byte", value: 2 } })).not.toContain("soundset_gender_mismatch");
+    const goblin = {
+      ClassList: { type: "list", value: [{ __struct_id: 2, Class: { type: "int", value: 12 }, ClassLevel: { type: "short", value: 1 } }] },
+      SkillList: { type: "list", value: [{ __struct_id: 0, Rank: { type: "byte", value: 6 } }] },
+    };
+    expect(await codes(goblin)).not.toContain("skill_rank_over_cap");
   });
 
   it("a forged creature's CR is compared with its MCP_LEVEL target, not its level-1 build", async () => {

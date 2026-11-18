@@ -84,6 +84,21 @@ describe("build_area spec and recipes", () => {
     if ("errors" in bad) expect(bad.errors.map((e) => e.field).sort()).toEqual(["colour", "name", "resref", "style"]);
   });
 
+  it("reads what small models write: aliases, a string for the list, size words, sizes out of range", () => {
+    const r = checkAreaSpec({ resref: "blackwater", name: "Blackwater", tileset: "ttr01", preferredFeatures: "village, Well", size: "medium" });
+    expect("spec" in r).toBe(true);
+    if (!("spec" in r)) return;
+    expect(r.spec.features).toEqual(["village", "Well"]);
+    expect([r.spec.width, r.spec.height]).toEqual([12, 12]);
+    expect(r.spec.adjusted?.join(" | ")).toContain("preferredFeatures read as features");
+    const small = checkAreaSpec({ resref: "millroad", name: "Road", tileset: "ttf01", width: 8, height: 40 });
+    expect("spec" in small && [small.spec.width, small.spec.height]).toEqual([9, 32]);
+    const both = checkAreaSpec({ resref: "millroad", name: "Road", tileset: "ttf01", features: ["A"], preferredFeatures: ["B"] });
+    expect("spec" in both && both.spec.features).toEqual(["A"]);
+    const word = checkAreaSpec({ resref: "millroad", name: "Road", tileset: "ttf01", size: "enormous" });
+    expect("errors" in word && word.errors.map((e) => e.field)).toEqual(["size"]);
+  });
+
   it("knows the style, biome and music of the usual tilesets", () => {
     expect(AREA_RECIPES.ttf01.style).toBe("forest");
     expect(AREA_RECIPES.tin01.biome).toBe("interior");
