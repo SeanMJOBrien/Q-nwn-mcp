@@ -28,6 +28,7 @@ import { snapshotGitForUndo } from "../util/undo.js";
 import { checkCollision } from "../util/collision.js";
 import { COLLISION_FIX, WALK_FIX } from "../util/placement-hints.js";
 import { placeCreatureCore } from "../util/creature-placer.js";
+import { notFoundText } from "../util/blueprint-hint.js";
 import {
   compassToOrientation,
   orientationToCompass,
@@ -218,7 +219,7 @@ export function registerPlacementTools(server: McpServer): void {
       // Resolve blueprint
       const utp = await resolveBlueprint(index, blueprint, "utp", resmanOpts);
       if (!utp) {
-        return { isError: true, content: [{ type: "text", text: `Blueprint not found: ${blueprint}.utp` }] };
+        return { isError: true, content: [{ type: "text", text: await notFoundText("utp", blueprint) }] };
       }
 
       const obj = utp as GffObj;

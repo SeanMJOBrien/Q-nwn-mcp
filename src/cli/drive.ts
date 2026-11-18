@@ -253,6 +253,16 @@ async function main(): Promise<void> {
       say("wrote the Module section");
     }
 
+    // The goal: a driver run builds the adventure from the plot or the idea; record
+    // it so get_progress does not keep asking for it.
+    if (!dirInfo.files.scope?.exists) {
+      const goal = plot?.premise ?? flags.idea ?? `Build the adventure "${flags.create ?? path.basename(dirInfo.dir).replace(/-/g, " ")}"`;
+      // Always the whole adventure: --phases picks this run's phases, not the build's (some_phases would skip the rest
+      // in every later run).
+      const scoped = await host.callTool("set_project_scope", { kind: "whole_adventure", scope: goal });
+      if (!scoped.isError) say("recorded the goal from the plot or idea");
+    }
+
     const logDir = flags.log ?? path.join(dirInfo.dir, "driver-log");
     fs.mkdirSync(logDir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");

@@ -131,7 +131,7 @@ export function registerResmanTools(server: McpServer): void {
     "Search for blueprints across the full resman stack (base game + HAKs + module) by resref, tag, or display name (including TLK-resolved names). Returns type-specific summaries.",
     {
       type: z.enum(["utc", "uti", "utp", "utd", "utm", "ute"]).describe("Blueprint type to search"),
-      pattern: z.string().describe("Search term — matches against resref, tag, and display name"),
+      pattern: z.string().describe("Search term — matches against resref, tag, and display name; a comma list searches each word"),
       limit: z.string().optional().describe("Max results to return (default 20, max 50)"),
     },
     { readOnlyHint: true, idempotentHint: true },
@@ -139,54 +139,14 @@ export function registerResmanTools(server: McpServer): void {
       const index = requireIndex();
       const resman = await buildResmanOptions(index);
       const maxResults = Math.min(Math.max(toI(limit) || 20, 1), 50);
-      const searchLower = searchPattern.toLowerCase();
-
       const hitResrefs = new Set<string>();
-
-      // Layer 1: Resref name search
-      try {
-        const output = await resmanGrep({ ...resman, pattern: searchLower, details: true });
-        for (const line of output.trim().split("\n").filter(Boolean)) {
-          const match = line.match(/^(\S+)/);
-          if (match && match[1].toLowerCase().endsWith(`.${bpType}`)) {
-            hitResrefs.add(match[1].toLowerCase());
-          }
-        }
-      } catch { /* no matches */ }
-
-      // Layer 2: Binary content search (finds tags and hardcoded locstring names)
-      try {
-        const output = await resmanGrep({ ...resman, binary: searchPattern, details: true });
-        for (const line of output.trim().split("\n").filter(Boolean)) {
-          const match = line.match(/^(\S+)/);
-          if (match && match[1].toLowerCase().endsWith(`.${bpType}`)) {
-            hitResrefs.add(match[1].toLowerCase());
-          }
-        }
-      } catch { /* no matches */ }
-
-      // Layer 3: TLK name search — find strrefs containing the search term, then find blueprints referencing them
-      const matchingStrrefs: number[] = [];
-      if (index.baseTlk) {
-        for (const [strref, text] of index.baseTlk) {
-          if (text.toLowerCase().includes(searchLower)) {
-            matchingStrrefs.push(strref);
-            if (matchingStrrefs.length >= 100) break; // cap TLK search
-          }
-        }
-      }
-      if (index.customTlk) {
-        for (const [strref, text] of index.customTlk) {
-          if (text.toLowerCase().includes(searchLower)) {
-            matchingStrrefs.push(strref + 0x01000000); // custom TLK offset
-            if (matchingStrrefs.length >= 100) break;
-          }
-        }
-      }
-      // Binary-grep for strref references in GFF files (strrefs stored as decimal in JSON-serialized GFF)
-      for (const strref of matchingStrrefs.slice(0, 10)) { // limit to 10 TLK greps
+      // A comma list searches each word ("plc_campfr,plc_box1,plc_barrel").
+      const terms = searchPattern.split(",").map((t) => t.trim()).filter(Boolean);
+      for (const term of terms.length ? terms : [searchPattern]) {
+        const searchLower = term.toLowerCase();
+        // Layer 1: Resref name search
         try {
-          const output = await resmanGrep({ ...resman, binary: String(strref), details: true });
+          const output = await resmanGrep({ ...resman, pattern: searchLower, details: true });
           for (const line of output.trim().split("\n").filter(Boolean)) {
             const match = line.match(/^(\S+)/);
             if (match && match[1].toLowerCase().endsWith(`.${bpType}`)) {
@@ -194,6 +154,48 @@ export function registerResmanTools(server: McpServer): void {
             }
           }
         } catch { /* no matches */ }
+
+        // Layer 2: Binary content search (finds tags and hardcoded locstring names)
+        try {
+          const output = await resmanGrep({ ...resman, binary: term, details: true });
+          for (const line of output.trim().split("\n").filter(Boolean)) {
+            const match = line.match(/^(\S+)/);
+            if (match && match[1].toLowerCase().endsWith(`.${bpType}`)) {
+              hitResrefs.add(match[1].toLowerCase());
+            }
+          }
+        } catch { /* no matches */ }
+
+        // Layer 3: TLK name search — find strrefs containing the search term, then find blueprints referencing them
+        const matchingStrrefs: number[] = [];
+        if (index.baseTlk) {
+          for (const [strref, text] of index.baseTlk) {
+            if (text.toLowerCase().includes(searchLower)) {
+              matchingStrrefs.push(strref);
+              if (matchingStrrefs.length >= 100) break; // cap TLK search
+            }
+          }
+        }
+        if (index.customTlk) {
+          for (const [strref, text] of index.customTlk) {
+            if (text.toLowerCase().includes(searchLower)) {
+              matchingStrrefs.push(strref + 0x01000000); // custom TLK offset
+              if (matchingStrrefs.length >= 100) break;
+            }
+          }
+        }
+        // Binary-grep for strref references in GFF files (strrefs stored as decimal in JSON-serialized GFF)
+        for (const strref of matchingStrrefs.slice(0, 10)) { // limit to 10 TLK greps
+          try {
+            const output = await resmanGrep({ ...resman, binary: String(strref), details: true });
+            for (const line of output.trim().split("\n").filter(Boolean)) {
+              const match = line.match(/^(\S+)/);
+              if (match && match[1].toLowerCase().endsWith(`.${bpType}`)) {
+                hitResrefs.add(match[1].toLowerCase());
+              }
+            }
+          } catch { /* no matches */ }
+        }
       }
 
       if (hitResrefs.size === 0) {

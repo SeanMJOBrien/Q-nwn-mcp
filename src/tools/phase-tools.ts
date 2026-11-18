@@ -19,6 +19,7 @@ import type { GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import { isContainerPlaceable } from "../util/containers.js";
 import { DM_AREA_RESREF } from "../util/dm-books.js";
+import { draftStorySection } from "./area-build-tools.js";
 import { type AreaFacts, buildChecklist, type ModuleFacts, nextStep, type PhaseStatus, type ProgressItem, recentNotes, renderProgress } from "../util/progress.js";
 import {
   clearScopeFields,
@@ -460,18 +461,26 @@ export function registerPhaseTools(server: McpServer): void {
 
   server.tool(
     "write_story_section",
-    "Write one `## Section` of the story file (adventure.md): replaces the section when it exists, appends it otherwise, and leaves every other section untouched. Each phase writes its own section this way before phase_check(step: \"end\"). Give the section body only, without the `## Name` heading.",
+    "Write one `## Section` of the story file (adventure.md): replaces the section when it exists, appends it otherwise, and leaves every other section untouched. Each phase writes its own section this way before phase_check(step: \"end\"). Give the section body only, without the `## Name` heading. For Areas and Environment pass draft: true instead of writing it: the tool writes the section from what the module really holds (sizes, features, exits; placeables, containers, sounds, map pins), and any text you give is added below.",
     {
       section: z.string().describe("Section name: Module, Plot, Areas, Environment, Actors, Quests, Challenges, Affordances, Polish or Rewards"),
-      text: z.string().describe("The section body in markdown (sub-headings start at ###)"),
+      text: z.string().optional().describe("The section body in markdown (sub-headings start at ###); with draft, notes added below the drafted part"),
+      draft: z.boolean().optional().describe("Areas or Environment only: write the section from the module's real state"),
     },
     { idempotentHint: true },
-    async ({ section, text: body }) => {
+    async ({ section, text: given, draft }) => {
       const index = requireIndex();
       const name = section.replace(/^#+\s*/, "").trim();
       const known = ["Module", ...Object.values(OWN_SECTION)];
       const canonical = known.find((k) => k.toLowerCase() === name.toLowerCase());
       if (!canonical) return text({ ok: false, field: "section", error: `"${section}" is not a story section. Use one of: ${known.join(", ")}` }, true);
+      let body = given ?? "";
+      if (draft) {
+        if (canonical !== "Areas" && canonical !== "Environment") return text({ ok: false, field: "draft", error: "draft works for the Areas and Environment sections only; write this one with text." }, true);
+        const drafted = await draftStorySection(index, canonical);
+        if (!drafted) return text({ ok: false, field: "draft", error: "The module has no story areas yet: build them first (build_area)." }, true);
+        body = given?.trim() ? `${drafted}\n\n${stripOwnHeading(canonical, given)}` : drafted;
+      }
       const clean = stripOwnHeading(canonical, body);
       if (!clean) return text({ ok: false, field: "text", error: "The section text is empty." }, true);
       if (/^##\s/m.test(clean)) return text({ ok: false, field: "text", error: "The text contains a `## ` heading. Write one section per call and start sub-headings at ###." }, true);

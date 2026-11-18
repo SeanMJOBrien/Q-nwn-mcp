@@ -112,7 +112,14 @@ describe("build_area spec and recipes", () => {
       { name: "Mill House", columns: 2, rows: 3 },
       { name: "Well", columns: 1, rows: 1 },
     ];
-    expect(pickFeatures(groups, "The Old Mill", 2)).toEqual(["Mill House", "Well"]);
+    expect(pickFeatures(groups, "The Old Mill", 2)).toEqual(["Mill House", "Windmill"]);
+    expect(pickFeatures(groups, "The Old Road", 1)).toEqual(["Well"]);
+  });
+
+  it("gives a village houses, an inn and a well, one of each, and never fills up with odd groups", () => {
+    const ttr = ["Crystal", "Well", "Portal", "Barn 3 1x2", "Barn 1 2x2", "Barn 2 1x2", "Inn 1x2", "House 1", "Chessboard"].map((name) => ({ name, columns: 1, rows: 1 }));
+    expect(pickFeatures(ttr, "Blackwater Village", 3)).toEqual(["House 1", "Inn 1x2", "Well"]);
+    expect(pickFeatures(ttr, "Somewhere", 2)).toEqual(["Well", "Barn 3 1x2"]);
   });
 });
 

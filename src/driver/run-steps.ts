@@ -11,7 +11,8 @@
 
 import type { Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
-import { STEP_BASE_TOOLS } from "../util/progress.js";
+import { DRAFTED_SECTIONS, STEP_BASE_TOOLS } from "../util/progress.js";
+import { OWN_SECTION } from "../util/phase-check.js";
 import type { Chat, ChatMessage, ToolSpec } from "./llm.js";
 import { checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, type ToolHost, trimContext } from "./run-phase.js";
 
@@ -183,6 +184,17 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
     if (!open.length) break;
     const step = open[0];
     runs++;
+
+    // A section the module can write itself (Areas, Environment): the driver drafts it from the real state; a small
+    // model writing it invents positions and objects.
+    if (step.id === `${phase}.section` && DRAFTED_SECTIONS.includes(phase) && toolByName.has("write_story_section")) {
+      const r = await host.callTool("write_story_section", { section: OWN_SECTION[phase], draft: true });
+      log({ event: "driver_step", id: step.id, tool: "write_story_section", isError: r.isError, result: r.text.slice(0, 300) });
+      if (!r.isError) {
+        log({ event: "step_done", id: step.id });
+        continue;
+      }
+    }
 
     // The facts: the plot's block for the subject, the card of each area, all areas for a section.
     const facts: string[] = [];

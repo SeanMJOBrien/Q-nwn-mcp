@@ -57,7 +57,6 @@ describe("step mode", () => {
     const turns: Array<ToolCall[] | string> = [
       [call("build_area", { spec: '{"resref":"blackwater"}' })], "DONE",
       [call("build_area", { spec: '{"resref":"millroad"}' })], "DONE",
-      [call("write_story_section", { section: "Areas", text: "### Blackwater" })], "DONE",
     ];
     let i = 0;
     const chat = async (messages: ChatMessage[], tools: Array<{ name: string }>): Promise<ChatMessage> => {
@@ -68,7 +67,7 @@ describe("step mode", () => {
     };
     const r = await runPhaseSteps(fakeModule(log), chat, "areas");
     expect(r.status).toBe("success");
-    expect(r.toolCalls).toBe(3);
+    expect(r.toolCalls).toBe(2);
     // each step starts fresh: system + card
     expect(seen[0].length).toBe(2);
     expect(seen[2].length).toBe(2);
@@ -84,15 +83,16 @@ describe("step mode", () => {
     expect(offered[0]).not.toContain("write_story_section");
     // the progress line reaches the model with the result
     expect(seen[1].at(-1)?.content).toContain("[progress 2/9");
-    // the section step gets the format, not the rules
-    expect(seen[4][1].content).toContain("all areas");
+    // the Areas section is drafted from the module by the driver, not written by the model
+    expect(seen.length).toBe(4);
+    expect(log).toContain('write_story_section {"section":"Areas","draft":true}');
   });
 
   it("leaves a step open after its tries and goes on; a failing phase check gets one repair pass", async () => {
     const log: string[] = [];
     const chat = async (): Promise<ChatMessage> => ({ role: "assistant", content: "DONE" });
     const r = await runPhaseSteps(fakeModule(log), chat, "areas", { stepTries: 1, maxSteps: 2 });
-    expect(r.openSteps).toEqual(["areas.blackwater.create", "areas.millroad.create", "areas.section"]);
+    expect(r.openSteps).toEqual(["areas.blackwater.create", "areas.millroad.create"]);
     expect(r.status).not.toBe("success");
     expect(log.filter((l) => l.startsWith("phase_check")).length).toBeGreaterThanOrEqual(3);
   });

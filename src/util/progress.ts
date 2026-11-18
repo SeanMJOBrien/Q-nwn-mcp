@@ -30,6 +30,9 @@ export interface ProgressItem {
 }
 
 /** Tools every step may use besides its own. */
+/** Phases whose story section write_story_section drafts from the module (draft: true). */
+export const DRAFTED_SECTIONS: readonly Phase[] = ["areas", "environment"];
+
 export const STEP_BASE_TOOLS = ["get_progress", "get_area_card", "get_result", "read_story", "undo_last_change"];
 
 /** The tools one step needs, by its id. */
@@ -283,7 +286,13 @@ export function buildChecklist(
     );
   };
   const section = (p: Phase) =>
-    add(p, `${p}.section`, `story section "## ${OWN_SECTION[p]}" written`, has(OWN_SECTION[p]), `write_story_section(section: "${OWN_SECTION[p]}", text: "...")`);
+    add(
+      p,
+      `${p}.section`,
+      `story section "## ${OWN_SECTION[p]}" written`,
+      has(OWN_SECTION[p]),
+      DRAFTED_SECTIONS.includes(p) ? `write_story_section(section: "${OWN_SECTION[p]}", draft: true)` : `write_story_section(section: "${OWN_SECTION[p]}", text: "...")`,
+    );
 
   // start
   add("start", "start.scope", "the user's goal recorded", facts.scopeRecorded, 'set_project_scope(kind: "whole_adventure", scope: "<the user\'s words>")');
@@ -352,7 +361,7 @@ export function buildChecklist(
       if (!a) continue;
       const about = { areas: [l.resref], subject: l.name };
       add("environment", `environment.${l.resref}.props`, `${l.name}: dressed with props (at least 5)`, a.props >= 5,
-        `dress_area(area: "${l.resref}", props: "[\\"<blueprint>\\", ...]") places them on open ground, or place_placeable(area: "${l.resref}", ...) one by one`, `${a.props} placed`, about);
+        `dress_area(area: "${l.resref}") places props that suit the area on open ground (or give props: real resrefs from list_blueprints)`, `${a.props} placed`, about);
       add("environment", `environment.${l.resref}.pins`, `${l.name}: map pins at doors, shops and key places`, a.mapPins > 0,
         `dress_area(area: "${l.resref}") pins every exit; place_waypoint(area: "${l.resref}", ..., mapNote: "Bram's Smithy") for a shop or quest giver`, undefined, about);
       if (fightAreas.has(l.resref) && a.containers) {

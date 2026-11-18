@@ -282,6 +282,12 @@ describe("story tools and phase prompts", () => {
       expect(areas.status).toBe("partial");
       expect((areas.errors as string[]).some((e) => e.startsWith("Step not done: Blackwater Village: area blackwater created"))).toBe(true);
       expect((areas.errors as string[]).some((e) => e.includes("<-> The Mill Road connected"))).toBe(true);
+      // draft: only Areas and Environment, and only once there are story areas
+      const noAreas = await c.callTool({ name: "write_story_section", arguments: { section: "Areas", draft: true } });
+      expect(noAreas.isError).toBe(true);
+      expect(body(noAreas).error).toContain("no story areas yet");
+      const wrongSection = await c.callTool({ name: "write_story_section", arguments: { section: "Quests", draft: true } });
+      expect(body(wrongSection).field).toBe("draft");
       const env = body(await c.callTool({ name: "phase_check", arguments: { phase: "environment", step: "end" } }));
       expect(env.status).toBe("partial");
       expect(env.errors as string[]).toContain("Blackwater Village: area blackwater does not exist; the areas phase must build it first.");

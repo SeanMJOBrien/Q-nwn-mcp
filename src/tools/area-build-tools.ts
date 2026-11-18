@@ -19,6 +19,8 @@ import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types
 import { adventurePath, ensureAdventureDir } from "../util/adventure-dir.js";
 import { AREA_RECIPES, pickFeatures } from "../util/area-recipes.js";
 import { isContainerPlaceable } from "../util/containers.js";
+import { notFoundText } from "../util/blueprint-hint.js";
+import { DM_AREA_RESREF } from "../util/dm-books.js";
 import { MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import { getKeptResult, keptIds, shapeLongText, valueAtPath } from "../util/result-store.js";
 import { callTool } from "../util/tool-registry.js";
@@ -213,6 +215,9 @@ interface AreaSpec {
   adjusted?: string[];
 }
 
+/** Names that make an area a settlement (at least 12x12 tiles). */
+const SETTLEMENT = /\b(village|town|hamlet|city|settlement|market)\b/i;
+
 /** Size words small models use instead of width/height, in tiles. */
 const SIZE_WORDS: Record<string, number> = { tiny: 9, small: 9, medium: 12, large: 16, huge: 20 };
 /** Field names small models use for a spec field. */
@@ -351,6 +356,13 @@ async function buildArea(spec: AreaSpec) {
     notes.push(`raised ${width}x${height} to at least ${MIN_SINGLE_ROOM_AREA_SIZE}x${MIN_SINGLE_ROOM_AREA_SIZE}, the smallest area the layout generator builds`);
     width = Math.max(width, MIN_SINGLE_ROOM_AREA_SIZE);
     height = Math.max(height, MIN_SINGLE_ROOM_AREA_SIZE);
+  }
+
+  // A settlement needs room for its houses: suggest_area_size gave a village 8x7 (The Mill on Blackwater).
+  if (!existing && spec.width === undefined && spec.height === undefined && SETTLEMENT.test(`${spec.name} ${spec.purpose ?? ""}`) && (width < 12 || height < 12)) {
+    notes.push(`raised ${width}x${height} to 12x12: a village or town needs room for its buildings`);
+    width = Math.max(width, 12);
+    height = Math.max(height, 12);
   }
 
   // 2. feature groups
@@ -513,7 +525,7 @@ async function dressArea(area: string, props: Array<string | { blueprint: string
         lastError = (r.json?.error as string | undefined) ?? r.text.slice(0, 160);
         if (/not found|no blueprint|unknown blueprint/i.test(r.text)) break; // another spot will not help
       }
-      if (!ok) failed.push(`${blueprint}: ${lastError}`);
+      if (!ok) failed.push(`${blueprint}: ${/not found/i.test(lastError) ? await notFoundText("utp", blueprint) : lastError}`);
     }
   }
   return json({
@@ -561,7 +573,7 @@ export function registerAreaBuildTools(server: McpServer): void {
 
   server.tool(
     "dress_area",
-    'Dress one area in one call: a map pin at every exit that has none ("To <area name>", on the walkable side), extra pins you name, and props spread over open ground away from exits, doors and people (or at the positions you give). props: ["plc_barrel","plc_crate",...] or [{"blueprint":"plc_chest1","x":40,"y":52}]. near: "x,y" gathers the props around that point instead of spreading them. Each placement is checked like place_placeable / place_waypoint; failures are listed, the rest stay.',
+    'Dress one area in one call: a map pin at every exit that has none ("To <area name>", on the walkable side), extra pins you name, and props spread over open ground away from exits, doors and people (or at the positions you give). Leave props out to get the props that suit the tileset of the area (only while it has fewer than 5) (a well, hay and a fence in a village; rocks, logs and mushrooms in a forest; rocks, bones and rubble in a cave; furniture indoors), or give real resrefs: ["plc_barrel","x2_easy_crate1",...] or [{"blueprint":"plc_chest1","x":40,"y":52}]; "[]" places none. near: "x,y" gathers the props around that point instead of spreading them. Each placement is checked like place_placeable / place_waypoint; failures are listed, the rest stay.',
     {
       area: z.string().describe("Area resref"),
       props: z.string().optional().describe('JSON list of placeable blueprints, or of {"blueprint","x","y","bearing"}'),
@@ -571,7 +583,13 @@ export function registerAreaBuildTools(server: McpServer): void {
     },
     { destructiveHint: false },
     async ({ area, props, pins, extraPins, near }) => {
-      const p = parseList<string | { blueprint: string; x?: number; y?: number; bearing?: number }>(props, "props");
+      // No props given and the area still bare (under 5 placeables): the kit that suits its tileset
+      // (util/area-recipes.ts), so a second call for pins does not add a second kit; props: "[]" places none.
+      const idx = requireIndex();
+      const tileset = getFieldStr((idx.parsedGff.get(`${area.toLowerCase()}.are`) ?? {}) as GffObj, "Tileset").toLowerCase();
+      const placed = getFieldList((idx.parsedGff.get(`${area.toLowerCase()}.git`) ?? {}) as GffObj, "Placeable List").length;
+      const kit = props === undefined ? (placed < 5 ? (AREA_RECIPES[tileset]?.props ?? []) : []) : undefined;
+      const p = kit ? [...kit] : parseList<string | { blueprint: string; x?: number; y?: number; bearing?: number }>(props, "props");
       if ("error" in p) return json({ ok: false, field: "props", error: p.error }, true);
       const e = parseList<{ text: string; x: number; y: number }>(extraPins, "extraPins");
       if ("error" in e) return json({ ok: false, field: "extraPins", error: e.error }, true);
@@ -646,4 +664,51 @@ export function registerAreaBuildTools(server: McpServer): void {
       return { content: [{ type: "text" as const, text: `${part}${rest > 0 ? `\n[... ${rest} more characters: get_result(id: "${id}", offset: ${from + part.length})]` : ""}` }] };
     },
   );
+}
+
+// ─── story sections drafted from the module (a small model invents them otherwise) ───
+
+const fmtAt = (x: number, y: number) => `(${Math.round(x)}, ${Math.round(y)})`;
+
+/** The story areas: every area but the DM area and the empty _start stub. */
+function storyAreas(index: ReturnType<typeof requireIndex>): string[] {
+  return [...index.areas.keys()].filter((r) => r !== DM_AREA_RESREF && r !== "_start");
+}
+
+/**
+ * The `## Areas` or `## Environment` section in the format of docs/phase-prompts/areas.md / environment.md, read
+ * from the module: what is really there, so later phases and the DM guide read facts.
+ */
+export async function draftStorySection(index: ReturnType<typeof requireIndex>, section: "Areas" | "Environment"): Promise<string> {
+  const built = await readBuiltAreas(index);
+  const out: string[] = [];
+  for (const r of storyAreas(index)) {
+    const f = areaFacts(index, r);
+    if (!f) continue;
+    out.push(`### ${f.name} (\`${r}\`)`);
+    if (section === "Areas") {
+      const b = built[r];
+      out.push(`- **Tileset:** ${f.tileset}, ${f.width}x${f.height}${b ? `, style ${b.style}` : ""}`);
+      out.push(`- **Features:** ${b?.features.length ? b.features.join(", ") : "none"}`);
+      out.push(`- **Transitions:** ${f.exits.length ? f.exits.map((e) => `to \`${e.to}\` at ${fmtAt(e.x, e.y)}`).join("; ") : "none"}`);
+    } else {
+      const git = index.parsedGff.get(`${r}.git`) as GffObj;
+      const plcs = getFieldList(git, "Placeable List");
+      const show = (p: GffObj) => `${getFieldStr(p, "TemplateResRef") || "?"} (${getFieldStr(p, "Tag")}) at ${fmtAt(getFieldNum(p, "X"), getFieldNum(p, "Y"))}`;
+      const plain = plcs.filter((p) => !isContainerPlaceable(p));
+      const boxes = plcs.filter((p) => isContainerPlaceable(p));
+      const sounds = getFieldList(git, "SoundList");
+      const pins = getFieldList(git, "WaypointList").filter((w) => getFieldNum(w, "HasMapNote") === 1);
+      out.push(`**Placeables:** ${plain.length ? plain.map(show).join("; ") : "none"}`);
+      out.push(`**Containers:** ${boxes.length ? boxes.map(show).join("; ") : "none"}`);
+      out.push(
+        `**Sounds:** ${sounds.length ? sounds.map((s) => `${getFieldStr(s, "TemplateResRef") || getFieldStr(s, "Tag")} at ${fmtAt(getFieldNum(s, "XPosition"), getFieldNum(s, "YPosition"))}`).join("; ") : "none"}`,
+      );
+      out.push(
+        `**Waypoints:** ${pins.length ? pins.map((w) => `${getFieldStr(w, "Tag")} "${getFieldLocStr(w, "MapNote") || getFieldStr(w, "Tag")}" at ${fmtAt(getFieldNum(w, "XPosition"), getFieldNum(w, "YPosition"))}`).join("; ") : "none"}`,
+      );
+    }
+    out.push("");
+  }
+  return out.join("\n").trim();
 }
