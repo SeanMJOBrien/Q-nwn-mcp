@@ -104,6 +104,7 @@ Scoped to **non-persistent world (non-PW) modules** — single-player and small 
 npm run build        # Compile TypeScript to dist/
 npm run dev          # Run directly with tsx (development)
 npm run start        # Run compiled output
+scripts/setup-new-machine.sh   # new macOS/Linux machine: build, nim tools, game folders, nwn-mcp.env, check (--ollama)
 ./UpdateMCP.sh       # pull, npm install, build (UpdateMCP.cmd on Windows; --check lists waiting commits); then reconnect the MCP
 ```
 

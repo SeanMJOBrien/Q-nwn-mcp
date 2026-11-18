@@ -9,6 +9,12 @@ the first runs as a trial and keep the logs (section 8).
 
 ## 1. What you need
 
+On a new macOS or Linux machine, `scripts/setup-new-machine.sh` does all of this section: it builds the repository,
+downloads the neverwinter.nim tools (release 2.1.2, into `.tools/`) unless it finds them, finds the game's install and
+user folders, writes `nwn-mcp.env`, runs the setup check and a driver dry run. `--ollama [base model]` also pulls the
+model and creates `nwn-qwen` with a 16k context; `--game`, `--user`, `--tools` give folders it cannot find. It is safe
+to run again.
+
 - This repository, built: `npm install && npm run build`.
 - The three paths the MCP server uses, as environment variables:
 
