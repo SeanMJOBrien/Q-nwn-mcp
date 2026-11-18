@@ -50,6 +50,7 @@ import { registerScriptTools } from "./tools/script-tools.js";
 import { registerSpecAbilityTools } from "./tools/spec-ability-tools.js";
 import { registerSpecAssertTools } from "./tools/spec-assert-tools.js";
 import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
+import { registerStartMenuTools } from "./tools/start-menu-tools.js";
 import { registerSystestTools } from "./tools/systest-tools.js";
 import { registerTilesetTools } from "./tools/tileset-tools.js";
 import { registerUndoTools } from "./tools/undo-tools.js";
@@ -62,6 +63,7 @@ import { registerWriteTools } from "./tools/write-tools.js";
 /** Registers every tool group on `server`. Shared by the entry point and the profile tests. */
 export function registerAll(server: McpServer): void {
   // ── Base tools: module reading, querying, analysis ──────────────────────
+  registerStartMenuTools(server);
   registerCoreReadTools(server);
   registerAreaTools(server);
   registerCreatureTools(server);

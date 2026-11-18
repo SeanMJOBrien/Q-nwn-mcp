@@ -74,7 +74,7 @@ This MCP serves two purposes:
 
 ### How a session starts (user intent, 2026-11-09)
 
-The first thing a session on this MCP does is **ask the user what they are trying to accomplish**, then the LLM drives that goal to completion
+The first thing a session on this MCP does is **ask the user what they are trying to accomplish** (2026-11-18: with the lettered start menu `show_menu`, `src/util/start-menu.ts`, also the MCP prompt `start`; the server instructions say to offer it), then the LLM drives that goal to completion
 with the tools and skills, teaching as it goes (the user may not know how to build or equip a creature, script behaviour, fill story gaps,
 design an area with encounters, or add quests, journal entries, dialog and rewards, or may only want a script bug found). Most sessions are on a
 module that is **already built but incomplete**: the order is **adopt** (write `adventure.md` from what the module contains), then **review the

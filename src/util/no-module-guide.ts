@@ -54,8 +54,11 @@ export function noModuleMessage(): string {
 
 /** Server-level instructions sent to clients at connect time. */
 export const SERVER_INSTRUCTIONS =
-  "nwn-mcp builds and edits Neverwinter Nights: Enhanced Edition modules. Every tool works on the one loaded module, " +
-  `so the first call is always create_module or load_module. ${START_STEPS} ` +
+  "nwn-mcp builds and edits Neverwinter Nights: Enhanced Edition modules. At the start of a session, when the user " +
+  "has not said what they want, call show_menu and show them its lettered menu of what it can help with (NPCs and " +
+  "henchmen, areas, spells, markets, quests and dialog, encounters, loot, a whole adventure, reviewing a module, " +
+  "scripts, building); when they choose, show_menu(choice) gives the plan. Every tool works on the one loaded module, " +
+  `so the first module call is always create_module or load_module. ${START_STEPS} ` +
   "A new adventure is always its own new module from create_module: a complete, playable module (it uses the base " +
   "game's tilesets, creatures and items directly; nothing is merged into or out of another .mod). Never build a new " +
   "adventure inside an existing module such as a test module; load_module is for continuing or editing that module. " +
