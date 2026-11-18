@@ -181,14 +181,14 @@ export interface AreaLayoutSpec {
   tileset: string;
   /**
    * Width in tiles. 9 fits one room, 14 fits several (see `suggest_area_size`).
-   * @minimum 8
+   * @minimum 9
    * @maximum 32
    * @asType integer
    */
   width: number;
   /**
    * Height in tiles.
-   * @minimum 8
+   * @minimum 9
    * @maximum 32
    * @asType integer
    */

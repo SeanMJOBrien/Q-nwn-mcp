@@ -7,6 +7,7 @@ import type { ResmanOptions } from "./nim-tools.js";
 import { createTempDir, cleanupTempDir } from "./util/temp-dir.js";
 import { clearWokCache, setWokCacheDir } from "./util/walkmesh.js";
 import { clearWalkGraphCache } from "./util/area-walk-graph.js";
+import { noModuleMessage } from "./util/no-module-guide.js";
 import { clearTilesetCache } from "./util/tileset.js";
 import { clearUndoStack } from "./util/undo.js";
 import { isDirtyUnder, clearDirtyUnder } from "./util/dirty-state.js";
@@ -28,7 +29,7 @@ export function getIndex(): ModuleIndex | null {
 }
 
 export function requireIndex(): ModuleIndex {
-  if (!currentIndex) throw new Error("No module loaded. Call load_module first.");
+  if (!currentIndex) throw new Error(noModuleMessage());
   return currentIndex;
 }
 

@@ -640,8 +640,8 @@ export function registerAdventureTools(server: McpServer): void {
     `Generate a procedural area layout with terrain zones, crosser paths, and transition points. Returns data ready to pass to adventure_apply_layout. Encodes all layout rules: perimeter encapsulation, room separation, adjacency validation, walkable ratio. Styles: dungeon (varied rooms + corridors, some L-shapes), cave (smaller rooms, more corridors, maze-like), dwelling (quadrant rooms, fewer corridors, building interior), forest (clearings separated by trees, winding roads), rural (farmland/village, spine roads), city (urban cobblestone, grid roads), plains (open terrain, sparse clearings), desert (arid, cliff borders), castle (fortified exterior, castle walls), tundra (frozen, snow/camp clearings). Returns suggestedFeatures array with pre-validated feature placements. Set style.safeMode:true for a "safe scaffold" — disables L-shaped rooms, S-curves, shortcut corridors, obstacle patches, and feature packing, leaving only plain rectangular rooms and straight corridors (the tile classes least likely to need a solver fallback). Intended for a user who wants a correct room/story shape to finish by hand in the toolset rather than a fully solver-decorated area. Combine with rooms:1 and width/height:${MIN_SINGLE_ROOM_AREA_SIZE} for the smallest possible single-room scaffold, expandable later.`,
     {
       tileset: z.string().describe("Tileset resref (e.g., 'tdc01' for crypt, 'ttf01' for forest)"),
-      width: z.string().describe("Area width in tiles (8-32)"),
-      height: z.string().describe("Area height in tiles (8-32)"),
+      width: z.string().describe(`Area width in tiles (${MIN_SINGLE_ROOM_AREA_SIZE}-32; 14+ for several rooms; suggest_area_size picks one)`),
+      height: z.string().describe(`Area height in tiles (${MIN_SINGLE_ROOM_AREA_SIZE}-32)`),
       style: z.string().describe("JSON style object: {type: 'dungeon'|'cave'|'dwelling'|'forest'|'rural'|'city'|'plains'|'desert'|'castle'|'tundra', rooms?: number, clearings?: number, corridorStyle?: 'straight'|'zigzag', roadStyle?: 'spine'|'grid'|'winding', preferredFeatures?: string[], safeMode?: boolean, avenue?: boolean, seed?: number|string} — seed repeats a layout exactly (the result always carries the seed it used; pass it back as style.seed). Without one a fresh seed is used. preferredFeatures is an array of tileset group names (from get_tileset_details) to prioritize when placing features (ignored when safeMode is true — safeMode always returns an empty suggestedFeatures array). Preferred groups are tried first before falling back to random selection. avenue:true (default false, zero effect on existing callers) reserves the primary room-to-room corridor as a protected avenue BEFORE packing features — a feature never overlaps it, and a feature in an avenue-adjacent room is preferentially placed/rotated so its entrance (see get_tileset_details's per-group entrances field) faces the avenue, falling back to ordinary placement if no facing match fits. Placed features may then carry a rotation field (0-3 quarter-turns) — pass it straight through to adventure_apply_layout."),
       transitionCount: z.string().optional().describe("Number of transition points to generate (default 1)"),
       transitionDirections: z.string().optional().describe("JSON array of directions: ['south', 'north', 'east', 'west']"),
@@ -651,8 +651,19 @@ export function registerAdventureTools(server: McpServer): void {
       const w = toI(widthStr);
       const h = toI(heightStr);
 
-      if (w < 4 || w > 32 || h < 4 || h > 32) {
-        return { isError: true, content: [{ type: "text", text: "Width and height must be between 4 and 32." }] };
+      if (!Number.isInteger(w) || !Number.isInteger(h) || w < MIN_SINGLE_ROOM_AREA_SIZE || w > 32 || h < MIN_SINGLE_ROOM_AREA_SIZE || h > 32) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text:
+                `A ${widthStr} x ${heightStr} layout cannot be generated: width and height must each be ${MIN_SINGLE_ROOM_AREA_SIZE}-32 tiles ` +
+                `(${MIN_SINGLE_ROOM_AREA_SIZE} fits one room with its walls, 14 fits several). For a long hall use a long side up to 32 and a short side of ` +
+                `at least ${MIN_SINGLE_ROOM_AREA_SIZE}, e.g. width 32, height ${MIN_SINGLE_ROOM_AREA_SIZE}. suggest_area_size(biome, events) picks a size.`,
+            },
+          ],
+        };
       }
 
       let styleObj: LayoutStyle;

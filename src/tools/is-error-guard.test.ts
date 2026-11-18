@@ -8,7 +8,7 @@ import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
 
-const FAIL = /not found|Not found|Invalid|invalid|must be|must have|must |out of range|Cannot|cannot|requires|Failed|failed|No module loaded/;
+const FAIL = /not found|Not found|Invalid|invalid|must be|must have|must |out of range|Cannot|cannot|requires|Failed|failed|No module loaded|No module is loaded/;
 const RET = /return \{\s*content: \[\{ type: "text"(?: as const)?, text: ([^\n]{0,260}?)\}\],?\s*\};?/g;
 
 describe("isError guard", () => {

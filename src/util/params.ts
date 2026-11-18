@@ -1,9 +1,9 @@
 /**
  * Shared parameter helpers for MCP tool handlers.
  *
- * MCP SDK validates JSON Schema before Zod transforms execute, so z.coerce.number()
- * and z.union([z.number(), z.string().transform()]) both fail when clients send strings.
- * All numeric tool params must use z.string() + manual parse.
+ * Numeric tool params are declared z.string() and parsed by hand (toF/toI). At registration every string param is
+ * widened by util/lenient-args.ts (src/index.ts) to also accept a number, boolean, array or object, which reaches the
+ * handler as a string; so a handler still sees "12" whether the client sent "12" or 12. Keep declaring z.string() here.
  */
 
 import { z } from "zod";

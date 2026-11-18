@@ -3,6 +3,7 @@ import { briefModuleSummary, resolveBrief } from "../util/brief.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, currentScriptUsages, indexAreaCreatures, requireIndex } from "../module-loader.js";
+import { loadableModules, noModuleMessage, START_STEPS } from "../util/no-module-guide.js";
 import type { FlatDialogNode } from "../types/dialog.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
@@ -351,12 +352,30 @@ export function registerAnalysisTools(server: McpServer): void {
 
   server.tool(
     "get_module_summary",
-    "Get a high-level summary of the entire module.",
+    "Get a high-level summary of the loaded module. With no module loaded it says so and how to start (create_module for a new module, load_module for an existing one) instead of failing.",
     {
       brief: z.boolean().optional().describe("Short result for small models (default: on when MCP_TOOL_PROFILE is set). false = full result"),
     },
     { readOnlyHint: true, idempotentHint: true },
     async ({ brief }) => {
+      // The first call many models make: answer "nothing loaded" as a normal result with the next step, not an error.
+      let loaded = true;
+      try {
+        requireIndex();
+      } catch {
+        loaded = false;
+      }
+      if (!loaded) {
+        const { modules, projects } = loadableModules();
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({ loaded: false, message: noModuleMessage(), next: START_STEPS, modules, projects }, null, 2),
+            },
+          ],
+        };
+      }
       const index = requireIndex();
 
       const scriptCount = [...index.resources.values()].filter((r) => r.extension === "nss").length;

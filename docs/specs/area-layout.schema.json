@@ -9,7 +9,7 @@
         "height": {
           "description": "Height in tiles.",
           "maximum": 32,
-          "minimum": 8,
+          "minimum": 9,
           "type": "integer"
         },
         "style": {
@@ -41,7 +41,7 @@
         "width": {
           "description": "Width in tiles. 9 fits one room, 14 fits several (see `suggest_area_size`).",
           "maximum": 32,
-          "minimum": 8,
+          "minimum": 9,
           "type": "integer"
         }
       },

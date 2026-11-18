@@ -232,7 +232,7 @@ loads it per area (cached on the tile list and door positions), finds objects an
 
 - `check_path(fromTag | fromArea+fromX/fromY, toTag | toX/toY [+toArea], snap?, showPath?)`: reachable, the route per area (metres, height range,
   climb/descent, the transition taken), or why not: each end's region (height, ground area, extent), the closest approach between the two
-  regions with the height gap, and the nearest reachable spot to the target. In the `areas`, `fix` and `verify` profiles.
+  regions with the height gap, and the nearest reachable spot to the target. In the `areas` and `fix` profiles.
 - `verify_all` (default `checkWalkable: true`) and `verify_area(checkWalkable: true)`: `object_unreachable` for an NPC (non-hostile, or with a
   conversation), a placeable with something to do (inventory, transition, conversation, module OnUsed script), a door, a transition or map-pin
   waypoint, or a trigger with a transition or OnEnter script that stands on ground no route from the start reaches (a trigger counts at any

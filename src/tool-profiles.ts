@@ -8,6 +8,7 @@
  */
 
 export const CORE_TOOLS: string[] = [
+  "create_module",
   "load_module",
   "get_module_summary",
   "get_phase_prompt",
@@ -160,7 +161,6 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   verify: [
     "verify_*",
-    "check_path",
     "validate_module",
     "audit_module",
     "run_live_verification",

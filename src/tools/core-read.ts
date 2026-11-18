@@ -38,7 +38,15 @@ export function registerCoreReadTools(server: McpServer): void {
         .then((st) => st.isDirectory())
         .catch(() => false); // a missing path is reported by loadModule below
       if (isDir) {
-        if (!(await isProjectDir(resolvedPath))) throw new Error(`load_module: ${resolvedPath} is a directory without project.json (not a module project; run export_project first).`);
+        if (!(await isProjectDir(resolvedPath))) {
+          // A folder of modules (often NWN's own modules folder): name the .mod files in it instead of a bare refusal.
+          const mods = (await fs.readdir(resolvedPath).catch(() => [] as string[])).filter((f) => f.toLowerCase().endsWith(".mod"));
+          throw new Error(
+            mods.length
+              ? `load_module: ${resolvedPath} is a folder, not a module. Give one module file from it, e.g. load_module(modPath: "${path.join(resolvedPath, mods[0])}"). Modules there: ${mods.slice(0, 12).join(", ")}. To start a new module instead: create_module(name, filename).`
+              : `load_module: ${resolvedPath} is a directory without project.json (not a module project; run export_project first). To start a new module: create_module(name, filename).`,
+          );
+        }
         packedFrom = resolvedPath;
         // Not caught: a manifest naming a file that is missing from src/ is reported as that, not as "cannot open <dir>".
         resolvedPath = await packProject(resolvedPath);

@@ -211,6 +211,24 @@ Profiles: `read`, `plot`, `quests`, `actors`, `areas`, `encounters`, `loot`, `fi
 big results (`visualize_area`, `verify_all`, `get_module_summary`) come back in a short form; pass `brief: false` for
 the full one. In such a session, `get_phase_prompt(phase: "quests")` returns the instruction sheet for a phase.
 
+**What the server does for any client (2026-11-17).**
+
+- At connect it sends short instructions (`src/util/no-module-guide.ts`): the first call is `create_module` (new module) or
+  `load_module` (existing); `create_module` is in every profile. With nothing loaded, `get_module_summary` answers
+  `loaded: false` with the next step and the modules it can load, and every other tool's refusal says the same and "do not
+  call this tool again until a module is loaded".
+- Arguments are lenient (`src/util/lenient-args.ts`): a parameter documented as a string ("12", a JSON list) also takes a
+  number, a boolean, a real array or object; booleans also take "true"/"false". An argument the tool does not have is refused
+  with the list of its parameters instead of being dropped silently (a model that invented `stats` for `forge_creature` is
+  told so).
+- Messages a client prints itself, not this server (fix them in the client or the model's tool-call template):
+  `[tool_call bridge refused] Deferred tool ... has no verified schema review` (the client hides tool schemas until the
+  model searches for them; a smaller `MCP_TOOL_PROFILE` keeps the list short enough not to be deferred), and
+  `params must have required property 'arguments'` (the model put the arguments next to the tool name instead of inside
+  `arguments`: a tool-call format problem of the model or its chat template).
+- Prefer the one-call spec tools for a small model: `write_plot`, `build_quest`, `build_creature` (a whole character in
+  words), `build_companion`; and the driver above, which gives each phase a fresh conversation and only its tools.
+
 **Checking a spec by hand or from a script.** No module or model needed:
 
 ```
@@ -219,7 +237,7 @@ node dist/cli/spec.js schema key-npc
 node dist/cli/spec.js validate key-npc npc.json
 ```
 
-Kinds: `companion`, `key-npc`, `dialog`, `journal`, `area-layout`. The answer is either the wrong fields by name or
+Kinds: `companion`, `key-npc`, `dialog`, `journal`, `area-layout`, `plot`, `creature`. The answer is either the wrong fields by name or
 the tool calls that build the thing.
 
 **Quests with no model at all.** `node dist/cli/quest.js` and the forms in Q-nwn-manager and the TFN Content Studio

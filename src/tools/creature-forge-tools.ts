@@ -594,7 +594,9 @@ export function registerCreatureForgeTools(server: McpServer): void {
 
   server.tool(
     "forge_creature",
-    "Limitation: gear uses each base item's default model variant, so same-type gear looks identical across NPCs (randomised gear appearance is TODO #35). " +
+    "Works on a creature that already exists (a blueprint resref, or a placed copy by area + tag). To make a NEW " +
+      "creature from a description (race, class, level, feats, look, gear in words), use build_creature instead. " +
+      "Limitation: gear uses each base item's default model variant, so same-type gear looks identical across NPCs (randomised gear appearance is TODO #35). " +
       "Make a creature level itself correctly at spawn. Writes a LEGAL level-1 build (every feat checked against feat.2da " +
       "requirements; package feat order), fits alignment to the class, then sets the levelling plan: at spawn " +
       "LevelUpHenchman takes it to `level` (or the party's average level + `levelRel`), it buys gear from the module's " +
