@@ -203,7 +203,7 @@ Execute in this order:
 
 1. **Create the area** — `create_area` with tileset, dimensions, and a resref derived from the area name (lowercase, no spaces, e.g., `darkforest`, `temple_ruins`).
 
-2. **Paint the layout** — A single `adventure_apply_layout` call with the full `LayoutResult` from `adventure_generate_layout`. Pass `autoRepack: "true"` to save progress to the .mod file immediately (prevents lost work if context runs out). The solver applies all terrain zones, crosser paths, and feature groups atomically.
+2. **Paint the layout** — A single `adventure_apply_layout(area, layoutId)` call with the `layoutId` that `adventure_generate_layout` returned (nothing to copy; the full `LayoutResult` as `layout` also works, unchanged). The area must have the layout's tileset, width and height. Edits are saved to the module project as they happen; do not repack after each area. The solver applies all terrain zones, crosser paths, and feature groups atomically.
 
    **CRITICAL — Perimeter encapsulation (applies to BOTH interior and exterior areas):**
 

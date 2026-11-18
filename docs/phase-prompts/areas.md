@@ -18,7 +18,7 @@ You build one area per location in the plot and connect them. The tools know the
    2. `adventure_list_features(tileset: "ttf01", style: "forest")`. Choose 3 to 6 group names that fit the location, best first.
    3. `adventure_generate_layout(tileset: "ttf01", width: "16", height: "16", style: "{\"type\":\"forest\",\"rooms\":3,\"preferredFeatures\":[\"...\"]}", transitionCount: "2")`. `transitionCount` = the number of Connections of this location.
    4. `create_area(resref: "darkforest", name: "The Dark Forest", width: "16", height: "16", tileset: "ttf01")`. Use the location's **Resref** when the plot gives one; else lower case, no spaces, at most 16 characters.
-   5. `adventure_apply_layout(area: "darkforest", layout: "<the whole result of step 3>")`. If it reports `solverWarnings`, generate again with fewer rooms or `"safeMode":true`.
+   5. `adventure_apply_layout(area: "darkforest", layoutId: "layout_1")`: the `layoutId` step 3 returned; do not copy the layout. If it reports `solverWarnings`, generate again with fewer rooms or `"safeMode":true`.
    6. `place_tile_doors(area: "darkforest")`.
    7. `set_area_properties(area: "darkforest", musicDay: "1", musicNight: "3", musicBattle: "10", ambientSndDay: "33", skyBox: "1", dayNightCycle: true)` with values from the table.
 4. For each line in Connections, one call: `adventure_create_transition(areaA: "village", aX: "85", aY: "45", areaB: "darkforest", bX: "15", bY: "15", tag: "vil_for")`. Use the transition points from each layout result. If a point is refused, get one with `adventure_find_walkable(area: "village", count: "3", clearRadius: "2")`.
