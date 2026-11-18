@@ -66,6 +66,10 @@ node dist/cli/drive.js --plot my-plot.json \
   --endpoint http://localhost:11434/v1 --model qwen2.5:14b
 ```
 
+Two scripts wrap the usual commands: `scripts/adventure-driver-dry-run.sh [plot.json | adventures/<Title>] [phases]`
+(the plan and any setup problems, no model call) and `scripts/build-module-from-project.sh adventures/<Title> [out.mod]`
+(the playable `.mod`, by default into `<NWN_FOLDER_USER>/modules/<title>.mod`).
+
 Work on a copy the first time. The driver changes the module project as it goes, and `--force` on a finished phase
 adds to what is already there.
 
