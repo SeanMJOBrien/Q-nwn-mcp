@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# UpdateMCP: bring this nwn-mcp checkout up to date and rebuild it.
+# UpdateMCP.sh: bring this nwn-mcp checkout up to date and rebuild it.
 #
-#   ./UpdateMCP            pull the current branch, install packages, build
-#   ./UpdateMCP --check    only show whether an update is waiting (changes nothing)
+#   ./UpdateMCP.sh         pull the current branch, install packages, build
+#   ./UpdateMCP.sh --check only show whether an update is waiting (changes nothing)
 #
 # Run it from anywhere; it works on the folder it lives in. Afterwards, reconnect the MCP server in your client
 # (Claude Code: /mcp; other clients: restart the client or its MCP connection) so it loads the new build.
@@ -49,7 +49,7 @@ fi
 if ! git diff --quiet || ! git diff --cached --quiet; then
   say "You have local changes to these files:"
   git status --short --untracked-files=no
-  fail "commit or stash them first (git stash), then run UpdateMCP again."
+  fail "commit or stash them first (git stash), then run UpdateMCP.sh again."
 fi
 [ "$AHEAD" -eq 0 ] || say "Note: $AHEAD local commit(s) not on $UPSTREAM; pulling only if it can fast-forward."
 

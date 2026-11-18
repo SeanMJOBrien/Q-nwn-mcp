@@ -211,7 +211,7 @@ Profiles: `read`, `plot`, `quests`, `actors`, `areas`, `encounters`, `loot`, `fi
 big results (`visualize_area`, `verify_all`, `get_module_summary`) come back in a short form; pass `brief: false` for
 the full one. In such a session, `get_phase_prompt(phase: "quests")` returns the instruction sheet for a phase.
 
-**Keeping the server current.** On each machine that runs it, `./UpdateMCP` (`UpdateMCP.cmd` on Windows) pulls,
+**Keeping the server current.** On each machine that runs it, `./UpdateMCP.sh` (`UpdateMCP.cmd` on Windows) pulls,
 installs and builds; then reconnect the MCP server in the client. An old build is the usual cause of a client error
 such as `params/layout must be string` for a parameter this server now accepts as an object.
 
