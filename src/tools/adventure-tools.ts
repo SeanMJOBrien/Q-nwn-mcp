@@ -42,6 +42,37 @@ import { getFeatureCollar } from "../util/feature-collars.js";
 
 /** Layouts made by adventure_generate_layout this session, by layoutId (applied by id, not copied back). */
 const layoutStore = new Map<string, { layout: unknown; width: number; height: number; tileset: string }>();
+
+/** The create_area call for a layout's size and tileset. */
+export function createAreaCall(resref: string, width: number, height: number, tileset: string): string {
+  return `create_area(resref: "${resref}", name: "<display name>", width: "${width}", height: "${height}", tileset: "${tileset}")`;
+}
+
+/**
+ * adventure_apply_layout's answer when the area does not exist: small models pass the layoutId as the area, or apply
+ * before creating the area. Gives the exact create_area call for the layout.
+ */
+export function missingAreaMessage(
+  area: string,
+  stored: { width: number; height: number; tileset: string } | undefined,
+  available: string[],
+  layoutId = "<the layoutId>",
+): string {
+  const lines = [`Area not found: ${area}; nothing was painted. Areas in the module: ${available.join(", ") || "none"}.`];
+  if (layoutStore.has(area) || /^layout_\d+$/i.test(area)) {
+    lines.push(`"${area}" is a layoutId; pass it as layoutId, and give the area's own resref as area.`);
+  }
+  const resref = /^layout_\d+$/i.test(area) ? "myarea" : area;
+  if (stored) {
+    lines.push(
+      `Create the area first with the layout's size and tileset: ${createAreaCall(resref, stored.width, stored.height, stored.tileset)}, ` +
+        `then adventure_apply_layout(area: "${resref}", layoutId: "${layoutId}").`,
+    );
+  } else {
+    lines.push("Create it first with create_area(resref, name, width, height, tileset) using the layout's width, height and tileset.");
+  }
+  return lines.join(" ");
+}
 let layoutCounter = 0;
 let lastLayoutId: string | undefined;
 
@@ -705,7 +736,10 @@ export function registerAdventureTools(server: McpServer): void {
           type: "text",
           text: JSON.stringify({
             layoutId,
-            next: `adventure_apply_layout(area: "<resref of a ${w}x${h} ${tilesetResref} area>", layoutId: "${layoutId}") — pass the id, not the layout`,
+            next:
+              `1) if the area does not exist yet: ${createAreaCall("myarea", w, h, tilesetResref)} — ` +
+              `2) adventure_apply_layout(area: "myarea", layoutId: "${layoutId}"). "area" is the area's resref (your own name), ` +
+              "never the layoutId; pass the id, not the layout",
             ...result,
           }),
         }],
@@ -771,7 +805,7 @@ export function registerAdventureTools(server: McpServer): void {
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
       if (!areDoc) {
-        return { isError: true, content: [{ type: "text", text: `Area not found: ${area}. Available: ${[...index.areas.keys()].join(", ")}` }] };
+        return { isError: true, content: [{ type: "text", text: missingAreaMessage(area, stored, [...index.areas.keys()], layoutId ?? lastLayoutId) }] };
       }
 
       const are = areDoc as GffObj;

@@ -1,6 +1,6 @@
 ---
 phase: environment
-profile: areas
+profile: dress
 reads: Plot, Areas
 writes: Environment
 ---
@@ -19,7 +19,7 @@ You dress each area with objects, sounds and map notes so it looks like the plac
    4. Place 3 to 6 objects per room: `place_placeable(area: "darkforest", blueprint: "plc_campfr", x: "35", y: "42", faceTowardX: "40", faceTowardY: "40")`. Find blueprints with `list_blueprints(type: "utp", pattern: "chest")`.
    5. One area sound at the centre: `place_sound(area: "darkforest", blueprint: "songbirdchirps", x: "80", y: "80")`.
    6. A map note at every exit, every door of a large building, every shop and quest giver, and each landmark, 1-2 m in front on walkable ground: `place_waypoint(area: "darkforest", tag: "wp_oldmill", name: "Old Mill", x: "55", y: "70", mapNote: "Old Mill", mapNoteEnabled: true)`.
-4. `write_story_section(section: "Environment", text: "...")`, then `phase_check(phase: "environment", step: "end")`.
+4. `write_story_section(section: "Environment", text: "...")`, then `phase_check(phase: "environment", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Objects by theme (examples; search for more)
 

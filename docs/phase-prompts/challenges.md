@@ -26,7 +26,7 @@ You place the enemies and traps of the adventure. The tools size each fight for 
    2. `place_trigger(area: "oldcrypt", blueprint: "trap_fire_01", x: "55", y: "45")`
    3. `add_skill_check(area: "oldcrypt", tag: "trap_fire_01", kind: "trigger", check: "{\"save\":\"reflex\",\"dc\":13,\"fail_damage\":\"2d6\",\"half\":\"1\",\"damage_type\":\"fire\",\"fail_msg\":\"Flames burst from the wall!\"}")`
 6. `verify_encounter_chain()` and `get_balance_report(partyLevel: "3")`. If a fight other than the boss is rated `deadly`, remove one creature from it or use a weaker one.
-7. `write_story_section(section: "Challenges", text: "...")`, then `phase_check(phase: "challenges", step: "end")`.
+7. `write_story_section(section: "Challenges", text: "...")`, then `phase_check(phase: "challenges", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Numbers
 

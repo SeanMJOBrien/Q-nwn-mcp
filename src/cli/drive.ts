@@ -142,6 +142,22 @@ async function main(): Promise<void> {
     finish(code, summary);
   };
 
+  // get_progress between phases: the whole build's checklist from the module state (also saved as <Title>-progress.md).
+  const progress = async () => {
+    try {
+      const r = JSON.parse((await host.callTool("get_progress", {})).text) as {
+        done: number;
+        total: number;
+        next: string | { step: string; call?: string };
+        progressFile?: string;
+      };
+      const nextText = typeof r.next === "string" ? r.next : `${r.next.step}${r.next.call ? ` (${r.next.call})` : ""}`;
+      return { ...r, nextText };
+    } catch {
+      return undefined;
+    }
+  };
+
   try {
     const allTools = await host.listTools();
 
@@ -259,7 +275,10 @@ async function main(): Promise<void> {
       }
       results.push({ ...r, model: used });
       if (r.status === "failed" || r.status === "blocked") break; // later phases need this one
+      const p = await progress();
+      if (p) say(`progress: ${p.done} of ${p.total} steps; next: ${p.nextText}`);
     }
+    const finalProgress = await progress();
 
     const bad = results.find((r) => r.status === "failed" || r.status === "blocked");
     await stop(bad ? 2 : 0, {
@@ -267,6 +286,7 @@ async function main(): Promise<void> {
       adventureDir: dirInfo.dir,
       log: logDir,
       phases: results,
+      ...(finalProgress ? { progress: { done: finalProgress.done, total: finalProgress.total, next: finalProgress.next, file: finalProgress.progressFile } } : {}),
       ...(bad
         ? { stoppedAt: bad.phase, next: `Fix the errors listed for "${bad.phase}" (by hand or with a stronger model), then run again: finished phases are skipped.` }
         : { next: "All requested phases are done. The .mod is not built: build it with repack_module when you want to play." }),

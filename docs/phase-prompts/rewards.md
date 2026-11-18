@@ -1,6 +1,6 @@
 ---
 phase: rewards
-profile: loot, quests
+profile: rewards
 specs: quest
 reads: Module, Plot, Areas, Environment, Actors, Quests, Challenges, Affordances, Polish
 writes: Rewards
@@ -23,7 +23,7 @@ You set what the party earns, describe the module for players, and write the gui
 7. `write_dm_guide(text: "...")` (shape below), then `create_dm_area()`.
 8. `audit_module()`: the "DM area and books" row is done.
 9. `verify_all()`: `shippable` is true. If not, repair the entries in `fixFirst` that this phase caused.
-10. `write_story_section(section: "Rewards", text: "...")`, then `phase_check(phase: "rewards", step: "end")`.
+10. `write_story_section(section: "Rewards", text: "...")`, then `phase_check(phase: "rewards", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Quest reward by target level
 

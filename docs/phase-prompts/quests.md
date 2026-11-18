@@ -19,7 +19,7 @@ You turn each quest of the plot into one short spec. `build_quest` writes the jo
    3. `build_quest(spec: "<the JSON>")`. Keep the `adventureMd` text it returns.
    4. `verify_dialog(resref: "dlg_elara")` for the giver's dialog: no errors.
 4. `verify_quest_completability()` and `verify_journal()`: no gaps for your quests. To change a quest, change the spec and build again.
-5. `write_story_section(section: "Quests", text: "...")` with every `adventureMd` block, then `phase_check(phase: "quests", step: "end")`.
+5. `write_story_section(section: "Quests", text: "...")` with every `adventureMd` block, then `phase_check(phase: "quests", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Spec shape
 

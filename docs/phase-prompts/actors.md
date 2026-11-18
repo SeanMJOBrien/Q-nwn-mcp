@@ -23,7 +23,7 @@ You create the friendly people of the adventure: key NPCs with a conversation, c
    2. Each: `build_companion(resref: "cmp_borin", name: "Borin", area: "village", x: "50", y: "60", race: "0", classId: "2", level: "3", gender: "0", introduction: "...", backstory: "...")`. Level = the adventure's target level.
    3. `verify_creature(resref: "cmp_borin", henchman: true)`: no errors.
 6. Animals (2 to 5 per outdoor area, 0 to 1 indoors): `create_creature_blueprint(resref: "amb_deer", tag: "amb_deer", name: "Deer", sourceResref: "nw_deer", faction: "2")` once per kind, then `place_creature(area: "darkforest", blueprint: "amb_deer", x: "65", y: "95")`.
-7. `write_story_section(section: "Actors", text: "...")`, then `phase_check(phase: "actors", step: "end")`.
+7. `write_story_section(section: "Actors", text: "...")`, then `phase_check(phase: "actors", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Numbers
 

@@ -145,14 +145,19 @@ Give the client only the tools a task needs. Suggested profiles; counts are appr
 | `read` | `load_module`, `get_*`, `list_*`, `search_*`, `get_dialog_tree`, `visualize_area` | Explore a module |
 | `quests` | `build_quest`, `remove_quest`, `verify_quest_completability`, `verify_journal`, `get_journal`, `get_dialog_tree`, `list_creatures`, `list_items` | Add or fix quests |
 | `actors` | `build_key_npc`, `build_companion`, `create_dialog`, `add_dialog_node`, `add_dialog_return_links`, `place_creature`, `randomize_npc_appearance` | NPCs and conversations |
-| `areas` | `suggest_area_size`, `create_area`, `adventure_generate_layout`, `adventure_apply_layout`, `adventure_create_transition`, `check_area_connectivity`, `place_*`, `probe_ground`, `fix_object_heights` | Build areas |
+| `areas` | `suggest_area_size`, `create_area`, `adventure_*`, `paint_tiles`, `place_tile_doors`, `link_doors`, `set_module_start`, `check_area_connectivity`, `check_path`, `probe_ground` | Build areas (35 tools with the core) |
+| `dress` | `place_placeable`, `place_sound`, `place_waypoint`, `adventure_find_walkable`, `list_blueprints`, `fix_object_heights`, `move_object`, `remove_object` | Environment phase (27) |
+| `rewards` | `create_reward_system`, `build_quest`, `list_treasure_samples`, `import_treasure_item`, `add_items_to_container`, `write_dm_guide`, `create_dm_area`, `verify_all` | Rewards phase (27) |
 | `encounters` | `compose_encounter`, `suggest_encounter`, `forge_creature`, `place_encounter`, `create_treasure_system` | Fights and loot |
-| `verify` | `verify_*`, `validate_module`, `audit_module`, `phase_check`, `run_live_verification` | Check and test |
+| `verify` | `verify_all`, `verify_area`, `verify_creature`, `verify_dialog`, `verify_journal`, `verify_coop_rules`, `verify_quest_completability`, `verify_story`, `validate_module`, `audit_module` | Module-wide checks (`verify_all` runs every per-object check; `run_live_verification` is in `fix`) |
+
+Every phase's profile is kept under 40 tools, core included (`src/tool-profiles.test.ts`; 2026-11-17: plot 16, quests 21,
+environment 27, rewards 27, challenges 29, actors 30, polish 31, areas 35, affordances 35).
 
 **Built (W1, 2026-11-13).** `MCP_TOOL_PROFILE=quests,verify` (comma list of `read`, `plot`, `quests`, `actors`, `areas`,
-`encounters`, `loot`, `fix`, `verify`; `all` or unset = every tool) registers only those tools plus a small always-on core
-(`load_module`, `get_module_summary`, `get_phase_prompt`, `phase_check`, `read_story`, `write_story_section`,
-`repack_module`, `undo_last_change`). An unknown name stops the server with the list of valid ones. The profiles are exact names and
+`dress`, `encounters`, `loot`, `rewards`, `fix`, `verify`; `all` or unset = every tool) registers only those tools plus a small always-on core
+(`create_module`, `load_module`, `get_module_summary`, `get_phase_prompt`, `phase_check`, `get_progress`, `read_story`,
+`write_story_section`, `repack_module`, `undo_last_change`). An unknown name stops the server with the list of valid ones. The profiles are exact names and
 `prefix*` globs in `src/tool-profiles.ts`; `src/register-all.ts` holds the registration list. Measured over stdio:
 all tools 212, `quests,verify` 38. `src/tool-profiles.test.ts` fails if a profile entry names a tool that no longer
 exists, if `quests,verify` reaches 40 tools, or if one profile outgrows 60 tools. A new tool is in no profile until

@@ -16,7 +16,7 @@ You write the story outline of a short Neverwinter Nights adventure. Later phase
 4. `list_tilesets()` and choose one tileset resref for each location.
 5. Write the section with `write_story_section(section: "Plot", text: "...")` in the format below.
 6. `verify_story()`. Fix what it reports by writing the section again.
-7. `phase_check(phase: "plot", step: "end")`.
+7. `phase_check(phase: "plot", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## Format of the section
 

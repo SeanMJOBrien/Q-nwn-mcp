@@ -15,7 +15,9 @@ import { requireIndex } from "../module-loader.js";
 import { adventureFileNames, adventurePath as advFile, ensureAdventureDir } from "../util/adventure-dir.js";
 import { defaultFocus, FOCUS, guideFor, type Focus } from "../util/focus.js";
 import type { GffObj } from "../types/gff.js";
-import { getFieldStr } from "../types/gff.js";
+import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
+import { DM_AREA_RESREF } from "../util/dm-books.js";
+import { type AreaFacts, buildChecklist, type ModuleFacts, nextStep, type PhaseStatus, renderProgress } from "../util/progress.js";
 import {
   clearScopeFields,
   filterForPhase,
@@ -68,6 +70,43 @@ async function recordStatus(dir: string, phase: Phase, entry: PhaseEntry): Promi
   }
   await fs.writeFile(statusPath, JSON.stringify(mergeStatus(existing, phase, entry), null, 2));
   return statusPath;
+}
+
+/** What get_progress needs to know about the loaded module. */
+export function gatherModuleFacts(index: ReturnType<typeof requireIndex>, scopeRecorded: boolean, dmGuideWritten: boolean): ModuleFacts {
+  const areas = new Map<string, AreaFacts>();
+  for (const [resref] of index.areas) {
+    const are = (index.parsedGff.get(`${resref}.are`) ?? {}) as GffObj;
+    const git = (index.parsedGff.get(`${resref}.git`) ?? {}) as GffObj;
+    const tiles = new Set(getFieldList(are, "Tile_List").map((t) => getFieldNum(t, "Tile_ID")));
+    areas.set(resref, {
+      width: getFieldNum(are, "Width"),
+      height: getFieldNum(are, "Height"),
+      tileset: getFieldStr(are, "Tileset").toLowerCase(),
+      distinctTiles: tiles.size,
+      props: getFieldList(git, "Placeable List").length,
+      mapPins: getFieldList(git, "WaypointList").filter((w) => getFieldNum(w, "HasMapNote") === 1).length,
+      creatures: getFieldList(git, "Creature List").map((c) => ({
+        name: `${getFieldLocStr(c, "FirstName")} ${getFieldLocStr(c, "LastName")}`.trim(),
+        hostile: getFieldNum(c, "FactionID") === 1,
+        tag: getFieldStr(c, "Tag"),
+        resref: getFieldStr(c, "TemplateResRef").toLowerCase(),
+      })),
+      encounters: getFieldList(git, "Encounter List").length,
+      stores: getFieldList(git, "StoreList").length,
+      storeTags: getFieldList(git, "StoreList").map((st) => getFieldStr(st, "Tag")),
+      triggerTags: getFieldList(git, "TriggerList").map((t) => getFieldStr(t, "Tag")),
+      containers: getFieldList(git, "Placeable List")
+        .filter((pl) => getFieldNum(pl, "HasInventory") === 1)
+        .map((pl) => ({ tag: getFieldStr(pl, "Tag"), items: getFieldList(pl, "ItemList").length })),
+    });
+  }
+  const entryArea = getFieldStr((index.parsedGff.get("module.ifo") ?? {}) as GffObj, "Mod_Entry_Area").toLowerCase();
+  const start = index.areas.has(entryArea) ? entryArea : [...index.areas.keys()][0];
+  const graph = start ? computeConnectivity(index, start).graph : {};
+  const jrl = (index.parsedGff.get("module.jrl") ?? {}) as GffObj;
+  const journalQuests = getFieldList(jrl, "Categories").flatMap((c) => [getFieldLocStr(c, "Name"), getFieldStr(c, "Tag")].filter(Boolean));
+  return { areas, graph, entryArea, journalQuests, dmAreaResref: DM_AREA_RESREF, dmGuideWritten, scopeRecorded };
 }
 
 export function registerPhaseTools(server: McpServer): void {
@@ -256,9 +295,54 @@ export function registerPhaseTools(server: McpServer): void {
           ...(connectivity ? { connectivity } : {}),
           statusFile: statusPath,
           ...(p === "quests" ? { alsoRun: "verify_quest_completability" } : {}),
+          next: status === "success" ? "get_progress() for the next step" : "fix the errors above, then run this check again",
         },
         false,
       );
+    },
+  );
+
+  server.tool(
+    "get_progress",
+    "Where the build of this module stands and the ONE next step, with the exact call. Ticks every step of the whole process (goal, story, each area created and laid out, each connection, start point, props and map pins per area, each key NPC, each quest, enemies, store, verify, DM guide and area) from the module's real state, and saves the checklist as the module's progress file (<Title>-progress.md in its folder). Call it at the start of a session, after each step, and whenever unsure what to do next. `note` adds a line to the file's Notes (decisions, open questions) that later sessions read.",
+    {
+      note: z.string().optional().describe("One line to add to the Notes, e.g. a decision or what to ask the user"),
+      full: z.boolean().optional().describe("true: return every step, not only the open ones of the current phase"),
+      phase: z.string().optional().describe('Only this phase\'s open steps, e.g. "areas" (start, plot, areas, environment, actors, quests, challenges, affordances, polish, rewards, ship)'),
+    },
+    { idempotentHint: true },
+    async ({ note, full, phase }) => {
+      const index = requireIndex();
+      const dir = await ensureAdventureDir(index);
+      const story = await readIfExists(advFile(dir, "story"));
+      let status: Record<string, PhaseStatus> | undefined;
+      try {
+        const raw = await readIfExists(advFile(dir, "status"));
+        status = raw ? (JSON.parse(raw) as { phases?: Record<string, PhaseStatus> }).phases : undefined;
+      } catch {
+        status = undefined;
+      }
+      const facts = gatherModuleFacts(index, (await readIfExists(advFile(dir, "scope"))) !== null, (await readIfExists(advFile(dir, "dmGuide"))) !== null);
+      const { items } = buildChecklist(story, status, facts);
+      const progressPath = advFile(dir, "progress");
+      const md = renderProgress(index.moduleName, items, await readIfExists(progressPath), note);
+      await fs.writeFile(progressPath, md, "utf8");
+      const next = nextStep(items);
+      const done = items.filter((i) => i.done).length;
+      const open = items.filter((i) => !i.done && (full || i.phase === (phase?.toLowerCase() || next?.phase)));
+      return text({
+        module: index.moduleName,
+        done,
+        total: items.length,
+        phase: next?.phase ?? "done",
+        next: next
+          ? { step: next.label, call: next.call, ...(next.detail ? { why: next.detail } : {}), ...(next.readFirst ? { readFirst: next.readFirst } : {}) }
+          : "Every step is done.",
+        [full ? "steps" : "openInThisPhase"]: (full ? items : open).map((i) => `${i.done ? "[x]" : "[ ]"} ${i.label}`),
+        ...(phase && !full ? { open: open.map((i) => ({ id: i.id, step: i.label, call: i.call, ...(i.detail ? { why: i.detail } : {}) })) } : {}),
+        progressFile: progressPath,
+        rule: "Do the next step, then call get_progress again. Build the .mod only when the user asks.",
+      });
     },
   );
 

@@ -39,7 +39,8 @@ export function loadableModules(limit = 8): { modules: string[]; projects: strin
 export const START_STEPS =
   "To start a NEW module: create_module(name: \"The Lost Tomb\", filename: \"the-lost-tomb\") — it creates and loads it. " +
   "To open an EXISTING one: load_module(modPath: \"<file>.mod\" or a module project folder). " +
-  "Then get_module_summary to see what is in it, and get_phase_prompt(phase: \"plot\") for the step-by-step build instructions.";
+  "Then get_progress: it shows where the build stands and the one next step with the exact call (call it again after every step); " +
+  "get_phase_prompt(phase) gives each phase's step-by-step instructions.";
 
 /** The text of the "no module loaded" error and answer. */
 export function noModuleMessage(): string {

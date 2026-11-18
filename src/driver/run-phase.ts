@@ -121,6 +121,21 @@ export function withoutStartCheck(body: string, phase: Phase): string {
   return body.replace(line, "1. (Already done for you: the start check passed.)");
 }
 
+interface ProgressStep {
+  id?: string;
+  step: string;
+  call?: string;
+  why?: string;
+}
+
+/** Open steps as a short list for the model ("" when there are none). */
+export function planText(open: ProgressStep[], heading: string): string {
+  if (!open.length) return "";
+  const lines = open.slice(0, 12).map((o) => `- ${o.step}${o.call ? `: ${o.call}` : ""}${o.why ? ` (${o.why})` : ""}`);
+  if (open.length > 12) lines.push(`- ... and ${open.length - 12} more (get_progress lists them)`);
+  return `${heading ? `\n\n${heading}:` : ""}\n${lines.join("\n")}`;
+}
+
 function checkOk(text: string): { ok: boolean; skipped: boolean; errors: string[] } {
   try {
     const r = JSON.parse(text) as { ok?: boolean; skipped?: boolean; errors?: string[]; stop?: string; error?: string };
@@ -140,7 +155,9 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
 
   const prompt = loadPhasePrompt(phase);
   const profile = resolveToolProfile(prompt.profile.join(","));
-  const hostTools = (await host.listTools()).filter((t) => isToolAllowed(t.name, profile) && !DRIVER_ONLY.has(t.name));
+  const allTools = await host.listTools();
+  const hostTools = allTools.filter((t) => isToolAllowed(t.name, profile) && !DRIVER_ONLY.has(t.name));
+  const hasProgress = allTools.some((t) => t.name === "get_progress");
   const byName = new Map(hostTools.map((t) => [t.name, t]));
   const toolSpecs: ToolSpec[] = hostTools.map((t) => ({ name: t.name, description: t.description, parameters: t.inputSchema as Record<string, unknown> }));
 
@@ -148,10 +165,38 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
   if (start.skipped) return { ...result, status: "skipped" };
   if (!start.ok) return { ...result, status: "blocked", reason: start.errors[0], errors: start.errors };
 
+  // The plan: this phase's open steps as get_progress sees them in the module (per area, NPC, quest...).
+  const openSteps = async (): Promise<ProgressStep[]> => {
+    if (!hasProgress) return [];
+    try {
+      const r = JSON.parse((await host.callTool("get_progress", { phase })).text) as { open?: ProgressStep[] };
+      return (r.open ?? []).filter((o) => !/\.(check|section)$/.test(o.id ?? ""));
+    } catch {
+      return [];
+    }
+  };
+  const planAtStart = await openSteps();
+  if (planAtStart.length) log({ event: "plan", open: planAtStart.map((o) => o.step) });
+
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM },
-    { role: "user", content: `${withoutStartCheck(prompt.body, phase)}\n\nBegin with step 2.` },
+    { role: "user", content: `${withoutStartCheck(prompt.body, phase)}${planText(planAtStart, "Steps open in this phase now (get_progress)")}\n\nBegin with step 2.` },
   ];
+  // phase_check judges the phase; get_progress may still list steps it does not check (a map pin, an NPC). The model
+  // is told once and may then finish.
+  let nudged = false;
+  const accept = async (): Promise<boolean> => {
+    if (nudged) return true;
+    const open = await openSteps();
+    if (!open.length) return true;
+    nudged = true;
+    log({ event: "progress_open", open: open.map((o) => o.step) });
+    messages.push({
+      role: "user",
+      content: `phase_check passed, but these steps of the phase are still open:${planText(open, "")}\nDo them now (leave out one the story does not need), then call phase_check(phase: "${phase}", step: "end") again.`,
+    });
+    return false;
+  };
   let failedChecks = 0;
   let lastFailing = "";
   let sameFailures = 0;
@@ -159,7 +204,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
   const judge = async (): Promise<boolean> => {
     const end = checkOk((await host.callTool("phase_check", { phase, step: "end" })).text);
     log({ event: "phase_check_end", by: "driver", ok: end.ok, errors: end.errors.slice(0, 10) });
-    if (end.ok) return true;
+    if (end.ok) return accept();
     result.errors = end.errors;
     failedChecks++;
     messages.push({
@@ -222,7 +267,10 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
 
       if (call.name === "phase_check" && args.phase === phase && args.step === "end") {
         const end = checkOk(out.text);
-        if (end.ok) return { ...result, status: "success", errors: [] };
+        if (end.ok) {
+          if (await accept()) return { ...result, status: "success", errors: [] };
+          continue;
+        }
         result.errors = end.errors;
         failedChecks++;
       }

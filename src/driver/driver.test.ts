@@ -182,6 +182,44 @@ describe("runPhase", () => {
     expect(seen[3].some((m) => m.role === "user" && m.content.includes("repeated the same failing call"))).toBe(true);
   });
 
+  it("hands the model the phase's open steps from get_progress, and once more when phase_check passes with steps open", async () => {
+    const base = fakeHost([]);
+    let pinPlaced = false;
+    const host: ToolHost = {
+      listTools: async () => [...(await base.listTools()), tool("get_progress", { phase: str })],
+      callTool: async (name, args) => {
+        if (name === "get_progress") {
+          const open = [
+            ...(pinPlaced ? [] : [{ id: "environment.road.pins", step: "Road: map pins", call: 'place_waypoint(area: "road", mapNote: "...")' }]),
+            { id: "plot.check", step: "phase_check end passes for plot" },
+          ];
+          return { text: JSON.stringify({ open }), isError: false };
+        }
+        if (name === "plan_adventure_shape") pinPlaced = true;
+        return base.callTool(name, args);
+      },
+    };
+    const seen: ChatMessage[][] = [];
+    const r = await runPhase(
+      host,
+      scripted(
+        [
+          [call("write_story_section", { section: "Plot", text: "ok" })],
+          [call("phase_check", { phase: "plot", step: "end" })],
+          [call("plan_adventure_shape", { playMinutes: "90" })],
+          [call("phase_check", { phase: "plot", step: "end" })],
+        ],
+        seen,
+      ),
+      "plot",
+    );
+    expect(r.status).toBe("success");
+    expect(seen[0][1].content).toContain("Steps open in this phase now (get_progress):\n- Road: map pins: place_waypoint");
+    expect(seen[0][1].content).not.toContain("phase_check end passes"); // the check and section steps are the prompt's own
+    expect(seen[2].some((m) => m.role === "user" && m.content.includes("phase_check passed, but these steps"))).toBe(true);
+    expect(r.steps).toBe(4);
+  });
+
   it("reports a skipped phase and a blocked phase without calling the model", async () => {
     const host = (answer: object): ToolHost => ({ listTools: async () => [], callTool: async () => ({ text: JSON.stringify(answer), isError: false }) });
     const never = async (): Promise<ChatMessage> => {

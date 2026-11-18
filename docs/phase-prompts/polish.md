@@ -19,7 +19,7 @@ You check the whole module and fix what the checkers report. You do not add new 
 7. `verify_quest_completability()`: every quest can be finished. `verify_journal()`: no errors.
 8. `verify_coop_rules()`: no errors (every reward reaches every player).
 9. `audit_module()`: read which parts it lists as missing.
-10. `write_story_section(section: "Polish", text: "...")`, then `phase_check(phase: "polish", step: "end")`.
+10. `write_story_section(section: "Polish", text: "...")`, then `phase_check(phase: "polish", step: "end")`. Then `get_progress()`: what is still open, and the next step.
 
 ## How to read a finding
 

@@ -207,9 +207,17 @@ of `verify_all`.
 "env": { "MCP_TOOL_PROFILE": "quests,verify" }
 ```
 
-Profiles: `read`, `plot`, `quests`, `actors`, `areas`, `encounters`, `loot`, `fix`, `verify`. With a profile set, the
+Profiles: `read`, `plot`, `quests`, `actors`, `areas`, `dress`, `encounters`, `loot`, `rewards`, `fix`, `verify` (each phase prompt names its own; every phase stays under 40 tools). With a profile set, the
 big results (`visualize_area`, `verify_all`, `get_module_summary`) come back in a short form; pass `brief: false` for
 the full one. In such a session, `get_phase_prompt(phase: "quests")` returns the instruction sheet for a phase.
+
+**Tracking progress: `get_progress`** (always on). It ticks every step of the build (each area created and laid out,
+each connection, map pins, each NPC, each quest, enemies, store, verify, DM guide) from the module's real state, saves
+the checklist as `adventures/<Title>/<Title>-progress.md`, and returns the one next step with its exact call. Tell the
+model to call it at the start and after every step; a new session picks up where the last one stopped. `note: "..."`
+keeps decisions in the file's Notes. The driver uses it as its plan: each phase starts with its open steps
+listed, a phase whose check passes with steps still open is told once to finish them, and progress is printed between
+phases and in the run summary. The blank form for a client without it: [build-checklist.md](build-checklist.md).
 
 **Keeping the server current.** On each machine that runs it, `./UpdateMCP.sh` (`UpdateMCP.cmd` on Windows) pulls,
 installs and builds; then reconnect the MCP server in the client. An old build is the usual cause of a client error

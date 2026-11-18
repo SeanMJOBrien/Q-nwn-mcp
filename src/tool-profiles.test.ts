@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { registerAll } from "./register-all.js";
+import { PHASES } from "./util/phase-check.js";
+import { loadPhasePrompt } from "./util/phase-prompts.js";
 import {
   CORE_TOOLS,
   TOOL_PROFILES,
@@ -33,6 +35,14 @@ describe("tool profiles", () => {
     expect(names).toContain("load_module");
     expect(names).not.toContain("paint_tiles");
   });
+
+  // A small model chooses tools worse as the list grows and every schema costs context: each phase stays under 40.
+  for (const phase of PHASES) {
+    it(`the ${phase} phase's profile lists fewer than 40 tools`, () => {
+      const profile = loadPhasePrompt(phase).profile.join(",");
+      expect(collect(profile).length, `${phase} (${profile})`).toBeLessThan(40);
+    });
+  }
 
   it("every exact entry names a real tool and every glob matches something", () => {
     for (const [profile, patterns] of Object.entries({ core: CORE_TOOLS, ...TOOL_PROFILES })) {
