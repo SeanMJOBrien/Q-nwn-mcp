@@ -341,7 +341,9 @@ export function registerPhaseTools(server: McpServer): void {
         [full ? "steps" : "openInThisPhase"]: (full ? items : open).map((i) => `${i.done ? "[x]" : "[ ]"} ${i.label}`),
         ...(phase && !full ? { open: open.map((i) => ({ id: i.id, step: i.label, call: i.call, ...(i.detail ? { why: i.detail } : {}) })) } : {}),
         progressFile: progressPath,
-        rule: "Do the next step, then call get_progress again. Build the .mod only when the user asks.",
+        rule:
+          "Do the next step, then call get_progress again. Do not ask the user which part to do next; ask only for creative " +
+          "choices or before building the .mod (only when the user asks).",
       });
     },
   );

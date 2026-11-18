@@ -59,6 +59,10 @@ export const SERVER_INSTRUCTIONS =
   "A new adventure is always its own new module from create_module: a complete, playable module (it uses the base " +
   "game's tilesets, creatures and items directly; nothing is merged into or out of another .mod). Never build a new " +
   "adventure inside an existing module such as a test module; load_module is for continuing or editing that module. " +
+  "While building a whole adventure, do not ask the user which part to do next: the order is fixed (plot, areas, " +
+  "environment, actors, quests, challenges, affordances, polish, rewards), so call get_progress and do its next step. " +
+  "Ask the user only for creative choices (tone, a character, a plot direction), for their goal when none is recorded, " +
+  "and before building the .mod. " +
   "Numbers may be given as numbers or strings, lists and objects as JSON values or JSON text. A result that says " +
   "success: false or isError explains what to change; fix that argument instead of repeating the same call. Edits " +
   "are saved as you go; repack_module builds the .mod only when the user asks.";
