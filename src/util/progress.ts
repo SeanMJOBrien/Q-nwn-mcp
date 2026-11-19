@@ -549,7 +549,7 @@ export function buildChecklist(
       for (const tag of targets.containers.get(l.resref) ?? []) {
         const there = (a.containers ?? []).some((c) => tagKey(c.tag) === tag);
         if (a.containers) add("environment", `environment.${l.resref}.c.${tag}`, `${l.name}: container ${tag} (named in ## Environment) is placed`, there,
-          `place_placeable(area: "${l.resref}", ...) with tag ${tag}, or correct the Environment section`, undefined, about);
+          `place_container(area: "${l.resref}", tag: "${tag}")`, undefined, { ...about, ...(there ? {} : { auto: { tool: "place_container", args: { area: l.resref, tag, blueprint: "plc_chest1" } } }) });
       }
     }
     section("environment");
@@ -653,7 +653,8 @@ export function buildChecklist(
     for (const [r, tag] of targets.loot) {
       const c = facts.areas.get(r)?.containers?.find((x) => tagKey(x.tag) === tag);
       if (facts.areas.get(r)?.containers) add("affordances", `affordances.${r}.c.${tag}`, `container ${tag} in ${r} holds the loot ## Affordances names`, !!c && c.items > 0,
-        `add_items_to_container(area: "${r}", containerTag: "${tag}", items: "[...]")`, undefined, { areas: [r] });
+        `add_items_to_container(area: "${r}", containerTag: "${tag}", items: "[...]")`, undefined,
+        { areas: [r], ...(c ? { auto: { tool: "add_items_to_container", args: { area: r, containerTag: tag, items: JSON.stringify(starterLoot(targetLevel)) } } } : {}) });
     }
     if (facts.startingGold !== undefined) {
       const level = /\*\*(?:Target )?Level:\*\*\s*(\d+)/i.exec(sections.get("Module") ?? "")?.[1] ?? "<level>";

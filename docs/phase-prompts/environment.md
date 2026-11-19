@@ -48,6 +48,7 @@ You dress each area with objects, sounds and map notes so it looks like the plac
 - Keep exits clear: nothing within 3 m of a transition.
 - Put related objects together (table with chairs, fire with seats), 1 to 2 m apart.
 - Place at least one container (chest, crate or barrel) in every area that has a fight or a secret. Later phases put loot in them.
+- A container the story names (`**Containers:** ... (tag)` in ## Environment) with its tag: `place_container(area: "<area>", tag: "<the tag exactly>")`. Use the tag as written; do not make up another.
 - No wall torches, banners or other objects that hang on a wall.
 - Every room or clearing gets at least one object.
 

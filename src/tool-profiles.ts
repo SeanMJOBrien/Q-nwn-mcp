@@ -104,6 +104,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   // Dress built areas (environment phase): props, sounds, map pins.
   dress: [
     "dress_area",
+    "place_container",
     "place_placeable",
     "place_sound",
     "place_waypoint",
@@ -147,11 +148,11 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   loot: [
     "build_store",
+    "place_container",
     "set_starting_gold",
     "get_wealth_budget",
     "create_store_blueprint",
     "place_store",
-    "create_item_blueprint",
     "add_items_to_container",
     "list_blueprints",
     "list_treasure_samples",

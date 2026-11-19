@@ -317,6 +317,9 @@ Use these resrefs directly. Organized by environment theme. Mix and match across
 | Braziers | plc_brazier, x3_plc_brazier |
 
 ### Containers (use across any theme)
+
+A container the story names by tag (the Environment section's `**Containers:**` line) is placed with `place_container(area, tag)`: it finds open ground and uses the tag as written. Later phases fill it by that tag.
+
 | Type | Resrefs |
 |------|---------|
 | Chests | plc_chest1, plc_chest2, plc_chest3, plc_chest4 |

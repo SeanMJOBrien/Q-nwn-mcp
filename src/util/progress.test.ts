@@ -282,6 +282,22 @@ describe("fixes from the Millers Daughter run", () => {
     expect(step?.done).toBe(true);
     expect(tagKey("Chest - 1")).toBe("chest___1");
   });
+  it("a container the Environment section names and the module lacks is placed by place_container with its story tag", () => {
+    const [s, f] = facts("\n## Environment\n### `mill`\n- **Containers:** Mill chest (chest_mill)\n\n## Affordances\n### Container Loot\n- `mill` chest_mill: 2x nw_it_mpotion001\n");
+    const items = buildChecklist(s, undefined, f as never).items;
+    expect(items.find((i) => i.id === "environment.mill.c.chest_mill")?.auto).toEqual({ tool: "place_container", args: { area: "mill", tag: "chest_mill", blueprint: "plc_chest1" } });
+    // Filling waits until the container exists: the auto call is only for a container that is there.
+    expect(items.find((i) => i.id === "affordances.mill.c.chest_mill")?.auto).toBeUndefined();
+  });
+
+  it("a container that is there and already holds loot is ticked; no call is handed out for it", () => {
+    const [s, f] = facts("\n## Environment\n### `village`\n- **Containers:** Chest - 1 (chest___1)\n\n## Affordances\n### Container Loot\n- `village` Chest___1: 2x nw_it_mpotion001\n");
+    const items = buildChecklist(s, undefined, f as never).items;
+    const step = items.find((i) => i.id === "affordances.village.c.chest___1");
+    expect(step?.done).toBe(true);
+    expect(step?.auto).toBeUndefined();
+    expect(items.find((i) => i.id === "environment.village.c.chest___1")?.done).toBe(true);
+  });
 });
 
 describe("rewards steps", () => {

@@ -24,6 +24,7 @@ import { notFoundText } from "../util/blueprint-hint.js";
 import { DM_AREA_RESREF } from "../util/dm-books.js";
 import { layoutStyles, MIN_SINGLE_ROOM_AREA_SIZE } from "../util/layout-generator.js";
 import { getKeptResult, keptIds, shapeLongText, valueAtPath } from "../util/result-store.js";
+import { alreadyExistsResult } from "../util/tool-result.js";
 import { callTool } from "../util/tool-registry.js";
 import { findOpenGround, loadAreaWalkGrid } from "../util/walkgrid.js";
 import { buildAreaTransitions, buildTagToAreaMap } from "./tileset-tools.js";
@@ -553,7 +554,47 @@ function parseList<T>(raw: string | undefined, field: string): T[] | { error: st
   }
 }
 
+/** The container placed for a tag the story names, on open ground clear of the module's other objects. */
+async function placeContainer(area: string, tag: string, blueprint: string) {
+  const index = requireIndex();
+  const git = index.parsedGff.get(`${area}.git`) as GffObj | undefined;
+  if (!git) return json({ ok: false, field: "area", error: `area ${area} is not in the module` }, true);
+  const wanted = tag.toLowerCase();
+  if (getFieldList(git, "Placeable List").some((p) => getFieldStr(p, "Tag").toLowerCase() === wanted)) {
+    return alreadyExistsResult(`placeable ${tag} in ${area}`, `Fill it: add_items_to_container(area: "${area}", containerTag: "${tag}", items: "[...]").`);
+  }
+  const taken: Point[] = ["Creature List", "Placeable List", "Door List"].flatMap((listName) =>
+    getFieldList(git, listName).map((o) => ({ x: getFieldNum(o, "XPosition") || getFieldNum(o, "X"), y: getFieldNum(o, "YPosition") || getFieldNum(o, "Y") })),
+  );
+  const spots = ((await openSpots(index, area, 1, 400, 3)) ?? []).filter((s) => taken.every((t) => dist(s, t) >= 3)).slice(0, 6);
+  let lastError = "no open ground left in the area";
+  for (const s of spots) {
+    const r = await callTool("place_placeable", { area, blueprint, x: String(s.x), y: String(s.y), tag });
+    if (!r.isError && r.json?.success === true) {
+      return json({ ok: true, area, tag, blueprint, x: s.x, y: s.y, next: `add_items_to_container(area: "${area}", containerTag: "${tag}", items: "[...]") fills it.` });
+    }
+    lastError = (r.json?.error as string | undefined) ?? r.text.slice(0, 160);
+    if (/not found|no blueprint|unknown blueprint/i.test(r.text)) {
+      lastError = await notFoundText("utp", blueprint);
+      break; // another spot will not help
+    }
+  }
+  return json({ ok: false, field: "blueprint", area, tag, error: `could not place ${tag} in ${area}: ${lastError}` }, true);
+}
+
 export function registerAreaBuildTools(server: McpServer): void {
+  server.tool(
+    "place_container",
+    "Place a container (a chest by default) with the tag the story names, on open ground in an area, for the loot phases to fill. Does nothing when the area already has a placeable with that tag. Use the tag exactly as the story's Environment or Affordances section writes it.",
+    {
+      area: z.string().describe("Area resref"),
+      tag: z.string().describe("The container's tag as the story names it, e.g. chest_crypt1"),
+      blueprint: z.string().optional().describe("Container blueprint resref (default plc_chest1)"),
+    },
+    { idempotentHint: true },
+    async ({ area, tag, blueprint }) => placeContainer(area, tag.trim(), blueprint?.trim() || "plc_chest1"),
+  );
+
   server.tool(
     "build_area",
     'Build one area from a short spec, in one call: picks the size (suggest_area_size) and feature groups (adventure_list_features) when not given, generates the layout, creates the area, applies the terrain, places the tile doors and sets music, sound and sky for the tileset. spec: {"resref":"millroad","name":"The Mill Road","tileset":"ttr01","connections":2} plus optional style, biome, purpose (inn, shop, home... for interiors), events (number of encounters/conversations, default 2), travel (true = long road), width, height (9-32 tiles; or size: small, medium, large), rooms, features (group names from adventure_list_features; other words only steer the choice), safeMode, seed, genericDoor. Answers with the transition points for connecting it (also kept for get_area_card). On a failure it names the step and field; call it again: an empty area it created is reused.',
