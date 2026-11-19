@@ -1,4 +1,5 @@
 import { markDirty } from "../util/dirty-state.js";
+import { alreadyExistsResult } from "../util/tool-result.js";
 import { resrefError } from "../util/resref.js";
 import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
 import { z } from "zod";
@@ -195,7 +196,7 @@ export function registerWriteTools(server: McpServer): void {
       const key = `${resrefLower}.uti`;
 
       if (index.resources.has(key)) {
-        return { content: [{ type: "text", text: `Resource already exists: ${key}` }] };
+        return alreadyExistsResult(key, `Use it (add_items_to_container, a store's inventory, a reward) by resref "${key.replace(/\.uti$/, "")}".`);
       }
 
       const needsResman = !!sourceResref;

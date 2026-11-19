@@ -124,6 +124,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
   ],
   encounters: [
     "build_enemy_group",
+    "build_trap",
     "compose_encounter",
     "suggest_encounter",
     "build_key_npc",
@@ -145,6 +146,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "verify_creature",
   ],
   loot: [
+    "build_store",
     "set_starting_gold",
     "get_wealth_budget",
     "create_store_blueprint",

@@ -48,9 +48,11 @@ describe("phase prompts", () => {
       it("starts and ends with phase_check and writes its section", () => {
         expect(prompt.body).toContain(`phase_check(phase: "${phase}", step: "start")`);
         expect(prompt.body).toContain(`phase_check(phase: "${phase}", step: "end")`);
-        expect(prompt.body).toContain(`write_story_section(section: "${OWN_SECTION[phase]}"`);
+        // The plot is written with write_plot (checked JSON); every other phase with write_story_section.
+        const writer = phase === "plot" ? "write_plot" : "write_story_section";
+        expect(prompt.body).toContain(phase === "plot" ? "write_plot(spec:" : `write_story_section(section: "${OWN_SECTION[phase]}"`);
         const last = calls.filter((c) => c.tool === "phase_check").pop();
-        const write = calls.filter((c) => c.tool === "write_story_section").pop();
+        const write = calls.filter((c) => c.tool === writer).pop();
         expect((write?.line ?? 0) <= (last?.line ?? -1)).toBe(true);
       });
     });

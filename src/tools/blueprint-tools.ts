@@ -8,6 +8,7 @@
  * - create_trap_blueprint: Create a new UTT trap trigger blueprint
  */
 
+import { alreadyExistsResult } from "../util/tool-result.js";
 import { resrefError } from "../util/resref.js";
 import { z } from "zod";
 import { factionWarning, parseFaction } from "../util/placement-hints.js";
@@ -79,6 +80,7 @@ export function registerBlueprintTools(server: McpServer): void {
         featIds = parsedFeats.ids;
       }
       { const bad = resrefError(resref); if (bad) return bad; }
+      if (requireIndex().resources.has(`${resref.toLowerCase()}.utc`)) return alreadyExistsResult(`${resref.toLowerCase()}.utc`, `Place it with place_creature(blueprint: "${resref.toLowerCase()}").`);
       const index = requireIndex();
 
       const params: CreatureBuildParams = {
@@ -151,7 +153,7 @@ export function registerBlueprintTools(server: McpServer): void {
       const key = `${resrefLower}.ute`;
 
       if (index.resources.has(key)) {
-        return { content: [{ type: "text", text: `Resource already exists: ${key}` }] };
+        return alreadyExistsResult(key, `Place it with place_encounter(blueprint: "${resrefLower}").`);
       }
 
       const needsResman = !!sourceResref;
@@ -254,7 +256,7 @@ export function registerBlueprintTools(server: McpServer): void {
       const key = `${resrefLower}.utm`;
 
       if (index.resources.has(key)) {
-        return { content: [{ type: "text", text: `Resource already exists: ${key}` }] };
+        return alreadyExistsResult(key, `Place it with place_store(blueprint: "${resrefLower}").`);
       }
 
       const needsResman = !!sourceResref || !!inventory;

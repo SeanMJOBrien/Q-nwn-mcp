@@ -96,6 +96,10 @@ For each phase, in order:
    from a step it has just been handed. A step still open after two tries is left open and the run moves on.
    **Phase mode** (plot, polish, rewards, or `--mode phase`): one conversation per phase, with the short instruction
    sheet and all the phase's tools.
+The plot itself is written as one checked JSON object (`write_plot`); free-text writing is not offered in the plot
+phase. Every tool marks a failure as an error (`isError`), and a repeated create call answers "already exists" as a
+success, so a retry never loops.
+
 3. It checks every tool call before running it and refuses a bad one with the name of the wrong field. A field error
    a step was refused with is listed on the cards of the phase's later steps ("Refused earlier in this phase"), so a
    fresh conversation does not make the same mistake. A tool that fails because of the machine's setup (a missing
@@ -107,7 +111,8 @@ For each phase, in order:
    Steps that leave no choice are done by the driver itself before the model is asked: each area's `build_area` (the
    spec comes from the plot), `dress_area` with the tileset's props, the exit pins and a chest, each person the plot
    names (`build_key_npc` with the plot's name, race, class and faction), the main quest (giver, defeat the
-   antagonist, return, once both stand), each fight area's
+   antagonist, return, once both stand), the connections and the start, the traps the plot names (`build_trap`), loot
+   in each container, the merchant's shop (`build_store`), starting gold, the DM area, each fight area's
    enemies (`build_enemy_group` with the kind and number the plot's Challenges line names), and the Areas,
    Environment, Actors, Challenges and Affordances sections (`write_story_section(draft: true)`, from what the module really holds). The model
    gets a step only when it is still open after that. A conversation ends when the model repeats the same failing call

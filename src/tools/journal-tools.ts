@@ -12,6 +12,7 @@
  * - remove_journal_entry: Remove an entry from a quest
  */
 
+import { alreadyExistsResult } from "../util/tool-result.js";
 import { z } from "zod";
 import path from "path";
 import fs from "fs/promises";
@@ -119,7 +120,7 @@ export function registerJournalTools(server: McpServer): void {
       // Check if a JRL already exists
       const existing = findJrl(index);
       if (existing) {
-        return { content: [{ type: "text", text: `Journal already exists: ${existing.key}` }] };
+        return alreadyExistsResult(existing.key, "Add quests with add_journal_quest (or build_quest).");
       }
 
       const jrlResref = (resref || "module").toLowerCase();
@@ -180,7 +181,7 @@ export function registerJournalTools(server: McpServer): void {
 
       // Check for duplicate tag
       if (findQuestByTag(categories, tag)) {
-        return { content: [{ type: "text", text: `Quest with tag '${tag}' already exists.` }] };
+        return alreadyExistsResult(`quest ${tag}`, `Add entries with add_journal_entry(questTag: "${tag}", ...).`);
       }
 
       const quest: GffObj = {

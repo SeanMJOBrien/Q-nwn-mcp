@@ -63,13 +63,13 @@ export function stepTools(id: string): string[] {
   if (phase === "actors") return ["build_key_npc", "build_creature", "list_creature_samples", "adventure_find_walkable", "get_dialog_tree", "verify_creature"];
   if (phase === "quests") return ["build_quest", "get_dialog_tree", "list_creatures", "list_items", "get_journal", "verify_quest_completability"];
   if (phase === "challenges") {
-    if (id.includes(".trap.")) return ["create_trap_blueprint", "place_trigger", "add_skill_check", "adventure_find_walkable"];
+    if (id.includes(".trap.") || id.endsWith(".plottrap")) return ["build_trap", "create_trap_blueprint", "place_trigger", "add_skill_check", "adventure_find_walkable"];
     if (id.includes(".boss.")) return ["build_key_npc", "compose_encounter", "list_creature_samples", "adventure_find_walkable", "get_area_creatures"];
     return ["build_enemy_group", "suggest_encounter", "place_creature", "place_encounter", "adventure_find_walkable", "get_area_creatures"];
   }
   if (phase === "affordances") {
     if (id === "affordances.gold") return ["set_starting_gold", "get_wealth_budget"];
-    if (id.startsWith("affordances.store")) return ["create_store_blueprint", "place_store", "adventure_find_walkable", "get_dialog_tree", "add_dialog_node", "list_creatures"];
+    if (id.startsWith("affordances.store")) return ["build_store", "create_store_blueprint", "place_store", "get_dialog_tree", "add_dialog_node", "list_creatures"];
     return ["add_items_to_container", "list_treasure_samples", "import_treasure_item", "list_blueprints", "get_wealth_budget", "get_area_placeables"];
   }
   if (id === "polish.verify") return ["verify_all", "check_area_connectivity", "add_dialog_return_links", "prune_dialog_orphans", "fix_object_heights", "move_object", "remove_object"];
@@ -233,6 +233,14 @@ export function parsePlotOutline(plot: string): PlotOutline {
     role: field(b, "Role")?.toLowerCase(),
     who: field(b, "Race, class, gender")?.toLowerCase(),
   }));
+  // Antagonists (write_plot: "- **Name:** who, in Location. Motive: ..."): people too, built hostile by the actors phase.
+  for (const line of (sub.get("antagonists") ?? "").split("\n")) {
+    const m = /^\s*-\s*\*\*(.+?):\*\*\s*(.*)$/.exec(line);
+    if (!m || npcs.some((n) => norm(n.name) === norm(m[1]))) continue;
+    const rest = m[2];
+    const where = /,?\s+in\s+([^.]+)\./.exec(rest)?.[1]?.trim() ?? locations.find((l) => norm(rest).includes(norm(l.name)))?.name;
+    npcs.push({ name: m[1].trim(), location: where, role: "antagonist", who: rest.split(/,\s+in\s+|\.\s/)[0].toLowerCase() });
+  }
   const quests = blocks(sub.get("quest objectives") ?? "", 4)
     .map(([h, b]) => ({
       name: h.replace(/^(primary|side)\s+quest:\s*/i, "").replace(/\s*\(optional\)\s*$/i, "").trim(),
@@ -269,6 +277,14 @@ export function nameMatches(npc: string, creature: string): boolean {
 function phaseDone(status: Record<string, PhaseStatus> | undefined, p: Phase): boolean {
   const s = status?.[p]?.status;
   return s === "success" || s === "skipped";
+}
+
+/** A container's loot for the party's level: two healing potions and some coin. */
+export function starterLoot(level: number): Array<{ resref: string; quantity: number }> {
+  return [
+    { resref: "nw_it_mpotion001", quantity: 2 },
+    { resref: "nw_it_gold001", quantity: Math.max(10, level * 25) },
+  ];
 }
 
 /** A person's resref and tag from the plot's name: "Mill Owner" -> mill_owner. */
@@ -442,13 +458,14 @@ export function buildChecklist(
       if (!ra || !rb) continue;
       const linked = (facts.graph[ra] ?? []).includes(rb) || (facts.graph[rb] ?? []).includes(ra);
       add("areas", `areas.link.${ra}.${rb}`, `${x} <-> ${y} connected`, linked,
-        `adventure_create_transition(areaA: "${ra}", aX: "<x>", aY: "<y>", areaB: "${rb}", bX: "<x>", bY: "<y>", tag: "<tag>") at the free transition points get_area_card shows, or link_doors(...) between door tags`,
-        undefined, { areas: [ra, rb] });
+        `adventure_create_transition(areaA: "${ra}", areaB: "${rb}") (uses the free transition points build_area left; give aX/aY/bX/bY to choose)`,
+        undefined, { areas: [ra, rb], auto: { tool: "adventure_create_transition", args: { areaA: ra, areaB: rb } } });
     }
     if (locs.length) {
       const first = locs[0].resref;
       const okStart = facts.entryArea !== "" && facts.entryArea !== "_start" && facts.areas.has(facts.entryArea) && !facts.areas.has("_start");
-      add("areas", "areas.start", "module start set in a story area (the empty _start area removed)", okStart, `set_module_start(area: "${first}", x: "<x>", y: "<y>")`, undefined, { areas: [first] });
+      add("areas", "areas.start", "module start set in a story area (the empty _start area removed)", okStart, `set_module_start(area: "${first}") (picks a spot)`, undefined,
+        { areas: [first], auto: { tool: "set_module_start", args: { area: first } } });
     }
     section("areas");
     endCheck("areas");
@@ -524,6 +541,12 @@ export function buildChecklist(
       const about = { areas: [r], subject: name, auto: { tool: "build_enemy_group", args: enemyArgs } };
       add("challenges", `challenges.${r}`, `${name}: enemies placed`, hostile,
         `build_enemy_group(area: "${r}", kind: "${group.kind}"${group.count ? `, count: "${group.count}"` : ""})${line ? ` (the plot: ${line})` : ""}`, undefined, about);
+      // A trap or obstacle the plot names here ("a pit trap"): the driver places one.
+      if (/trap/i.test(line) && a?.triggerTags) {
+        const kind = /acid/i.test(line) ? "acid" : /spike|pit|dart|blade/i.test(line) ? "spikes" : /lightning|electric|shock/i.test(line) ? "electric" : /cold|frost|ice/i.test(line) ? "cold" : "fire";
+        add("challenges", `challenges.${r}.plottrap`, `${name}: the trap the plot names is placed`, a.triggerTags.some((x) => x.toLowerCase().startsWith("trap")),
+          `build_trap(area: "${r}", kind: "${kind}")`, undefined, { areas: [r], subject: name, auto: { tool: "build_trap", args: { area: r, kind } } });
+      }
       const t = targets.fights.get(r);
       for (const b of t?.bosses ?? []) {
         const placed = !!a && a.creatures.some((c) => c.hostile && ((b.resref && (c.resref === b.resref || c.tag?.toLowerCase() === b.resref)) || nameMatches(b.name, c.name)));
@@ -544,7 +567,12 @@ export function buildChecklist(
   if (!skipped("affordances")) {
     if (outline?.merchant) {
       const stores = [...facts.areas.values()].reduce((s, a) => s + a.stores, 0);
-      add("affordances", "affordances.store", "the merchant's store placed", stores > 0, "create_store_blueprint(...), then place_store(...)");
+      // The merchant the plot names, by the tag it stands with: build_store does the five calls of the recipe.
+      const merchantName = (outline.npcs ?? []).find((n) => /merchant/.test(n.role ?? ""))?.name;
+      const merchant = merchantName ? [...facts.areas.values()].flatMap((x) => x.creatures).find((c) => !c.hostile && (c.tag?.toLowerCase() === npcResref(merchantName) || nameMatches(merchantName, c.name))) : undefined;
+      add("affordances", "affordances.store", "the merchant's store placed", stores > 0,
+        merchant?.tag ? `build_store(merchant: "${merchant.tag.toLowerCase()}")` : "build_store(merchant: \"<the merchant's tag>\")", undefined,
+        merchant?.tag ? { auto: { tool: "build_store", args: { merchant: merchant.tag.toLowerCase() } } } : {});
     }
     for (const [r, tag] of targets.stores) {
       const a = facts.areas.get(r);
@@ -554,7 +582,8 @@ export function buildChecklist(
       const a = facts.areas.get(l.resref);
       if (!a?.containers?.length || /boss/.test(l.purpose ?? "")) continue; // the boss room's chest is the rewards phase's
       add("affordances", `affordances.${l.resref}.loot`, `${l.name}: loot in at least one container`, a.containers.some((c) => c.items > 0),
-        `add_items_to_container(area: "${l.resref}", containerTag: "${a.containers[0].tag}", items: "[...]")`, undefined, { areas: [l.resref], subject: l.name });
+        `add_items_to_container(area: "${l.resref}", containerTag: "${a.containers[0].tag}", items: "[...]")`, undefined,
+        { areas: [l.resref], subject: l.name, auto: { tool: "add_items_to_container", args: { area: l.resref, containerTag: a.containers[0].tag, items: JSON.stringify(starterLoot(targetLevel)) } } });
     }
     for (const [r, tag] of targets.loot) {
       const c = facts.areas.get(r)?.containers?.find((x) => x.tag.toLowerCase() === tag);
@@ -563,7 +592,8 @@ export function buildChecklist(
     }
     if (facts.startingGold !== undefined) {
       const level = /\*\*(?:Target )?Level:\*\*\s*(\d+)/i.exec(sections.get("Module") ?? "")?.[1] ?? "<level>";
-      add("affordances", "affordances.gold", `players start at level ${level} with the gold for it`, facts.startingGold, `set_starting_gold(level: "${level}")`);
+      add("affordances", "affordances.gold", `players start at level ${level} with the gold for it`, facts.startingGold, `set_starting_gold(level: "${level}")`, undefined,
+        level !== "<level>" ? { auto: { tool: "set_starting_gold", args: { level } } } : {});
     }
     section("affordances");
     endCheck("affordances");
@@ -576,7 +606,8 @@ export function buildChecklist(
   }
   if (!skipped("rewards")) {
     add("rewards", "rewards.dmguide", "DM guide written", facts.dmGuideWritten, 'write_dm_guide(text: "...")');
-    add("rewards", "rewards.dmarea", "DM area with the story and DM-guide books", facts.areas.has(facts.dmAreaResref), "create_dm_area()");
+    add("rewards", "rewards.dmarea", "DM area with the story and DM-guide books", facts.areas.has(facts.dmAreaResref), "create_dm_area()", undefined,
+      facts.dmGuideWritten ? { auto: { tool: "create_dm_area", args: {} } } : {});
     section("rewards");
     endCheck("rewards");
   }

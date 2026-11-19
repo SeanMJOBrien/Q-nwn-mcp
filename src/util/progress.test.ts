@@ -201,3 +201,43 @@ describe("actor and quest steps from the plot", () => {
     expect(buildChecklist(story, undefined, placed).items.find((i) => i.id === "actors.mill_owner")?.done).toBe(true);
   });
 });
+
+describe("driver-run steps across the phases", () => {
+  it("reads antagonists from write_plot's format as hostile people of their location", () => {
+    const o = parsePlotOutline("### Locations\n#### 1. Camp\n- **Resref:** camp\n### Key NPCs\n### Antagonists\n- **Grak:** a half-orc bandit chief, in Camp. Motive: gold. Stopped by: a fight.\n");
+    expect(o.npcs).toEqual([{ name: "Grak", location: "Camp", role: "antagonist", who: "a half-orc bandit chief" }]);
+  });
+
+  it("hand the driver links, the start, a plot trap, loot, the store, gold and the DM area", () => {
+    const story = [
+      "## Module", "- **Target Level:** 4", "## Plot", "### Locations", "#### 1. Town", "- **Resref:** town", "- **Tileset:** ttr01", "- **Purpose:** hub",
+      "#### 2. Crypt", "- **Resref:** crypt", "- **Tileset:** tdc01", "- **Purpose:** adventure",
+      "### Connections", "- Town <-> Crypt", "### Key NPCs", "#### Bram", "- **Location:** Town", "- **Role:** merchant", "- **Race, class, gender:** dwarf fighter, male",
+      "### Challenges", "- Crypt: 4 skeletons, a pit trap", "### Loot & Economy", "- Merchant: Bram. Final reward: a sword.",
+    ].join("\n");
+    const area = (creatures: unknown[], containers: unknown[]) => ({ width: 9, height: 9, tileset: "ttr01", distinctTiles: 4, props: 6, mapPins: 1, creatures, encounters: 0, stores: 0, storeTags: [], triggerTags: [], containers });
+    const facts = {
+      areas: new Map([
+        ["town", area([{ name: "Bram", hostile: false, tag: "bram", resref: "bram" }], [{ tag: "Barrel", items: 0 }])],
+        ["crypt", area([], [{ tag: "plc_chest1", items: 0 }])],
+      ]),
+      graph: {},
+      entryArea: "_start",
+      journalQuests: [],
+      dmAreaResref: "dm_area",
+      dmGuideWritten: true,
+      scopeRecorded: true,
+      startingGold: false,
+    };
+    const { items } = buildChecklist(story, undefined, facts as never);
+    const auto = (id: string) => items.find((i) => i.id === id)?.auto;
+    expect(auto("areas.link.town.crypt")).toEqual({ tool: "adventure_create_transition", args: { areaA: "town", areaB: "crypt" } });
+    expect(auto("areas.start")).toEqual({ tool: "set_module_start", args: { area: "town" } });
+    expect(auto("challenges.crypt.plottrap")).toEqual({ tool: "build_trap", args: { area: "crypt", kind: "spikes" } });
+    expect(auto("challenges.crypt")?.args).toEqual({ area: "crypt", kind: "skeleton", count: "4" });
+    expect(auto("affordances.store")).toEqual({ tool: "build_store", args: { merchant: "bram" } });
+    expect(auto("affordances.gold")).toEqual({ tool: "set_starting_gold", args: { level: "4" } });
+    expect(JSON.parse(String(auto("affordances.town.loot")?.args.items))).toEqual([{ resref: "nw_it_mpotion001", quantity: 2 }, { resref: "nw_it_gold001", quantity: 100 }]);
+    expect(auto("rewards.dmarea")).toEqual({ tool: "create_dm_area", args: {} });
+  });
+});

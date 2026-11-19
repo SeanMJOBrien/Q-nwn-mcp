@@ -6,6 +6,7 @@
 
 import { z } from "zod";
 import { lenientShape } from "./lenient-args.js";
+import { markFailure } from "./tool-result.js";
 
 type Shape = Record<string, z.ZodType>;
 type Handler = (args: Record<string, unknown>, extra: unknown) => unknown;
@@ -35,8 +36,12 @@ export function recordTools<T extends { tool: (...args: any[]) => unknown }>(ser
           const description = typeof args[0] === "string" ? (args.shift() as string) : "";
           const shape = (args.length > 1 && typeof args[0] === "object" ? args.shift() : {}) as Shape;
           const annotations = (args.length > 1 ? args.shift() : undefined) as Recorded["annotations"];
-          registry.set(name, { description, shape, annotations, handler: args[0] as Handler });
-          return target.tool(name, ...rest);
+          // The result contract (util/tool-result.ts): a failure reported in the text gets isError, for the client and
+          // for the in-process callers alike.
+          const raw = args[0] as Handler;
+          const handler: Handler = async (a, extra) => markFailure(name, await raw(a, extra));
+          registry.set(name, { description, shape, annotations, handler });
+          return target.tool(name, ...rest.slice(0, rest.length - 1), handler);
         };
       }
       const v = Reflect.get(target, prop, receiver);

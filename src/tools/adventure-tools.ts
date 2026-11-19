@@ -19,7 +19,9 @@ import { z } from "zod";
 import path from "path";
 import fsPromises from "fs/promises";
 
-import { numParam, optNumParam, toF, toI } from "../util/params.js";
+import { optNumParam, toF, toI } from "../util/params.js";
+import { callTool } from "../util/tool-registry.js";
+import { freeTransitionPoints } from "./area-build-tools.js";
 import { markDirty } from "../util/dirty-state.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
@@ -185,12 +187,12 @@ export function registerAdventureTools(server: McpServer): void {
     ].join(" "),
     {
       areaA: z.string().describe("First area resref (e.g. 'village')"),
-      aX: numParam("Portal X position in areaA"),
-      aY: numParam("Portal Y position in areaA"),
+      aX: optNumParam("Portal X position in areaA; leave aX/aY out to use a free transition point build_area left (or open ground)"),
+      aY: optNumParam("Portal Y position in areaA"),
       areaB: z.string().describe("Second area resref (e.g. 'cave')"),
-      bX: numParam("Portal X position in areaB"),
-      bY: numParam("Portal Y position in areaB"),
-      tag: z.string().describe("Base tag, max 11 chars. Generates: lights 'at_<tag>'/'rt_<tag>', waypoints 'wp_at_<tag>'/'wp_rt_<tag>', scripts 'a_at_<tag>'/'a_rt_<tag>', dialogs 'd_at_<tag>'/'d_rt_<tag>'."),
+      bX: optNumParam("Portal X position in areaB; leave bX/bY out like aX/aY"),
+      bY: optNumParam("Portal Y position in areaB"),
+      tag: z.string().optional().describe("Base tag, max 11 chars; left out, one is made from the two area names. Generates: lights 'at_<tag>'/'rt_<tag>', waypoints 'wp_at_<tag>'/'wp_rt_<tag>', scripts 'a_at_<tag>'/'a_rt_<tag>', dialogs 'd_at_<tag>'/'d_rt_<tag>'."),
       travelTime: z
         .enum(["short", "long"])
         .optional()
@@ -199,16 +201,42 @@ export function registerAdventureTools(server: McpServer): void {
         ),
     },
     { destructiveHint: true },
-    async ({ areaA, aX, aY, areaB, bX, bY, tag, travelTime }) => {
-      const axN = toF(aX), ayN = toF(aY);
-      const bxN = toF(bX), byN = toF(bY);
+    async ({ areaA, aX, aY, areaB, bX, bY, tag: tagIn, travelTime }) => {
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
+      for (const a of [areaA, areaB]) {
+        if (!index.parsedGff.has(`${a.toLowerCase()}.git`)) {
+          return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: "area", error: `No area ${a}`, valid: [...index.areas.keys()] }, null, 2) }] };
+        }
+      }
+      // No coordinates: a free transition point build_area left in that area, else open ground (the driver connects
+      // areas itself this way; a small model guessed points and hit walls).
+      const pick = async (area: string, x?: string, y?: string) => {
+        if (x !== undefined && y !== undefined) return { x: toF(x), y: toF(y) };
+        const free = await freeTransitionPoints(index, area);
+        if (free.length) return free[0];
+        const found = await callTool("adventure_find_walkable", { area, clearRadius: "2", count: "1" });
+        return (found.json?.positions as Array<{ x: number; y: number }> | undefined)?.[0];
+      };
+      const pa = await pick(areaA, aX, aY);
+      const pb = await pick(areaB, bX, bY);
+      if (!pa || !pb) {
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: pa ? "bX" : "aX", error: `no open ground found in ${pa ? areaB : areaA}; give the coordinates` }, null, 2) }] };
+      }
+      const axN = pa.x, ayN = pa.y;
+      const bxN = pb.x, byN = pb.y;
 
       // A tag already used by another transition would share its scripts, dialogs and landing waypoints, so both
       // portals lead to the same place (The Old Mill used "millvill" twice, 2026-11-18). The names are cut to 16
       // characters, so the check is on the cut names.
       const inUse = (t: string) => ["a_at_", "a_rt_", "d_at_", "d_rt_"].some((p) => index.resources.has(`${`${p}${t}`.substring(0, 16)}.nss`) || index.resources.has(`${`${p}${t}`.substring(0, 16)}.dlg`));
+      let tag = tagIn ?? "";
+      if (!tag) {
+        // From the two names, unique: "village" + "millroad" -> "villa_millr".
+        const base = `${areaA.replace(/[^a-z0-9]/gi, "").slice(0, 5)}_${areaB.replace(/[^a-z0-9]/gi, "").slice(0, 5)}`.toLowerCase();
+        tag = base;
+        for (let n = 2; inUse(tag) && n < 100; n++) tag = `${base.slice(0, 9)}${n}`;
+      }
       if (!/^[a-z0-9_]+$/i.test(tag)) {
         return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: "tag", error: `tag "${tag}" may hold only letters, digits and _` }, null, 2) }] };
       }
@@ -236,11 +264,11 @@ export function registerAdventureTools(server: McpServer): void {
       const TRANSITION_BUFFER = 2.0;
       const aWalk = await checkPlacementWalkable(axN, ayN, areaA.toLowerCase(), index, resmanOpts, TRANSITION_BUFFER);
       if (!aWalk.ok) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "areaA position not safe", area: areaA, position: { x: axN, y: ayN }, detail: aWalk.reason }, null, 2) }] };
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: "aX", error: "areaA position not safe", area: areaA, position: { x: axN, y: ayN }, detail: aWalk.reason, next: "leave aX/aY out to use a free transition point, or pick one from get_area_card" }, null, 2) }] };
       }
       const bWalk = await checkPlacementWalkable(bxN, byN, areaB.toLowerCase(), index, resmanOpts, TRANSITION_BUFFER);
       if (!bWalk.ok) {
-        return { content: [{ type: "text", text: JSON.stringify({ error: "areaB position not safe", area: areaB, position: { x: bxN, y: byN }, detail: bWalk.reason }, null, 2) }] };
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: "bX", error: "areaB position not safe", area: areaB, position: { x: bxN, y: byN }, detail: bWalk.reason, next: "leave bX/bY out to use a free transition point, or pick one from get_area_card" }, null, 2) }] };
       }
 
       const aZ = aWalk.z ?? 0;

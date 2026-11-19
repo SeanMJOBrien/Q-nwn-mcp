@@ -8,6 +8,8 @@ import { SIM_INCLUDE } from "../util/sim-script.js";
  * Script source lives in util/companion-script.ts.
  */
 
+import { findPlacedCreature } from "../util/creature-placer.js";
+import { alreadyExistsResult } from "../util/tool-result.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { jsonToGff } from "../nim-tools.js";
@@ -306,7 +308,12 @@ export function registerCompanionTools(server: McpServer): void {
       if (race < 0 || race > 6)
         return fail("race must be 0-6 (a standard PC race); use the individual tools for another look");
       if (level < 1) return fail("level must be at least 1");
-      if (index.resources.has(`${resref}.utc`)) return fail(`${resref}.utc already exists`);
+      if (index.resources.has(`${resref}.utc`)) {
+        // Built by an earlier call: placed means done; not placed means place it (small models retry).
+        const at = findPlacedCreature(index, resref);
+        if (at) return alreadyExistsResult(`${resref}.utc`, `It stands in ${at.area} at (${Math.round(at.x)}, ${Math.round(at.y)}); nothing more to do.`);
+        return fail(`${resref}.utc already exists but is not placed`, { field: "resref", next: `place_creature(area: "<area>", blueprint: "${resref}", ...) places it` });
+      }
       let pinned: number[] | undefined;
       let domains: number[] | undefined;
       try {

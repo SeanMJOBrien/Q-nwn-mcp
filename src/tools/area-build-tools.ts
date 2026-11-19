@@ -814,3 +814,12 @@ function affordanceLines(index: ReturnType<typeof requireIndex>): string {
   if (loot.length) out.push("### Container Loot", ...loot);
   return out.join("\n");
 }
+
+/** The transition points build_area left in an area that no exit uses yet (for adventure_create_transition). */
+export async function freeTransitionPoints(index: ReturnType<typeof requireIndex>, area: string): Promise<Point[]> {
+  const built = (await readBuiltAreas(index))[area.toLowerCase()];
+  const facts = areaFacts(index, area.toLowerCase());
+  if (!built || !facts) return [];
+  const taken: Point[] = [...facts.exits, ...facts.doors];
+  return built.transitionPoints.filter((t) => taken.every((e) => dist(e, t) >= 8)).map((t) => ({ x: t.x, y: t.y }));
+}

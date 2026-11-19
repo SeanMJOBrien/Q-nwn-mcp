@@ -153,6 +153,8 @@ interface ProgressStep {
   step: string;
   call?: string;
   why?: string;
+  /** A call the driver runs itself (progress.ts `auto`). */
+  auto?: { tool: string; args: Record<string, unknown> };
 }
 
 /** Open steps as a short list for the model ("" when there are none). */
@@ -214,7 +216,10 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
   const prompt = loadPhasePrompt(phase);
   const profile = resolveToolProfile(prompt.profile.join(","));
   const allTools = await host.listTools();
-  const hostTools = allTools.filter((t) => isToolAllowed(t.name, profile) && !DRIVER_ONLY.has(t.name));
+  // The plot is written as checked JSON (write_plot), never as free text: a small model's free-text plot named
+  // tilesets, people and quests the later phases could not match (The Old Mill and Millers Daughter, 2026-11-18/19).
+  const typedPlot = phase === "plot" && allTools.some((t) => t.name === "write_plot");
+  const hostTools = allTools.filter((t) => isToolAllowed(t.name, profile) && !DRIVER_ONLY.has(t.name) && !(typedPlot && t.name === "write_story_section"));
   const hasProgress = allTools.some((t) => t.name === "get_progress");
   const byName = new Map(hostTools.map((t) => [t.name, t]));
   const toolSpecs: ToolSpec[] = hostTools.map((t) => ({ name: t.name, description: t.description, parameters: t.inputSchema as Record<string, unknown> }));
@@ -233,6 +238,14 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
       return [];
     }
   };
+  // Steps that leave no choice (progress.ts `auto`): run once by the driver before the model is asked, as in step mode.
+  if (hasProgress) {
+    for (const o of await openSteps()) {
+      if (!o.auto || !allTools.some((t) => t.name === o.auto?.tool)) continue;
+      const r = await host.callTool(o.auto.tool, o.auto.args);
+      log({ event: "driver_step", id: o.id, tool: o.auto.tool, args: o.auto.args, isError: r.isError, result: r.text.slice(0, 300) });
+    }
+  }
   const planAtStart = await openSteps();
   if (planAtStart.length) log({ event: "plan", open: planAtStart.map((o) => o.step) });
 

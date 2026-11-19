@@ -7,6 +7,7 @@
  * - edit_dialog_node: Edit text/script/sound/comment on an existing dialog node
  */
 
+import { alreadyExistsResult } from "../util/tool-result.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import fs from "fs/promises";
 import path from "path";
@@ -262,10 +263,7 @@ export function registerDialogWriteTools(server: McpServer): void {
       const key = `${resrefLower}.dlg`;
 
       if (index.resources.has(key)) {
-        return {
-          content: [{ type: "text", text: `Dialog already exists: ${key}. Use add_dialog_node to modify it.` }],
-          isError: true,
-        };
+        return alreadyExistsResult(key, `Add lines with add_dialog_node(dialog: "${resrefLower}", ...); get_dialog_tree shows it.`);
       }
 
       let parsed: InputNode[];

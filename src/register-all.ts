@@ -51,7 +51,8 @@ import { registerSpecAbilityTools } from "./tools/spec-ability-tools.js";
 import { registerSpecAssertTools } from "./tools/spec-assert-tools.js";
 import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
 import { registerStartMenuTools } from "./tools/start-menu-tools.js";
-import { registerEnemyTools } from "./tools/enemy-tools.js";
+import { registerEnemyTools, registerTrapTools } from "./tools/enemy-tools.js";
+import { registerStoreKitTools } from "./tools/store-kit-tools.js";
 import { registerSystestTools } from "./tools/systest-tools.js";
 import { registerTilesetTools } from "./tools/tileset-tools.js";
 import { registerUndoTools } from "./tools/undo-tools.js";
@@ -75,6 +76,8 @@ export function registerAll(server: McpServer): void {
   registerLookupTools(server);
   registerEncounterTools(server);
   registerEnemyTools(server);
+  registerTrapTools(server);
+  registerStoreKitTools(server);
   registerResmanTools(server);
   registerTilesetTools(server);
   registerDatabaseTools(server);
