@@ -1,0 +1,140 @@
+{
+ "antagonists": [
+  {
+   "defeat": "defeated by the militia and the party",
+   "location": "Castle",
+   "motive": "control the village",
+   "name": "Bandit Chief",
+   "who": "a half-orc bandit chief"
+  }
+ ],
+ "challenges": [
+  {
+   "enemies": "3 bandits",
+   "location": "Forest",
+   "obstacle": "a pit trap"
+  }
+ ],
+ "connections": [
+  [
+   "Mill",
+   "Forest"
+  ],
+  [
+   "Forest",
+   "Cave"
+  ],
+  [
+   "Cave",
+   "Village"
+  ],
+  [
+   "Village",
+   "Castle"
+  ]
+ ],
+ "finalReward": "a chest of gold and a map to the next village",
+ "level": 3,
+ "locations": [
+  {
+   "events": [
+    "social"
+   ],
+   "name": "Mill",
+   "purpose": "hub",
+   "tileset": "ttf02"
+  },
+  {
+   "events": [
+    "combat"
+   ],
+   "name": "Forest",
+   "purpose": "adventure",
+   "tileset": "ttf02"
+  },
+  {
+   "events": [
+    "discovery"
+   ],
+   "name": "Cave",
+   "purpose": "adventure",
+   "tileset": "tdc01"
+  },
+  {
+   "events": [
+    "social"
+   ],
+   "name": "Village",
+   "purpose": "hub",
+   "tileset": "tcn01"
+  },
+  {
+   "events": [
+    "combat",
+    "boss"
+   ],
+   "name": "Castle",
+   "purpose": "climax",
+   "tileset": "tno01"
+  }
+ ],
+ "merchant": "leave out",
+ "npcs": [
+  {
+   "class": "fighter",
+   "gender": "male",
+   "location": "Mill",
+   "motive": "save his daughter",
+   "name": "Miller",
+   "race": "human",
+   "role": "quest giver",
+   "voice": "gruff"
+  },
+  {
+   "class": "fighter",
+   "gender": "male",
+   "location": "Mill",
+   "motive": "protect the village",
+   "name": "Militia Captain",
+   "race": "human",
+   "role": "henchman",
+   "voice": "strong"
+  },
+  {
+   "class": "fighter",
+   "gender": "male",
+   "location": "Castle",
+   "motive": "control the village",
+   "name": "Bandit Chief",
+   "race": "half-orc",
+   "role": "antagonist",
+   "voice": "harsh"
+  },
+  {
+   "class": "fighter",
+   "gender": "male",
+   "location": "Village",
+   "motive": "protect the village",
+   "name": "Militia Soldier",
+   "race": "human",
+   "role": "henchman",
+   "voice": "strong"
+  }
+ ],
+ "partySize": 4,
+ "playMinutes": 90,
+ "premise": "Bandits hold a mill and the miller's daughter hostage, the town militia will follow you as henchmen to rescue the daughter, but the players will learn it was a diversion once they rescue the daughter, a horn will sound to signal an attack on the village and you and the militia NPCs will return to several monster trying to break down the main gate in the wall into the village.",
+ "quests": [
+  {
+   "giver": "Miller",
+   "name": "Rescue the Miller's Daughter",
+   "primary": true,
+   "stages": [
+    "rescue the daughter",
+    "return to the mill",
+    "return to the village"
+   ]
+  }
+ ],
+ "title": "Millers Daughter"
+}

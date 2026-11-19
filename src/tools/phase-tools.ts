@@ -42,7 +42,7 @@ import {
   stopMessage,
 } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
-import { moduleFields, type PlotSpec, plotWarnings, renderPlot, setModuleFields } from "../util/plot-spec.js";
+import { moduleFields, normalizePlotSpec, type PlotSpec, plotWarnings, renderPlot, setModuleFields } from "../util/plot-spec.js";
 import { validateSpec } from "../util/spec-validate.js";
 import { pickSections, setSection, stripOwnHeading } from "../util/story-sections.js";
 import { computeConnectivity } from "./analysis-tools.js";
@@ -566,11 +566,13 @@ export function registerPhaseTools(server: McpServer): void {
       } catch (e) {
         return text({ ok: false, field: "spec", error: `not valid JSON: ${(e as Error).message}` }, true);
       }
+      const normal = normalizePlotSpec(parsed);
+      parsed = normal.spec;
       const checked = validateSpec("plot", parsed);
       if (!checked.ok) return text({ ok: false, error: "Fix these fields and call write_plot again.", fields: checked.errors.slice(0, 12) }, true);
       const plot = parsed as PlotSpec;
       const body = renderPlot(plot);
-      const warnings = plotWarnings(plot);
+      const warnings = [...normal.adjusted, ...plotWarnings(plot)];
       if (key(plot.title) !== key(index.moduleName)) warnings.push(`The plot's title is "${plot.title}" but the loaded module is "${index.moduleName}"; the story file keeps the module's name.`);
       if (dryRun) return text({ ok: true, dryRun: true, warnings, plot: body });
 

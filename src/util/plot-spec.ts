@@ -255,6 +255,72 @@ export function plotSemanticErrors(spec: PlotSpec): PlotError[] {
 }
 
 /** Advice, not faults: how the plot compares with what plan_adventure_shape suggests for the play time. */
+/** Words a model uses for a location's purpose, an NPC's role: read as the allowed value. */
+const PURPOSE_WORDS: Array<[RegExp, PlotLocation["purpose"]]> = [
+  [/^(boss|climax|final|finale|end|ending|showdown|lair|confrontation)/, "boss"],
+  [/^(hub|town|village|city|start|home|base|safe|social)/, "hub"],
+  [/^(travel|road|path|journey|wilderness|crossing|transit)/, "travel"],
+  [/^(adventure|dungeon|combat|explore|exploration|quest|challenge|dangerous)/, "adventure"],
+];
+const ROLE_WORDS: Array<[RegExp, PlotNpc["role"]]> = [
+  [/(companion|henchm|follower|ally|recruit|militia|guard|soldier)/, "companion"],
+  [/(merchant|shop|trader|vendor|seller|smith|innkeep)/, "merchant"],
+  [/(quest ?giver|giver|patron|employer|client)/, "quest giver"],
+  [/(witness|informant|villager|bystander|guide|other|npc)/, "witness"],
+];
+
+/**
+ * A plot as a small model writes it, made to fit the spec where the intent is plain: "climax" is a boss location,
+ * "henchman" a companion, an NPC with the role "antagonist" belongs in antagonists, "leave out" as the merchant means
+ * none, a missing beat is made from the place's name. Each change is reported. A 7B model sent "climax" and
+ * "henchman" eight times while saying it had fixed them (Millers Daughter, 2026-11-19).
+ */
+export function normalizePlotSpec(raw: unknown): { spec: unknown; adjusted: string[] } {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { spec: raw, adjusted: [] };
+  const spec = JSON.parse(JSON.stringify(raw)) as Record<string, unknown>;
+  const adjusted: string[] = [];
+  const locs = Array.isArray(spec.locations) ? (spec.locations as Array<Record<string, unknown>>) : [];
+  locs.forEach((l, i) => {
+    const p = typeof l.purpose === "string" ? l.purpose.toLowerCase().trim() : "";
+    if (p && !["hub", "travel", "adventure", "boss"].includes(p)) {
+      const to = PURPOSE_WORDS.find(([re]) => re.test(p))?.[1] ?? (i === locs.length - 1 ? "boss" : "adventure");
+      adjusted.push(`locations[${i}].purpose "${l.purpose}" read as "${to}"`);
+      l.purpose = to;
+    }
+    if (typeof l.beat !== "string" || !l.beat.trim()) {
+      l.beat = `The party comes to ${String(l.name ?? "this place")}.`;
+      adjusted.push(`locations[${i}].beat was missing: "${l.beat}"`);
+    }
+  });
+  const npcs = Array.isArray(spec.npcs) ? (spec.npcs as Array<Record<string, unknown>>) : [];
+  const antagonists = Array.isArray(spec.antagonists) ? (spec.antagonists as Array<Record<string, unknown>>) : [];
+  const kept: Array<Record<string, unknown>> = [];
+  npcs.forEach((n, i) => {
+    const role = typeof n.role === "string" ? n.role.toLowerCase().trim() : "";
+    if (/(antagonist|villain|enemy|boss|foe)/.test(role)) {
+      // A foe listed among the people: an antagonist (once).
+      if (!antagonists.some((a) => String(a.name).toLowerCase() === String(n.name).toLowerCase())) {
+        antagonists.push({ name: n.name, who: `a ${n.race ?? "human"} ${n.class ?? "fighter"}`, location: n.location, motive: n.motive ?? "power", defeat: "The party defeats them." });
+        adjusted.push(`npcs[${i}] "${n.name}" (role ${n.role}) moved to antagonists`);
+      } else adjusted.push(`npcs[${i}] "${n.name}" (role ${n.role}) dropped: already an antagonist`);
+      return;
+    }
+    if (role && !["quest giver", "merchant", "companion", "witness"].includes(role)) {
+      const to = ROLE_WORDS.find(([re]) => re.test(role))?.[1] ?? "witness";
+      adjusted.push(`npcs[${i}].role "${n.role}" read as "${to}"`);
+      n.role = to;
+    }
+    kept.push(n);
+  });
+  if (npcs.length) spec.npcs = kept;
+  if (antagonists.length || Array.isArray(spec.antagonists)) spec.antagonists = antagonists;
+  if (typeof spec.merchant === "string" && /^(none|no|leave out|n\/a|-|null|nobody)$/i.test(spec.merchant.trim())) {
+    adjusted.push(`merchant "${spec.merchant}" read as none`);
+    delete spec.merchant;
+  }
+  return { spec, adjusted };
+}
+
 export function plotWarnings(spec: PlotSpec): string[] {
   const out: string[] = [];
   const plan = planAdventureShape({ playMinutes: spec.playMinutes, partySize: spec.partySize });

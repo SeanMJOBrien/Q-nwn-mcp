@@ -57,7 +57,7 @@ import { FOOTER_PREFIX } from "../util/result-shaping.js";
 import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
 import { PHASES, type Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
-import { type PlotSpec, plotWarnings } from "../util/plot-spec.js";
+import { normalizePlotSpec, type PlotSpec, plotWarnings } from "../util/plot-spec.js";
 import { loadSettingsFile } from "../util/settings-file.js";
 import { SetupError, setupProblems } from "../util/setup-check.js";
 import { validateSpec } from "../util/spec-validate.js";
@@ -423,8 +423,9 @@ export function readPlotFile(file: string): { plot: PlotSpec } | { errors: Array
   } catch (e) {
     return { errors: [{ field: "", message: `cannot read it as JSON: ${(e as Error).message}` }] };
   }
-  const checked = validateSpec("plot", spec);
-  return checked.ok ? { plot: spec as PlotSpec } : { errors: checked.errors };
+  const normal = normalizePlotSpec(spec);
+  const checked = validateSpec("plot", normal.spec);
+  return checked.ok ? { plot: normal.spec as PlotSpec } : { errors: checked.errors };
 }
 
 function planRow(phase: Phase, toolNames: string[], mode: string) {

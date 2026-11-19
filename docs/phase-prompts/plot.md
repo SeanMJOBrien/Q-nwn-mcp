@@ -27,7 +27,7 @@ You write the story outline of a short Neverwinter Nights adventure as one JSON 
  "antagonists":[{"name":"<Foe>","who":"<a half-orc bandit chief>","location":"<last Place>","motive":"...","defeat":"<how>"}],
  "quests":[{"name":"<Quest>","primary":true,"giver":"<Person>","stages":["<task as given>","<what the party does>","<how it ends>"]}],
  "challenges":[{"location":"<Place>","enemies":"3 bandits","obstacle":"a pit trap"}],
- "merchant":"<Person or leave out>","finalReward":"<item or gold>"}
+ "merchant":"<a person's name; drop the field when there is none>","finalReward":"<item or gold>"}
 ```
 
 - tileset (only these work): ttr01 village, farmland, rural road · ttf01 forest · ttf02 deep forest · tcn01 city, town, market · tin01 house, inn, shop · tde01 dungeon · tdc01 crypt · tds01 sewer · tdm01 cave, mine · ttd01 desert · tno01 castle, keep, wall gate · tts01 winter.
