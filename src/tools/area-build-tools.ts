@@ -681,14 +681,15 @@ function storyAreas(index: ReturnType<typeof requireIndex>): string[] {
  * The `## Areas` or `## Environment` section in the format of docs/phase-prompts/areas.md / environment.md, read
  * from the module: what is really there, so later phases and the DM guide read facts.
  */
-export async function draftStorySection(index: ReturnType<typeof requireIndex>, section: "Areas" | "Environment" | "Actors"): Promise<string> {
+export async function draftStorySection(index: ReturnType<typeof requireIndex>, section: "Areas" | "Environment" | "Actors" | "Challenges" | "Affordances"): Promise<string> {
   const built = await readBuiltAreas(index);
   const out: string[] = [];
+  if (section === "Affordances") return affordanceLines(index);
   for (const r of storyAreas(index)) {
     const f = areaFacts(index, r);
     if (!f) continue;
-    if (section === "Actors") {
-      const lines = actorLines(index, r);
+    if (section === "Actors" || section === "Challenges") {
+      const lines = section === "Actors" ? actorLines(index, r) : challengeLines(index, r);
       if (lines.length) out.push(`### ${f.name} (\`${r}\`)`, ...lines, "");
       continue;
     }
@@ -749,4 +750,67 @@ function actorLines(index: ReturnType<typeof requireIndex>, area: string): strin
   if (companions.length) out.push(`**Companions:** ${companions.join("; ")}`);
   if (ambient.size) out.push(`**Ambient:** ${[...ambient].map(([r, n]) => `${r} x${n}`).join(", ")}`);
   return out;
+}
+
+/** The Challenges section lines of one area (docs/phase-prompts/challenges.md format) from its hostile creatures and traps. */
+function challengeLines(index: ReturnType<typeof requireIndex>, area: string): string[] {
+  const git = index.parsedGff.get(`${area}.git`) as GffObj | undefined;
+  if (!git) return [];
+  const groups = new Map<string, { n: number; at: string }>();
+  const bosses: string[] = [];
+  for (const c of getFieldList(git, "Creature List")) {
+    if (getFieldNum(c, "FactionID") !== 1) continue;
+    const where = fmtAt(getFieldNum(c, "XPosition"), getFieldNum(c, "YPosition"));
+    if (getFieldStr(c, "Conversation")) {
+      const name = `${getFieldLocStr(c, "FirstName")} ${getFieldLocStr(c, "LastName")}`.trim() || getFieldStr(c, "Tag");
+      bosses.push(`**Boss:** ${name} (\`${getFieldStr(c, "Tag").toLowerCase()}\`), at ${where}`);
+      continue;
+    }
+    const r = getFieldStr(c, "TemplateResRef") || getFieldStr(c, "Tag");
+    const g = groups.get(r);
+    if (g) g.n++;
+    else groups.set(r, { n: 1, at: where });
+  }
+  const traps = getFieldList(git, "TriggerList")
+    .filter((t) => getFieldNum(t, "TrapFlag") === 1 || getFieldStr(t, "ScriptOnEnter") === "q_check_evt")
+    .map((t) => {
+      const pt = getFieldList(t, "Geometry")[0];
+      const x = getFieldNum(t, "XPosition") + (pt ? getFieldNum(pt, "PointX") : 0);
+      const y = getFieldNum(t, "YPosition") + (pt ? getFieldNum(pt, "PointY") : 0);
+      return `${getFieldStr(t, "Tag").toLowerCase()} at ${fmtAt(x, y)}`;
+    });
+  const out: string[] = [];
+  let n = 0;
+  for (const [r, g] of groups) out.push(`**Group ${++n}:** ${r} x${g.n} at ${g.at}`);
+  out.push(...bosses);
+  if (traps.length) out.push(`**Traps:** ${traps.join("; ")}`);
+  return out;
+}
+
+/** The Affordances section (docs/phase-prompts/affordances.md format): the stores and the containers that hold items. */
+function affordanceLines(index: ReturnType<typeof requireIndex>): string {
+  const stores: string[] = [];
+  const loot: string[] = [];
+  for (const r of storyAreas(index)) {
+    const git = index.parsedGff.get(`${r}.git`) as GffObj | undefined;
+    if (!git) continue;
+    for (const st of getFieldList(git, "StoreList")) {
+      const name = getFieldLocStr(st, "LocName") || getFieldStr(st, "Tag");
+      stores.push(`- ${name} (\`${getFieldStr(st, "Tag").toLowerCase()}\`) in \`${r}\` at ${fmtAt(getFieldNum(st, "XPosition"), getFieldNum(st, "YPosition"))}`);
+    }
+    for (const p of getFieldList(git, "Placeable List")) {
+      const items = getFieldList(p, "ItemList");
+      if (!items.length) continue;
+      const counts = new Map<string, number>();
+      for (const it of items) {
+        const k = getFieldStr(it, "InventoryRes") || getFieldStr(it, "TemplateResRef") || "item";
+        counts.set(k, (counts.get(k) ?? 0) + Math.max(1, getFieldNum(it, "StackSize")));
+      }
+      loot.push(`- \`${r}\` ${getFieldStr(p, "Tag").replace(/[^A-Za-z0-9_]/g, "_")}: ${[...counts].map(([k, n]) => `${n}x ${k}`).join(", ")}`);
+    }
+  }
+  const out: string[] = [];
+  if (stores.length) out.push("### Stores", ...stores);
+  if (loot.length) out.push("### Container Loot", ...loot);
+  return out.join("\n");
 }

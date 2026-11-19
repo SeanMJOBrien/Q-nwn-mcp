@@ -123,6 +123,7 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "verify_sound",
   ],
   encounters: [
+    "build_enemy_group",
     "compose_encounter",
     "suggest_encounter",
     "build_key_npc",

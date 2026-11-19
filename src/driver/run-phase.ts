@@ -52,6 +52,24 @@ export interface PhaseResult {
   openSteps?: string[];
 }
 
+/**
+ * A call's identity for the stuck check: the tool and its arguments with keys sorted, so the same arguments in another
+ * order count as the same call (a model repeated one failing create_store_blueprint six times, reordering the keys).
+ */
+export function callSignature(tool: string, args: unknown): string {
+  let value = args;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return `${tool} ${value}`;
+    }
+  }
+  const sorted = (v: unknown): unknown =>
+    Array.isArray(v) ? v.map(sorted) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, sorted(x)])) : v;
+  return `${tool} ${JSON.stringify(sorted(value))}`;
+}
+
 /** Identical calls in a row (after the first; failing or not) that end a conversation: the model is stuck. */
 export const STUCK_REPEATS = 4;
 
@@ -275,7 +293,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
       // The same failing call again and again (refused before the call or failed in it): warn once, then stop. A
       // repair pass sent one refused create_dialog 50 times (The Old Mill, 2026-11-18).
       // A successful call repeated is as stuck as a failing one: list_tilesets 57 times in a row (The Old Mill).
-      const signature = `${call.name} ${JSON.stringify(out.args ?? call.arguments)}`;
+      const signature = callSignature(call.name, out.args ?? call.arguments);
       if (signature === lastFailing) sameFailures++;
       else sameFailures = 0;
       lastFailing = signature;

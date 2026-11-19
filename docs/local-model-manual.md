@@ -105,8 +105,9 @@ For each phase, in order:
    checklist step of the phase (each plot location built and laid out, each connection made, the start moved off
    `_start`; each area dressed and pinned), so a phase where nothing was built cannot pass on its story section.
    Steps that leave no choice are done by the driver itself before the model is asked: each area's `build_area` (the
-   spec comes from the plot), `dress_area` with the tileset's props, the exit pins and a chest, and the Areas,
-   Environment and Actors sections (`write_story_section(draft: true)`, from what the module really holds). The model
+   spec comes from the plot), `dress_area` with the tileset's props, the exit pins and a chest, each fight area's
+   enemies (`build_enemy_group` with the kind and number the plot's Challenges line names), and the Areas,
+   Environment, Actors, Challenges and Affordances sections (`write_story_section(draft: true)`, from what the module really holds). The model
    gets a step only when it is still open after that. A conversation ends when the model repeats the same failing call
    5 times. In step mode, a failed check gets one repair pass in phase
    mode with the errors. In phase mode, if the model stops early, the driver runs the check and hands the first five

@@ -9,6 +9,7 @@
  */
 
 import { AREA_RECIPES } from "./area-recipes.js";
+import { challengeGroups } from "./enemy-roster.js";
 import { OWN_SECTION, PHASES, type Phase, parseSections } from "./phase-check.js";
 
 export type ProgressPhase = "start" | Phase | "ship";
@@ -38,7 +39,7 @@ export interface ProgressItem {
 
 /** Tools every step may use besides its own. */
 /** Phases whose story section write_story_section drafts from the module (draft: true). */
-export const DRAFTED_SECTIONS: readonly Phase[] = ["areas", "environment", "actors"];
+export const DRAFTED_SECTIONS: readonly Phase[] = ["areas", "environment", "actors", "challenges", "affordances"];
 
 export const STEP_BASE_TOOLS = ["get_progress", "get_area_card", "get_result", "read_story", "undo_last_change"];
 
@@ -64,7 +65,7 @@ export function stepTools(id: string): string[] {
   if (phase === "challenges") {
     if (id.includes(".trap.")) return ["create_trap_blueprint", "place_trigger", "add_skill_check", "adventure_find_walkable"];
     if (id.includes(".boss.")) return ["build_key_npc", "compose_encounter", "list_creature_samples", "adventure_find_walkable", "get_area_creatures"];
-    return ["suggest_encounter", "compose_encounter", "place_creature", "place_encounter", "list_creature_samples", "adventure_find_walkable", "get_area_creatures"];
+    return ["build_enemy_group", "suggest_encounter", "place_creature", "place_encounter", "adventure_find_walkable", "get_area_creatures"];
   }
   if (phase === "affordances") {
     if (id === "affordances.gold") return ["set_starting_gold", "get_wealth_budget"];
@@ -94,6 +95,8 @@ export interface PlotOutline {
   quests: Array<{ name: string; giver?: string }>;
   /** Locations that the Challenges list names. */
   challengeLocations: string[];
+  /** The Challenges list's text per location ("The Mill: 2 bandits, 1 trap" -> "2 bandits, 1 trap"), by location name. */
+  challengeLines?: Record<string, string>;
   merchant: boolean;
 }
 
@@ -237,11 +240,17 @@ export function parsePlotOutline(plot: string): PlotOutline {
     .filter((q) => q.name);
   const challengeText = sub.get("challenges") ?? "";
   const challengeLocations = locations.filter((l) => norm(challengeText).includes(norm(l.name))).map((l) => l.name);
+  const challengeLines: Record<string, string> = {};
+  for (const line of challengeText.split("\n")) {
+    const m = /^\s*-\s*(.+?)\s*:\s*(.+)$/.exec(line);
+    const loc = m ? locations.find((l) => norm(l.name) === norm(m[1]) || l.resref === m[1].trim().toLowerCase()) : undefined;
+    if (m && loc) challengeLines[loc.name] = m[2].trim();
+  }
   const economy = norm(sub.get("loot economy") ?? sub.get("loot & economy") ?? "");
   const merchantLine = /merchants?:?\s*(.*)/.exec(economy)?.[1] ?? "";
   const merchant =
     npcs.some((n) => n.role?.includes("merchant")) || (merchantLine !== "" && !/^none\b/.test(merchantLine));
-  return { locations, connections, npcs, quests, challengeLocations, merchant };
+  return { locations, connections, npcs, quests, challengeLocations, challengeLines, merchant };
 }
 
 /** A placed creature is this NPC when one name holds the other, or they share a surname. */
@@ -258,6 +267,13 @@ export function nameMatches(npc: string, creature: string): boolean {
 function phaseDone(status: Record<string, PhaseStatus> | undefined, p: Phase): boolean {
   const s = status?.[p]?.status;
   return s === "success" || s === "skipped";
+}
+
+/** Enemies that suit an area when the plot names none: undead below ground in crypts and dungeons, goblins in caves. */
+function defaultEnemyKind(tileset: string): string {
+  if (/^td[ecs]/.test(tileset)) return "skeleton";
+  if (tileset === "tdm01") return "goblin";
+  return "bandit";
 }
 
 /** Every step, in build order. */
@@ -430,8 +446,13 @@ export function buildChecklist(
       const a = facts.areas.get(r);
       const name = locs.find((l) => l.resref === r)?.name ?? r;
       const hostile = !!a && (a.encounters > 0 || a.creatures.some((c) => c.hostile));
-      const about = { areas: [r], subject: name };
-      add("challenges", `challenges.${r}`, `${name}: enemies placed`, hostile, `suggest_encounter(...) then place_creature(area: "${r}", ...)`, undefined, about);
+      // The plot's line for the place names the enemies ("2 bandits"): the driver places them itself.
+      const line = outline?.challengeLines?.[name] ?? "";
+      const group = challengeGroups(line)[0] ?? { kind: defaultEnemyKind(a?.tileset ?? "") };
+      const enemyArgs = { area: r, kind: group.kind, ...(group.count ? { count: String(group.count) } : {}) };
+      const about = { areas: [r], subject: name, auto: { tool: "build_enemy_group", args: enemyArgs } };
+      add("challenges", `challenges.${r}`, `${name}: enemies placed`, hostile,
+        `build_enemy_group(area: "${r}", kind: "${group.kind}"${group.count ? `, count: "${group.count}"` : ""})${line ? ` (the plot: ${line})` : ""}`, undefined, about);
       const t = targets.fights.get(r);
       for (const b of t?.bosses ?? []) {
         const placed = !!a && a.creatures.some((c) => c.hostile && ((b.resref && (c.resref === b.resref || c.tag?.toLowerCase() === b.resref)) || nameMatches(b.name, c.name)));

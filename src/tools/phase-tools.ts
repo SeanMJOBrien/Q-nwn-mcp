@@ -336,7 +336,9 @@ export function registerPhaseTools(server: McpServer): void {
 
       // Areas and environment: every checklist step of the phase must be done, so a phase that built nothing (a missing
       // tool, a model that answered DONE) cannot pass on its story section alone.
-      if (p === "areas" || p === "environment") {
+      // (Since 2026-11-18 also actors, quests, challenges and affordances: the quests phase passed with its one quest
+      // missing from the journal, The Old Mill.)
+      if (p === "areas" || p === "environment" || p === "actors" || p === "quests" || p === "challenges" || p === "affordances") {
         const facts = gatherModuleFacts(index, true, false);
         const { items, outline } = buildChecklist(md, undefined, facts);
         if (p === "environment") {
@@ -475,11 +477,11 @@ export function registerPhaseTools(server: McpServer): void {
 
   server.tool(
     "write_story_section",
-    "Write one `## Section` of the story file (adventure.md): replaces the section when it exists, appends it otherwise, and leaves every other section untouched. Each phase writes its own section this way before phase_check(step: \"end\"). Give the section body only, without the `## Name` heading. For Areas, Environment and Actors pass draft: true instead of writing it: the tool writes the section from what the module really holds (sizes, features, exits; placeables, containers, sounds, map pins; key NPCs, companions, ambient creatures), and any text you give is added below.",
+    "Write one `## Section` of the story file (adventure.md): replaces the section when it exists, appends it otherwise, and leaves every other section untouched. Each phase writes its own section this way before phase_check(step: \"end\"). Give the section body only, without the `## Name` heading. For Areas, Environment, Actors, Challenges and Affordances pass draft: true instead of writing it: the tool writes the section from what the module really holds (sizes, features, exits; placeables, containers, sounds, map pins; key NPCs, companions, ambient creatures; enemy groups, bosses, traps; stores and filled containers), and any text you give is added below.",
     {
       section: z.string().describe("Section name: Module, Plot, Areas, Environment, Actors, Quests, Challenges, Affordances, Polish or Rewards"),
       text: z.string().optional().describe("The section body in markdown (sub-headings start at ###); with draft, notes added below the drafted part"),
-      draft: z.boolean().optional().describe("Areas, Environment or Actors only: write the section from the module's real state"),
+      draft: z.boolean().optional().describe("Areas, Environment, Actors, Challenges or Affordances only: write the section from the module's real state"),
     },
     { idempotentHint: true },
     async ({ section, text: given, draft }) => {
@@ -490,10 +492,17 @@ export function registerPhaseTools(server: McpServer): void {
       if (!canonical) return text({ ok: false, field: "section", error: `"${section}" is not a story section. Use one of: ${known.join(", ")}` }, true);
       let body = given ?? "";
       if (draft) {
-        if (canonical !== "Areas" && canonical !== "Environment" && canonical !== "Actors") return text({ ok: false, field: "draft", error: "draft works for the Areas, Environment and Actors sections only; write this one with text." }, true);
-        const drafted = await draftStorySection(index, canonical);
+        if (!["Areas", "Environment", "Actors", "Challenges", "Affordances"].includes(canonical)) return text({ ok: false, field: "draft", error: "draft works for the Areas, Environment, Actors, Challenges and Affordances sections only; write this one with text." }, true);
+        const drafted = await draftStorySection(index, canonical as Parameters<typeof draftStorySection>[1]);
         if (!drafted) {
-          const what = canonical === "Actors" ? "no creatures are placed in the story areas yet: place them first" : "the module has no story areas yet: build them first (build_area)";
+          const what =
+            canonical === "Actors"
+              ? "no creatures are placed in the story areas yet: place them first"
+              : canonical === "Challenges"
+                ? "no enemies or traps are placed yet: place them first (build_enemy_group)"
+                : canonical === "Affordances"
+                  ? "no store is placed and no container holds items yet"
+                  : "the module has no story areas yet: build them first (build_area)";
           return text({ ok: false, field: "draft", error: `Nothing to draft: ${what}.` }, true);
         }
         body = given?.trim() ? `${drafted}\n\n${stripOwnHeading(canonical, given)}` : drafted;

@@ -147,3 +147,23 @@ describe("build progress checklist", () => {
     for (const id of ["areas.x.create", "actors.maren", "quests.q", "affordances.x.loot"]) expect(stepTools(id).length).toBeLessThanOrEqual(8);
   });
 });
+
+describe("challenge steps from the plot", () => {
+  it("hand the driver a build_enemy_group call from the plot's challenge line", async () => {
+    const { buildChecklist } = await import("./progress.js");
+    const story = "## Module\n- **Target Level:** 3\n## Plot\n### Locations\n#### 1. The Mill\n- **Resref:** mill\n- **Tileset:** ttr01\n- **Purpose:** adventure\n### Challenges\n- The Mill: 2 bandits, 1 trap\n";
+    const facts = {
+      areas: new Map([["mill", { width: 9, height: 9, tileset: "ttr01", distinctTiles: 4, props: 6, mapPins: 1, creatures: [], encounters: 0, stores: 0, storeTags: [], triggerTags: [], containers: [] }]]),
+      graph: {},
+      entryArea: "mill",
+      journalQuests: [],
+      dmAreaResref: "dm_area",
+      dmGuideWritten: false,
+      scopeRecorded: true,
+    };
+    const { items } = buildChecklist(story, undefined, facts as never);
+    const step = items.find((i) => i.id === "challenges.mill");
+    expect(step?.auto).toEqual({ tool: "build_enemy_group", args: { area: "mill", kind: "bandit", count: "2" } });
+    expect(step?.call).toContain("(the plot: 2 bandits, 1 trap)");
+  });
+});

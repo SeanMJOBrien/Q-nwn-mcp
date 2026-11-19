@@ -13,7 +13,7 @@ import type { Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
 import { STEP_BASE_TOOLS } from "../util/progress.js";
 import type { Chat, ChatMessage, ToolSpec } from "./llm.js";
-import { checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, STUCK_REPEATS, type ToolHost, trimContext } from "./run-phase.js";
+import { callSignature, checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, STUCK_REPEATS, type ToolHost, trimContext } from "./run-phase.js";
 
 export interface RunStepsOptions extends RunPhaseOptions {
   /** Model turns per step (default 12). */
@@ -244,7 +244,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
         result.toolCalls++;
         const out = await runTool(call, byName, host, log);
         messages.push({ role: "tool", tool_call_id: call.id, content: clip(out.text, maxResult) });
-        const signature = `${call.name} ${JSON.stringify(out.args ?? call.arguments)}`;
+        const signature = callSignature(call.name, out.args ?? call.arguments);
         if (signature === lastFailing) {
           sameFailures++;
           messages.push({
