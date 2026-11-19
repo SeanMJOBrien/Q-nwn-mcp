@@ -231,6 +231,19 @@ export class QuestBuilder {
   // --- finding objects
 
   /** A creature by tag or blueprint resref: its module blueprint (if any) and every placed copy. */
+  /** Tags of the placed non-hostile creatures (the people a quest can be given by or returned to), for errors. */
+  private placedTags(): string[] {
+    const out = new Set<string>();
+    for (const area of this.areas()) {
+      try {
+        for (const c of getFieldList(this.git(area), "Creature List")) if (getFieldNum(c, "FactionID") !== 1) out.add(getFieldStr(c, "Tag").toLowerCase());
+      } catch {
+        // an area without a GIT
+      }
+    }
+    return [...out].slice(0, 12);
+  }
+
   private creature(ref: string): Participant | undefined {
     const key = `creature:${ref.toLowerCase()}`;
     const known = this.participants.get(key);
@@ -1224,7 +1237,7 @@ export class QuestBuilder {
       case "escort": {
         const who = s.do === "rescue" || s.do === "escort" ? (s.target as string) : (s.to ?? this.spec.giver);
         const npc = this.creature(who);
-        if (!npc) throw new QuestBuildError(`stage ${s.n}: no creature with tag or blueprint ${who} in the module`);
+        if (!npc) throw new QuestBuildError(`stage ${s.n}: no creature with tag or blueprint ${who} in the module. Placed people (tags): ${this.placedTags().join(", ") || "none"}`);
         slot = this.assignSlot(npc, s);
         this.writeStageVars(npc, s, slot);
         if (s.do === "escort") {

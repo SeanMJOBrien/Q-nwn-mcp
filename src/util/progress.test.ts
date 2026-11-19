@@ -167,3 +167,37 @@ describe("challenge steps from the plot", () => {
     expect(step?.call).toContain("(the plot: 2 bandits, 1 trap)");
   });
 });
+
+describe("actor and quest steps from the plot", () => {
+  const story = [
+    "## Module", "- **Target Level:** 3", "## Plot", "### Locations", "#### 1. Mill", "- **Resref:** mill", "- **Tileset:** ttf02",
+    "#### 2. Bandit Camp", "- **Resref:** banditcamp", "- **Tileset:** ttf02",
+    "### Key NPCs", "#### Mill Owner", "- **Location:** Mill", "- **Role:** quest giver", "- **Race, class, gender:** human cleric, male",
+    "#### Bandit Leader", "- **Location:** Bandit Camp", "- **Role:** antagonist", "- **Race, class, gender:** half-orc fighter, female",
+    "### Quest Objectives", "#### Primary Quest: Rescue the Millers Daughter",
+    "**Stage 1:** The Mill Owner asks the party to rescue his daughter.", "**Stage 2:** The party defeats the Bandit Leader.", "**Stage 3 (Resolution):** The daughter is home.",
+  ].join("\n");
+  const area = (creatures: Array<{ name: string; hostile: boolean; tag: string; resref: string }>) => ({ width: 9, height: 9, tileset: "ttf02", distinctTiles: 4, props: 6, mapPins: 1, creatures, encounters: 0, stores: 0, storeTags: [], triggerTags: [], containers: [] });
+  const facts = (mill: Parameters<typeof area>[0], camp: Parameters<typeof area>[0]) =>
+    ({ areas: new Map([["mill", area(mill)], ["banditcamp", area(camp)]]), graph: {}, entryArea: "mill", journalQuests: [], dmAreaResref: "dm_area", dmGuideWritten: false, scopeRecorded: true }) as never;
+
+  it("hand the driver build_key_npc with the plot's name, race, class, gender and faction", () => {
+    const { items } = buildChecklist(story, undefined, facts([], []));
+    expect(items.find((i) => i.id === "actors.mill_owner")?.auto).toEqual({
+      tool: "build_key_npc",
+      args: { resref: "mill_owner", name: "Mill Owner", area: "mill", race: "6", classId: "2", level: "3", gender: "0", faction: "commoner", conversation: "mill_owner" },
+    });
+    expect(items.find((i) => i.id === "actors.bandit_leader")?.auto?.args).toMatchObject({ race: "5", classId: "4", level: "4", gender: "1", faction: "hostile" });
+  });
+
+  it("hand the driver a talk-kill-return quest with the real tags once both people stand", () => {
+    expect(buildChecklist(story, undefined, facts([], [])).items.find((i) => i.id.startsWith("quests.rescue"))?.auto).toBeUndefined();
+    const placed = facts([{ name: "Mill Owner", hostile: false, tag: "mill_owner", resref: "mill_owner" }], [{ name: "Bandit Leader", hostile: true, tag: "bandit_leader", resref: "bandit_leader" }]);
+    const step = buildChecklist(story, undefined, placed).items.find((i) => i.id.startsWith("quests.rescue"));
+    const spec = JSON.parse(String(step?.auto?.args.spec));
+    expect(spec).toMatchObject({ name: "Rescue the Millers Daughter", giver: "mill_owner", level: 3 });
+    expect(spec.stages.map((s: { do: string }) => s.do)).toEqual(["talk", "kill", "return"]);
+    expect(spec.stages[1]).toMatchObject({ target: "bandit_leader", journal: "The party defeats the Bandit Leader." });
+    expect(buildChecklist(story, undefined, placed).items.find((i) => i.id === "actors.mill_owner")?.done).toBe(true);
+  });
+});

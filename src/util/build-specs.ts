@@ -32,10 +32,6 @@ interface CharacterBase {
   name: string;
   /** Resref of the area to place the character in (must exist in the module). */
   area: string;
-  /** X position in metres (10 m per tile, 0 = west edge). */
-  x: number;
-  /** Y position in metres (10 m per tile, 0 = south edge). */
-  y: number;
   race: PcRace;
   classId: PcClass;
   /**
@@ -62,6 +58,10 @@ interface CharacterBase {
 
 /** A recruitable companion (maps to `build_companion`). */
 export interface CompanionSpec extends CharacterBase {
+  /** X position in metres (10 m per tile, 0 = west edge). */
+  x: number;
+  /** Y position in metres (10 m per tile, 0 = south edge). */
+  y: number;
   /**
    * First-meeting line: who they are and why they are here.
    * @minLength 1
@@ -82,8 +82,12 @@ export interface CompanionSpec extends CharacterBase {
 
 /** A combat-capable key NPC or boss (maps to `build_key_npc`). */
 export interface KeyNpcSpec extends CharacterBase {
-  /** Default "hostile" (a boss). Use "commoner" for a friendly NPC. */
-  faction?: "hostile" | "commoner" | "merchant" | "defender";
+  /** X position in metres; leave x and y out to place it on open ground near the middle of the area. */
+  x?: number;
+  /** Y position in metres (10 m per tile, 0 = south edge). */
+  y?: number;
+  /** "hostile" for an enemy or boss, "commoner" for a friendly person, "merchant", "defender". */
+  faction: "hostile" | "commoner" | "merchant" | "defender";
   /** Gear budget. Default "elite". */
   gearRole?: "pc" | "elite" | "standard" | "mook";
   /** Resref of an existing dialog to attach. */

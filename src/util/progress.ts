@@ -91,8 +91,8 @@ const specArg = (o: Record<string, unknown>) => JSON.stringify(JSON.stringify(o)
 export interface PlotOutline {
   locations: Array<{ name: string; resref: string; tileset?: string; purpose?: string }>;
   connections: Array<[string, string]>;
-  npcs: Array<{ name: string; location?: string; role?: string }>;
-  quests: Array<{ name: string; giver?: string }>;
+  npcs: Array<{ name: string; location?: string; role?: string; who?: string }>;
+  quests: Array<{ name: string; giver?: string; stages?: string[] }>;
   /** Locations that the Challenges list names. */
   challengeLocations: string[];
   /** The Challenges list's text per location ("The Mill: 2 bandits, 1 trap" -> "2 bandits, 1 trap"), by location name. */
@@ -231,11 +231,13 @@ export function parsePlotOutline(plot: string): PlotOutline {
     name: h.trim(),
     location: field(b, "Location"),
     role: field(b, "Role")?.toLowerCase(),
+    who: field(b, "Race, class, gender")?.toLowerCase(),
   }));
   const quests = blocks(sub.get("quest objectives") ?? "", 4)
     .map(([h, b]) => ({
       name: h.replace(/^(primary|side)\s+quest:\s*/i, "").replace(/\s*\(optional\)\s*$/i, "").trim(),
       giver: /\*\*Giver:\*\*\s*(.+)/.exec(b)?.[1].trim(),
+      stages: [...b.matchAll(/\*\*Stage \d+[^*]*:\*\*\s*(.+)/g)].map((m) => m[1].trim()),
     }))
     .filter((q) => q.name);
   const challengeText = sub.get("challenges") ?? "";
@@ -267,6 +269,66 @@ export function nameMatches(npc: string, creature: string): boolean {
 function phaseDone(status: Record<string, PhaseStatus> | undefined, p: Phase): boolean {
   const s = status?.[p]?.status;
   return s === "success" || s === "skipped";
+}
+
+/** A person's resref and tag from the plot's name: "Mill Owner" -> mill_owner. */
+export function npcResref(name: string): string {
+  return name.toLowerCase().replace(/^the\s+/, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 16) || "npc";
+}
+
+const RACES: Array<[RegExp, number]> = [[/half[- ]?elf/, 4], [/half[- ]?orc/, 5], [/dwarf/, 0], [/elf/, 1], [/gnome/, 2], [/halfling/, 3], [/human/, 6]];
+const CLASSES: Array<[RegExp, number]> = [
+  [/barbarian/, 0], [/bard/, 1], [/cleric|priest/, 2], [/druid/, 3], [/fighter|warrior|soldier|guard/, 4], [/monk/, 5],
+  [/paladin/, 6], [/ranger/, 7], [/rogue|thief/, 8], [/sorcerer/, 9], [/wizard|mage/, 10],
+];
+
+/** build_key_npc arguments for a plot person: race, class and gender from "human cleric, male", faction from the role. */
+function keyNpcArgs(n: { name: string; role?: string; who?: string }, tag: string, area: string, level: number): Record<string, string> {
+  const who = n.who ?? "";
+  const hostile = /antagonist|villain|enemy|boss|leader of the|bandit/.test(n.role ?? "");
+  return {
+    resref: tag,
+    name: n.name,
+    area,
+    race: String(RACES.find(([re]) => re.test(who))?.[1] ?? 6),
+    classId: String(CLASSES.find(([re]) => re.test(who))?.[1] ?? 4),
+    level: String(hostile ? level + 1 : level),
+    gender: /female|woman/.test(who) ? "1" : "0",
+    faction: hostile ? "hostile" : /merchant/.test(n.role ?? "") ? "merchant" : "commoner",
+    ...(hostile ? {} : { conversation: tag }),
+  };
+}
+
+/**
+ * A build_quest spec from the plot: the giver gives it (talk), the foe is defeated (kill), the giver is told
+ * (return), with the plot's stage lines as the journal. Only when both stand in the module, by their real tags.
+ */
+function questSpec(
+  q: { name: string; giver?: string; stages?: string[] },
+  npcs: Array<{ name: string; role?: string }>,
+  facts: ModuleFacts,
+  level: number,
+): Record<string, unknown> | null {
+  const people = [...facts.areas.values()].flatMap((a) => a.creatures);
+  const find = (name: string | undefined, hostile: boolean) =>
+    name ? people.find((c) => c.hostile === hostile && (c.tag?.toLowerCase() === npcResref(name) || nameMatches(name, c.name))) : undefined;
+  const giverName = q.giver ?? npcs.find((n) => /quest giver|giver/.test(n.role ?? ""))?.name ?? npcs.find((n) => !/antagonist|villain|enemy|boss/.test(n.role ?? ""))?.name;
+  const foeName = npcs.find((n) => /antagonist|villain|enemy|boss/.test(n.role ?? ""))?.name;
+  const giver = find(giverName, false);
+  const foe = find(foeName, true);
+  if (!giver?.tag || !foe?.tag) return null;
+  const st = q.stages ?? [];
+  const line = (i: number, fallback: string) => (st[i] ?? fallback).replace(/\s+/g, " ").slice(0, 200);
+  return {
+    name: q.name,
+    giver: giver.tag.toLowerCase(),
+    level,
+    stages: [
+      { do: "talk", journal: line(0, `${giverName} asked for help.`) },
+      { do: "kill", target: foe.tag.toLowerCase(), journal: line(1, `Defeat ${foeName}.`) },
+      { do: "return", journal: line(2, `Tell ${giverName} it is done.`), reward: { xp: level * 100, gold: level * 50 } },
+    ],
+  };
 }
 
 /** Enemies that suit an area when the plot names none: undead below ground in crypts and dungeons, goblins in caves. */
@@ -305,6 +367,7 @@ export function buildChecklist(
   };
   const sections = story ? parseSections(story) : new Map<string, string>();
   const has = (s: string) => (sections.get(s) ?? "").trim().length > 0;
+  const targetLevel = Number(/\*\*(?:Target )?Level:\*\*\s*(\d+)/i.exec(sections.get("Module") ?? "")?.[1] ?? 3) || 3;
   const skipped = (p: Phase) => status?.[p]?.status === "skipped";
   const endCheck = (p: Phase) => {
     const s = status?.[p];
@@ -421,9 +484,14 @@ export function buildChecklist(
   if (!skipped("actors")) {
     for (const n of outline?.npcs ?? []) {
       const where = resrefOf(n.location);
-      const placedIn = [...facts.areas].filter(([, a]) => a.creatures.some((c) => nameMatches(n.name, c.name))).map(([r]) => r);
+      const tag = npcResref(n.name);
+      const placedIn = [...facts.areas].filter(([, a]) => a.creatures.some((c) => c.tag?.toLowerCase() === tag || nameMatches(n.name, c.name))).map(([r]) => r);
+      // Everything build_key_npc needs is in the plot: the driver builds the person itself, with the plot's name (a model
+      // renamed "Mill Owner" to "Miller", built him three times and left the last one hostile; 2026-11-19).
+      const args = where ? keyNpcArgs(n, tag, where, targetLevel) : undefined;
       add("actors", `actors.${norm(n.name).replace(/ /g, "_")}`, `${n.name} placed${where ? ` in ${where}` : ""}`, placedIn.length > 0,
-        `build_key_npc(...) or build_creature(spec: "{...}") with place in "${where ?? "<area>"}"`, undefined, { areas: where ? [where] : [], subject: n.name });
+        args ? `build_key_npc(${Object.entries(args).map(([k, v]) => `${k}: "${v}"`).join(", ")})` : `build_key_npc(...) with place in "${where ?? "<area>"}"`,
+        undefined, { areas: where ? [where] : [], subject: n.name, ...(args ? { auto: { tool: "build_key_npc", args } } : {}) });
     }
     section("actors");
     endCheck("actors");
@@ -433,8 +501,11 @@ export function buildChecklist(
   if (!skipped("quests")) {
     for (const q of outline?.quests ?? []) {
       const built = facts.journalQuests.some((j) => nameMatches(q.name, j));
+      // The giver and the foe as the module has them (tags): a model invented "farmer_ned" nine times (2026-11-19).
+      const spec = questSpec(q, outline?.npcs ?? [], facts, targetLevel);
       add("quests", `quests.${norm(q.name).replace(/ /g, "_")}`, `quest "${q.name}" built (journal + dialog)`, built,
-        `build_quest(spec: "{...}")${q.giver ? `, giver ${q.giver}` : ""}`, undefined, { subject: q.name });
+        spec ? `build_quest(spec: ${specArg(spec)})` : `build_quest(spec: "{...}") with the giver's tag from get_area_card`, undefined,
+        { subject: q.name, ...(spec ? { auto: { tool: "build_quest", args: { spec: JSON.stringify(spec) } } } : {}) });
     }
     section("quests");
     endCheck("quests");

@@ -48,7 +48,7 @@ Module: ______________________   Folder: `adventures/______________________/`
 - [ ] `## Environment` written, phase check passes
 
 ## Actors — `get_phase_prompt(phase: "actors")`
-- [ ] Each key NPC placed in their location: `build_key_npc(...)` or `build_creature(spec: "{...}")`
+- [ ] Each key NPC placed in their location: `build_key_npc(..., faction: "commoner")` (the driver builds it from the plot) or `build_creature(spec: "{...}")`
 - [ ] `## Actors` written, phase check passes
 
 ## Quests — `get_phase_prompt(phase: "quests")`

@@ -52,7 +52,7 @@ describe("slimSchema", () => {
 
 describe("specErrors", () => {
   it("checks tool arguments against the build spec and names the field", () => {
-    const base = { resref: "boss", name: "Harl", area: "a1", x: "8", y: "9", race: "6", classId: "4", level: "5", gender: "0" };
+    const base = { resref: "boss", name: "Harl", area: "a1", x: "8", y: "9", race: "6", classId: "4", level: "5", gender: "0", faction: "hostile" };
     expect(specErrors("build_key_npc", base)).toEqual([]);
     expect(specErrors("build_key_npc", { ...base, tag: "t", gearWealth: "0" })).toEqual([]);
     expect(specErrors("build_key_npc", { ...base, classId: "14" }).map((e) => e.field)).toEqual(["classId"]);

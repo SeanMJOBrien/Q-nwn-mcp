@@ -25,7 +25,7 @@ const companion = {
   introduction: "I am Mira, a healer of the harbour shrine.",
   backstory: "I came here after the fever took my village.",
 };
-const keyNpc = { resref: "boss_harl", name: "Captain Harl", area: "saltgate", x: 80, y: 120, race: 6, classId: 4, level: 7, gender: 0, powerLevel: "tougher" };
+const keyNpc = { resref: "boss_harl", name: "Captain Harl", area: "saltgate", x: 80, y: 120, race: 6, classId: 4, level: 7, gender: 0, powerLevel: "tougher", faction: "hostile" };
 const dialog = {
   resref: "dlg_innkeep",
   nodes: [

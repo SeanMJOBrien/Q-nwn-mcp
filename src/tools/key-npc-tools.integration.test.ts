@@ -11,7 +11,7 @@ vi.mock("../module-loader.js", () => ({
   buildDialogSummary: () => ({}),
 }));
 
-const base = { resref: "boss_a", name: "Boss A", area: "a1", x: "10", y: "10", race: "6", classId: "2", level: "8", gender: "0" };
+const base = { resref: "boss_a", name: "Boss A", area: "a1", x: "10", y: "10", race: "6", classId: "2", level: "8", gender: "0", faction: "hostile" };
 
 describe("build_key_npc validation", () => {
   it("refuses a bad resref, race, level, conversation and a bad spot before writing, with isError", async () => {
@@ -36,6 +36,10 @@ describe("build_key_npc validation", () => {
     expect(dup.fix).toContain("adventure_find_walkable");
     expect(dup.isError).toBe(true);
     expect((await run({ ...base, resref: "other", conversation: "dlg_bandit_leader" })).error).toContain("at most 16 characters");
+    const { faction: _f, ...noFaction } = base;
+    expect((await run({ ...noFaction, resref: "other" })).error).toContain("faction is required");
+    const { x: _x, y: _y, ...noSpot } = base;
+    expect((await run({ ...noSpot, resref: "other" })).error).toContain("nothing was built: No area a1");
     await c.close();
     await server.close();
   });
