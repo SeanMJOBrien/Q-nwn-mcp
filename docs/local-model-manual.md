@@ -260,8 +260,21 @@ Common causes:
 - `"event": "tool"`: the call, its arguments and the start of the result.
 - `"event": "refused"`: a call the driver stopped, with the reason.
 - `"event": "phase_check_end"`: the driver's own end check and its errors.
+- `"event": "driver_step"`: a step the driver did itself (its call and result).
+- `"event": "stuck"`: a conversation ended because the model repeated one call 5 times.
+- `"event": "step_done"` / `"step_left_open"`: how each checklist step ended.
 
-These files are what to send when asking for help with a failed run.
+Read a run in seconds:
+
+```
+node dist/cli/drive.js --report <adventure dir>/driver-log          # the newest run, as markdown
+node dist/cli/drive.js --report <adventure dir>/driver-log --json   # the same as JSON
+```
+
+It shows, per phase, the model turns, calls, failures and refusals, the steps done and left open and the phase check,
+then the findings: repeated calls, names the module does not have (an invented giver, blueprint or container),
+refusals by field, failed driver steps. These files (and that report) are what to send when asking for help with a
+failed run.
 
 ## 9. After the run
 

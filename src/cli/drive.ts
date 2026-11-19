@@ -35,6 +35,10 @@
  *                            a stronger model that gets one attempt at a phase the first model failed
  *   --log <dir>              where the transcripts go (default: <adventure dir>/driver-log)
  *   --dry-run                show the plan (phases, tools, prompt sizes); call no model, change nothing
+ *   --report <dir|file> [--json]
+ *                            read a finished run's transcripts (the newest run in a driver-log folder, or one .jsonl)
+ *                            and report where the model got stuck: repeated calls, refusals by field, names the module
+ *                            does not have, steps left open, failed checks
  *
  * Output: progress lines on stderr, one JSON summary on stdout. Exit code 0 when every phase ended as
  * success or skipped, 2 when a phase failed or was blocked, 1 on a usage or connection error.
@@ -48,6 +52,7 @@ import type { JsonSchemaObject } from "../driver/coerce.js";
 import { type Chat, openAiChat } from "../driver/llm.js";
 import { type PhaseResult, type ToolHost, runPhase } from "../driver/run-phase.js";
 import { runPhaseSteps, STEP_PHASES } from "../driver/run-steps.js";
+import { analyzeRun, type LogEvent, renderReport } from "../driver/log-report.js";
 import { FOOTER_PREFIX } from "../util/result-shaping.js";
 import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
 import { PHASES, type Phase } from "../util/phase-check.js";
@@ -59,9 +64,9 @@ import { validateSpec } from "../util/spec-validate.js";
 
 const VALUE_FLAGS = new Set([
   "module", "create", "endpoint", "model", "api-key", "phases", "idea", "level", "party", "minutes", "tone",
-  "max-steps", "retries", "context-chars", "mode", "step-turns", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot",
+  "max-steps", "retries", "context-chars", "mode", "step-turns", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot", "report",
 ]);
-const BOOL_FLAGS = new Set(["force", "dry-run", "help"]);
+const BOOL_FLAGS = new Set(["force", "dry-run", "help", "json"]);
 
 export function parseDriveArgs(argv: string[]): { flags: Record<string, string>; bools: Set<string>; error?: string } {
   const flags: Record<string, string> = {};
@@ -101,6 +106,15 @@ async function main(): Promise<void> {
     say(error ? `error: ${error}` : "");
     say("usage: drive --module <dir|.mod> | --create <title>  --endpoint <url/v1> --model <name> [--phases a,b] [--dry-run] (see the header of src/cli/drive.ts)");
     process.exit(error ? 1 : 0);
+  }
+  // A finished run's transcripts: where the model got stuck (src/driver/log-report.ts). No server, no model.
+  if (flags.report) {
+    const run = readRunLogs(flags.report);
+    if ("error" in run) finish(1, { ok: false, error: run.error });
+    const report = analyzeRun(run.phases);
+    if (bools.has("json")) finish(0, { ok: true, stamp: run.stamp, ...report });
+    fs.writeSync(1, `${renderReport(report)}\n\n(${run.stamp}: ${run.phases.map((p) => p.phase).join(", ")})\n`);
+    process.exit(0);
   }
   const dryRun = bools.has("dry-run");
   const endpoint = flags.endpoint ?? process.env.DRIVE_ENDPOINT ?? process.env.OPENAI_BASE_URL;
@@ -348,6 +362,49 @@ async function main(): Promise<void> {
     }
     await stop(1, { ok: false, error: (e as Error).message });
   }
+}
+
+/**
+ * The newest run in a driver-log folder (files `<stamp>-<phase>[-escalated].jsonl`), or one transcript file, as
+ * events per phase in pipeline order.
+ */
+export function readRunLogs(target: string): { stamp: string; phases: Array<{ phase: string; events: LogEvent[] }> } | { error: string } {
+  let files: string[];
+  try {
+    files = fs.statSync(target).isDirectory() ? fs.readdirSync(target).filter((f) => f.endsWith(".jsonl")).map((f) => path.join(target, f)) : [target];
+  } catch {
+    return { error: `cannot read ${target}` };
+  }
+  const parsed = files
+    .map((f) => {
+      const m = /^(\d{4}-\d{2}-\d{2}T[\d-]+Z)-([a-z]+)(-escalated)?\.jsonl$/.exec(path.basename(f));
+      return { file: f, stamp: m?.[1] ?? "", phase: m ? `${m[2]}${m[3] ?? ""}` : path.basename(f, ".jsonl") };
+    })
+    .filter((x) => x.stamp || files.length === 1);
+  if (!parsed.length) return { error: `no driver transcripts (<stamp>-<phase>.jsonl) in ${target}` };
+  const stamp = parsed.map((x) => x.stamp).sort().pop() ?? "";
+  const order = (p: string) => {
+    const i = (PHASES as readonly string[]).indexOf(p.replace(/-escalated$/, ""));
+    return (i < 0 ? 99 : i) + (p.endsWith("-escalated") ? 0.5 : 0);
+  };
+  const phases = parsed
+    .filter((x) => x.stamp === stamp)
+    .sort((a, b) => order(a.phase) - order(b.phase))
+    .map((x) => ({
+      phase: x.phase,
+      events: fs
+        .readFileSync(x.file, "utf8")
+        .split("\n")
+        .filter((l) => l.trim())
+        .flatMap((l) => {
+          try {
+            return [JSON.parse(l) as LogEvent];
+          } catch {
+            return [];
+          }
+        }),
+    }));
+  return { stamp: stamp || path.basename(target), phases };
 }
 
 /** Reads and checks a plot file. Errors name the failing field. */
