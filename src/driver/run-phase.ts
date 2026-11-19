@@ -11,7 +11,7 @@ import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
 import { isSetupError, SetupError } from "../util/setup-check.js";
 import { validateSpec } from "../util/spec-validate.js";
 import { coerceArgs, type JsonSchemaObject } from "./coerce.js";
-import type { Chat, ChatMessage, ToolCall, ToolSpec } from "./llm.js";
+import { ContextExceededError, type Chat, type ChatMessage, type ToolCall, type ToolSpec } from "./llm.js";
 
 export interface HostTool {
   name: string;
@@ -142,6 +142,33 @@ export function trimContext(messages: ChatMessage[], budget: number): void {
   }
 }
 
+/** The smallest conversation the driver will shrink to before it gives up on a context overflow (about 1k tokens). */
+export const MIN_CONTEXT_CHARS = 4_000;
+
+/**
+ * Asks the model. When the server reports that the conversation is longer than its context window, the budget is
+ * halved (the budget object is shared across the turns of a phase or step, so later turns start small too), the
+ * conversation is trimmed to it, and the same turn is asked again. At the minimum the overflow is thrown.
+ */
+export async function askWithinContext(
+  chat: Chat,
+  messages: ChatMessage[],
+  tools: ToolSpec[],
+  budget: { chars: number },
+  log: (event: Record<string, unknown>) => void,
+): Promise<ChatMessage> {
+  for (;;) {
+    trimContext(messages, budget.chars);
+    try {
+      return await chat(messages, tools);
+    } catch (e) {
+      if (!(e instanceof ContextExceededError) || budget.chars <= MIN_CONTEXT_CHARS) throw e;
+      budget.chars = Math.max(MIN_CONTEXT_CHARS, Math.floor(budget.chars / 2));
+      log({ event: "context_exceeded", budget: budget.chars, message: (e as Error).message.slice(0, 300) });
+    }
+  }
+}
+
 /** The driver has already run the start check, so the model need not spend a turn on it. */
 export function withoutStartCheck(body: string, phase: Phase): string {
   const line = new RegExp(`^1\\. \`phase_check\\(phase: "${phase}", step: "start"\\)\`.*$`, "m");
@@ -240,7 +267,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
   const maxSteps = options.maxSteps ?? 60;
   const retries = options.retries ?? 3;
   const maxResult = options.maxResultChars ?? 6000;
-  const budget = options.contextChars ?? 48_000;
+  const budget = { chars: options.contextChars ?? 48_000 };
   const log = options.onEvent ?? (() => {});
   const result: PhaseResult = { phase, status: "failed", steps: 0, toolCalls: 0, errors: [] };
 
@@ -312,8 +339,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
 
   while (result.steps < maxSteps) {
     if (failedChecks > retries) return { ...result, reason: `the phase check failed ${failedChecks} times` };
-    trimContext(messages, budget);
-    const reply = await chat(messages, toolSpecs);
+    const reply = await askWithinContext(chat, messages, toolSpecs, budget, log);
     result.steps++;
     messages.push(reply);
     log({ event: "model", step: result.steps, content: reply.content.slice(0, 500), calls: reply.tool_calls?.map((c) => c.name) ?? [] });

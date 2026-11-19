@@ -84,7 +84,34 @@ type WireCall = { id?: string; index?: number; function?: { name?: string; argum
 type WireMessage = { content?: string | null; tool_calls?: WireCall[] };
 type WireAnswer = { choices?: Array<{ message?: WireMessage }> };
 
-class HttpError extends Error {}
+/** A failure that another attempt with the same request would repeat: not retried. */
+class NoRetryError extends Error {}
+
+class HttpError extends NoRetryError {}
+
+/** The conversation is longer than the model's context window. The driver shrinks the conversation and asks again. */
+export class ContextExceededError extends NoRetryError {}
+
+const CONTEXT_EXCEEDED = /context (size|length|window)|exceeds? (the )?(available )?context|prompt is too long|too many tokens/i;
+
+/** The message of an error the server put in its answer: a stream event or a JSON body, whatever its shape. */
+function errorMessageOf(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as { error?: unknown; message?: unknown; choices?: Array<{ finish_reason?: unknown }> };
+  if (v.error !== undefined && v.error !== null) {
+    if (typeof v.error === "string") return v.error;
+    const inner = (v.error as { message?: unknown }).message;
+    return typeof inner === "string" ? inner : JSON.stringify(v.error);
+  }
+  if (v.choices?.[0]?.finish_reason === "error") return typeof v.message === "string" ? v.message : "the model server stopped with an error";
+  return undefined;
+}
+
+/** Throws the server's error: a context overflow as ContextExceededError, anything else as a plain failure (not retried). */
+function throwServerError(message: string): never {
+  if (CONTEXT_EXCEEDED.test(message)) throw new ContextExceededError(`model context exceeded: ${message}`);
+  throw new NoRetryError(`model server error: ${message}`);
+}
 
 /** The reason under a bare "fetch failed" (a timeout, a refused or reset connection), for the error message. */
 function causeOf(e: unknown): string {
@@ -101,12 +128,14 @@ async function readStream(res: Response): Promise<WireMessage> {
   const take = (line: string) => {
     const data = line.replace(/^data:\s*/, "").trim();
     if (!data || data === "[DONE]") return;
-    let chunk: { choices?: Array<{ delta?: WireMessage; message?: WireMessage }> };
+    let chunk: { choices?: Array<{ delta?: WireMessage; message?: WireMessage; finish_reason?: unknown }>; error?: unknown; message?: unknown };
     try {
       chunk = JSON.parse(data);
     } catch {
       return;
     }
+    const failed = errorMessageOf(chunk);
+    if (failed !== undefined) throwServerError(failed);
     const d = chunk.choices?.[0]?.delta ?? chunk.choices?.[0]?.message;
     if (!d) return;
     if (d.content) content += d.content;
@@ -178,11 +207,18 @@ export function openAiChat(options: LlmOptions): Chat {
           signal: AbortSignal.timeout(options.timeoutMs ?? 900_000),
         });
         if (!res.ok) throw new HttpError(`model endpoint answered ${res.status}: ${(await res.text()).slice(0, 400)}`);
-        msg = (res.headers.get("content-type") ?? "").includes("text/event-stream") ? await readStream(res) : ((await res.json()) as WireAnswer).choices?.[0]?.message;
+        if ((res.headers.get("content-type") ?? "").includes("text/event-stream")) msg = await readStream(res);
+        else {
+          const body = (await res.json()) as WireAnswer & { error?: unknown };
+          const failed = errorMessageOf(body);
+          if (failed !== undefined) throwServerError(failed);
+          msg = body.choices?.[0]?.message;
+        }
         break;
       } catch (e) {
         // A dropped or timed-out connection is retried; an HTTP error (bad request, unknown model) is not.
-        if (e instanceof HttpError || attempt >= retries) throw new Error(`${(e as Error).message}${causeOf(e)}`);
+        if (e instanceof NoRetryError) throw e;
+        if (attempt >= retries) throw new Error(`${(e as Error).message}${causeOf(e)}`);
         await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
       }
     }

@@ -13,7 +13,7 @@ import type { Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
 import { STEP_BASE_TOOLS } from "../util/progress.js";
 import type { Chat, ChatMessage, ToolSpec } from "./llm.js";
-import { callSignature, checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, STUCK_REPEATS, type ToolHost, trimContext } from "./run-phase.js";
+import { callSignature, checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, STUCK_REPEATS, type ToolHost, askWithinContext } from "./run-phase.js";
 
 export interface RunStepsOptions extends RunPhaseOptions {
   /** Model turns per step (default 12). */
@@ -146,7 +146,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
   const maxRuns = options.maxStepRuns ?? 60;
   const tries = options.stepTries ?? 2;
   const maxResult = options.maxResultChars ?? 6000;
-  const budget = options.contextChars ?? 48_000;
+  const budget = { chars: options.contextChars ?? 48_000 };
   const result: PhaseResult = { phase, status: "failed", steps: 0, toolCalls: 0, errors: [] };
 
   const start = checkOk((await host.callTool("phase_check", { phase, step: "start" })).text);
@@ -234,8 +234,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
     let sameFailures = 0;
     let stuck = false;
     for (let turn = 0; turn < stepTurns && !stuck; turn++) {
-      trimContext(messages, budget);
-      const reply = await chat(messages, specs);
+      const reply = await askWithinContext(chat, messages, specs, budget, log);
       result.steps++;
       messages.push(reply);
       log({ event: "model", step: result.steps, id: step.id, content: reply.content.slice(0, 300), calls: reply.tool_calls?.map((c) => c.name) ?? [] });

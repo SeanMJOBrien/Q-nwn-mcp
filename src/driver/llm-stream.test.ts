@@ -1,7 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { openAiChat } from "./llm.js";
+import { ContextExceededError, openAiChat } from "./llm.js";
 
 let server: http.Server | undefined;
 afterEach(() => new Promise<void>((r) => (server ? server.close(() => r()) : r())));
@@ -60,5 +60,24 @@ describe("model calls", () => {
     });
     await expect(openAiChat({ endpoint: url, model: "nope" })([{ role: "user", content: "go" }], [])).rejects.toThrow(/answered 404.*model not found/);
     expect(calls).toBe(1);
+  });
+
+  it("raises a context overflow the server sends inside the stream, and does not retry it", async () => {
+    let calls = 0;
+    const url = await serve((_req, res) => {
+      calls++;
+      sse(res, [
+        { choices: [{ delta: { content: "par" } }] },
+        { error: { type: "provider.internal", message: 'Engine protocol predict stream returned an error: {"code":500,"message":"Context size has been exceeded."}' } },
+      ]);
+    });
+    const failing = openAiChat({ endpoint: url, model: "m", retries: 2 })([{ role: "user", content: "go" }], []);
+    await expect(failing).rejects.toBeInstanceOf(ContextExceededError);
+    expect(calls).toBe(1);
+  });
+
+  it("raises any other error the server sends inside the stream instead of an empty answer", async () => {
+    const url = await serve((_req, res) => sse(res, [{ choices: [{ delta: {}, finish_reason: "error" }], message: "out of memory" }]));
+    await expect(openAiChat({ endpoint: url, model: "m" })([{ role: "user", content: "go" }], [])).rejects.toThrow(/model server error: out of memory/);
   });
 });

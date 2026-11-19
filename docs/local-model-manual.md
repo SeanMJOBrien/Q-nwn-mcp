@@ -321,7 +321,11 @@ such as `params/layout must be string` for a parameter this server now accepts a
   `[tool_call bridge refused] Deferred tool ... has no verified schema review` (the client hides tool schemas until the
   model searches for them; a smaller `MCP_TOOL_PROFILE` keeps the list short enough not to be deferred), and
   `params must have required property 'arguments'` (the model put the arguments next to the tool name instead of inside
-  `arguments`: a tool-call format problem of the model or its chat template).
+  `arguments`: a tool-call format problem of the model or its chat template), and
+  `params must have required property 'name'` (the call reached the client without a tool name, for example
+  `{"file_path": ..., "content": ...}` alone or the name under another key: the same template problem; it is not an
+  nwn-mcp schema, and a plan written to a file such as `<name>.layout` is not a step of the build, `write_plot` and
+  `get_progress` are).
 - Prefer the one-call spec tools for a small model: `write_plot`, `build_quest`, `build_creature` (a whole character in
   words), `build_companion`; and the driver above, which gives each phase a fresh conversation and only its tools.
 
