@@ -35,7 +35,11 @@ export function lenientField(schema: z.ZodType): z.ZodType {
   const description = schema.description ?? inner.description;
   let out: z.ZodType;
   if (inner instanceof z.ZodString) {
-    const accepted = z.union([inner, z.number(), z.boolean(), z.array(z.unknown()), z.record(z.string(), z.unknown())]);
+    // The string branch is bare (no description, unless the parameter has checks): the description is written once,
+    // on the whole parameter, so the published schema stays small (the full server's schema was ~4x its descriptions).
+    const hasChecks = ((inner as unknown as { def?: { checks?: unknown[] } }).def?.checks ?? []).length > 0;
+    const text = hasChecks ? inner : z.string();
+    const accepted = z.union([text, z.number(), z.boolean(), z.array(z.unknown()), z.record(z.string(), z.unknown())]);
     out = (description ? accepted.describe(description) : accepted).transform(toText);
   } else if (inner instanceof z.ZodBoolean) {
     const accepted = z.union([inner, z.enum(["true", "false", "1", "0"])]);

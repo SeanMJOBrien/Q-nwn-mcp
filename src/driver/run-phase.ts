@@ -133,12 +133,26 @@ export function clip(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max)}\n[... ${text.length - max} more characters not shown]`;
 }
 
-/** Drops the oldest tool results until the conversation fits the budget. The system and first user message stay. */
+/** The characters a conversation takes: its messages and their tool calls. */
+export function messageChars(messages: ChatMessage[]): number {
+  return messages.reduce((n, m) => n + m.content.length + JSON.stringify(m.tool_calls ?? "").length, 0);
+}
+
+/**
+ * Makes the conversation fit the budget (characters of messages). First the oldest tool results go, then the oldest
+ * long tool-call arguments (a written section or spec can be large). The system and first user message stay, and the
+ * last four messages are never touched.
+ */
 export function trimContext(messages: ChatMessage[], budget: number): void {
-  const size = () => messages.reduce((n, m) => n + m.content.length + JSON.stringify(m.tool_calls ?? "").length, 0);
-  for (let i = 2; i < messages.length - 4 && size() > budget; i++) {
+  for (let i = 2; i < messages.length - 4 && messageChars(messages) > budget; i++) {
     const m = messages[i];
     if (m.role === "tool" && m.content.length > 80) m.content = "[earlier result removed to save space]";
+  }
+  for (let i = 2; i < messages.length - 4 && messageChars(messages) > budget; i++) {
+    for (const call of messages[i].tool_calls ?? []) {
+      const args = typeof call.arguments === "string" ? call.arguments : JSON.stringify(call.arguments);
+      if (args.length > 200) call.arguments = "{}";
+    }
   }
 }
 
@@ -158,7 +172,10 @@ export async function askWithinContext(
   log: (event: Record<string, unknown>) => void,
 ): Promise<ChatMessage> {
   for (;;) {
-    trimContext(messages, budget.chars);
+    // The tool schemas go with every request, so they count against the budget too.
+    const toolChars = JSON.stringify(tools).length;
+    trimContext(messages, Math.max(MIN_CONTEXT_CHARS, budget.chars - toolChars));
+    log({ event: "request", messageChars: messageChars(messages), toolChars, budget: budget.chars });
     try {
       return await chat(messages, tools);
     } catch (e) {

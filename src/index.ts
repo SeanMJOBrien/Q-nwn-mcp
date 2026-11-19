@@ -1,4 +1,5 @@
 import { withLenientArgs } from "./util/lenient-args.js";
+import { slimLimitsFromEnv, withSlimDescriptions } from "./util/slim-descriptions.js";
 import { setupProblems } from "./util/setup-check.js";
 import { SERVER_INSTRUCTIONS } from "./util/no-module-guide.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -22,9 +23,11 @@ const profile = resolveToolProfile(process.env.MCP_TOOL_PROFILE);
 // Numbers, booleans, arrays and objects accepted for string parameters; unknown argument names refused with the list
 // of real ones (src/util/lenient-args.ts). Wraps every tool once, under the profile filter.
 // Results: a progress line at the end and long results kept behind an id (src/util/result-shaping.ts), on with a profile.
+// Descriptions: on with a profile, shortened to fit a small context window (src/util/slim-descriptions.ts).
 // recordTools keeps every handler (outside the filter) so build_area and dress_area can run other tools.
 const shaping = resultShapingFromEnv(profile !== null);
-registerAll(recordTools(filterToolsByProfile(withResultShaping(withLenientArgs(server), shaping, progressFooter), profile)));
+const slim = slimLimitsFromEnv(profile !== null);
+registerAll(recordTools(filterToolsByProfile(withResultShaping(withSlimDescriptions(withLenientArgs(server), slim), shaping, progressFooter), profile)));
 
 // Start the server
 const transport = new StdioServerTransport();
