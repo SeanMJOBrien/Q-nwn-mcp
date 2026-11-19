@@ -174,12 +174,18 @@ describe("runPhase", () => {
     expect(r.errors[0]).toContain("Plot");
   });
 
-  it("stops at the step limit, and nudges after a repeated failing call", async () => {
+  it("stops at the step limit, and nudges after a repeated call", async () => {
     const seen: ChatMessage[][] = [];
     const r = await runPhase(fakeHost([]), scripted([[call("plan_adventure_shape", { playMinutes: "0" })]], seen), "plot", { maxSteps: 4 });
     expect(r).toMatchObject({ status: "failed", steps: 4 });
     expect(r.reason).toContain("4 model turns");
-    expect(seen[3].some((m) => m.role === "user" && m.content.includes("repeated the same failing call"))).toBe(true);
+    expect(seen[3].some((m) => m.role === "user" && m.content.includes("repeated the same call to plan_adventure_shape"))).toBe(true);
+  });
+
+  it("ends the phase when the model repeats one successful call", async () => {
+    const r = await runPhase(fakeHost([]), scripted([[call("read_story", { sections: "Module" })]], []), "plot", { maxSteps: 60 });
+    expect(r.reason).toMatch(/^stuck: the same call to read_story 5 times/);
+    expect(r.steps).toBe(5);
   });
 
   it("hands the model the phase's open steps from get_progress, and once more when phase_check passes with steps open", async () => {

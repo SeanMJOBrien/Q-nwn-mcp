@@ -52,7 +52,7 @@ export interface PhaseResult {
   openSteps?: string[];
 }
 
-/** Identical failing calls in a row (after the first) that end a conversation: the model is stuck. */
+/** Identical calls in a row (after the first; failing or not) that end a conversation: the model is stuck. */
 export const STUCK_REPEATS = 4;
 
 /** Tools the driver runs itself; never shown to the model. */
@@ -274,16 +274,20 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
       messages.push({ role: "tool", tool_call_id: call.id, content: clip(out.text, maxResult) });
       // The same failing call again and again (refused before the call or failed in it): warn once, then stop. A
       // repair pass sent one refused create_dialog 50 times (The Old Mill, 2026-11-18).
+      // A successful call repeated is as stuck as a failing one: list_tilesets 57 times in a row (The Old Mill).
       const signature = `${call.name} ${JSON.stringify(out.args ?? call.arguments)}`;
-      if (out.isError && signature === lastFailing) sameFailures++;
+      if (signature === lastFailing) sameFailures++;
       else sameFailures = 0;
-      lastFailing = out.isError ? signature : "";
+      lastFailing = signature;
+      if (sameFailures === 1 && !out.isError) {
+        messages.push({ role: "user", content: `You already have the result of this ${call.name} call. Use it and go on to the next step; do not call it again.` });
+      }
       if (sameFailures === 2) {
-        messages.push({ role: "user", content: `You repeated the same failing call to ${call.name}. Read its error and change the arguments, or go on to the next step.` });
+        messages.push({ role: "user", content: `You repeated the same call to ${call.name}. ${out.isError ? "Read its error and change the arguments" : "Use the answer you have"}, or go on to the next step.` });
       }
       if (sameFailures >= STUCK_REPEATS) {
         log({ event: "stuck", tool: call.name, repeats: sameFailures + 1 });
-        return { ...result, reason: `stuck: the same failing call to ${call.name} ${sameFailures + 1} times in a row` };
+        return { ...result, reason: `stuck: the same call to ${call.name} ${sameFailures + 1} times in a row` };
       }
       if (out.refused || !out.args) continue;
       const args = out.args;

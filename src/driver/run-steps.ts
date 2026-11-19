@@ -245,11 +245,16 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
         const out = await runTool(call, byName, host, log);
         messages.push({ role: "tool", tool_call_id: call.id, content: clip(out.text, maxResult) });
         const signature = `${call.name} ${JSON.stringify(out.args ?? call.arguments)}`;
-        if (out.isError && signature === lastFailing) {
+        if (signature === lastFailing) {
           sameFailures++;
-          messages.push({ role: "user", content: `That is the same failing call to ${call.name}. Change the field its error names, or reply DONE if the step cannot be done.` });
+          messages.push({
+            role: "user",
+            content: out.isError
+              ? `That is the same failing call to ${call.name}. Change the field its error names, or reply DONE if the step cannot be done.`
+              : `You already have the result of this ${call.name} call. Use it to do the step, or reply DONE.`,
+          });
         } else sameFailures = 0;
-        lastFailing = out.isError ? signature : "";
+        lastFailing = signature;
         if (sameFailures >= STUCK_REPEATS) {
           log({ event: "stuck", id: step.id, tool: call.name, repeats: sameFailures + 1 });
           stuck = true;

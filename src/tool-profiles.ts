@@ -38,7 +38,9 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "set_project_scope",
     "show_menu",
   ],
-  plot: ["write_plot", "plan_adventure_shape", "verify_story", "list_tilesets", "suggest_area_size", "set_project_scope"],
+  // No list_tilesets: the plot prompt lists the tilesets build_area has recipes for; a small model called
+  // list_tilesets 57 times reading only its outline (The Old Mill, 2026-11-18).
+  plot: ["write_plot", "plan_adventure_shape", "verify_story", "suggest_area_size", "set_project_scope"],
   quests: [
     "build_quest",
     "remove_quest",
