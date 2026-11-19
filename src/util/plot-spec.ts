@@ -346,7 +346,16 @@ export function renderPlot(spec: PlotSpec): string {
   });
 
   md.push("### Connections");
-  if (spec.connections?.length) for (const [a, b] of spec.connections) md.push(`- ${a} <-> ${b}`);
+  // One line per pair of places, whichever way round or however often the spec lists it.
+  const seen = new Set<string>();
+  if (spec.connections?.length) {
+    for (const [a, b] of spec.connections) {
+      const key = [a, b].map((x) => x.toLowerCase().trim()).sort().join("|");
+      if (seen.has(key) || a.toLowerCase().trim() === b.toLowerCase().trim()) continue;
+      seen.add(key);
+      md.push(`- ${a} <-> ${b}`);
+    }
+  }
   else md.push("- (none: a single location)");
   md.push("");
 

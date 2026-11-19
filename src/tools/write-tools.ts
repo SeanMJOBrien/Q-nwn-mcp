@@ -1,4 +1,5 @@
 import { markDirty } from "../util/dirty-state.js";
+import { applyCreaturePalette } from "./palette-tools.js";
 import { alreadyExistsResult } from "../util/tool-result.js";
 import { resrefError } from "../util/resref.js";
 import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
@@ -150,6 +151,15 @@ export function registerWriteTools(server: McpServer): void {
       const index = requireIndex();
       const outPath = outputPath ? path.resolve(outputPath) : index.modPath;
 
+      // Every creature blueprint in the custom palette, so the DM can spawn it in play (util/creature-palette.ts).
+      let palette: unknown;
+      try {
+        const r = await applyCreaturePalette(index);
+        palette = "error" in r ? r.error : { creatures: r.entries };
+      } catch (e) {
+        palette = `palette not updated: ${(e as Error).message}`;
+      }
+
       await erfPack(index.tempDir, outPath);
       // The packed .mod now matches the temp dir again — the whole point of
       // this call, and the baseline the load_module dirty guard checks against.
@@ -163,6 +173,7 @@ export function registerWriteTools(server: McpServer): void {
             success: true,
             outputPath: outPath,
             sizeBytes: stat.size,
+            palette,
           }, null, 2),
         }],
       };

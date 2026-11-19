@@ -8,6 +8,7 @@ import { SIM_INCLUDE } from "../util/sim-script.js";
  * Script source lives in util/companion-script.ts.
  */
 
+import { callTool, hasTool } from "../util/tool-registry.js";
 import { findPlacedCreature } from "../util/creature-placer.js";
 import { alreadyExistsResult } from "../util/tool-result.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -200,6 +201,14 @@ export function companionSoundset(index: ModuleIndex, classId: number, gender: n
   return row;
 }
 
+/** The given position, or open ground near the middle of the area (the driver builds companions without one). */
+async function companionSpot(area: string, x?: string, y?: string): Promise<{ x: number; y: number }> {
+  if (x !== undefined && y !== undefined) return { x: toF(x), y: toF(y) };
+  const found = hasTool("adventure_find_walkable") ? await callTool("adventure_find_walkable", { area, clearRadius: "2", count: "3" }) : undefined;
+  const p = (found?.json?.positions as Array<{ x: number; y: number }> | undefined)?.[0];
+  return p ?? { x: Number.NaN, y: Number.NaN };
+}
+
 export function registerCompanionTools(server: McpServer): void {
   server.tool(
     "create_companion_system",
@@ -269,8 +278,8 @@ export function registerCompanionTools(server: McpServer): void {
       resref: z.string().describe("Blueprint resref (max 16 characters); also the tag unless `tag` is given"),
       name: z.string().describe("Display name"),
       area: z.string().describe("Area resref to place the companion in"),
-      x: numParam("X position (metres)"),
-      y: numParam("Y position (metres)"),
+      x: optNumParam("X position (metres); leave x and y out to place it on open ground near the middle of the area"),
+      y: optNumParam("Y position (metres)"),
       race: numParam("racialtypes.2da row, 0-6: Dwarf, Elf, Gnome, Halfling, Half-Elf, Half-Orc, Human"),
       classId: numParam(
         "0 Barbarian 1 Bard 2 Cleric 3 Druid 4 Fighter 5 Monk 6 Paladin 7 Ranger 8 Rogue 9 Sorcerer 10 Wizard",
@@ -372,8 +381,7 @@ export function registerCompanionTools(server: McpServer): void {
       const placed = await placeCreatureCore(index, resmanOpts, {
         area: args.area,
         blueprint: resref,
-        x: toF(args.x),
-        y: toF(args.y),
+        ...(await companionSpot(args.area, args.x, args.y)),
         bearing: args.bearing !== undefined ? toF(args.bearing) : 0,
       });
       if (!placed.success) {

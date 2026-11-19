@@ -81,7 +81,7 @@
           "type": "number"
         },
         "x": {
-          "description": "X position in metres (10 m per tile, 0 = west edge).",
+          "description": "X position in metres; leave x and y out to place it on open ground near the middle of the area.",
           "type": "number"
         },
         "y": {
@@ -98,9 +98,7 @@
         "level",
         "name",
         "race",
-        "resref",
-        "x",
-        "y"
+        "resref"
       ],
       "type": "object"
     },

@@ -58,10 +58,10 @@ interface CharacterBase {
 
 /** A recruitable companion (maps to `build_companion`). */
 export interface CompanionSpec extends CharacterBase {
-  /** X position in metres (10 m per tile, 0 = west edge). */
-  x: number;
+  /** X position in metres; leave x and y out to place it on open ground near the middle of the area. */
+  x?: number;
   /** Y position in metres (10 m per tile, 0 = south edge). */
-  y: number;
+  y?: number;
   /**
    * First-meeting line: who they are and why they are here.
    * @minLength 1

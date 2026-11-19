@@ -89,9 +89,9 @@ export function recentNotes(progressFile: string | null, n = 6): string[] {
 const specArg = (o: Record<string, unknown>) => JSON.stringify(JSON.stringify(o));
 
 export interface PlotOutline {
-  locations: Array<{ name: string; resref: string; tileset?: string; purpose?: string }>;
+  locations: Array<{ name: string; resref: string; tileset?: string; purpose?: string; events?: string; beat?: string }>;
   connections: Array<[string, string]>;
-  npcs: Array<{ name: string; location?: string; role?: string; who?: string }>;
+  npcs: Array<{ name: string; location?: string; role?: string; who?: string; motive?: string; voice?: string }>;
   quests: Array<{ name: string; giver?: string; stages?: string[] }>;
   /** Locations that the Challenges list names. */
   challengeLocations: string[];
@@ -220,18 +220,28 @@ export function parsePlotOutline(plot: string): PlotOutline {
   const locations = blocks(sub.get("locations") ?? "", 4).map(([h, b]) => {
     const name = h.replace(/^\d+\.\s*/, "").trim();
     const resref = (field(b, "Resref") ?? name.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 16)).split(/\s/)[0].toLowerCase();
-    return { name, resref, tileset: field(b, "Tileset")?.split(/\s/)[0], purpose: field(b, "Purpose")?.toLowerCase() };
+    return {
+      name,
+      resref,
+      tileset: field(b, "Tileset")?.split(/\s/)[0],
+      purpose: field(b, "Purpose")?.toLowerCase(),
+      events: field(b, "Events")?.toLowerCase(),
+      beat: field(b, "Beat"),
+    };
   });
   const connections: Array<[string, string]> = [];
   for (const line of (sub.get("connections") ?? "").split("\n")) {
     const m = /^\s*-\s*(.+?)\s*<->\s*(.+?)(?:\s+via\s+.*)?$/.exec(line);
-    if (m) connections.push([m[1].trim(), m[2].trim()]);
+    // One link per pair of places, whichever way round or however often the plot lists it.
+    if (m && !connections.some(([x, y]) => (norm(x) === norm(m[1]) && norm(y) === norm(m[2])) || (norm(x) === norm(m[2]) && norm(y) === norm(m[1])))) connections.push([m[1].trim(), m[2].trim()]);
   }
   const npcs = blocks(sub.get("key npcs") ?? "", 4).map(([h, b]) => ({
     name: h.trim(),
     location: field(b, "Location"),
     role: field(b, "Role")?.toLowerCase(),
     who: field(b, "Race, class, gender")?.toLowerCase(),
+    motive: field(b, "Motive"),
+    voice: field(b, "Voice"),
   }));
   // Antagonists (write_plot: "- **Name:** who, in Location. Motive: ..."): people too, built hostile by the actors phase.
   for (const line of (sub.get("antagonists") ?? "").split("\n")) {
@@ -239,7 +249,7 @@ export function parsePlotOutline(plot: string): PlotOutline {
     if (!m || npcs.some((n) => norm(n.name) === norm(m[1]))) continue;
     const rest = m[2];
     const where = /,?\s+in\s+([^.]+)\./.exec(rest)?.[1]?.trim() ?? locations.find((l) => norm(rest).includes(norm(l.name)))?.name;
-    npcs.push({ name: m[1].trim(), location: where, role: "antagonist", who: rest.split(/,\s+in\s+|\.\s/)[0].toLowerCase() });
+    npcs.push({ name: m[1].trim(), location: where, role: "antagonist", who: rest.split(/,\s+in\s+|\.\s/)[0].toLowerCase(), motive: /Motive:\s*([^.]+)/.exec(rest)?.[1]?.trim(), voice: undefined });
   }
   const quests = blocks(sub.get("quest objectives") ?? "", 4)
     .map(([h, b]) => ({
@@ -315,6 +325,27 @@ function keyNpcArgs(n: { name: string; role?: string; who?: string }, tag: strin
   };
 }
 
+/** build_companion arguments for a plot companion: the plot's motive and voice become its first lines. */
+function companionArgs(n: { name: string; who?: string; motive?: string; voice?: string }, tag: string, area: string, level: number): Record<string, string> {
+  const who = n.who ?? "";
+  return {
+    resref: tag,
+    name: n.name,
+    area,
+    race: String(RACES.find(([re]) => re.test(who))?.[1] ?? 6),
+    classId: String(CLASSES.find(([re]) => re.test(who))?.[1] ?? 4),
+    level: String(level),
+    gender: /female|woman/.test(who) ? "1" : "0",
+    introduction: `I am ${n.name}.${n.motive ? ` I want to ${n.motive.replace(/^to\s+/i, "").replace(/\.$/, "")}.` : ""} I will fight beside you if you will have me.`,
+    backstory: n.voice || n.motive || `${n.name} has served the village for years.`,
+  };
+}
+
+/** A container tag as the section formats write it (lower case, no spaces): "Chest - 1" -> "chest___1". */
+export function tagKey(tag: string): string {
+  return tag.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+}
+
 /**
  * A build_quest spec from the plot: the giver gives it (talk), the foe is defeated (kill), the giver is told
  * (return), with the plot's stage lines as the journal. Only when both stand in the module, by their real tags.
@@ -341,7 +372,8 @@ function questSpec(
     level,
     stages: [
       { do: "talk", journal: line(0, `${giverName} asked for help.`) },
-      { do: "kill", target: foe.tag.toLowerCase(), journal: line(1, `Defeat ${foeName}.`) },
+      // early: a foe killed before the quest reaches this stage still counts (it stands hostile from the start).
+      { do: "kill", target: foe.tag.toLowerCase(), journal: line(1, `Defeat ${foeName}.`), early: true },
       { do: "return", journal: line(2, `Tell ${giverName} it is done.`), reward: { xp: level * 100, gold: level * 50 } },
     ],
   };
@@ -432,6 +464,9 @@ export function buildChecklist(
     [
       ...(outline?.challengeLocations ?? []).map(resrefOf),
       ...locs.filter((l) => /boss|combat|dungeon/.test(l.purpose ?? "")).map((l) => l.resref),
+      // A place whose events are a fight (combat, ambush, boss) needs enemies even when the Challenges list forgets it
+      // (Millers Daughter: the forest ambush and the attack on the village gate got none).
+      ...locs.filter((l) => /\b(combat|ambush|boss)\b/.test(l.events ?? "")).map((l) => l.resref),
       ...targets.fights.keys(),
     ].filter((r): r is string => !!r),
   );
@@ -488,7 +523,7 @@ export function buildChecklist(
           { ...about, auto: { tool: "dress_area", args: { area: l.resref, props: JSON.stringify(["plc_chest1"]), pins: "none" } } });
       }
       for (const tag of targets.containers.get(l.resref) ?? []) {
-        const there = (a.containers ?? []).some((c) => c.tag.toLowerCase() === tag);
+        const there = (a.containers ?? []).some((c) => tagKey(c.tag) === tag);
         if (a.containers) add("environment", `environment.${l.resref}.c.${tag}`, `${l.name}: container ${tag} (named in ## Environment) is placed`, there,
           `place_placeable(area: "${l.resref}", ...) with tag ${tag}, or correct the Environment section`, undefined, about);
       }
@@ -505,10 +540,15 @@ export function buildChecklist(
       const placedIn = [...facts.areas].filter(([, a]) => a.creatures.some((c) => c.tag?.toLowerCase() === tag || nameMatches(n.name, c.name))).map(([r]) => r);
       // Everything build_key_npc needs is in the plot: the driver builds the person itself, with the plot's name (a model
       // renamed "Mill Owner" to "Miller", built him three times and left the last one hostile; 2026-11-19).
-      const args = where ? keyNpcArgs(n, tag, where, targetLevel) : undefined;
+      // A companion is a henchman the party recruits (build_companion), everyone else a key NPC (Millers Daughter:
+      // the militia meant as henchmen were built as plain NPCs).
+      const companion = /companion|henchm/.test(n.role ?? "");
+      const tool = companion ? "build_companion" : "build_key_npc";
+      const args = where ? (companion ? companionArgs(n, tag, where, targetLevel) : keyNpcArgs(n, tag, where, targetLevel)) : undefined;
+      const shown = args ? Object.fromEntries(Object.entries(args).filter(([k]) => k !== "introduction" && k !== "backstory")) : undefined;
       add("actors", `actors.${norm(n.name).replace(/ /g, "_")}`, `${n.name} placed${where ? ` in ${where}` : ""}`, placedIn.length > 0,
-        args ? `build_key_npc(${Object.entries(args).map(([k, v]) => `${k}: "${v}"`).join(", ")})` : `build_key_npc(...) with place in "${where ?? "<area>"}"`,
-        undefined, { areas: where ? [where] : [], subject: n.name, ...(args ? { auto: { tool: "build_key_npc", args } } : {}) });
+        shown ? `${tool}(${Object.entries(shown).map(([k, v]) => `${k}: "${v}"`).join(", ")}${companion ? ', introduction: "...", backstory: "..."' : ""})` : `${tool}(...) with place in "${where ?? "<area>"}"`,
+        undefined, { areas: where ? [where] : [], subject: n.name, ...(args ? { auto: { tool, args } } : {}) });
     }
     section("actors");
     endCheck("actors");
@@ -536,7 +576,8 @@ export function buildChecklist(
       const hostile = !!a && (a.encounters > 0 || a.creatures.some((c) => c.hostile));
       // The plot's line for the place names the enemies ("2 bandits"): the driver places them itself.
       const line = outline?.challengeLines?.[name] ?? "";
-      const group = challengeGroups(line)[0] ?? { kind: defaultEnemyKind(a?.tileset ?? "") };
+      const beat = locs.find((l) => l.resref === r)?.beat ?? "";
+      const group = challengeGroups(line)[0] ?? challengeGroups(beat)[0] ?? { kind: defaultEnemyKind(a?.tileset ?? "") };
       const enemyArgs = { area: r, kind: group.kind, ...(group.count ? { count: String(group.count) } : {}) };
       const about = { areas: [r], subject: name, auto: { tool: "build_enemy_group", args: enemyArgs } };
       add("challenges", `challenges.${r}`, `${name}: enemies placed`, hostile,
@@ -586,7 +627,7 @@ export function buildChecklist(
         { areas: [l.resref], subject: l.name, auto: { tool: "add_items_to_container", args: { area: l.resref, containerTag: a.containers[0].tag, items: JSON.stringify(starterLoot(targetLevel)) } } });
     }
     for (const [r, tag] of targets.loot) {
-      const c = facts.areas.get(r)?.containers?.find((x) => x.tag.toLowerCase() === tag);
+      const c = facts.areas.get(r)?.containers?.find((x) => tagKey(x.tag) === tag);
       if (facts.areas.get(r)?.containers) add("affordances", `affordances.${r}.c.${tag}`, `container ${tag} in ${r} holds the loot ## Affordances names`, !!c && c.items > 0,
         `add_items_to_container(area: "${r}", containerTag: "${tag}", items: "[...]")`, undefined, { areas: [r] });
     }

@@ -702,7 +702,11 @@ export async function draftStorySection(index: ReturnType<typeof requireIndex>, 
     } else {
       const git = index.parsedGff.get(`${r}.git`) as GffObj;
       const plcs = getFieldList(git, "Placeable List");
-      const show = (p: GffObj) => `${getFieldStr(p, "TemplateResRef") || "?"} (${getFieldStr(p, "Tag")}) at ${fmtAt(getFieldNum(p, "X"), getFieldNum(p, "Y"))}`;
+      const show = (p: GffObj) => {
+        const tag = getFieldStr(p, "Tag");
+        const kind = getFieldStr(p, "TemplateResRef") || (/^(at|rt)_/.test(tag) ? "portal" : "placeable");
+        return `${kind} (${tag}) at ${fmtAt(getFieldNum(p, "X"), getFieldNum(p, "Y"))}`;
+      };
       const plain = plcs.filter((p) => !isContainerPlaceable(p));
       const boxes = plcs.filter((p) => isContainerPlaceable(p));
       const sounds = getFieldList(git, "SoundList");

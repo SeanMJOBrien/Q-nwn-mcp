@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { type PlotSpec, renderPlot } from "./plot-spec.js";
-import { type AreaFacts, buildChecklist, type ModuleFacts, nameMatches, nextStep, parsePlotOutline, recentNotes, renderProgress, stepTools } from "./progress.js";
+import { type AreaFacts, buildChecklist, type ModuleFacts, nameMatches, nextStep, parsePlotOutline, recentNotes, renderProgress, stepTools, tagKey } from "./progress.js";
 
 const spec = JSON.parse(readFileSync("docs/specs/plot.example.json", "utf8")) as PlotSpec;
 const story = (extra = "") => `# The Mill\n\n## Module\n- **Title:** The Mill\n\n## Plot\n${renderPlot(spec)}\n${extra}`;
@@ -205,7 +205,7 @@ describe("actor and quest steps from the plot", () => {
 describe("driver-run steps across the phases", () => {
   it("reads antagonists from write_plot's format as hostile people of their location", () => {
     const o = parsePlotOutline("### Locations\n#### 1. Camp\n- **Resref:** camp\n### Key NPCs\n### Antagonists\n- **Grak:** a half-orc bandit chief, in Camp. Motive: gold. Stopped by: a fight.\n");
-    expect(o.npcs).toEqual([{ name: "Grak", location: "Camp", role: "antagonist", who: "a half-orc bandit chief" }]);
+    expect(o.npcs).toEqual([{ name: "Grak", location: "Camp", role: "antagonist", who: "a half-orc bandit chief", motive: "gold", voice: undefined }]);
   });
 
   it("hand the driver links, the start, a plot trap, loot, the store, gold and the DM area", () => {
@@ -239,5 +239,47 @@ describe("driver-run steps across the phases", () => {
     expect(auto("affordances.gold")).toEqual({ tool: "set_starting_gold", args: { level: "4" } });
     expect(JSON.parse(String(auto("affordances.town.loot")?.args.items))).toEqual([{ resref: "nw_it_mpotion001", quantity: 2 }, { resref: "nw_it_gold001", quantity: 100 }]);
     expect(auto("rewards.dmarea")).toEqual({ tool: "create_dm_area", args: {} });
+  });
+});
+
+describe("fixes from the Millers Daughter run", () => {
+  const story = [
+    "## Module", "- **Target Level:** 3", "## Plot", "### Locations",
+    "#### 1. Mill", "- **Resref:** mill", "- **Tileset:** ttf02", "- **Purpose:** hub", "- **Events:** social", "- **Beat:** The party meets the militia.",
+    "#### 2. Forest", "- **Resref:** forest", "- **Tileset:** ttf02", "- **Purpose:** travel", "- **Events:** ambush", "- **Beat:** Bandits ambush the party.",
+    "#### 3. Village", "- **Resref:** village", "- **Tileset:** tcn01", "- **Purpose:** hub", "- **Events:** social, combat", "- **Beat:** Monsters try to break down the main gate.",
+    "### Connections", "- Mill <-> Forest", "- Forest <-> Mill", "- Mill <-> Forest", "- Forest <-> Village",
+    "### Key NPCs", "#### Militia Captain", "- **Location:** Mill", "- **Role:** companion", "- **Race, class, gender:** human fighter, male", "- **Motive:** protect the village", "- **Voice:** brave and determined",
+  ].join("\n");
+  const area = (containers: unknown[] = []) => ({ width: 9, height: 9, tileset: "ttf02", distinctTiles: 4, props: 6, mapPins: 1, creatures: [], encounters: 0, stores: 0, storeTags: [], triggerTags: [], containers });
+  const facts = (extraSections = "") =>
+    [`${story}${extraSections}`, { areas: new Map([["mill", area()], ["forest", area()], ["village", area([{ tag: "Chest - 1", items: 2 }])]]), graph: {}, entryArea: "mill", journalQuests: [], dmAreaResref: "dm_area", dmGuideWritten: false, scopeRecorded: true }] as const;
+
+  it("one link step per pair of places", () => {
+    const [s, f] = facts();
+    expect(buildChecklist(s, undefined, f as never).items.filter((i) => i.id.startsWith("areas.link.")).map((i) => i.id)).toEqual(["areas.link.mill.forest", "areas.link.forest.village"]);
+  });
+
+  it("companions are built with build_companion, with the plot's motive and voice as their lines", () => {
+    const [s, f] = facts();
+    const step = buildChecklist(s, undefined, f as never).items.find((i) => i.id === "actors.militia_captain");
+    expect(step?.auto?.tool).toBe("build_companion");
+    expect(step?.auto?.args).toMatchObject({ resref: "militia_captain", race: "6", classId: "4", backstory: "brave and determined" });
+    expect(String(step?.auto?.args.introduction)).toContain("I want to protect the village.");
+  });
+
+  it("places with a fight among their events get enemies, of the kind their beat names", () => {
+    const [s, f] = facts();
+    const items = buildChecklist(s, undefined, f as never).items;
+    expect(items.find((i) => i.id === "challenges.forest")?.auto?.args).toMatchObject({ area: "forest", kind: "bandit" });
+    expect(items.find((i) => i.id === "challenges.village")?.auto?.args).toMatchObject({ area: "village", kind: "ogre" });
+    expect(items.some((i) => i.id === "challenges.mill")).toBe(false);
+  });
+
+  it("a container named in the drafted Affordances section matches its real tag", () => {
+    const [s, f] = facts("\n## Affordances\n### Container Loot\n- `village` Chest___1: 2x nw_it_mpotion001\n");
+    const step = buildChecklist(s, undefined, f as never).items.find((i) => i.id === "affordances.village.c.chest___1");
+    expect(step?.done).toBe(true);
+    expect(tagKey("Chest - 1")).toBe("chest___1");
   });
 });
