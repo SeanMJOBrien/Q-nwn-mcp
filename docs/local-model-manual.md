@@ -143,6 +143,7 @@ It never builds the `.mod`. When the run is finished, build it yourself (section
 | `--plot <file.json>` | A plot file (section 5a). The driver writes the Module and Plot sections from it and skips the plot phase. Without `--module` or `--create` it creates a module with the plot's title |
 | `--max-steps <n>` | Model turns per phase (default 60) |
 | `--retries <n>` | Failed phase checks allowed per phase (default 3) |
+| `--no-stream` | Ask for each answer whole instead of streamed. Streaming is the default because a slow model's long answer (a whole plot on a CPU) otherwise hits Node's 5-minute wait for the first response bytes and ends as "fetch failed". A dropped connection is retried twice; the error then names the cause |
 | `--context-chars <n>` | Conversation size in characters before old results are dropped (default 48000) |
 | `--mode step\|phase` | `step` (default): one conversation per checklist step where a phase has steps. `phase`: one conversation per phase |
 | `--step-turns <n>` | Model turns per step in step mode (default 12) |

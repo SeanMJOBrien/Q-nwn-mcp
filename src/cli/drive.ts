@@ -34,6 +34,8 @@
  *   --escalate-model <name> [--escalate-endpoint <url>] [--escalate-api-key <key>]
  *                            a stronger model that gets one attempt at a phase the first model failed
  *   --log <dir>              where the transcripts go (default: <adventure dir>/driver-log)
+ *   --no-stream              ask for the whole answer at once instead of streaming it (streaming is the default: a long
+ *                            answer from a slow model otherwise hits Node's 5-minute wait for the first response bytes)
  *   --dry-run                show the plan (phases, tools, prompt sizes); call no model, change nothing
  *   --report <dir|file> [--json]
  *                            read a finished run's transcripts (the newest run in a driver-log folder, or one .jsonl)
@@ -66,7 +68,7 @@ const VALUE_FLAGS = new Set([
   "module", "create", "endpoint", "model", "api-key", "phases", "idea", "level", "party", "minutes", "tone",
   "max-steps", "retries", "context-chars", "mode", "step-turns", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot", "report",
 ]);
-const BOOL_FLAGS = new Set(["force", "dry-run", "help", "json"]);
+const BOOL_FLAGS = new Set(["force", "dry-run", "help", "json", "no-stream"]);
 
 export function parseDriveArgs(argv: string[]): { flags: Record<string, string>; bools: Set<string>; error?: string } {
   const flags: Record<string, string> = {};
@@ -291,12 +293,13 @@ async function main(): Promise<void> {
     const logDir = flags.log ?? path.join(dirInfo.dir, "driver-log");
     fs.mkdirSync(logDir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const chat = openAiChat({ endpoint: endpoint as string, model: model as string, apiKey: flags["api-key"] ?? process.env.OPENAI_API_KEY });
+    const chat = openAiChat({ endpoint: endpoint as string, model: model as string, apiKey: flags["api-key"] ?? process.env.OPENAI_API_KEY, stream: !bools.has("no-stream") });
     const strong: Chat | undefined = flags["escalate-model"]
       ? openAiChat({
           endpoint: flags["escalate-endpoint"] ?? (endpoint as string),
           model: flags["escalate-model"],
           apiKey: flags["escalate-api-key"] ?? flags["api-key"] ?? process.env.OPENAI_API_KEY,
+          stream: !bools.has("no-stream"),
         })
       : undefined;
     const options = {

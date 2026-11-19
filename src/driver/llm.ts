@@ -29,6 +29,11 @@ export interface LlmOptions {
   apiKey?: string;
   temperature?: number;
   timeoutMs?: number;
+  /** Stream the answer (default true): the first bytes arrive at once, so Node's 5-minute wait for response headers
+   * cannot end a long answer (a CPU-run model writing a whole plot took longer, and fetch failed). */
+  stream?: boolean;
+  /** Retries after a dropped connection (default 2). */
+  retries?: number;
   /** Longest tool description sent, in characters (the full ones are written for large models). */
   maxDescription?: number;
   /** Longest parameter description sent, in characters. */
@@ -75,6 +80,60 @@ export function slimSchema(schema: unknown, maxDescription: number): unknown {
   return out;
 }
 
+type WireCall = { id?: string; index?: number; function?: { name?: string; arguments?: unknown } };
+type WireMessage = { content?: string | null; tool_calls?: WireCall[] };
+type WireAnswer = { choices?: Array<{ message?: WireMessage }> };
+
+class HttpError extends Error {}
+
+/** The reason under a bare "fetch failed" (a timeout, a refused or reset connection), for the error message. */
+function causeOf(e: unknown): string {
+  const c = (e as { cause?: { code?: string; message?: string } }).cause;
+  return c ? ` (${[c.code, c.message].filter(Boolean).join(": ")})` : "";
+}
+
+/** An OpenAI-style server-sent-event answer, its content and tool-call pieces put together. */
+async function readStream(res: Response): Promise<WireMessage> {
+  let content = "";
+  const calls: WireCall[] = [];
+  const text = res.body ? res.body.pipeThrough(new TextDecoderStream()) : null;
+  let buffer = "";
+  const take = (line: string) => {
+    const data = line.replace(/^data:\s*/, "").trim();
+    if (!data || data === "[DONE]") return;
+    let chunk: { choices?: Array<{ delta?: WireMessage; message?: WireMessage }> };
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      return;
+    }
+    const d = chunk.choices?.[0]?.delta ?? chunk.choices?.[0]?.message;
+    if (!d) return;
+    if (d.content) content += d.content;
+    for (const [i, c] of (d.tool_calls ?? []).entries()) {
+      const at = c.index ?? i;
+      const have = calls[at] ?? (calls[at] = { function: { name: "", arguments: "" } });
+      if (c.id) have.id = c.id;
+      if (c.function?.name) have.function = { ...have.function, name: `${have.function?.name ?? ""}${c.function.name}` };
+      if (c.function?.arguments !== undefined) {
+        const piece = c.function.arguments;
+        const prev = have.function?.arguments;
+        have.function = { ...have.function, arguments: typeof piece === "string" ? `${typeof prev === "string" ? prev : ""}${piece}` : piece };
+      }
+    }
+  };
+  if (text) {
+    for await (const part of text as unknown as AsyncIterable<string>) {
+      buffer += part;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const l of lines) if (l.startsWith("data:")) take(l);
+    }
+    if (buffer.startsWith("data:")) take(buffer);
+  }
+  return { content, tool_calls: calls.filter((c) => c?.function?.name) };
+}
+
 export function openAiChat(options: LlmOptions): Chat {
   const url = `${options.endpoint.replace(/\/+$/, "")}/chat/completions`;
   const maxDescription = options.maxDescription ?? 300;
@@ -107,17 +166,26 @@ export function openAiChat(options: LlmOptions): Chat {
           }
         : {}),
     };
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}) },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(options.timeoutMs ?? 600_000),
-    });
-    if (!res.ok) throw new Error(`model endpoint answered ${res.status}: ${(await res.text()).slice(0, 400)}`);
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string | null; tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: unknown } }> } }>;
-    };
-    const msg = data.choices?.[0]?.message;
+    const stream = options.stream !== false;
+    const retries = options.retries ?? 2;
+    let msg: WireMessage | undefined;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}) },
+          body: JSON.stringify({ ...body, ...(stream ? { stream: true } : {}) }),
+          signal: AbortSignal.timeout(options.timeoutMs ?? 900_000),
+        });
+        if (!res.ok) throw new HttpError(`model endpoint answered ${res.status}: ${(await res.text()).slice(0, 400)}`);
+        msg = (res.headers.get("content-type") ?? "").includes("text/event-stream") ? await readStream(res) : ((await res.json()) as WireAnswer).choices?.[0]?.message;
+        break;
+      } catch (e) {
+        // A dropped or timed-out connection is retried; an HTTP error (bad request, unknown model) is not.
+        if (e instanceof HttpError || attempt >= retries) throw new Error(`${(e as Error).message}${causeOf(e)}`);
+        await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+      }
+    }
     if (!msg) throw new Error("model endpoint answered without a message");
     const content = msg.content ?? "";
     let calls: ToolCall[] = (msg.tool_calls ?? [])
