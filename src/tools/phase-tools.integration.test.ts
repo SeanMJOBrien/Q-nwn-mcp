@@ -311,6 +311,21 @@ describe("story tools and phase prompts", () => {
     }
   });
 
+  it("the Module section is merged, never replaced, once it exists", async () => {
+    const { c, close } = await client();
+    try {
+      await c.callTool({ name: "write_story_section", arguments: { section: "Module", text: "- **Title:** Mill\n- **Target Level:** 3" } });
+      const note = await c.callTool({ name: "write_story_section", arguments: { section: "Module", text: "dlg_militia_captain.dlg: Created the dialog." } });
+      expect(note.isError).toBe(true);
+      await c.callTool({ name: "write_story_section", arguments: { section: "Module", text: "- **Tone:** grim" } });
+      const story = await fs.readFile(path.join(advDir(), "Demo.md"), "utf8");
+      expect(story).toContain("- **Title:** Mill\n- **Target Level:** 3\n- **Tone:** grim");
+      expect(story).not.toContain("dlg_militia_captain");
+    } finally {
+      await close();
+    }
+  });
+
   it("write_dm_guide writes the titled guide file", async () => {
     const { c, close } = await client();
     try {

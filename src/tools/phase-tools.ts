@@ -7,6 +7,7 @@
  *                 entry to adventure-status.json.
  */
 
+import { draftDmGuide } from "../util/dm-guide-draft.js";
 import { readFileSync } from "fs";
 import fs from "fs/promises";
 import path from "path";
@@ -103,7 +104,16 @@ export function gatherModuleFacts(index: ReturnType<typeof requireIndex>, scopeR
       triggerTags: getFieldList(git, "TriggerList").map((t) => getFieldStr(t, "Tag")),
       containers: getFieldList(git, "Placeable List")
         .filter((pl) => isContainerPlaceable(pl))
-        .map((pl) => ({ tag: getFieldStr(pl, "Tag"), items: getFieldList(pl, "ItemList").length })),
+        .map((pl) => {
+          const items = getFieldList(pl, "ItemList");
+          const res = (it: GffObj) => (getFieldStr(it, "InventoryRes") || getFieldStr(it, "TemplateResRef")).toLowerCase();
+          return {
+            tag: getFieldStr(pl, "Tag"),
+            items: items.length,
+            gold: items.filter((it) => res(it) === "nw_it_gold001").reduce((n, it) => n + Math.max(1, getFieldNum(it, "StackSize")), 0),
+            resrefs: items.map(res),
+          };
+        }),
     });
   }
   const entryArea = getFieldStr((index.parsedGff.get("module.ifo") ?? {}) as GffObj, "Mod_Entry_Area").toLowerCase();
@@ -121,7 +131,9 @@ export function gatherModuleFacts(index: ReturnType<typeof requireIndex>, scopeR
       startingGold = false;
     }
   }
-  return { areas, graph, entryArea, journalQuests, dmAreaResref: DM_AREA_RESREF, dmGuideWritten, scopeRecorded, startingGold };
+  const ifo = (index.parsedGff.get("module.ifo") ?? {}) as GffObj;
+  const descriptionSet = ifo.Mod_Description !== undefined ? getFieldLocStr(ifo, "Mod_Description").trim().length > 0 : undefined;
+  return { areas, graph, entryArea, journalQuests, dmAreaResref: DM_AREA_RESREF, dmGuideWritten, scopeRecorded, startingGold, descriptionSet };
 }
 
 /** The checklist of the loaded module, the user's goal and the recent decisions (nothing is written). */
@@ -492,7 +504,7 @@ export function registerPhaseTools(server: McpServer): void {
       if (!canonical) return text({ ok: false, field: "section", error: `"${section}" is not a story section. Use one of: ${known.join(", ")}` }, true);
       let body = given ?? "";
       if (draft) {
-        if (!["Areas", "Environment", "Actors", "Challenges", "Affordances"].includes(canonical)) return text({ ok: false, field: "draft", error: "draft works for the Areas, Environment, Actors, Challenges and Affordances sections only; write this one with text." }, true);
+        if (!["Areas", "Environment", "Actors", "Challenges", "Affordances", "Rewards"].includes(canonical)) return text({ ok: false, field: "draft", error: "draft works for the Areas, Environment, Actors, Challenges, Affordances and Rewards sections only; write this one with text." }, true);
         const drafted = await draftStorySection(index, canonical as Parameters<typeof draftStorySection>[1]);
         if (!drafted) {
           const what =
@@ -514,7 +526,18 @@ export function registerPhaseTools(server: McpServer): void {
       const storyPath = advFile(dir, "story");
       const before = (await readIfExists(storyPath)) ?? `# ${index.moduleName}\n`;
       const replaced = pickSections(before, [canonical]).missing.length === 0;
-      await fs.writeFile(storyPath, setSection(before, canonical, clean), "utf8");
+      // The Module section holds the facts every phase reads (title, level, party size): a write merges its
+      // "- **Field:** value" lines into it and never replaces it (a polish model overwrote it with a note about a dialog,
+      // Millers Daughter 2026-11-19).
+      let newBody = clean;
+      if (canonical === "Module" && replaced) {
+        const fields = [...clean.matchAll(/^[-*]\s*\*\*([^*:]+):\*\*\s*(.+)$/gm)].map((m) => ({ name: m[1].trim(), value: m[2].trim() }));
+        if (!fields.length) {
+          return text({ ok: false, field: "text", error: 'The Module section only takes "- **Field:** value" lines (Title, Target Level, Party Size, Tone, ...); notes about other work belong in that phase\'s own section.' }, true);
+        }
+        newBody = setModuleFields(stripOwnHeading("Module", pickSections(before, ["Module"]).text), fields);
+      }
+      await fs.writeFile(storyPath, setSection(before, canonical, newBody), "utf8");
       const phase = (Object.keys(OWN_SECTION) as Phase[]).find((p) => OWN_SECTION[p] === canonical);
       return text({
         ok: true,
@@ -573,15 +596,22 @@ export function registerPhaseTools(server: McpServer): void {
 
   server.tool(
     "write_dm_guide",
-    "Write the DM guide file of the loaded module (spoilers included; for the person running the game). create_dm_area then puts it, with the story, into the books in the DM chest.",
+    "Write the DM guide file of the loaded module (spoilers included; for the person running the game). create_dm_area then puts it, with the story, into the books in the DM chest. draft: true writes it from the story file (the plot, the people, the quests, place by place with its people, fights, exits and loot); text is then added as the DM's notes.",
     {
-      text: z.string().describe("The whole guide in markdown"),
+      text: z.string().optional().describe("The whole guide in markdown; with draft, notes added at the end"),
+      draft: z.boolean().optional().describe("Write the guide from the story file (util/dm-guide-draft.ts)"),
     },
     { idempotentHint: true },
-    async ({ text: body }) => {
+    async ({ text: given, draft }) => {
       const index = requireIndex();
-      if (body.trim().length < 200) return text({ ok: false, field: "text", error: "The guide is too short to run a game from (under 200 characters)." }, true);
       const dir = await ensureAdventureDir(index);
+      let body = given ?? "";
+      if (draft) {
+        const story = (await readIfExists(advFile(dir, "story"))) ?? "";
+        if (!story.trim()) return text({ ok: false, field: "draft", error: "There is no story file to draft the guide from yet." }, true);
+        body = `${draftDmGuide(story, index.moduleName)}${given?.trim() ? `\n\n## DM notes\n\n${given.trim()}` : ""}`;
+      }
+      if (body.trim().length < 200) return text({ ok: false, field: "text", error: "The guide is too short to run a game from (under 200 characters). write_dm_guide(draft: true) drafts it from the story." }, true);
       const guidePath = advFile(dir, "dmGuide");
       await fs.writeFile(guidePath, `${body.trim()}\n`, "utf8");
       return text({ ok: true, characters: body.trim().length, file: guidePath, next: "create_dm_area()" });

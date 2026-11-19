@@ -1,7 +1,6 @@
 ---
 phase: rewards
 profile: rewards
-specs: quest
 reads: Module, Plot, Areas, Environment, Actors, Quests, Challenges, Affordances, Polish
 writes: Rewards
 ---
@@ -14,7 +13,7 @@ You set what the party earns, describe the module for players, and write the gui
 1. `phase_check(phase: "rewards", step: "start")`. Stop on `skipped` or on an error (repeat its `stop` text).
 2. `read_story()` (all sections).
 3. `create_reward_system()`. Its answer must say `compiles: true`.
-4. Quest rewards. For each quest, copy its spec from the Quests section, add `"reward": {"xp": 300, "gold": 150}` at the top level with values from the table, then `build_quest(spec: "<the JSON>", dryRun: true)` and, with no warnings, `build_quest(spec: "<the JSON>")`.
+4. Quest rewards are already set: the quests phase built each quest with its reward from the table below. Do not rebuild a quest.
 5. The final reward, one item in the boss room's container:
    1. `list_treasure_samples(level: "3", group: "weapon")` (or armor, ring, amulet, cloak: what suits the story).
    2. `import_treasure_item(sample: "<id from the list>", resref: "rw_final", name: "<a name from the story>")`.

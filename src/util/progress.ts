@@ -39,7 +39,7 @@ export interface ProgressItem {
 
 /** Tools every step may use besides its own. */
 /** Phases whose story section write_story_section drafts from the module (draft: true). */
-export const DRAFTED_SECTIONS: readonly Phase[] = ["areas", "environment", "actors", "challenges", "affordances"];
+export const DRAFTED_SECTIONS: readonly Phase[] = ["areas", "environment", "actors", "challenges", "affordances", "rewards"];
 
 export const STEP_BASE_TOOLS = ["get_progress", "get_area_card", "get_result", "read_story", "undo_last_change"];
 
@@ -115,7 +115,7 @@ export interface AreaFacts {
   /** Tags of placed triggers (traps, transitions). */
   triggerTags?: string[];
   /** Placeables with an inventory, and how many items each holds. */
-  containers?: Array<{ tag: string; items: number }>;
+  containers?: Array<{ tag: string; items: number; gold?: number; resrefs?: string[] }>;
 }
 
 /** What a phase's own story section says it placed, per area (the section formats in docs/phase-prompts/). */
@@ -179,6 +179,8 @@ export interface ModuleFacts {
   dmAreaResref: string;
   dmGuideWritten: boolean;
   scopeRecorded: boolean;
+  /** module.ifo has a player-facing description. */
+  descriptionSet?: boolean;
   /** The OnClientEnter handler gives starting gold (set_starting_gold's script, or a hand-written GiveGoldToCreature). */
   startingGold?: boolean;
 }
@@ -341,6 +343,28 @@ function companionArgs(n: { name: string; who?: string; motive?: string; voice?:
   };
 }
 
+/** The description players read before they start (docs/phase-prompts/rewards.md shape), from the Module fields. */
+export function moduleDescription(module: string, outline: PlotOutline | null): string {
+  const f = (name: string) => new RegExp(`\\*\\*${name}:\\*\\*\\s*(.+)`, "i").exec(module)?.[1]?.trim();
+  const tone = f("Tone") ?? "adventurous";
+  const party = f("Party Size") ?? "4";
+  const level = f("Target Level") ?? f("Level") ?? "3";
+  const difficulty = f("Difficulty") ?? "standard";
+  const minutes = f("Estimated Duration") ?? "90 minutes";
+  const companions = (outline?.npcs ?? []).filter((n) => /companion|henchm/.test(n.role ?? "")).length;
+  const idea = (f("Idea") ?? "").split(/(?<=[.!?])\s/)[0];
+  return `${tone[0].toUpperCase()}${tone.slice(1)} adventure for ${party} character(s) of level ${level}. ${difficulty[0].toUpperCase()}${difficulty.slice(1)} difficulty. ${companions} recruitable companion(s). About ${minutes}.${idea ? ` ${idea}` : ""}`.slice(0, 600);
+}
+
+/** The main quest's reward by target level (docs/phase-prompts/rewards.md table): set when the quest is built. */
+export function questReward(level: number): { xp: number; gold: number } {
+  if (level <= 2) return { xp: 300, gold: 100 };
+  if (level <= 4) return { xp: 600, gold: 300 };
+  if (level <= 6) return { xp: 1200, gold: 700 };
+  if (level <= 8) return { xp: 2000, gold: 1500 };
+  return { xp: 3000, gold: 2500 };
+}
+
 /** A container tag as the section formats write it (lower case, no spaces): "Chest - 1" -> "chest___1". */
 export function tagKey(tag: string): string {
   return tag.toLowerCase().replace(/[^a-z0-9_]/g, "_");
@@ -374,7 +398,7 @@ function questSpec(
       { do: "talk", journal: line(0, `${giverName} asked for help.`) },
       // early: a foe killed before the quest reaches this stage still counts (it stands hostile from the start).
       { do: "kill", target: foe.tag.toLowerCase(), journal: line(1, `Defeat ${foeName}.`), early: true },
-      { do: "return", journal: line(2, `Tell ${giverName} it is done.`), reward: { xp: level * 100, gold: level * 50 } },
+      { do: "return", journal: line(2, `Tell ${giverName} it is done.`), reward: questReward(level) },
     ],
   };
 }
@@ -646,9 +670,32 @@ export function buildChecklist(
     add("polish", "polish.verify", "verify_all: shippable, no errors", phaseDone(status, "polish"), "verify_all(), fix each error, then phase_check(phase: \"polish\", step: \"end\")");
   }
   if (!skipped("rewards")) {
-    add("rewards", "rewards.dmguide", "DM guide written", facts.dmGuideWritten, 'write_dm_guide(text: "...")');
+    // The final reward in the boss's area: gold the plot names goes in by the driver; an item is the model's to choose.
+    const economy = (sections.get("Plot") ?? "").match(/Final reward:\s*([^\n]+)/i)?.[1]?.trim() ?? "";
+    const goldAmount = Number(/(\d[\d,]*)\s*(gold|gp)\b/i.exec(economy)?.[1]?.replace(/,/g, "") ?? 0);
+    const bossLoc = locs.find((l) => /boss/.test(l.purpose ?? "")) ?? locs.find((l) => norm(l.name) === norm((outline?.npcs ?? []).find((n) => n.role === "antagonist")?.location ?? "")) ?? locs[locs.length - 1];
+    const bossArea = bossLoc ? facts.areas.get(bossLoc.resref) : undefined;
+    if (bossLoc && bossArea?.containers && economy) {
+      const box = bossArea.containers[0];
+      const done = goldAmount > 0 ? bossArea.containers.some((c) => (c.gold ?? 0) >= goldAmount) : bossArea.containers.some((c) => (c.resrefs ?? []).some((r) => r.startsWith("rw_")));
+      const auto = goldAmount > 0
+        ? box
+          ? { tool: "add_items_to_container", args: { area: bossLoc.resref, containerTag: box.tag, items: JSON.stringify([{ resref: "nw_it_gold001", quantity: goldAmount }]) } }
+          : { tool: "dress_area", args: { area: bossLoc.resref, props: JSON.stringify(["plc_chest1"]), pins: "none" } }
+        : undefined;
+      add("rewards", "rewards.final", `the final reward (${economy}) in ${bossLoc.name}`, done,
+        goldAmount > 0 ? `add_items_to_container(area: "${bossLoc.resref}", containerTag: "${box?.tag ?? "<chest>"}", items: "[{\\"resref\\":\\"nw_it_gold001\\",\\"quantity\\":${goldAmount}}]")`
+          : `list_treasure_samples(...), import_treasure_item(sample: "<id>", resref: "rw_final", name: "<a name from the story>"), then add_items_to_container(area: "${bossLoc.resref}", containerTag: "${box?.tag ?? "<chest>"}", items: "[{\\"resref\\":\\"rw_final\\"}]")`,
+        undefined, { areas: [bossLoc.resref], ...(auto ? { auto } : {}) });
+    }
+    const descr = moduleDescription(sections.get("Module") ?? "", outline);
+    add("rewards", "rewards.description", "the module description players read is set", facts.descriptionSet === true, `set_module_description(description: "${descr.replace(/"/g, "'")}")`, undefined,
+      facts.descriptionSet === undefined ? {} : { auto: { tool: "set_module_description", args: { description: descr } } });
+    // The DM guide is drafted from the story, the DM area built from the template: both by the driver.
+    add("rewards", "rewards.dmguide", "DM guide written", facts.dmGuideWritten, "write_dm_guide(draft: true) (drafted from the story; text adds notes)", undefined,
+      { auto: { tool: "write_dm_guide", args: { draft: true } } });
     add("rewards", "rewards.dmarea", "DM area with the story and DM-guide books", facts.areas.has(facts.dmAreaResref), "create_dm_area()", undefined,
-      facts.dmGuideWritten ? { auto: { tool: "create_dm_area", args: {} } } : {});
+      { auto: { tool: "create_dm_area", args: {} } });
     section("rewards");
     endCheck("rewards");
   }

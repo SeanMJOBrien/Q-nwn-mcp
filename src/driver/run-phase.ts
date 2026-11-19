@@ -205,6 +205,37 @@ export async function runTool(
   return { text: out.footer ? `${out.text}\n\n${out.footer}` : out.text, isError: out.isError, refused: false, args, raw: out.text };
 }
 
+/**
+ * Run the driver-run steps (progress.ts `auto`) of these phases, one at a time, reading the progress again after each:
+ * one step can make the next possible (the DM area needs the guide). Each call is tried once.
+ */
+export async function runAutoSteps(host: ToolHost, allTools: HostTool[], phases: string[], log: (event: Record<string, unknown>) => void): Promise<number> {
+  const tried = new Set<string>();
+  let ran = 0;
+  for (let round = 0; round < 40; round++) {
+    let next: { id?: string; auto: { tool: string; args: Record<string, unknown> } } | undefined;
+    for (const ph of phases) {
+      let open: Array<{ id?: string; auto?: { tool: string; args: Record<string, unknown> } }> = [];
+      try {
+        open = (JSON.parse((await host.callTool("get_progress", { phase: ph })).text) as { open?: typeof open }).open ?? [];
+      } catch {
+        open = [];
+      }
+      const o = open.find((x) => x.auto && allTools.some((t) => t.name === x.auto?.tool) && !tried.has(callSignature(x.auto.tool, x.auto.args)));
+      if (o?.auto) {
+        next = { id: o.id, auto: o.auto };
+        break;
+      }
+    }
+    if (!next) break;
+    tried.add(callSignature(next.auto.tool, next.auto.args));
+    const r = await host.callTool(next.auto.tool, next.auto.args);
+    ran++;
+    log({ event: "driver_step", id: next.id, tool: next.auto.tool, args: next.auto.args, isError: r.isError, result: r.text.slice(0, 300) });
+  }
+  return ran;
+}
+
 export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options: RunPhaseOptions = {}): Promise<PhaseResult> {
   const maxSteps = options.maxSteps ?? 60;
   const retries = options.retries ?? 3;
@@ -238,14 +269,8 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
       return [];
     }
   };
-  // Steps that leave no choice (progress.ts `auto`): run once by the driver before the model is asked, as in step mode.
-  if (hasProgress) {
-    for (const o of await openSteps()) {
-      if (!o.auto || !allTools.some((t) => t.name === o.auto?.tool)) continue;
-      const r = await host.callTool(o.auto.tool, o.auto.args);
-      log({ event: "driver_step", id: o.id, tool: o.auto.tool, args: o.auto.args, isError: r.isError, result: r.text.slice(0, 300) });
-    }
-  }
+  // Steps that leave no choice (progress.ts `auto`): run by the driver before the model is asked, as in step mode.
+  if (hasProgress) await runAutoSteps(host, allTools, [phase], log);
   const planAtStart = await openSteps();
   if (planAtStart.length) log({ event: "plan", open: planAtStart.map((o) => o.step) });
 

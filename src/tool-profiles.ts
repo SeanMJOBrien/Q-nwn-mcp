@@ -201,9 +201,10 @@ export const TOOL_PROFILES: Record<string, string[]> = {
     "audit_module",
   ],
   // End of the adventure: quest XP, reward items, module description, DM guide and DM area.
+  // No build_quest: the quests phase builds every quest with its reward; a rewards model rebuilt the main quest
+  // with one stage (Millers Daughter, 2026-11-19).
   rewards: [
     "create_reward_system",
-    "build_quest",
     "get_wealth_budget",
     "list_treasure_samples",
     "import_treasure_item",

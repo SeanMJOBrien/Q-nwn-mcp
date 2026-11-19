@@ -283,3 +283,28 @@ describe("fixes from the Millers Daughter run", () => {
     expect(tagKey("Chest - 1")).toBe("chest___1");
   });
 });
+
+describe("rewards steps", () => {
+  it("drive the final gold, the description, the DM guide and the DM area; the quest reward follows the level table", async () => {
+    const { questReward, moduleDescription } = await import("./progress.js");
+    expect(questReward(3)).toEqual({ xp: 600, gold: 300 });
+    const story = [
+      "## Module", "- **Target Level:** 3", "- **Party Size:** 4", "- **Tone:** adventurous", "- **Idea:** Bandits hold a mill. More.", "## Plot", "### Locations",
+      "#### 1. Mill", "- **Resref:** mill", "- **Tileset:** ttf02", "- **Purpose:** hub",
+      "#### 2. Camp", "- **Resref:** camp", "- **Tileset:** ttf02", "- **Purpose:** adventure",
+      "### Key NPCs", "#### Cap", "- **Location:** Mill", "- **Role:** companion",
+      "### Antagonists", "- **Chief:** a half-orc bandit chief, in Camp. Motive: gold. Stopped by: a fight.",
+      "### Loot & Economy", "- Merchant: none. Final reward: 1000 gold",
+    ].join("\n");
+    const area = (containers: unknown[]) => ({ width: 9, height: 9, tileset: "ttf02", distinctTiles: 4, props: 6, mapPins: 1, creatures: [], encounters: 0, stores: 0, storeTags: [], triggerTags: [], containers });
+    const facts = { areas: new Map([["mill", area([])], ["camp", area([{ tag: "Chest - 1", items: 3, gold: 75, resrefs: ["nw_it_gold001"] }])]]), graph: {}, entryArea: "mill", journalQuests: [], dmAreaResref: "dm_area", dmGuideWritten: false, scopeRecorded: true, descriptionSet: false };
+    const items = buildChecklist(story, undefined, facts as never).items;
+    const auto = (id: string) => items.find((i) => i.id === id)?.auto;
+    expect(auto("rewards.final")).toEqual({ tool: "add_items_to_container", args: { area: "camp", containerTag: "Chest - 1", items: JSON.stringify([{ resref: "nw_it_gold001", quantity: 1000 }]) } });
+    expect(auto("rewards.dmguide")).toEqual({ tool: "write_dm_guide", args: { draft: true } });
+    expect(auto("rewards.dmarea")).toEqual({ tool: "create_dm_area", args: {} });
+    expect(auto("rewards.description")?.tool).toBe("set_module_description");
+    expect(moduleDescription(story.split("## Plot")[0], parsePlotOutline(story.split("## Plot")[1]))).toBe("Adventurous adventure for 4 character(s) of level 3. Standard difficulty. 1 recruitable companion(s). About 90 minutes. Bandits hold a mill.");
+    expect(auto("rewards.section")).toEqual({ tool: "write_story_section", args: { section: "Rewards", draft: true } });
+  });
+});

@@ -50,7 +50,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { JsonSchemaObject } from "../driver/coerce.js";
 import { type Chat, openAiChat } from "../driver/llm.js";
-import { type PhaseResult, type ToolHost, runPhase } from "../driver/run-phase.js";
+import { type PhaseResult, type ToolHost, runAutoSteps, runPhase } from "../driver/run-phase.js";
 import { runPhaseSteps, STEP_PHASES } from "../driver/run-steps.js";
 import { analyzeRun, type LogEvent, renderReport } from "../driver/log-report.js";
 import { FOOTER_PREFIX } from "../util/result-shaping.js";
@@ -313,6 +313,14 @@ async function main(): Promise<void> {
         results.push({ phase, status: "skipped", steps: 0, toolCalls: 0, errors: [], reason: "recorded as success" });
         continue;
       }
+      // Driver-run steps of earlier phases that are still open (a step added since that phase passed, e.g. a chest
+      // for a fight found later): done before this phase starts.
+      const earlier = PHASES.slice(0, PHASES.indexOf(phase)).filter((p) => p !== "plot");
+      if (earlier.length && allTools.some((t) => t.name === "get_progress")) {
+        const sweepLog = path.join(logDir, `${stamp}-${phase}-sweep.jsonl`);
+        const ran = await runAutoSteps(host, allTools, earlier, (e) => fs.appendFileSync(sweepLog, `${JSON.stringify(e)}\n`));
+        if (ran) say(`${phase}: first ran ${ran} open driver step(s) of earlier phases`);
+      }
       const attempt = async (who: Chat, name: string, suffix: string) => {
         const file = path.join(logDir, `${stamp}-${phase}${suffix}.jsonl`);
         const stepMode = mode === "step" && STEP_PHASES.includes(phase);
@@ -377,7 +385,7 @@ export function readRunLogs(target: string): { stamp: string; phases: Array<{ ph
   }
   const parsed = files
     .map((f) => {
-      const m = /^(\d{4}-\d{2}-\d{2}T[\d-]+Z)-([a-z]+)(-escalated)?\.jsonl$/.exec(path.basename(f));
+      const m = /^(\d{4}-\d{2}-\d{2}T[\d-]+Z)-([a-z]+(?:-sweep)?)(-escalated)?\.jsonl$/.exec(path.basename(f));
       return { file: f, stamp: m?.[1] ?? "", phase: m ? `${m[2]}${m[3] ?? ""}` : path.basename(f, ".jsonl") };
     })
     .filter((x) => x.stamp || files.length === 1);

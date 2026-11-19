@@ -11,6 +11,7 @@
  */
 
 import fs from "fs/promises";
+import path from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
@@ -681,10 +682,11 @@ function storyAreas(index: ReturnType<typeof requireIndex>): string[] {
  * The `## Areas` or `## Environment` section in the format of docs/phase-prompts/areas.md / environment.md, read
  * from the module: what is really there, so later phases and the DM guide read facts.
  */
-export async function draftStorySection(index: ReturnType<typeof requireIndex>, section: "Areas" | "Environment" | "Actors" | "Challenges" | "Affordances"): Promise<string> {
+export async function draftStorySection(index: ReturnType<typeof requireIndex>, section: "Areas" | "Environment" | "Actors" | "Challenges" | "Affordances" | "Rewards"): Promise<string> {
   const built = await readBuiltAreas(index);
   const out: string[] = [];
   if (section === "Affordances") return affordanceLines(index);
+  if (section === "Rewards") return rewardLines(index);
   for (const r of storyAreas(index)) {
     const f = areaFacts(index, r);
     if (!f) continue;
@@ -826,4 +828,49 @@ export async function freeTransitionPoints(index: ReturnType<typeof requireIndex
   if (!built || !facts) return [];
   const taken: Point[] = [...facts.exits, ...facts.doors];
   return built.transitionPoints.filter((t) => taken.every((e) => dist(e, t) >= 8)).map((t) => ({ x: t.x, y: t.y }));
+}
+
+/** The Rewards section (docs/phase-prompts/rewards.md format): quest rewards from the quest specs, reward items, delivery. */
+async function rewardLines(index: ReturnType<typeof requireIndex>): Promise<string> {
+  const out: string[] = ["### Quest Rewards"];
+  const dir = await ensureAdventureDir(index);
+  let quests: string[] = [];
+  try {
+    quests = (await fs.readdir(path.join(dir, "quests"))).filter((f) => f.endsWith(".json"));
+  } catch {
+    quests = [];
+  }
+  for (const f of quests.sort()) {
+    try {
+      const q = JSON.parse(await fs.readFile(path.join(dir, "quests", f), "utf8")) as { name?: string; reward?: { xp?: number; gold?: number }; stages?: Array<{ reward?: { xp?: number; gold?: number } }> };
+      const rewards = [q.reward, ...(q.stages ?? []).map((st) => st.reward)].filter((r): r is { xp?: number; gold?: number } => !!r);
+      const xp = rewards.reduce((n, r) => n + (r.xp ?? 0), 0);
+      const gold = rewards.reduce((n, r) => n + (r.gold ?? 0), 0);
+      out.push(`- ${q.name ?? f.replace(/\.json$/, "")}: ${xp} XP, ${gold} gold`);
+    } catch {
+      // an unreadable spec
+    }
+  }
+  if (out.length === 1) out.push("- none");
+  out.push("### Reward Items");
+  const items: string[] = [];
+  for (const r of storyAreas(index)) {
+    const git = index.parsedGff.get(`${r}.git`) as GffObj | undefined;
+    for (const p of git ? getFieldList(git, "Placeable List") : []) {
+      const its = getFieldList(p, "ItemList").map((it) => ({ res: (getFieldStr(it, "InventoryRes") || getFieldStr(it, "TemplateResRef")).toLowerCase(), n: Math.max(1, getFieldNum(it, "StackSize")) }));
+      const reward = its.filter((i) => i.res.startsWith("rw_") || (i.res === "nw_it_gold001" && i.n >= 200));
+      if (reward.length) items.push(`- \`${r}\` ${getFieldStr(p, "Tag")}: ${reward.map((i) => `${i.n}x ${i.res}`).join(", ")}`);
+    }
+  }
+  out.push(...(items.length ? items : ["- none"]));
+  const ifo = (index.parsedGff.get("module.ifo") ?? {}) as GffObj;
+  const described = getFieldLocStr(ifo, "Mod_Description").trim().length > 0;
+  let guide = false;
+  try {
+    guide = (await fs.stat(adventurePath(dir, "dmGuide"))).size > 0;
+  } catch {
+    guide = false;
+  }
+  out.push("### Delivery", `- Module description ${described ? "set" : "not set"}. DM guide ${guide ? "written" : "not written"}. DM area ${index.areas.has(DM_AREA_RESREF) ? "built" : "not built"}.`);
+  return out.join("\n");
 }
