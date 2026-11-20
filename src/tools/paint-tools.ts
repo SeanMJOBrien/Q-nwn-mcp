@@ -9,6 +9,7 @@
  * - set_area_properties: Modify area lighting, music, weather, etc.
  */
 
+import type { ModuleIndex } from "../types/module.js";
 import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
 import { z } from "zod";
 import path from "path";
@@ -23,6 +24,52 @@ import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr, setFieldNum } f
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getWokForTile, computeTileWalkSummary, ensureWokCacheDir } from "../util/walkmesh.js";
 import type { TwoDATable } from "../types/module.js";
+
+/**
+ * Removes an area's files and its entry in the module's area list. The caller checks that the area exists and is
+ * not the module's entry area. Returns the area's display name.
+ */
+export async function removeAreaFromModule(index: ModuleIndex, areaResref: string): Promise<string> {
+  const ifo = index.parsedGff.get("module.ifo");
+  if (!ifo) throw new Error("module.ifo not found");
+  const ifoObj = ifo as GffObj;
+  const deletedArea = index.areas.get(areaResref)!;
+  const areaName = deletedArea.name;
+
+  // Remove from IFO Mod_Area_list
+  const areaList = getFieldList(ifoObj, "Mod_Area_list");
+  const ifoIdx = areaList.findIndex(a => getFieldStr(a, "Area_Name").toLowerCase() === areaResref);
+  if (ifoIdx >= 0) {
+    areaList.splice(ifoIdx, 1);
+    // Re-index __struct_id
+    for (let i = 0; i < areaList.length; i++) {
+      (areaList[i] as GffObj).__struct_id = i;
+    }
+  }
+  const ifoEntry = index.resources.get("module.ifo");
+  if (ifoEntry) {
+    await beforeWrite(ifoEntry.filePath);
+    await jsonToGff(ifo, ifoEntry.filePath);
+    await afterWrite(ifoEntry.filePath);
+  }
+
+  // Delete files and clean caches
+  for (const ext of ["are", "git", "gic"]) {
+    const key = `${areaResref}.${ext}`;
+    const entry = index.resources.get(key);
+    if (entry) {
+      await fs.unlink(entry.filePath).catch(() => {});
+      await afterRemove(entry.filePath);
+      index.resources.delete(key);
+      index.parsedGff.delete(key);
+    }
+  }
+
+  // Clean up index entries
+  index.areas.delete(areaResref);
+  index.creatures = index.creatures.filter(c => c.area !== areaResref);
+  return areaName;
+}
 
 export function registerPaintTools(server: McpServer): void {
 
@@ -281,39 +328,7 @@ export function registerPaintTools(server: McpServer): void {
         return { isError: true, content: [{ type: "text", text: `Cannot delete the module entry area '${areaResref}'. Change Mod_Entry_Area first.` }] };
       }
 
-      const deletedArea = index.areas.get(areaResref)!;
-      const areaName = deletedArea.name;
-
-      // Remove from IFO Mod_Area_list
-      const areaList = getFieldList(ifoObj, "Mod_Area_list");
-      const ifoIdx = areaList.findIndex(a => getFieldStr(a, "Area_Name").toLowerCase() === areaResref);
-      if (ifoIdx >= 0) {
-        areaList.splice(ifoIdx, 1);
-        // Re-index __struct_id
-        for (let i = 0; i < areaList.length; i++) {
-          (areaList[i] as GffObj).__struct_id = i;
-        }
-      }
-      const ifoEntry = index.resources.get("module.ifo");
-      if (ifoEntry) {
-        await jsonToGff(ifo, ifoEntry.filePath);
-      }
-
-      // Delete files and clean caches
-      for (const ext of ["are", "git", "gic"]) {
-        const key = `${areaResref}.${ext}`;
-        const entry = index.resources.get(key);
-        if (entry) {
-          await fs.unlink(entry.filePath).catch(() => {});
-          await afterRemove(entry.filePath);
-          index.resources.delete(key);
-          index.parsedGff.delete(key);
-        }
-      }
-
-      // Clean up index entries
-      index.areas.delete(areaResref);
-      index.creatures = index.creatures.filter(c => c.area !== areaResref);
+      const areaName = await removeAreaFromModule(index, areaResref);
 
       return {
         content: [{

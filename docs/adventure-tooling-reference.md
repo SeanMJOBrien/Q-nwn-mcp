@@ -196,3 +196,14 @@ main force, then a `kill` on the main force (§6 of this file and [adventure-com
 - Area budgets in `suggest_area_size`: measured 2026-11-09 against 1,019 unique hand-built areas (comment above `BIOME_RULES`). Interior, dungeon, cave and castle interior now match the medians; forest, rural, frozen, underdark and castle exterior are whole exploration maps in the corpus (n 8-25) and are deliberately smaller here; city exterior, desert and ruins had too few samples.
 - `run_live_verification` writes the forged creatures' `[CL_LOOT]` lines into adventure.md `## Spawn Loot` (`recordLoot`, default on) for `/adventure-rewards`.
 - `src/util/quest-script.live.test.ts` (env-gated) compiles every generated quest script with the real compiler.
+
+## 16. `set_module_start(area, x?, y?, keepStarterArea?)`
+
+Makes `area` the place players start: writes `Mod_Entry_Area` and `Mod_Entry_X/Y/Z` in `module.ifo`. Without `x` and `y` it takes open walkable
+ground nearest the area's centre (clear radius 3 m, then 2, then 1); a given point is refused when it is not walkable. It then removes the `_start`
+stub that `create_module` makes, unless `keepStarterArea` is true, something is placed in it, or a transition leads into or out of it (a starter-store
+area); the result's `starterArea` says which. In the `areas` profile and step 5 of the areas phase prompt. `delete_area` and this tool share
+`removeAreaFromModule` (`src/tools/paint-tools.ts`).
+
+`check_area_connectivity` no longer lists the DM area (`dm_area`) under `unreachable`: it is cut off on purpose and is reported as
+`disconnectedOnPurpose`.
