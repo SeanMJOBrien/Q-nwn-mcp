@@ -389,7 +389,7 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
   const weaponPref =
     params.weaponBaseItem !== undefined
       ? weaponPreferenceFor(index, params.weaponBaseItem)
-      : pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed");
+      : pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed", params.race);
   const grantWeaponInvestment = WEAPON_INVESTMENT_CLASS_IDS.has(params.classId);
   const investmentFeats = weaponInvestmentFeats(index);
   const preferred = params.preferredFeats ?? [];

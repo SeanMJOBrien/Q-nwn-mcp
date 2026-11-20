@@ -19,7 +19,7 @@ import type { VarTableEntry } from "./git-helpers.js";
 import { getFieldNum, setField } from "../types/gff.js";
 import { isPcRaceNpc, pcVoicesFrom, pickPcLook } from "./pc-appearance.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
-import { EQUIP_SLOT_MAP } from "./equip-slots.js";
+import { EQUIP_SLOT_MAP, hasWornGear } from "./equip-slots.js";
 import type { ModuleIndex } from "../types/module.js";
 
 /**
@@ -291,6 +291,10 @@ export async function buildCreatureBlueprint(
       console.error(`Equipment warnings for ${resrefLower}: ${failedItems.join(", ")}`);
     }
   }
+
+  // A fighter in gear leaves a body to search, like every other creature (verify_creature lootable_flag_off): the
+  // default when lootable is not given, for anything but a companion. A copied stock monster ships with Lootable 0.
+  if (lootable === undefined && !henchman && hasWornGear(obj) && getFieldNum(obj, "Lootable") === 0) setField(obj, "Lootable", "byte", 1);
 
   if (inventory) {
     const itemList: GffObj[] = [];

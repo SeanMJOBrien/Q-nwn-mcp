@@ -45,3 +45,6 @@ adventures/
 
 # Quest CLI one-file bundle (npm run quest:bundle)
 bundle/
+
+# Local settings for the server and the command-line tools (nwn-mcp.env.example lists the keys)
+nwn-mcp.env

@@ -452,7 +452,7 @@ export async function forgeCreature(
   const weapons =
     params.weapons ??
     (() => {
-      const pref = pickWeaponPreference(firstClass, seed);
+      const pref = pickWeaponPreference(firstClass, seed, params.race);
       return pref ? [pref.baseItem] : [];
     })();
   vars.push(
@@ -628,7 +628,7 @@ export function registerCreatureForgeTools(server: McpServer): void {
         .string()
         .optional()
         .describe("Allowance multiplier on the role share (default 0.5; 0 keeps current gear)"),
-      weapons: z.string().optional().describe("JSON array of preferred baseitems.2da rows"),
+      weapons: z.string().optional().describe("JSON array of preferred baseitems.2da rows (default: one from the class list; an elf caster or rogue may also draw longsword/rapier)"),
       originalSpawn: z
         .string()
         .optional()

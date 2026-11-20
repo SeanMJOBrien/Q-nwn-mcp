@@ -4,7 +4,7 @@
  * .ute encounters, .utm stores, .utw waypoints, .uts sounds.
  */
 
-import { EQUIP_SLOT_MAP } from "../equip-slots.js";
+import { EQUIP_SLOT_MAP, hasWornGear } from "../equip-slots.js";
 import { ENCOUNTER_POINT_STRUCT_ID, TRIGGER_POINT_STRUCT_ID } from "../trigger-geometry.js";
 import { getVarTableEntries } from "../git-helpers.js";
 import { tableFromConstantColumn } from "../npc-stat-block.js";
@@ -423,8 +423,9 @@ export async function verifyCreature(
       );
     }
     if (effectiveLevel >= 1) {
+      // The level + 3 cap is the player rule; monster classes (a goblin's Humanoid class) ship with more and the engine allows it.
       const cap = effectiveLevel + 3;
-      const over = getFieldList(obj, "SkillList").filter((sk) => getFieldNum(sk, "Rank") > cap);
+      const over = allPc ? getFieldList(obj, "SkillList").filter((sk) => getFieldNum(sk, "Rank") > cap) : [];
       if (over.length > 0) {
         report.warn(
           "skill_rank_over_cap",
@@ -694,8 +695,9 @@ export async function verifyCreature(
   const equipList = listOf(obj, "Equip_ItemList");
   // A creature that fights in gear but leaves no lootable corpse drops its items as a loose bag, unlike every other mook
   // (Salt Gate: the Grayward guards). Companions are not meant to be lootable, and LOOT_INTENTIONAL marks a deliberate choice.
+  // Claws, bite and hide are the creature's body: a wolf with a bite is not "in gear".
   if (
-    equipList.length > 0 &&
+    hasWornGear(obj) &&
     getFieldNum(obj, "Lootable") === 0 &&
     listOf(obj, "ClassList").length > 0 &&
     getFieldStr(obj, "ScriptDialogue") !== "x0_ch_hen_conv" &&
@@ -975,7 +977,8 @@ export async function verifyCreature(
         );
       }
       const rowGender = row.GENDER;
-      if (rowGender !== undefined && rowGender !== "****" && Number(rowGender) !== gender) {
+      // Only a male or female creature can have the wrong voice; animals and monsters (gender both/other/none) take any set.
+      if (rowGender !== undefined && rowGender !== "****" && (gender === 0 || gender === 1) && Number(rowGender) !== gender) {
         report.warn(
           "soundset_gender_mismatch",
           `SoundSetFile=${soundset} is a gender-${rowGender} voice set but the creature's Gender is ${gender}`,

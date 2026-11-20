@@ -17,6 +17,7 @@
  * - verify_all: every applicable checker across the whole module
  */
 
+import { checkGuideFacts, storyTexts } from "../util/verify/guide-facts.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
@@ -263,6 +264,16 @@ export async function collectVerifyResults(
     const chain = new Report("encounter chains", "chain");
     verifyEncounterChain(chain, index);
     if (chain.errors.length > 0 || chain.warnings.length > 0) results.push(chain.result());
+  }
+
+  // The story and DM guide against the module: weapons named for a creature, tags named in the text.
+  {
+    const texts = await storyTexts(index);
+    if (texts.length > 0) {
+      const report = new Report("story and DM guide", "md");
+      for (const f of checkGuideFacts(index, texts)) report.warn(f.code, f.message, f.field, f.fix);
+      if (report.warnings.length > 0) results.push(report.result());
+    }
   }
 
   // Co-op rules — module-wide, not per-asset.

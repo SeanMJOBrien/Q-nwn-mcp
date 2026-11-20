@@ -37,6 +37,7 @@
 | How does the parametrized PQJ quest system work? | [pqj-quest-system.md](pqj-quest-system.md) |
 | How should a cutscene that advances per dialog choice work (design, packages X0-X5)? | [cutscene-design.md](cutscene-design.md) |
 | Where does the pipeline flatten or drop the story it was meant to tell? | [story-vs-pipeline.md](story-vs-pipeline.md) |
+| How do I run a tool, a patch or a build from the command line, and where do the settings live? | [tool-cli.md](tool-cli.md) |
 | How is a quest built without an LLM (CLI, manager console, studio), and what is left to do? | [quest-cli.md](quest-cli.md), [quest-frontends-work-plan.md](quest-frontends-work-plan.md) |
 | Which bugs in TFN's quest scripts are confirmed, and what is the plan to port our quest fixes to the content studio? | [tfn-quest-findings.md](tfn-quest-findings.md) |
 | What happened when random caster abilities ran on a real headless server? | [random-abilities-runtime-findings.md](random-abilities-runtime-findings.md) |

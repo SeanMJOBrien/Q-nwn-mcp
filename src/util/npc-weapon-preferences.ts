@@ -128,10 +128,31 @@ export function seedHash(seed: string): number {
  * default. Returns null for a class with no candidates (Monk) or an unknown
  * class ID.
  */
-export function pickWeaponPreference(classId: number, seed: string): WeaponPreference | null {
-  const candidates = CLASS_WEAPON_PREFERENCES[classId];
+export function pickWeaponPreference(classId: number, seed: string, race?: number): WeaponPreference | null {
+  const candidates = weaponCandidates(classId, race);
   if (!candidates || candidates.length === 0) return null;
   return candidates[seedHash(seed) % candidates.length];
+}
+
+/**
+ * Weapons a race is trained with beyond its class (racialtypes.2da row -> weapons). Read from the base tables: the only
+ * racial weapon-proficiency feat is Weapon Proficiency (Elf), feat 256 in race_feat_elf.2da, which baseitems.2da lists
+ * in ReqFeat for longsword, rapier, longbow and shortbow (no other race_feat_*.2da has a weapon feat). The melee two
+ * are offered: an elf cleric or wizard can carry a longsword where the class alone allows only simple weapons.
+ */
+export const RACE_WEAPON_PREFERENCES: Record<number, WeaponPreference[]> = {
+  1: [LONGSWORD, RAPIER], // Elf — feat 256
+};
+
+/** Classes with full martial proficiency already have every racial weapon; their lists stay as they are. */
+const FULL_MARTIAL_CLASSES = new Set([0, 4, 6, 7]);
+
+/** The class's candidates, plus its race's weapons for a class without martial proficiency. */
+export function weaponCandidates(classId: number, race?: number): WeaponPreference[] | null {
+  const base = CLASS_WEAPON_PREFERENCES[classId];
+  if (!base) return base ?? null;
+  const extra = race !== undefined && !FULL_MARTIAL_CLASSES.has(classId) ? (RACE_WEAPON_PREFERENCES[race] ?? []) : [];
+  return [...base, ...extra.filter((w) => !base.some((b) => b.baseItem === w.baseItem))];
 }
 
 /** Universal filler feats for generic/bonus feat slots with no weapon left to pick — verified feat.2da rows. */

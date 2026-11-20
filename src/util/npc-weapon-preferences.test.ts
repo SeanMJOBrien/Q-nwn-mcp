@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CLASS_WEAPON_PREFERENCES, pickWeaponPreference } from "./npc-weapon-preferences.js";
+import { CLASS_WEAPON_PREFERENCES, pickWeaponPreference, weaponCandidates } from "./npc-weapon-preferences.js";
 
 describe("pickWeaponPreference", () => {
   it("is deterministic: the same seed always picks the same weapon", () => {
@@ -57,5 +57,18 @@ describe("CLASS_WEAPON_PREFERENCES", () => {
     const bard = CLASS_WEAPON_PREFERENCES[1]!;
     expect(cleric.some((w) => w.label === "Warhammer")).toBe(false);
     expect(bard.some((w) => w.label === "Rapier")).toBe(false);
+  });
+});
+
+describe("racial weapons", () => {
+  it("an elf cleric may carry a longsword or rapier; a human cleric and an elf fighter keep their class lists", () => {
+    const labels = (c: number, r?: number) => (weaponCandidates(c, r) ?? []).map((w) => w.label);
+    expect(labels(2, 1)).toEqual([...labels(2), "Longsword", "Rapier"]);
+    expect(labels(2, 6)).toEqual(labels(2));
+    expect(labels(4, 1)).toEqual(labels(4));
+    expect(labels(8, 1)).toEqual(["Rapier", "Shortsword", "Shortbow", "Longsword"]);
+    expect(weaponCandidates(5, 1)).toBeNull();
+    const seeds = Array.from({ length: 40 }, (_, i) => pickWeaponPreference(2, `drow_priestess_${i}`, 1)?.label);
+    expect(seeds).toContain("Longsword");
   });
 });
