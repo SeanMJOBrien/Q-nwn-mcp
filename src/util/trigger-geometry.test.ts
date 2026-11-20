@@ -38,5 +38,7 @@ describe("rectTriggerPoints", () => {
     expect(g.type).toBe("list");
     expect(g.value).toHaveLength(4);
     expect(g.value[0].PointZ.value).toBe(0.025);
+    // The engine skips trigger vertices whose struct ID is not 3 (toolset value).
+    for (const v of g.value) expect((v as unknown as { __struct_id: number }).__struct_id).toBe(3);
   });
 });

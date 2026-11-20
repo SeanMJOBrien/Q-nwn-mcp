@@ -344,6 +344,25 @@ describe("build_quest", () => {
     }
   });
 
+  it("keeps the spec in the module project as quests/<tag>.json on a real build only; remove deletes it", async () => {
+    const proj = path.join(tempDir, "proj");
+    await fs.mkdir(path.join(proj, "build"), { recursive: true });
+    await fs.writeFile(path.join(proj, "project.json"), JSON.stringify({ format: 1, moduleName: "T", resources: [] }));
+    (mockIndex as unknown as { modPath: string }).modPath = path.join(proj, "build", "module.mod");
+    const file = path.join(proj, "quests", "q_wolves_at_the_fold.json");
+    const { c, done } = await client();
+    try {
+      json(await c.callTool({ name: "build_quest", arguments: { spec: SPEC, dryRun: true } }));
+      await expect(fs.stat(file)).rejects.toThrow(); // a dry run changes nothing
+      json(await c.callTool({ name: "build_quest", arguments: { spec: SPEC } }));
+      expect(JSON.parse(await fs.readFile(file, "utf8"))).toEqual(JSON.parse(SPEC));
+      json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_wolves_at_the_fold" } }));
+      await expect(fs.stat(file)).rejects.toThrow();
+    } finally {
+      await done();
+    }
+  });
+
   it("build then remove puts the module back as it was (only the shared runtime scripts stay)", async () => {
     (mockIndex.parsedGff.get("module.ifo") as unknown as GffObj).Mod_OnAcquirItem = v("resref", "x2_mod_def_aqu");
     await addResource("bounty_orc.utc", { __data_type: "UTC ", ...creature("bounty_orc") });
