@@ -53,7 +53,12 @@ A request is a *category*, not a phase. This table is what the intake step maps 
 
 ## 3. Starting a session (the intake)
 
-1. Ask one question: *what do you want help with?* Offer the §2 rows as options, plus "build a whole adventure". Say plainly what each means.
+1. Ask one question: *what do you want help with?* `show_menu` (2026-11-18, `src/util/start-menu.ts`, no module needed)
+   gives the lettered menu to show as it is: A NPCs and henchmen, B areas and connections, C a creature's spells and
+   levels, D a market with merchants, E a dialog's quest and journal, F encounters, G loot, H a whole adventure, I
+   reviewing an existing module, J a script bug, K a script, L checking and building, each with an example in a
+   user's words. `show_menu(choice)` returns the plan for an entry (how to start, what to ask, skills, first calls,
+   the `set_project_scope` call). The MCP prompt `start` sends it as an opening message (Claude Code: `/mcp__nwn-mcp__start`).
 2. Is a module already loaded or named? If not, ask which (or whether to create one).
 3. Call `set_project_scope` with the user's own words, the `kind`, and (planned) the `focus`.
 4. If the module already has content, run the **audit** (§4) before changing anything, and show the user what exists.

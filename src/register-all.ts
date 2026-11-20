@@ -51,6 +51,7 @@ import { registerSpecAssertTools } from "./tools/spec-assert-tools.js";
 import { registerSpecCheckTools } from "./tools/spec-check-tools.js";
 import { registerStartKitTools } from "./tools/start-kit-tools.js";
 import { registerStoreMoveTools } from "./tools/store-move-tools.js";
+import { registerStartMenuTools } from "./tools/start-menu-tools.js";
 import { registerSystestTools } from "./tools/systest-tools.js";
 import { registerTilesetTools } from "./tools/tileset-tools.js";
 import { registerTreasureCatalogTools } from "./tools/treasure-catalog-tools.js";
@@ -62,6 +63,7 @@ import { registerWebTools } from "./tools/web-tools.js";
 import { registerWriteTools } from "./tools/write-tools.js";
 
 export function registerAll(server: McpServer): void {
+  registerStartMenuTools(server);
   registerCoreReadTools(server);
   registerAreaTools(server);
   registerCreatureTools(server);
