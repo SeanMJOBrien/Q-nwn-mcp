@@ -29,6 +29,7 @@ import { checkCollision } from "../util/collision.js";
 import { COLLISION_FIX, WALK_FIX } from "../util/placement-hints.js";
 import { placeCreatureCore } from "../util/creature-placer.js";
 import { notFoundText } from "../util/blueprint-hint.js";
+import { isContainerPlaceable } from "../util/containers.js";
 import {
   compassToOrientation,
   orientationToCompass,
@@ -841,11 +842,15 @@ export function registerPlacementTools(server: McpServer): void {
       const { doc: gitDoc, obj: git } = getGitDoc(index, area);
       const placeableList = getFieldList(git, "Placeable List");
 
-      // Find container by tag
-      const container = placeableList.find(p => getFieldStr(p, "Tag") === containerTag);
+      // Find the container by tag. Only real containers (chests, crates, barrels...): a small model filled a rock, which
+      // no player can open (The Old Mill, 2026-11-18).
+      const containers = placeableList.filter((p) => isContainerPlaceable(p));
+      const available = [...new Set(containers.map((p) => getFieldStr(p, "Tag")).filter(Boolean))].join(", ") || "none (dress_area(area, props: [\"plc_chest1\"]) places a chest)";
+      const named = placeableList.find((p) => getFieldStr(p, "Tag") === containerTag);
+      const container = named && isContainerPlaceable(named) ? named : undefined;
       if (!container) {
-        const available = placeableList.map(p => getFieldStr(p, "Tag")).filter(Boolean).join(", ");
-        return { isError: true, content: [{ type: "text", text: `Container '${containerTag}' not found. Available: ${available}` }] };
+        const why = named ? `'${containerTag}' is not a container (it has no inventory)` : `Container '${containerTag}' not found`;
+        return { isError: true, content: [{ type: "text", text: `${why}. Containers in ${area}: ${available}` }] };
       }
 
       snapshotGitForUndo(gitDoc, area, "add_items_to_container", `Add ${itemsArr.length} item(s) to ${containerTag}`);

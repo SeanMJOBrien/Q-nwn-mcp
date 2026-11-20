@@ -652,6 +652,7 @@ Differentiate similar creatures with a numeric suffix: `hos_gobwar`, `hos_gobmag
 - **Scale damage to level.** Trap damage and creature stats should match the adventure's target level.
 - **Magic items are loot.** Equipped magic items on defeated creatures become player loot. Note all magic items in adventure.md for `/adventure-rewards` analysis. Don't make magic items more powerful than the creature that carries them.
 - **Post-placement equipment changes.** For a forged creature, change `gearRole`/`gearWealth` and forge again rather than editing its equipment; spawn-time shopping replaces it. To give one a specific item, forge it with `gearWealth: "0"` and use `set_creature_equipment`.
+- **Quickest group: `build_enemy_group(area, kind, count?, level?, region?)`** places hostile base-game creatures of one kind (bandit, skeleton, zombie, ghoul, goblin, orc, kobold, gnoll, bugbear, ogre, troll, wolf, bear, spider, lizardfolk; `util/enemy-roster.ts`) sized for the party level (EL ~= level; CR below 1 counts as 1 + 2 log2(CR)), on open ground. `suggest_encounter` now also lists these base-game creatures, and only hostile module blueprints.
 - **Difficulty calibration.** Use `suggest_encounter(partyLevel: "[level]", partySize: "1", difficulty: "medium")` to get CR-appropriate creature suggestions and validate your encounter compositions against XP budgets.
 
 ## Finish

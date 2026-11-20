@@ -1,4 +1,5 @@
 import { DM_AREA_RESREF } from "../util/dm-books.js";
+import { ENEMY_ROSTER, rosterKind } from "../util/enemy-roster.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, currentScriptUsages, indexAreaCreatures, requireIndex } from "../module-loader.js";
@@ -761,7 +762,7 @@ export function registerAnalysisTools(server: McpServer): void {
 
   server.tool(
     "suggest_encounter",
-    "Advisory tool: suggest creature compositions for a given party level and size. Read-only, does not modify anything.",
+    "Advisory tool: suggest creature compositions for a given party level and size, from the module's hostile blueprints and the base game's creatures by kind (bandit, skeleton, goblin, orc, ...). Read-only. To place a group in one call use build_enemy_group(area, kind).",
     {
       partyLevel: numParam("Average party level (1-40)"),
       partySize: optNumParam("Number of party members (default 1)"),
@@ -787,6 +788,7 @@ export function registerAnalysisTools(server: McpServer): void {
         const name = getFieldLocStr(obj, "FirstName") || tag;
         const cr = getFieldNum(obj, "ChallengeRating");
         if (cr <= 0) continue;
+        if (obj.FactionID !== undefined && getFieldNum(obj, "FactionID") !== 1) continue; // only enemies: the quest giver is no encounter
 
         if (theme) {
           const themeLower = theme.toLowerCase();
@@ -794,6 +796,16 @@ export function registerAnalysisTools(server: McpServer): void {
         }
 
         creatures.push({ resref: key.replace(".utc", ""), tag, name, cr });
+      }
+
+      // The base game's hostile creatures by kind (util/enemy-roster.ts): a module has few of its own, and a small
+      // model then placed its one boss as a common enemy everywhere.
+      // With a theme, its kind; without one, every kind only when the module has no enemies of its own.
+      const kinds = theme ? [rosterKind(theme)].filter((k): k is string => !!k) : creatures.length ? [] : Object.keys(ENEMY_ROSTER);
+      for (const k of kinds) {
+        for (const c of ENEMY_ROSTER[k]) {
+          if (!creatures.some((x) => x.resref === c.resref)) creatures.push({ resref: c.resref, tag: c.resref, name: `${k} (base game)`, cr: c.cr });
+        }
       }
 
       if (creatures.length === 0) {
