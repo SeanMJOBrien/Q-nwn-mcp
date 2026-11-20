@@ -54,7 +54,8 @@ Runs: a throwaway two-stage quest module (above) and The Salt Gate Conspiracy (p
 | Companion recruit, `c_hen_free` / `c_hen_mine`, party of 3, dismiss (`a_hen_join`, `a_hen_leave`) | checked by simulation (Rurik, Wren, Fenn) |
 | Companion levelling and gear at spawn (`inc_cre_level`) | checked live by the existing `[SPEC_OK]` lines (this run: Rurik, Wren, Fenn level 10, gear, Wren's cleric slots and domains) |
 | Skill checks (`q_roll`, `q_check`, `add_skill_check`) | not checked yet; steps can call them, none written. Next: one step per check with a stand-in that has the skill |
-| Explore, trigger, use, kill stages | not checkable with the driver: they depend on `GetEnteringObject`, `GetLastUsedBy`, `GetLastKiller` events |
+| Explore, trigger, use, kill, search stages | checked by simulation since 2026-11-16: a step with `event: true` sets the module local `SIM_EVENT`, and `SimEvent()` in the event scripts returns the stand-in as the entering/using/killing creature (Quest Test Range: 14 of 14 steps, including early deeds caught up on accept) |
+| Pickup stages | checked by simulation: a `giveItem` step creates the item on the stand-in, which fires the module's OnAcquireItem |
 | Escort, spawn-on-accept, hostile flip, give/take items (`q_act` options) | possible with steps (`expectItem`), not run |
 | Dialog flow: node order, which root is shown, return-to-hub | not checkable: needs the dialog engine and a real conversation; `verify_dialog` covers the static shape |
 | Rewards (`inc_reward`) | not checkable: loops on real PCs only |

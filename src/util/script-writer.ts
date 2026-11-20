@@ -91,7 +91,6 @@ export async function writeAndCompileScript(
   result.compilerOutput = compResult.output;
 
   if (compResult.success) {
-    await afterWrite(ncsPath);
     const ncsStat = await fsPromises.stat(ncsPath);
     index.resources.set(ncsKey, {
       resref: resrefLower,

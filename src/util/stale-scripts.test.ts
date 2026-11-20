@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateQuestScripts } from "./quest-script.js";
+import { generateAcquireWrapper, generateHeartbeatWrapper, generateQuestScripts } from "./quest-script.js";
 import { generateRandomAbilitiesInclude } from "./random-abilities-script.js";
 import { generateSimInclude } from "./sim-script.js";
 import { generateSpecAbilityInclude } from "./spec-ability-script.js";
@@ -26,6 +26,14 @@ describe("findStaleGenerated", () => {
     const found = findStaleGenerated(new Map([["inc_cre_level", old]]));
     expect(found).toHaveLength(1);
     expect(found[0].tool).toBe("create_creature_level_system");
+  });
+  it("covers the module-event wrappers, keeping the handler they chain", () => {
+    const fresh = generateAcquireWrapper("x2_mod_def_aqu");
+    expect(findStaleGenerated(new Map([["q_mod_acquire", fresh]]))).toEqual([]);
+    expect(findStaleGenerated(new Map([["q_mod_tick", generateHeartbeatWrapper("")]]))).toEqual([]); // header wraps a line
+    expect(findStaleGenerated(new Map([["q_mod_tick", generateHeartbeatWrapper("x_hb")]]))).toEqual([]);
+    const old = fresh.replace("QuestEventAdvance(oItem", "QuestAdvance(oItem");
+    expect(findStaleGenerated(new Map([["q_mod_acquire", old]])).map((f) => f.tool)).toEqual(["create_quest_system"]);
   });
   it("ignores scripts the module does not have, and reports an unreadable one", () => {
     expect(findStaleGenerated(new Map())).toEqual([]);

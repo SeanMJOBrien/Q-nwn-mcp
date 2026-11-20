@@ -10,7 +10,7 @@
  */
 
 import type { ModuleIndex } from "../types/module.js";
-import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
+import { afterWrite, beforeWrite, removeResource } from "../util/project-sync.js";
 import { z } from "zod";
 import path from "path";
 import fs from "fs/promises";
@@ -56,13 +56,7 @@ export async function removeAreaFromModule(index: ModuleIndex, areaResref: strin
   // Delete files and clean caches
   for (const ext of ["are", "git", "gic"]) {
     const key = `${areaResref}.${ext}`;
-    const entry = index.resources.get(key);
-    if (entry) {
-      await fs.unlink(entry.filePath).catch(() => {});
-      await afterRemove(entry.filePath);
-      index.resources.delete(key);
-      index.parsedGff.delete(key);
-    }
+    if (index.resources.has(key)) await removeResource(index, key);
   }
 
   // Clean up index entries

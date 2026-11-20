@@ -9,7 +9,14 @@
 
 import { COMPANION_INCLUDE, COMPANION_LEVELUP, DEFAULT_MAX_COMPANIONS, generateCompanionScripts } from "./companion-script.js";
 import { hasHandEditedHeader } from "./hand-edited.js";
-import { generateQuestScripts } from "./quest-script.js";
+import {
+  ACQUIRE_WRAPPER,
+  generateAcquireWrapper,
+  generateHeartbeatWrapper,
+  generateQuestScripts,
+  HEARTBEAT_WRAPPER,
+  wrapperOriginal,
+} from "./quest-script.js";
 import { generateAppearanceInclude } from "./gear-appearance.js";
 import { generateRandomAbilitiesInclude } from "./random-abilities-script.js";
 import { generateRewardInclude, readRewardOptions } from "./reward-script.js";
@@ -88,6 +95,18 @@ export const GENERATED_SCRIPTS: GeneratedScript[] = [
   ...Object.keys(generateQuestScripts())
     .filter((name) => name !== SIM_INCLUDE)
     .map((name) => ({ resref: name, tool: "create_quest_system", regenerate: () => generateQuestScripts()[name] })),
+  // The per-module wrappers chain the module's own handler, named in their header.
+  ...([
+    [ACQUIRE_WRAPPER, generateAcquireWrapper],
+    [HEARTBEAT_WRAPPER, generateHeartbeatWrapper],
+  ] as const).map(([resref, generate]) => ({
+    resref,
+    tool: "create_quest_system",
+    regenerate: (existing: string) => {
+      const original = wrapperOriginal(existing);
+      return original === undefined ? undefined : generate(original);
+    },
+  })),
   // The other companion scripts (join, leave, orders, conditions, the level-up handler) come from the same generator.
   ...["c_hen_free", "c_hen_mine", "c_hen_full", "a_hen_join", "a_hen_leave", "a_hen_stay", "a_hen_follow"].map((name) => ({
     resref: name,

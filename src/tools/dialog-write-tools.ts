@@ -16,7 +16,7 @@ import { jsonToGff } from "../nim-tools.js";
 import type { GffDocument, GffObj } from "../types/gff.js";
 import { getFieldList, getFieldLocStr, getFieldStr, setField } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
-import { addReturnLinks, dialogShape, entryLabel } from "../util/dialog-hub.js";
+import { addReturnLinks, dialogShape, entryLabel, pruneDialogOrphans } from "../util/dialog-hub.js";
 import { numParam, optNumParam, toI } from "../util/params.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -369,6 +369,36 @@ export function registerDialogWriteTools(server: McpServer): void {
               null,
               2,
             ),
+          },
+        ],
+      };
+    },
+  );
+
+  // ─── prune_dialog_orphans ─────────────────────────────────────────────
+
+  server.tool(
+    "prune_dialog_orphans",
+    "Remove the nodes of a dialog that no path from its start lines can reach (verify_dialog's dialog_orphan_nodes): leftovers of rebuilt quest lines and old exit replies. Links are renumbered. dryRun lists what would go.",
+    {
+      dialog: z.string().describe("Dialog resref"),
+      dryRun: z.boolean().optional().describe("Report only, change nothing"),
+    },
+    { destructiveHint: true },
+    async ({ dialog, dryRun }) => {
+      const index = requireIndex();
+      const key = `${dialog.toLowerCase()}.dlg`;
+      const doc = index.parsedGff.get(key) as GffDocument | undefined;
+      if (!doc) return { content: [{ type: "text", text: `Dialog not found: ${key}` }], isError: true };
+      const work = dryRun ? (JSON.parse(JSON.stringify(doc)) as GffDocument) : doc;
+      const removed = pruneDialogOrphans(work as unknown as GffObj);
+      const changed = removed.entries.length + removed.replies.length > 0;
+      if (!dryRun && changed) await writeDialogDocument(index, dialog, doc);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ success: true, dialog: dialog.toLowerCase(), dryRun: !!dryRun, removedEntries: removed.entries, removedReplies: removed.replies }, null, 2),
           },
         ],
       };

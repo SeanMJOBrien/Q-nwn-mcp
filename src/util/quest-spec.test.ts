@@ -1,6 +1,8 @@
+import fs from "fs";
+import path from "path";
 import { describe, expect, it } from "vitest";
 import { generateAcquireWrapper, generateQuestScripts } from "./quest-script.js";
-import { normalizeQuestSpec, QuestSpecError, tagFromName } from "./quest-spec.js";
+import { normalizeQuestSpec, QUEST_KEYS, QuestSpecError, STAGE_KEYS, tagFromName } from "./quest-spec.js";
 
 describe("normalizeQuestSpec", () => {
   it("turns the smallest spec into numbered stages with an ending and a sized reward", () => {
@@ -93,7 +95,7 @@ describe("quest runtime", () => {
   it("advances an AoE stage with its own slot, and credits companions' kills to their master", () => {
     expect(src.q_act).toContain('QuestAdvanceSphere(OBJECT_SELF, StringToInt(s), StringToFloat(sAoe), "talk")');
     expect(src.inc_quest).toContain("if (SimIsPlayer(oCreature)) QuestAdvance(oObject, oCreature, nSlot, sVia);");
-    expect(src.q_ondeath).toContain("QuestResolvePC(GetLastKiller())");
+    expect(src.q_ondeath).toContain("QuestResolvePC(SimEvent(GetLastKiller()))");
   });
   it("keeps conditions free of side effects: skill checks roll in an action", () => {
     expect(src.q_chk).not.toContain("GetIsSkillSuccessful");
@@ -133,5 +135,51 @@ describe("QuestSpecError says where", () => {
       stage: undefined,
       field: "name",
     });
+  });
+});
+
+describe("spec keys", () => {
+  it("the accepted keys equal the generated schema (run npm run quest:schema after changing QuestInput)", () => {
+    const schema = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "../../docs/quest-spec.schema.json"), "utf8"));
+    expect([...QUEST_KEYS].sort()).toEqual(Object.keys(schema.definitions.QuestInput.properties).sort());
+    expect([...STAGE_KEYS].sort()).toEqual(Object.keys(schema.definitions.StageInput.properties).sort());
+  });
+
+  it("rejects an unknown or misspelt field and names it", () => {
+    expect(() => normalizeQuestSpec({ name: "X", giver: "ned", template: "kill", target: "w", jorunal: ["a"] } as never)).toThrow(
+      /unknown field\(s\) jorunal/,
+    );
+    expect(() =>
+      normalizeQuestSpec({ name: "X", giver: "ned", stages: [{ do: "talk", journal: "a" }, { do: "pickup", itemname: "Pelt", journal: "b" }] } as never),
+    ).toThrow(/stages\[1\]: unknown field\(s\) itemname \(did you mean itemName\?\)/);
+    expect(() => normalizeQuestSpec({ $schema: "x", name: "X", giver: "ned", template: "kill", target: "w" } as never)).not.toThrow();
+  });
+
+  it("fetch passes the holder (in / from_creature) to its pickup stage", () => {
+    const q = normalizeQuestSpec({ name: "Moonpetal", giver: "mara", template: "fetch", itemName: "Moonpetal", in: "old_crate" });
+    expect(q.stages[1]).toMatchObject({ do: "pickup", in: "old_crate" });
+    const r = normalizeQuestSpec({ name: "Pelt", giver: "ned", template: "fetch", itemName: "Pelt", from_creature: "wolf" });
+    expect(r.stages[1]).toMatchObject({ do: "pickup", from_creature: "wolf" });
+  });
+});
+
+describe("event-stage options", () => {
+  const base = { name: "Raid", giver: "ned" };
+  it("quest-level defaults reach the stages that take them; marker defaults stay per kind", () => {
+    const q = normalizeQuestSpec({ ...base, template: "kill", target: "raider", early: true, none: "Too soon.", respawn: 30 });
+    const kill = q.stages.find((s) => s.do === "kill");
+    expect(kill).toMatchObject({ early: true, none: "Too soon.", respawn: 30 });
+    expect(q.stages.find((s) => s.do === "return")).not.toHaveProperty("early");
+  });
+  it("refuses an option on a stage kind it does nothing for, and bad values", () => {
+    const st = (extra: object) => ({ ...base, stages: [{ do: "talk", journal: "a" }, { journal: "b", ...extra }] }) as never;
+    expect(() => normalizeQuestSpec(st({ do: "talk", early: true }))).toThrow(/early works on kill, pickup/);
+    expect(() => normalizeQuestSpec(st({ do: "talk", none: "x" }))).toThrow(/none works on/);
+    expect(() => normalizeQuestSpec(st({ do: "kill", target: "w", respawn: 2 }))).toThrow(/respawn is whole seconds from 6/);
+    expect(() => normalizeQuestSpec(st({ do: "explore", area: "a", respawn: 30 }))).toThrow(/respawn works on kill/);
+    expect(() => normalizeQuestSpec(st({ do: "trigger", area: "a", x: 1, y: 2, marker: true }))).not.toThrow();
+    expect(() => normalizeQuestSpec(st({ do: "kill", target: "w", marker: true }))).toThrow(/marker works on escort, trigger/);
+    expect(() => normalizeQuestSpec(st({ do: "kill", target: "w", early: true, from: 0 }))).toThrow(/early needs the stage to follow/);
+    expect(() => normalizeQuestSpec({ ...base, template: "bounty", target: "w", early: true })).toThrow(/bounty can't have early/);
   });
 });

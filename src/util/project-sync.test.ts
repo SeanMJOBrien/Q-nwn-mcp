@@ -45,6 +45,41 @@ describe("project sync", () => {
     expect(JSON.parse(await fs.readFile(path.join(proj, "project.json"), "utf-8")).resources).toEqual(["a.nss", "b.nss"]);
   });
 
+  it("removeResource deletes the resource from the project and its manifest at once", async () => {
+    const { afterWrite, removeResource } = await import("./project-sync.js");
+    const proj = path.join(dir, "adv", "Demo");
+    for (const [key, body] of [["a.nss", "keep"], ["b.nss", "gone"], ["c.utc", "{}"]] as const) {
+      const f = path.join(index.tempDir, key);
+      await fs.writeFile(f, body);
+      index.resources.set(key, { resref: key.split(".")[0], extension: key.split(".")[1], filePath: f, sizeBytes: body.length } as never);
+      if (key.endsWith(".utc")) index.parsedGff.set(key, {} as never);
+      await afterWrite(f);
+    }
+    await removeResource(index, "b.nss");
+    await removeResource(index, "C.UTC");
+    expect(index.resources.has("b.nss") || index.resources.has("c.utc") || index.parsedGff.has("c.utc")).toBe(false);
+    await expect(fs.stat(path.join(index.tempDir, "b.nss"))).rejects.toThrow();
+    await expect(fs.stat(path.join(proj, "src/nss/b.nss"))).rejects.toThrow();
+    await expect(fs.stat(path.join(proj, "src/utc/c.utc.json"))).rejects.toThrow();
+    expect(await fs.readFile(path.join(proj, "src/nss/a.nss"), "utf-8")).toBe("keep");
+    expect(JSON.parse(await fs.readFile(path.join(proj, "project.json"), "utf-8")).resources).toEqual(["a.nss"]);
+  });
+
+  it("removeResource prunes a file another program already deleted", async () => {
+    const { afterWrite, removeResource } = await import("./project-sync.js");
+    const proj = path.join(dir, "adv", "Demo");
+    const f = path.join(index.tempDir, "d.nss");
+    await fs.writeFile(f, "x");
+    index.resources.set("d.nss", { resref: "d", extension: "nss", filePath: f, sizeBytes: 1 });
+    await afterWrite(f);
+    expect(await fs.readFile(path.join(proj, "src/nss/d.nss"), "utf-8")).toBe("x");
+    await fs.rm(f);
+    index.resources.delete("d.nss");
+    await removeResource(index, "d.nss", f);
+    await expect(fs.stat(path.join(proj, "src/nss/d.nss"))).rejects.toThrow();
+    expect(JSON.parse(await fs.readFile(path.join(proj, "project.json"), "utf-8")).resources).toEqual([]);
+  });
+
   it("ignores files outside the temp dir", async () => {
     const { afterWrite } = await import("./project-sync.js");
     const f = path.join(dir, "elsewhere.nss");

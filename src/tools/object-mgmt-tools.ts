@@ -8,7 +8,7 @@
  * - move_object: Move an object to a new position in an area
  */
 
-import { afterRemove, afterWrite, beforeWrite } from "../util/project-sync.js";
+import { afterWrite, beforeWrite, removeResource } from "../util/project-sync.js";
 import { z } from "zod";
 import path from "path";
 import fsPromises from "fs/promises";
@@ -589,16 +589,7 @@ export function registerObjectMgmtTools(server: McpServer): void {
       }
       const keys = [key];
       if (ext === "nss" && index.resources.has(`${resref}.ncs`)) keys.push(`${resref}.ncs`);
-      for (const k of keys) {
-        const r = index.resources.get(k);
-        if (!r) continue;
-        if (r.filePath) {
-          await fsPromises.rm(r.filePath, { force: true });
-          await afterRemove(r.filePath);
-        }
-        index.resources.delete(k);
-        index.parsedGff.delete(k);
-      }
+      for (const k of keys) if (index.resources.has(k)) await removeResource(index, k);
       index.items = index.items.filter((i) => !(ext === "uti" && i.source === "blueprint" && i.resref === resref));
       markDirty(entry.filePath || path.join(index.tempDir, key));
       return { content: [{ type: "text", text: JSON.stringify({ removed: true, resources: keys, project: "manifest and file updated when the module is a project", forcedPastReferences: refs.length > 0 ? refs.slice(0, 25) : undefined }, null, 2) }] };

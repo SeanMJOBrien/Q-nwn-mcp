@@ -8,15 +8,24 @@ import { SIM_INCLUDE } from "../util/sim-script.js";
  *   remove_quest         undo build_quest for one tag
  */
 
-import { afterRemove } from "../util/project-sync.js";
+import fs from "fs/promises";
+import { afterRemove, flatSyncReport, projectDirFor } from "../util/project-sync.js";
+import { isProjectDir } from "../util/project.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { buildResmanOptions, requireIndex } from "../module-loader.js";
 import type { GffObj } from "../types/gff.js";
 import { getFieldStr } from "../types/gff.js";
 import type { ModuleIndex } from "../types/module.js";
-import { QuestBuildError, QuestBuilder, removeQuest } from "../util/quest-builder.js";
-import { generateQuestScripts, QUEST_INCLUDE } from "../util/quest-script.js";
+import { QuestBuildError, QuestBuilder, refreshWrapper, removeQuest } from "../util/quest-builder.js";
+import {
+  ACQUIRE_WRAPPER,
+  generateAcquireWrapper,
+  generateHeartbeatWrapper,
+  generateQuestScripts,
+  HEARTBEAT_WRAPPER,
+  QUEST_INCLUDE,
+} from "../util/quest-script.js";
 import { normalizeQuestSpec, type QuestInput, QuestSpecError, STAGE_KINDS, TEMPLATES } from "../util/quest-spec.js";
 import { writeAndCompileScript } from "../util/script-writer.js";
 
@@ -34,7 +43,28 @@ export async function writeQuestSystem(index: ModuleIndex): Promise<{
       ...(isInclude || r.compiled ? {} : { compilerOutput: r.compilerOutput }),
     });
   }
+  // The per-module wrappers chain the module's own handler, so they are regenerated in place, not rewritten blind.
+  for (const [wrapper, generate] of [
+    [ACQUIRE_WRAPPER, generateAcquireWrapper],
+    [HEARTBEAT_WRAPPER, generateHeartbeatWrapper],
+  ] as const) {
+    if (await refreshWrapper(index, wrapper, generate)) scripts.push({ resref: wrapper, compiled: true });
+  }
   return { scripts, compiled: scripts.every((s) => s.compiled !== false) };
+}
+
+/**
+ * Each built quest's spec is kept in the module project as quests/<tag>.json, so it can be rebuilt with a changed option
+ * later without recovering the spec from a conversation. Nothing is kept for a flat source build (quest CLI --out).
+ */
+async function questSpecFile(index: ModuleIndex, tag: string): Promise<string | null> {
+  if (flatSyncReport()) return null;
+  try {
+    const dir = await projectDirFor(index);
+    return (await isProjectDir(dir)) ? path.join(dir, "quests", `${tag}.json`) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** TRUE when some placed object or area in the module has this tag (for tag-convention auto-wiring). */
@@ -99,6 +129,12 @@ export async function buildQuestFromJson(spec: string, dryRun?: boolean): Promis
       }
       const report = await builder.build();
       if (systemWritten) report.notes.push("quest runtime written (create_quest_system)");
+      const specFile = await questSpecFile(index, normalized.tag);
+      if (specFile) {
+        await fs.mkdir(path.dirname(specFile), { recursive: true });
+        await fs.writeFile(specFile, `${JSON.stringify(input, null, 2)}\n`);
+        report.notes.push(`spec kept in ${specFile} (rebuild from it)`);
+      }
       // Later phases (rewards, polish) rebuild from this exact spec.
       report.adventureMd += `\n- **Spec:** \`${JSON.stringify(input)}\``;
       return { content: [{ type: "text", text: JSON.stringify({ success: true, ...report }, null, 2) }] };
@@ -170,6 +206,8 @@ export function registerQuestTools(server: McpServer): void {
     async ({ tag }) => {
       const index = requireIndex();
       const removed = await removeQuest(index, await buildResmanOptions(index), tag.toLowerCase());
+      const specFile = await questSpecFile(index, tag.toLowerCase());
+      if (specFile) await fs.rm(specFile, { force: true });
       return {
         content: [{ type: "text", text: JSON.stringify({ success: true, tag, variablesRemoved: removed }, null, 2) }],
       };

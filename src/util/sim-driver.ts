@@ -8,9 +8,16 @@
 
 export interface SimStep {
   label?: string;
-  /** Tag of the object the script runs on (OBJECT_SELF); the NPC whose dialog line it is. */
-  npc: string;
-  script: string;
+  /** Tag of the object the script runs on (OBJECT_SELF): the NPC whose dialog line it is, or the event object. */
+  npc?: string;
+  script?: string;
+  /**
+   * An event script (q_onenter on an area, q_trigger, q_onused, q_search, q_ondeath on the target): the stand-in counts as
+   * the creature entering, using or killing (SimEvent in inc_sim).
+   */
+  event?: boolean;
+  /** Instead of a script: create this item (resref) on the stand-in, which fires the module's OnAcquireItem (pickup stages). */
+  giveItem?: string;
   params?: Record<string, string>;
   /** A condition script: its result is read back. Default: an action script. */
   kind?: "action" | "condition";
@@ -42,8 +49,13 @@ export function validateSimSpec(spec: SimSpec): string[] {
   if (spec.actor !== undefined && !IDENT.test(spec.actor) || (spec.actor ?? "").length > 16) errors.push("actor must be a blueprint resref of at most 16 letters, digits or underscores");
   (spec.steps ?? []).forEach((st, i) => {
     const where = `step ${i + 1}`;
+    if (st.giveItem !== undefined) {
+      if (!IDENT.test(st.giveItem) || st.giveItem.length > 16) errors.push(`${where}: giveItem must be an item resref of at most 16 characters`);
+      if (st.script) errors.push(`${where}: a step gives an item or runs a script, not both`);
+      return;
+    }
     if (!st.npc || st.npc.length > 32 || /["\\]/.test(st.npc)) errors.push(`${where}: npc must be a tag`);
-    if (!IDENT.test(st.script ?? "") || st.script.length > 16) errors.push(`${where}: script must be a script resref of at most 16 characters`);
+    if (!IDENT.test(st.script ?? "") || (st.script ?? "").length > 16) errors.push(`${where}: script must be a script resref of at most 16 characters`);
     for (const k of Object.keys(st.params ?? {})) if (!IDENT.test(k)) errors.push(`${where}: parameter name "${k}" is not an identifier`);
   });
   return errors;
@@ -80,18 +92,24 @@ int SimItemCount(object oActor, string sTag)
 `);
   spec.steps.forEach((st, i) => {
     const n = i + 1;
-    const label = st.label ?? `${st.script} on ${st.npc}`;
+    const label = st.label ?? (st.giveItem ? `give ${st.giveItem}` : `${st.script} on ${st.npc}`);
     const cond = st.kind === "condition";
     out.push(`void SimStep${n}()
 {
     string sLabel = ${nwString(`step ${n}: ${label}`)};
     object oActor = SimActor();
-    object oNpc = GetObjectByTag(${nwString(st.npc)});
+    int bBad = FALSE;`);
+    if (st.giveItem) {
+      out.push(`    if (!GetIsObjectValid(CreateItemOnObject(${nwString(st.giveItem)}, oActor, 1))) { SimFail(sLabel, "item blueprint not found"); return; }`);
+    } else {
+      out.push(`    object oNpc = GetObjectByTag(${nwString(st.npc ?? "")});
     if (!GetIsObjectValid(oNpc)) { SimFail(sLabel, "npc not found"); return; }
-    int bBad = FALSE;
     DeleteLocalInt(GetModule(), "SIM_COND");`);
-    for (const [k, v] of Object.entries(st.params ?? {})) out.push(`    SetScriptParam(${nwString(k)}, ${nwString(String(v))});`);
-    out.push(`    ExecuteScript(${nwString(st.script)}, oNpc);`);
+      for (const [k, v] of Object.entries(st.params ?? {})) out.push(`    SetScriptParam(${nwString(k)}, ${nwString(String(v))});`);
+      if (st.event) out.push(`    SetLocalInt(GetModule(), "SIM_EVENT", 1);`);
+      out.push(`    ExecuteScript(${nwString(st.script ?? "")}, oNpc);`);
+      if (st.event) out.push(`    DeleteLocalInt(GetModule(), "SIM_EVENT");`);
+    }
     if (cond) {
       const want = st.expect === false ? 0 : 1;
       out.push(`    int nCond = GetLocalInt(GetModule(), "SIM_COND") - 1;

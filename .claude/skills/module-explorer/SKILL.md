@@ -93,7 +93,7 @@ Reach for these instead of manually cross-referencing GFF fields:
      each a JSON object of key → value read with `GetScriptParam`, so one generic script can serve many
      nodes. `quest` + `questEntry` make the node advance that journal stage itself, with no script.
      Dialog rule: branches return to the NPC's main options and only an exit reply ends the conversation. `create_dialog`
-     does this by default (`end: true` on a line keeps it terminal); `add_dialog_return_links` fixes an existing dialog,
+     does this by default (`end: true` on a line keeps it terminal); `add_dialog_return_links` fixes an existing dialog (`prune_dialog_orphans` removes nodes nothing reaches),
      and `verify_dialog` warns `dialog_branch_ends` / `dialog_no_exit_reply`. Hand-added nodes need the links too.
    - `export_resource(resref, type, outputPath)` pulls one resource out of
      the loaded module to a real file on disk — for handing a single

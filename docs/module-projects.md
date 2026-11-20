@@ -34,6 +34,10 @@ Each GFF resource is the `nwn_gff` JSON form (`-k json -p`, pretty, stable key o
 - `export_project` writes the whole loaded module (B2).
 - After each mutating tool, the changed resource is flushed to the project (B4: `jsonToGff` and `writeAndCompileScript` already mark dirty state; they gain a flush). A `flush_project` call exists for a bulk catch-up.
 - `adopt_module` writes the project from a `.mod` (B6).
+- A removed resource leaves the project at the moment it is removed: every tool deletes through `removeResource`
+  (`util/project-sync.ts`), which deletes the temp file, its project file (`src/<ext>/...`) and its manifest entry in one
+  step (`remove_resource`, `delete_area`, `remove_quest`, Moonglow plugins). `project-sync-guard.test.ts` fails on any
+  other `resources.delete(` in `src/`. `export_project` still prunes stray project files as a catch-up.
 
 ## How a session resumes
 

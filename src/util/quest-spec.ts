@@ -54,6 +54,11 @@ export interface StageCheck {
   prompt?: string;
   pass?: string;
   fail?: string;
+  /**
+   * Dialog check: the player may try again (a fresh roll each time the line is picked) instead of one roll per player.
+   * With else "fight" a failure still starts the fight; with else "end" the line stays on offer.
+   */
+  retry?: boolean;
   /** search: attempts per player (default 2). */
   tries?: number;
   /** search: succeed anyway once a player's tries are spent, so a required clue can't block the quest (default true). */
@@ -141,8 +146,24 @@ export interface StageInput {
   keep?: boolean;
   /** Script run on the advancing object (the NPC) when the stage advances (questK_self_script). */
   script?: string;
-  /** search: text when the placeable is used before the quest reaches this stage. */
+  /**
+   * Text the player sees when this stage's event happens before the quest reaches it (kill, pickup, explore, trigger, use,
+   * search): "Nothing to do here yet." instead of silence. On an early stage it is shown when the deed is recorded.
+   */
   none?: string;
+  /**
+   * kill, pickup, explore, trigger, use: doing it before the quest reaches this stage still counts. The deed is remembered on
+   * the party, and the stage completes (journal and reward) as soon as the quest arrives at the stage before it, e.g. on
+   * accepting. A spawn or script of the stage runs at the deed itself.
+   */
+  early?: boolean;
+  /**
+   * escort, trigger: put a map-note waypoint at the destination. Default on for an escort with x/y, off for a trigger.
+   * A string is the note text (default "<quest name>").
+   */
+  marker?: boolean | string;
+  /** kill: a fresh copy of the target appears this many seconds after it dies (6-3600), for repeatable or test quests. */
+  respawn?: number;
   /**
    * search: an optional clue, not a numbered stage — no journal entry, doesn't move the quest on; available once the quest
    * is at or past `from` (default 1); pays its `reward` to the party once.
@@ -184,6 +205,9 @@ export interface QuestInput {
   target?: string;
   item?: string;
   itemName?: string;
+  /** fetch: the creature (tag) carrying the item, or the placed container (tag) holding it. */
+  from_creature?: string;
+  in?: string;
   to?: string;
   area?: string;
   captive?: string;
@@ -197,6 +221,11 @@ export interface QuestInput {
   stages?: StageInput[];
   /** Template shortcut: spawn this when the quest is accepted (e.g. the bounty target). */
   spawn?: StageSpawn;
+  /** Defaults for every stage that takes them and leaves them out (templates included): see StageInput. */
+  none?: string;
+  early?: boolean;
+  marker?: boolean | string;
+  respawn?: number;
   autowire?: boolean;
 }
 
@@ -272,6 +301,10 @@ function validateSpawn(sp: StageSpawn, n: number, kind: StageKind): void {
 }
 
 const TAG_RE = /^[a-z][a-z0-9_]*$/;
+/** Stages advanced by an event (not a dialog line): the ones `none` and `early` apply to. */
+export const NONE_KINDS: StageKind[] = ["kill", "pickup", "explore", "trigger", "use", "search"];
+export const EARLY_KINDS: StageKind[] = ["kill", "pickup", "explore", "trigger", "use"];
+export const MARKER_KINDS: StageKind[] = ["escort", "trigger"];
 
 function expandTemplate(q: QuestInput): StageInput[] {
   const j = (i: number, fallback: string) => q.journal?.[i] ?? fallback;
@@ -280,7 +313,7 @@ function expandTemplate(q: QuestInput): StageInput[] {
     case "fetch":
       return [
         { do: "talk", journal: j(0, `I agreed to find something for ${giver}.`) },
-        { do: "pickup", item: q.item, itemName: q.itemName, area: q.area, journal: j(1, "I found it.") },
+        { do: "pickup", item: q.item, itemName: q.itemName, from_creature: q.from_creature, in: q.in, area: q.area, journal: j(1, "I found it.") },
         { do: "deliver", item: q.item, journal: j(2, "I handed it over."), text: q.thanks },
       ];
     case "kill":
@@ -353,8 +386,30 @@ function expandTemplate(q: QuestInput): StageInput[] {
  * Normalise a quest spec. `exists(tag)` answers whether an object with that tag is placed in the module (for the
  * tag-convention auto-wiring: <tag>_giver, <tag>_target, <tag>_captive, <tag>_npc, <tag>_item).
  */
+/** Every key QuestInput / StageInput accepts; kept equal to docs/quest-spec.schema.json by quest-spec.test.ts. */
+export const QUEST_KEYS = ["area", "autowire", "captive", "check", "clues", "dest", "from_creature", "giver", "in", "item", "itemName", "journal", "level", "marker", "name", "none", "early", "npc", "priority", "respawn", "reward", "spawn", "stages", "tag", "target", "template", "thanks", "to"];
+export const STAGE_KEYS = ["accept", "acceptReply", "approach", "area", "arrive", "check", "companion", "count", "decline", "declineReply", "dismiss", "do", "early", "end", "examine", "from", "from_creature", "in", "item", "itemName", "join", "journal", "keep", "leave", "marker", "missing", "n", "none", "offer", "optional", "plea", "radius", "reminder", "reply", "respawn", "reward", "script", "spawn", "target", "text", "to", "x", "y"];
+
+/**
+ * Unknown keys are an error, not silently ignored: a misspelt or unsupported field (fetch's `in` before it existed)
+ * used to vanish and the quest built without it. Keys starting with "$" ($schema, $comment) are allowed.
+ */
+function rejectUnknownKeys(obj: object, allowed: string[], where: string, stage?: number): void {
+  const unknown = Object.keys(obj).filter((k) => !k.startsWith("$") && !allowed.includes(k));
+  if (!unknown.length) return;
+  const hints = unknown.map((k) => {
+    const near = allowed.find((a) => a.toLowerCase().replace(/_/g, "") === k.toLowerCase().replace(/_/g, ""));
+    return near ? `${k} (did you mean ${near}?)` : k;
+  });
+  throw new QuestSpecError(`${where}: unknown field(s) ${hints.join(", ")}; allowed: ${allowed.join(", ")}`, stage, unknown[0]);
+}
+
 export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => boolean = () => false): QuestSpec {
   if (!input || typeof input !== "object") throw new QuestSpecError("spec must be an object");
+  rejectUnknownKeys(input, QUEST_KEYS, "spec");
+  (input.stages ?? []).forEach((st, i) => {
+    if (st && typeof st === "object") rejectUnknownKeys(st, STAGE_KEYS, `stages[${i}]`, i + 1);
+  });
   const name = (input.name ?? "").trim();
   if (!name) throw new QuestSpecError("a quest needs a name", undefined, "name");
   const isBounty = input.template === "bounty";
@@ -449,6 +504,34 @@ export function normalizeQuestSpec(input: QuestInput, exists: (tag: string) => b
     }
     if (s.do === "return") s.to = q.giver;
   }
+
+  // Quest-level defaults for the event options, then their rules.
+  for (const s of stages) {
+    if (s.none === undefined && q.none !== undefined && NONE_KINDS.includes(s.do)) s.none = q.none;
+    if (s.early === undefined && q.early !== undefined && EARLY_KINDS.includes(s.do)) s.early = q.early;
+    if (s.respawn === undefined && q.respawn !== undefined && s.do === "kill") s.respawn = q.respawn;
+    if (s.marker === undefined && q.marker !== undefined && MARKER_KINDS.includes(s.do)) s.marker = q.marker;
+    if (s.none !== undefined && !NONE_KINDS.includes(s.do))
+      throw new QuestSpecError(`stage ${s.n} (${s.do}): none works on ${NONE_KINDS.join(", ")} stages`, s.n, "none");
+    if (s.early && !EARLY_KINDS.includes(s.do))
+      throw new QuestSpecError(`stage ${s.n} (${s.do}): early works on ${EARLY_KINDS.join(", ")} stages`, s.n, "early");
+    if (s.early && s.optional) throw new QuestSpecError(`stage ${s.n}: an optional clue can't be early`, s.n, "early");
+    if (s.early && s.from !== s.n - 1)
+      throw new QuestSpecError(`stage ${s.n}: early needs the stage to follow the one before it (no from)`, s.n, "early");
+    if (s.respawn !== undefined) {
+      if (s.do !== "kill") throw new QuestSpecError(`stage ${s.n} (${s.do}): respawn works on kill stages`, s.n, "respawn");
+      if (!Number.isInteger(s.respawn) || s.respawn < 6 || s.respawn > 3600)
+        throw new QuestSpecError(`stage ${s.n}: respawn is whole seconds from 6 to 3600`, s.n, "respawn");
+    }
+    if (s.marker !== undefined && s.marker !== false) {
+      if (!MARKER_KINDS.includes(s.do))
+        throw new QuestSpecError(`stage ${s.n} (${s.do}): marker works on ${MARKER_KINDS.join(", ")} stages`, s.n, "marker");
+      if (s.x === undefined || s.y === undefined)
+        throw new QuestSpecError(`stage ${s.n}: a marker needs the destination's x and y`, s.n, "marker");
+    }
+  }
+  if (isBounty && stages.some((s) => s.early))
+    throw new QuestSpecError("a bounty can't have early stages (its repeat clock starts at the end stage)", undefined, "early");
 
   // Endings: explicit, else every stage with the highest number (optional clues never end a quest).
   const maxN = Math.max(...stages.filter((s) => !s.optional).map((s) => s.n));

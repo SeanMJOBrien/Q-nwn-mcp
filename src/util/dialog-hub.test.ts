@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDialogDocument } from "../tools/dialog-write-tools.js";
 import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types/gff.js";
 import type { GffObj } from "../types/gff.js";
-import { addReturnLinks, dialogShape } from "./dialog-hub.js";
+import { addReturnLinks, dialogShape, isEndMark, pruneDialogOrphans, withEndMark } from "./dialog-hub.js";
 
 const doc = () =>
   buildDialogDocument([
@@ -45,6 +45,17 @@ describe("addReturnLinks", () => {
     const entries = getFieldList(e, "EntryList");
     (entries[1] as Record<string, unknown>).Comment = { type: "cexostring", value: "end" };
     expect(addReturnLinks(e).terminal).toEqual([1]);
+  });
+  it("marks a forced end by appending :end, keeping a quest line's ownership comment", () => {
+    const e = doc();
+    const entries = getFieldList(e, "EntryList");
+    (entries[1] as Record<string, unknown>).Comment = { type: "cexostring", value: "mcpq:q_x:s2:fail" };
+    expect(addReturnLinks(e, { endEntries: [1] }).terminal).toEqual([1]);
+    expect(getFieldStr(entries[1], "Comment")).toBe("mcpq:q_x:s2:fail:end");
+    expect(getFieldStr(entries[2], "Comment")).not.toContain("end");
+    expect(dialogShape(e).deadEnds).toEqual([]);
+    expect(isEndMark("end") && isEndMark("mcpq:q_x:s2:turn:end") && !isEndMark("mcpq:q_friend")).toBe(true);
+    expect(withEndMark("")).toBe("end");
   });
   it("keeps link conditions so one-shot options still hide themselves", () => {
     const d = buildDialogDocument([
@@ -102,5 +113,28 @@ describe("addReturnLinks", () => {
     const entries = getFieldList(d, "EntryList");
     expect(getFieldStr(entries[1], "Comment")).toBe("end");
     expect(dialogShape(d).deadEnds).toEqual([]);
+  });
+});
+
+describe("pruneDialogOrphans", () => {
+  it("drops unreachable nodes and renumbers the links that stay", () => {
+    const d = doc();
+    // an orphan reply at index 0 and an orphan entry at the front: every surviving link must shift
+    const replies = getFieldList(d, "ReplyList");
+    const entries = getFieldList(d, "EntryList");
+    const orphanReply = { ...structuredClone(replies[0]), Text: { type: "cexolocstring", value: { "0": "[Leave.]" } }, EntriesList: { type: "list", value: [] } };
+    replies.unshift(orphanReply as GffObj);
+    for (const e of entries) for (const l of getFieldList(e, "RepliesList")) (l.Index as { value: number }).value += 1;
+    const orphanEntry = { ...structuredClone(entries[1]), Text: { type: "cexolocstring", value: { "0": "Old line." } }, RepliesList: { type: "list", value: [] } };
+    entries.unshift(orphanEntry as GffObj);
+    for (const l of getFieldList(d, "StartingList")) (l.Index as { value: number }).value += 1;
+    for (const r of replies) for (const l of getFieldList(r, "EntriesList")) (l.Index as { value: number }).value += 1;
+
+    expect(pruneDialogOrphans(d)).toEqual({ entries: ["Old line."], replies: ["[Leave.]"] });
+    const fresh = doc();
+    const texts = (x: GffObj) =>
+      getFieldList(x, "EntryList").map((e) => [getFieldLocStr(e, "Text"), getFieldList(e, "RepliesList").map((l) => getFieldNum(l, "Index"))]);
+    expect(texts(d)).toEqual(texts(fresh));
+    expect(pruneDialogOrphans(d)).toEqual({ entries: [], replies: [] });
   });
 });

@@ -11,6 +11,8 @@ import type { ModuleIndex } from "../types/module.js";
 import { getScriptParams } from "../util/dialog-params.js";
 import { getVarTableEntries } from "../util/git-helpers.js";
 import { collectQuestVarAwards } from "../util/quest-vars.js";
+import { Report } from "../util/verify/common.js";
+import { verifyDialog } from "../util/verify/dialog.js";
 
 vi.mock("../nim-tools.js", () => ({
   jsonToGff: vi.fn(async (doc: unknown, filePath: string) => {
@@ -227,6 +229,121 @@ describe("build_quest", () => {
     }
   });
 
+  it("builder dialogs pass verify_dialog's shape checks: no orphan node, every main line has an exit", async () => {
+    (mockIndex.parsedGff.get("fold.git") as unknown as GffObj)["Creature List"] = v("list", [
+      creature("farmer_ned"),
+      creature("wolf_alpha"),
+      creature("pip"),
+    ]);
+    const { c, done } = await client();
+    try {
+      json(await c.callTool({ name: "build_quest", arguments: { spec: SPEC } }));
+      const rescue = JSON.stringify({ name: "Free Pip", giver: "farmer_ned", template: "rescue", captive: "pip", journal: ["a", "b", "c"] });
+      json(await c.callTool({ name: "build_quest", arguments: { spec: rescue } }));
+      json(await c.callTool({ name: "build_quest", arguments: { spec: SPEC } })); // a rebuild keeps the exits
+      for (const name of ["dq_farmer_ned", "dq_pip"]) {
+        const r = new Report(name, "dlg");
+        verifyDialog(r, mockIndex, mockIndex.parsedGff.get(`${name}.dlg`) as unknown as GffObj);
+        const shape = r.warnings.filter((w) => ["dialog_orphan_nodes", "dialog_no_exit_reply", "dialog_branch_ends"].includes(w.code));
+        expect(shape, name).toEqual([]);
+      }
+    } finally {
+      await done();
+    }
+  });
+
+  it("event-stage options: early, none and respawn variables, map-note markers kept on rebuild and removed with the quest, retry", async () => {
+    (mockIndex.parsedGff.get("fold.git") as unknown as GffObj)["Creature List"] = v("list", [
+      creature("farmer_ned"),
+      creature("wolf_alpha"),
+      creature("old_tam"),
+    ]);
+    const { c, done } = await client();
+    try {
+      const raid = JSON.stringify({
+        name: "Raid",
+        giver: "farmer_ned",
+        stages: [
+          { do: "talk", journal: "a" },
+          { do: "kill", target: "wolf_alpha", journal: "b", early: true, none: "Remember to tell Ned.", respawn: 45 },
+          { do: "trigger", area: "fold", x: 20, y: 20, marker: "The old camp", journal: "c" },
+          { do: "return", journal: "d" },
+        ],
+      });
+      const r = json(await c.callTool({ name: "build_quest", arguments: { spec: raid } }));
+      // wolf_alpha has no module blueprint here: a respawned copy would lose the quest, so the builder says so
+      expect(r.warnings.join(" ")).toContain("no blueprint in the module");
+      const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+      const wolf = getFieldList(git, "Creature List")[1];
+      expect(vars(wolf)).toMatchObject({ quest1: "2_q_raid", quest1_early: 1, quest1_none: "Remember to tell Ned.", quest1_respawn: 45 });
+      const marks = () => getFieldList(git, "WaypointList").filter((w) => getFieldStr(w, "Tag").endsWith("_mark"));
+      expect(marks().map((w) => [getFieldStr(w, "Tag"), getFieldLocStr(w, "MapNote"), getFieldNum(w, "MapNoteEnabled")])).toEqual([
+        ["q_raid_s3_mark", "The old camp", 1],
+      ]);
+      json(await c.callTool({ name: "build_quest", arguments: { spec: raid } }));
+      expect(marks()).toHaveLength(1); // a rebuild updates the marker in place
+
+      const walk = JSON.stringify({
+        name: "Walk Tam",
+        giver: "old_tam",
+        template: "escort",
+        dest: { area: "fold", x: 30, y: 12, radius: 4 },
+        journal: ["a", "b"],
+      });
+      json(await c.callTool({ name: "build_quest", arguments: { spec: walk } }));
+      expect(marks().map((w) => getFieldStr(w, "Tag")).sort()).toEqual(["q_raid_s3_mark", "q_walk_tam_s2_mark"]); // escort: on by default
+
+      json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_raid" } }));
+      expect(marks().map((w) => getFieldStr(w, "Tag"))).toEqual(["q_walk_tam_s2_mark"]);
+      expect(vars(getFieldList(git, "Creature List")[1]).quest1_early).toBeUndefined();
+
+      // retry: a fresh roll each time and the line stays on offer
+      const talk = JSON.stringify({
+        name: "Haggle",
+        giver: "farmer_ned",
+        stages: [
+          { do: "talk", journal: "a" },
+          { do: "talk", journal: "b", check: { skill: "persuade", dc: 12, retry: true } },
+        ],
+      });
+      json(await c.callTool({ name: "build_quest", arguments: { spec: talk } }));
+      const dlg = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
+      const tryIt = getFieldList(dlg, "ReplyList").find((x) => getFieldStr(x, "Comment") === "mcpq:q_haggle:s2:try") as GffObj;
+      expect(getScriptParams(tryIt, "ActionParams")).toMatchObject({ again: "1" });
+      const intro = getFieldList(dlg, "EntryList").findIndex((e) => getFieldStr(e, "Comment") === "mcpq:q_haggle:s2:intro");
+      const root = getFieldList(dlg, "StartingList").find((l) => getFieldNum(l, "Index") === intro) as GffObj;
+      expect(getScriptParams(root, "ConditionParams")).toEqual({ target: "2" });
+    } finally {
+      await done();
+    }
+  });
+
+  it("an explore stage's variables go on the area's .git (where the engine reads them); OnEnter stays on the .are", async () => {
+    const are = mockIndex.parsedGff.get("fold.are") as unknown as GffObj;
+    are.OnEnter = v("resref", "q_onenter");
+    // a module built before the fix: the quest variables and the chained handler sit on the .are
+    are.VarTable = v("list", [
+      { __struct_id: 0, Name: v("cexostring", "quest1"), Type: v("dword", 3), Value: v("cexostring", "2_q_look") },
+      { __struct_id: 0, Name: v("cexostring", "quest_event"), Type: v("dword", 1), Value: v("int", 1) },
+      { __struct_id: 0, Name: v("cexostring", "MCP_Q_ORIG_ENTER"), Type: v("dword", 3), Value: v("cexostring", "a_old_enter") },
+    ]);
+    const { c, done } = await client();
+    try {
+      const spec = JSON.stringify({ name: "Look", giver: "farmer_ned", stages: [{ do: "talk", journal: "a" }, { do: "explore", area: "fold", early: true, journal: "b" }, { do: "return", journal: "c" }] });
+      json(await c.callTool({ name: "build_quest", arguments: { spec } }));
+      const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+      expect(vars(git)).toMatchObject({ quest1: "2_q_look", quest1_early: 1, quest_event: 1, MCP_Q_ORIG_ENTER: "a_old_enter" });
+      expect(vars(are)).toEqual({}); // migrated off the .are
+      expect(getFieldStr(are, "OnEnter")).toBe("q_onenter");
+      expect(collectQuestVarAwards(mockIndex).get("q_look")?.get(2)).toContain("are:fold");
+      json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_look" } }));
+      expect(getFieldStr(are, "OnEnter")).toBe("a_old_enter");
+      expect(vars(git)).toEqual({});
+    } finally {
+      await done();
+    }
+  });
+
   it("build then remove puts the module back as it was (only the shared runtime scripts stay)", async () => {
     (mockIndex.parsedGff.get("module.ifo") as unknown as GffObj).Mod_OnAcquirItem = v("resref", "x2_mod_def_aqu");
     await addResource("bounty_orc.utc", { __data_type: "UTC ", ...creature("bounty_orc") });
@@ -347,6 +464,28 @@ describe("build_quest", () => {
       );
       const wrapper = await fs.readFile(path.join(tempDir, "q_mod_acquire.nss"), "utf8");
       expect(wrapper).toContain('ExecuteScript("x2_mod_def_aqu", OBJECT_SELF);');
+    } finally {
+      await done();
+    }
+  });
+
+  it("makes a pickup container usable (place_placeable clears Useable) via the fetch template's in", async () => {
+    const git = mockIndex.parsedGff.get("fold.git") as unknown as GffObj;
+    (git["Placeable List"] as { value: GffObj[] }).value.push({
+      __struct_id: 9,
+      Tag: v("cexostring", "old_crate"),
+      Useable: v("byte", 0),
+      Static: v("byte", 1),
+      HasInventory: v("byte", 0),
+    } as unknown as GffObj);
+    const { c, done } = await client();
+    try {
+      const spec = JSON.stringify({ name: "Herb", giver: "farmer_ned", template: "fetch", itemName: "Herb", in: "old_crate" });
+      const r = json(await c.callTool({ name: "build_quest", arguments: { spec } }));
+      expect(r.warnings.join(" ")).not.toContain("nobody carries it");
+      const crate = (git["Placeable List"] as { value: GffObj[] }).value[0];
+      expect([getFieldNum(crate, "Useable"), getFieldNum(crate, "Static"), getFieldNum(crate, "HasInventory")]).toEqual([1, 0, 1]);
+      expect(getFieldList(crate, "ItemList").map((i) => getFieldStr(i, "TemplateResRef"))).toEqual(["q_herb_i2"]);
     } finally {
       await done();
     }
@@ -580,6 +719,17 @@ describe("build_quest", () => {
       json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_hard_talk" } }));
       json(await c.callTool({ name: "build_quest", arguments: { spec: spec({ skill: "persuade", dc: 15 }) } }));
       expect(getFieldStr(reply(), "Script")).toBe("q_roll");
+      const replies = () => getFieldList(mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj, "ReplyList");
+      expect(replies().some((r) => getFieldStr(r, "Comment").endsWith(":attack"))).toBe(false); // else: end has no fight
+      json(await c.callTool({ name: "remove_quest", arguments: { tag: "q_hard_talk" } }));
+      json(await c.callTool({ name: "build_quest", arguments: { spec: spec({ skill: "persuade", dc: 15, else: "fight" }) } }));
+      const dlg = mockIndex.parsedGff.get("dq_farmer_ned.dlg") as unknown as GffObj;
+      const attack = replies().find((r) => getFieldStr(r, "Comment").endsWith(":attack")) as GffObj;
+      expect(attack).toBeDefined();
+      const turn = getFieldList(dlg, "EntryList")[getFieldNum(getFieldList(attack, "EntriesList")[0], "Index")];
+      expect(getFieldStr(turn, "Script")).toBe("q_act");
+      expect(getScriptParams(turn, "ActionParams")).toEqual({ hostile: "1" });
+      expect(getFieldList(turn, "RepliesList")).toEqual([]); // the fight ends the talk
     } finally {
       await done();
     }

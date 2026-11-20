@@ -15,6 +15,20 @@ import { getFieldList, getFieldLocStr, getFieldNum, getFieldStr } from "../types
 
 /** Comment value that marks an NPC entry as deliberately ending the conversation. */
 export const END_MARK = "end";
+
+/**
+ * TRUE when an entry's Comment marks a deliberate end: "end" alone, or any comment ending in ":end". The suffix form
+ * lets a quest line keep its ownership comment ("mcpq:<tag>:s2:fail:end"), which remove_quest and rebuilds match on.
+ */
+export function isEndMark(comment: string): boolean {
+  return comment === END_MARK || comment.endsWith(`:${END_MARK}`);
+}
+
+/** The comment with the end mark added, keeping whatever it said before. */
+export function withEndMark(comment: string): string {
+  if (isEndMark(comment)) return comment;
+  return comment ? `${comment}:${END_MARK}` : END_MARK;
+}
 /** Comment of the shared reply that re-runs the dialog's start conditions. */
 export const REENTER_MARK = "hub:reenter";
 
@@ -135,9 +149,11 @@ export function addReturnLinks(doc: GffObj, options: ReturnLinkOptions = {}): Re
       if (assigned.has(e)) continue;
       const entry = entries[e];
       if (getFieldList(entry, "RepliesList").length > 0) continue;
-      if (getFieldStr(entry, "Comment") === END_MARK || forcedEnd.has(e)) {
+      if (isEndMark(getFieldStr(entry, "Comment")) || forcedEnd.has(e)) {
         // Record the intent in the dialog so verify_dialog (and the next run) know this answer ends the talk on purpose.
-        if (getFieldStr(entry, "Comment") !== END_MARK && !only) (entry as Record<string, unknown>).Comment = { type: "cexostring", value: END_MARK };
+        // Appended, never replacing: a quest line's "mcpq:<tag>:..." comment is how remove_quest finds it.
+        const comment = getFieldStr(entry, "Comment");
+        if (!isEndMark(comment) && !only) (entry as Record<string, unknown>).Comment = { type: "cexostring", value: withEndMark(comment) };
         result.terminal.push(e);
         continue;
       }
@@ -179,7 +195,7 @@ export function dialogShape(doc: GffObj): { deadEnds: number[]; rootsWithoutExit
   }
   entries.forEach((e, i) => {
     if (roots.has(i)) return;
-    if (getFieldList(e, "RepliesList").length === 0 && getFieldStr(e, "Comment") !== END_MARK) deadEnds.push(i);
+    if (getFieldList(e, "RepliesList").length === 0 && !isEndMark(getFieldStr(e, "Comment"))) deadEnds.push(i);
   });
   return { deadEnds, rootsWithoutExit };
 }
@@ -187,4 +203,58 @@ export function dialogShape(doc: GffObj): { deadEnds: number[]; rootsWithoutExit
 /** First words of an entry's text, for messages. */
 export function entryLabel(doc: GffObj, i: number): string {
   return getFieldLocStr(getFieldList(doc, "EntryList")[i] ?? {}, "Text").slice(0, 50);
+}
+
+/**
+ * Removes every entry and reply the conversation can never reach from its StartingList, and renumbers the links that
+ * remain. Left behind by rebuilds and hand edits (a "[Leave.]" exit whose line was replaced, an old quest node that lost its
+ * ownership comment). Returns the texts removed.
+ */
+export function pruneDialogOrphans(doc: GffObj): { entries: string[]; replies: string[] } {
+  const entries = getFieldList(doc, "EntryList");
+  const replies = getFieldList(doc, "ReplyList");
+  const seenE = new Set<number>();
+  const seenR = new Set<number>();
+  const walkE = (i: number) => {
+    if (i < 0 || i >= entries.length || seenE.has(i)) return;
+    seenE.add(i);
+    for (const l of getFieldList(entries[i], "RepliesList")) walkR(getFieldNum(l, "Index"));
+  };
+  const walkR = (i: number) => {
+    if (i < 0 || i >= replies.length || seenR.has(i)) return;
+    seenR.add(i);
+    for (const l of getFieldList(replies[i], "EntriesList")) walkE(getFieldNum(l, "Index"));
+  };
+  for (const l of getFieldList(doc, "StartingList")) walkE(getFieldNum(l, "Index"));
+  const removed = {
+    entries: entries.filter((_, i) => !seenE.has(i)).map((e) => getFieldLocStr(e, "Text")),
+    replies: replies.filter((_, i) => !seenR.has(i)).map((r) => getFieldLocStr(r, "Text")),
+  };
+  if (removed.entries.length === 0 && removed.replies.length === 0) return removed;
+  const remap = (keep: Set<number>, n: number) => {
+    const m = new Map<number, number>();
+    let next = 0;
+    for (let i = 0; i < n; i++) if (keep.has(i)) m.set(i, next++);
+    return m;
+  };
+  const eMap = remap(seenE, entries.length);
+  const rMap = remap(seenR, replies.length);
+  const relink = (links: GffObj[], map: Map<number, number>) => {
+    // A link into a removed node can only come from another removed node, so every surviving link has a new index.
+    for (const l of links) (l.Index as { value: number }).value = map.get(getFieldNum(l, "Index")) ?? 0;
+  };
+  relink(getFieldList(doc, "StartingList"), eMap);
+  const keptE = entries.filter((_, i) => seenE.has(i));
+  const keptR = replies.filter((_, i) => seenR.has(i));
+  keptE.forEach((e, i) => {
+    e.__struct_id = i;
+    relink(getFieldList(e, "RepliesList"), rMap);
+  });
+  keptR.forEach((r, i) => {
+    r.__struct_id = i;
+    relink(getFieldList(r, "EntriesList"), eMap);
+  });
+  (doc.EntryList as { value: GffObj[] }).value = keptE;
+  (doc.ReplyList as { value: GffObj[] }).value = keptR;
+  return removed;
 }

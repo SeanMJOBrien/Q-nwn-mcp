@@ -7,7 +7,7 @@
  */
 
 import type { GffObj } from "../../types/gff.js";
-import { getFieldNum, getFieldStr } from "../../types/gff.js";
+import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
 import { dialogShape, entryLabel } from "../dialog-hub.js";
 import { checkScriptRef, hasField, listOf, type Report } from "./common.js";
@@ -115,17 +115,26 @@ export function verifyDialog(report: Report, index: ModuleIndex, doc: GffObj): v
   };
   for (const link of starting) walkEntry(getFieldNum(link, "Index"));
 
-  const orphanEntries = entries.length - reachedEntries.size;
-  const orphanReplies = replies.length - reachedReplies.size;
-  if (orphanEntries > 0) {
+  const textOf = (node: GffObj | undefined) => (node ? getFieldLocStr(node, "Text") || "(empty)" : "");
+  const sample = (idx: number[], list: GffObj[]) =>
+    `${idx.slice(0, 3).map((i) => `#${i} "${textOf(list[i]).slice(0, 40)}"`).join(", ")}${idx.length > 3 ? ", ..." : ""}`;
+  const orphanEntries = entries.map((_, i) => i).filter((i) => !reachedEntries.has(i));
+  const orphanReplies = replies.map((_, i) => i).filter((i) => !reachedReplies.has(i));
+  if (orphanEntries.length > 0) {
     report.warn(
       "dialog_orphan_nodes",
-      `${orphanEntries} entry node(s) are unreachable from StartingList — dead content the player can never see`,
+      `${orphanEntries.length} entry node(s) are unreachable from StartingList — dead content the player can never see (${sample(orphanEntries, entries)})`,
       "EntryList",
+      "prune_dialog_orphans",
     );
   }
-  if (orphanReplies > 0) {
-    report.warn("dialog_orphan_nodes", `${orphanReplies} reply node(s) are unreachable from StartingList`, "ReplyList");
+  if (orphanReplies.length > 0) {
+    report.warn(
+      "dialog_orphan_nodes",
+      `${orphanReplies.length} reply node(s) are unreachable from StartingList (${sample(orphanReplies, replies)})`,
+      "ReplyList",
+      "prune_dialog_orphans",
+    );
   }
 
   // ─── Unconditional root ─────────────────────────────────────────────────
@@ -155,7 +164,7 @@ export function verifyDialog(report: Report, index: ModuleIndex, doc: GffObj): v
   if (shape.rootsWithoutExit.length > 0) {
     report.warn(
       "dialog_no_exit_reply",
-      `${shape.rootsWithoutExit.length} main dialog line(s) offer options but no exit reply, so the player can never leave by choice`,
+      `${shape.rootsWithoutExit.length} main dialog line(s) offer options but no exit reply, so the player can never leave by choice (${shape.rootsWithoutExit.slice(0, 3).map((i) => `#${i} "${entryLabel(doc, i)}"`).join(", ")}${shape.rootsWithoutExit.length > 3 ? ", ..." : ""})`,
       "StartingList",
       "add_dialog_return_links adds a \"[Leave.]\" reply",
     );

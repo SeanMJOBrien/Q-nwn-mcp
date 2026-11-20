@@ -266,6 +266,7 @@ export function registerVerifyServerTools(server: McpServer): void {
         .optional()
         .describe(
           'Player simulation (docs/player-simulation.md): JSON {"actor"?: "<stand-in blueprint>", "steps": [{"label"?, "npc": "<tag>", "script": "q_act", "params"?: {"quest":"..."}, "kind"?: "action"|"condition", "expect"?: true|false, "expectStage"?: [{"quest","stage"}], "expectGold"?, "expectItem"?: [{"tag","count"?}]}]}. ' +
+            'Event stages: "event": true runs an event script (q_onenter with the area tag as npc, q_trigger, q_onused, q_search, q_ondeath on the target) with the stand-in as the creature entering/using/killing; "giveItem": "<resref>" (no npc/script) creates an item on the stand-in, firing OnAcquireItem for a pickup stage (check the stage in a later step). ' +
             "The throwaway build gets a driver that spawns a stand-in creature as the player (MCP_TEST_ACTOR) and runs each step's generated script on the NPC with those script parameters, like a dialog line would. Needs the module's quest/companion scripts regenerated with inc_sim (create_quest_system / create_companion_system). Result: simResults.",
         ),
       recordLoot: z

@@ -187,6 +187,20 @@ async function flushResource(index: ModuleIndex, file: string, doc?: GffDocument
   }
 }
 
+/**
+ * Remove a resource from the module and, in the same step, from the module project (file and manifest) or the flat
+ * sync. The one way a tool deletes a resource: `project-sync-guard.test.ts` fails on a `resources.delete(` elsewhere.
+ * `filePath` is used when the index entry has none (a file another program already deleted).
+ */
+export async function removeResource(index: ModuleIndex, key: string, filePath?: string): Promise<void> {
+  const k = key.toLowerCase();
+  const file = index.resources.get(k)?.filePath || filePath || path.join(index.tempDir, k);
+  await fs.rm(file, { force: true });
+  await afterRemove(file);
+  index.resources.delete(k);
+  index.parsedGff.delete(k);
+}
+
 /** A resource was deleted from the module: delete it from the project and its manifest too. */
 export async function afterRemove(file: string): Promise<void> {
   const index = getIndex();

@@ -48,6 +48,18 @@ object SimSpeaker()
     return GetPCSpeaker();
 }
 
+// The creature behind an event (entering, using, killing): the test actor while the driver runs an event step (module local
+// SIM_EVENT = 1), else the engine's own. Lets a simulation fire explore, trigger, use and kill stages.
+object SimEvent(object oReal)
+{
+    if (GetLocalInt(GetModule(), "SIM_EVENT"))
+    {
+        object oActor = SimActor();
+        if (GetIsObjectValid(oActor)) return oActor;
+    }
+    return oReal;
+}
+
 // Stores a dialog condition's result for the simulation driver (SIM_COND = result + 1) and returns it unchanged.
 int SimCondResult(int nResult)
 {

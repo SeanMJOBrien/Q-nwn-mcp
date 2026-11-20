@@ -30,6 +30,7 @@ import {
   verifyEncounter,
   verifyItem,
   verifyPlaceable,
+  verifyPlaceableInventory,
   verifySound,
   verifyStore,
   verifyTrigger,
@@ -178,6 +179,19 @@ export async function collectVerifyResults(
       const report = new Report(`${areaResref}:${tag}`, "utc");
       const isHenchman = getFieldStr(creature, "ScriptHeartbeat").startsWith("x0_ch_hen_");
       await verifyCreature(report, index, creature, { henchman: isHenchman, resmanOpts });
+      results.push(report.result());
+    }
+  }
+
+  // Placed placeables: only the inventory checks (a full blueprint check on every prop would bury the module in name
+  // warnings); a quest item in a container nobody can open is the case this catches.
+  for (const areaResref of index.areas.keys()) {
+    const gitDoc = index.parsedGff.get(`${areaResref}.git`) as GffObj | undefined;
+    if (!gitDoc) continue;
+    for (const [i, plc] of listOf(gitDoc, "Placeable List").entries()) {
+      if (listOf(plc, "ItemList").length === 0) continue;
+      const report = new Report(`${areaResref}:${getFieldStr(plc, "Tag") || `#${i}`}`, "utp");
+      verifyPlaceableInventory(report, index, plc);
       results.push(report.result());
     }
   }

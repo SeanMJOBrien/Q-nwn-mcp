@@ -295,6 +295,76 @@ void QuestSpawn(string sResref, string sAt, string sKey, string sTag, int nCount
 
 // --- Advancing
 
+// The world effects of a stage, run where the stage happens: its questK_spawn group and questK_self_script. Shared by an
+// advance and by an early deed (questK_early), so an ambush still comes when the lookout is killed before the quest.
+void QuestStageEffects(object oObject, string sBase)
+{
+    string sSelfScript = GetLocalString(oObject, sBase + "_self_script");
+    if (sSelfScript != "") ExecuteScript(sSelfScript, oObject);
+    string sSpawn = GetLocalString(oObject, sBase + "_spawn");
+    if (sSpawn != "")
+    {
+        int nSpawn = QuestOutcomeCount(StringToInt(GetLocalString(oObject, sBase + "_spawn_count")), GetLocalString(oObject, sBase + "_spawn_flag"),
+            GetLocalString(oObject, sBase + "_spawn_flag_set"), GetLocalString(oObject, sBase + "_spawn_flag_unset"));
+        if (nSpawn != -1)
+            QuestSpawn(sSpawn, GetLocalString(oObject, sBase + "_spawn_at"), GetLocalString(oObject, sBase + "_spawn_key"),
+                GetLocalString(oObject, sBase + "_spawn_tag"), nSpawn, GetLocalString(oObject, sBase + "_spawn_hostile") != "0");
+    }
+}
+
+// Name of the party-member locals that remember an early deed for stage nStage of sTag.
+string QuestEarlyKey(string sTag, int nStage)
+{
+    return "QS_EARLY_" + sTag + "_" + IntToString(nStage);
+}
+
+// Completes stages whose deed the party did early (QuestRecordEarly), starting at nStage + 1, now that the quest has
+// reached nStage: journal, state and the reward stored with the deed, for every party member that recorded it.
+void QuestCatchUp(object oPC, string sTag, int nStage)
+{
+    int nNext = nStage + 1;
+    string sKey = QuestEarlyKey(sTag, nNext);
+    while (GetLocalInt(oPC, sKey))
+    {
+        AddJournalQuestEntry(sTag, nNext, oPC, TRUE, FALSE, FALSE);
+        object oMember = SimFirstPC(oPC);
+        while (GetIsObjectValid(oMember))
+        {
+            if (QuestGetStage(oMember, sTag) < nNext) SetLocalInt(oMember, "NW_JOURNAL_ENTRY" + sTag, nNext);
+            if (GetLocalInt(oMember, sKey))
+            {
+                QuestGiveXP(oMember, GetLocalInt(oMember, sKey + "_t"), GetLocalInt(oMember, sKey + "_l"));
+                if (GetLocalInt(oMember, sKey + "_x") > 0) GiveXPToCreature(oMember, GetLocalInt(oMember, sKey + "_x"));
+                if (GetLocalInt(oMember, sKey + "_g") > 0) GiveGoldToCreature(oMember, GetLocalInt(oMember, sKey + "_g"));
+                string sItem = GetLocalString(oMember, sKey + "_i");
+                if (sItem != "")
+                {
+                    object oItem = CreateItemOnObject(sItem, oMember, 1);
+                    if (GetIsObjectValid(oItem)) SetIdentified(oItem, TRUE);
+                }
+            }
+            oMember = SimNextPC(oPC);
+        }
+        string sPCScript = GetLocalString(oPC, sKey + "_s");
+        if (sPCScript != "") ExecuteScript(sPCScript, oPC);
+        oMember = SimFirstPC(oPC);
+        while (GetIsObjectValid(oMember))
+        {
+            DeleteLocalInt(oMember, sKey);
+            DeleteLocalInt(oMember, sKey + "_t");
+            DeleteLocalInt(oMember, sKey + "_l");
+            DeleteLocalInt(oMember, sKey + "_x");
+            DeleteLocalInt(oMember, sKey + "_g");
+            DeleteLocalString(oMember, sKey + "_i");
+            DeleteLocalString(oMember, sKey + "_s");
+            oMember = SimNextPC(oPC);
+        }
+        WriteTimestampedLogEntry("[QUEST] advance tag=" + sTag + " stage=" + IntToString(nNext) + " via=early pc=" + GetName(oPC) + " object=");
+        nNext++;
+        sKey = QuestEarlyKey(sTag, nNext);
+    }
+}
+
 // Advances oPC's whole party to slot nSlot's stage and pays everyone, if oPC is eligible. Returns TRUE on an advance.
 int QuestAdvance(object oObject, object oPC, int nSlot, string sVia = "")
 {
@@ -318,21 +388,69 @@ int QuestAdvance(object oObject, object oPC, int nSlot, string sVia = "")
     QuestRewardParty(oObject, oPC, nSlot);
     string sPCScript = GetLocalString(oObject, sBase + "_pc_script");
     if (sPCScript != "") ExecuteScript(sPCScript, oPC);
-    string sSelfScript = GetLocalString(oObject, sBase + "_self_script");
-    if (sSelfScript != "") ExecuteScript(sSelfScript, oObject);
-    string sSpawn = GetLocalString(oObject, sBase + "_spawn");
-    if (sSpawn != "")
-    {
-        int nSpawn = QuestOutcomeCount(StringToInt(GetLocalString(oObject, sBase + "_spawn_count")), GetLocalString(oObject, sBase + "_spawn_flag"),
-            GetLocalString(oObject, sBase + "_spawn_flag_set"), GetLocalString(oObject, sBase + "_spawn_flag_unset"));
-        if (nSpawn != -1)
-            QuestSpawn(sSpawn, GetLocalString(oObject, sBase + "_spawn_at"), GetLocalString(oObject, sBase + "_spawn_key"),
-                GetLocalString(oObject, sBase + "_spawn_tag"), nSpawn, GetLocalString(oObject, sBase + "_spawn_hostile") != "0");
-    }
+    QuestStageEffects(oObject, sBase);
 
     WriteTimestampedLogEntry("[QUEST] advance tag=" + sTag + " stage=" + IntToString(nStage) + " via=" + sVia
         + " pc=" + GetName(oPC) + " object=" + GetTag(oObject));
+    QuestCatchUp(oPC, sTag, nStage);
     return TRUE;
+}
+
+// Shows the slot's questK_none text when oPC's quest hasn't reached this stage yet ("Nothing to do here yet.").
+void QuestNotYet(object oObject, object oPC, int nSlot)
+{
+    string sText = GetLocalString(oObject, QuestSlotName(nSlot) + "_none");
+    if (sText == "" || !SimIsPlayer(oPC) || QuestIsPastSlotStage(oObject, oPC, nSlot)) return;
+    FloatingTextStringOnCreature(sText, oPC, FALSE);
+}
+
+// An early deed (questK_early): the quest hasn't reached the stage before this one yet, so the deed is remembered on every
+// party member, with the stage's reward, and QuestCatchUp completes the stage once the quest gets there. The stage's spawn
+// and self script run now, where it happened. Returns TRUE when a deed was recorded.
+int QuestRecordEarly(object oObject, object oPC, int nSlot)
+{
+    string sBase = QuestSlotName(nSlot);
+    if (!GetLocalInt(oObject, sBase + "_early") || GetLocalInt(oObject, sBase + "_jumpstage")) return FALSE;
+    string sValue = GetLocalString(oObject, sBase);
+    string sTag = QuestTagOf(sValue);
+    int nStage = QuestStageOf(sValue);
+    if (sTag == "" || nStage < 2 || QuestGetStage(oPC, sTag) >= nStage - 1) return FALSE;
+    string sKey = QuestEarlyKey(sTag, nStage);
+    if (GetLocalInt(oPC, sKey)) return FALSE;
+    object oMember = SimFirstPC(oPC);
+    while (GetIsObjectValid(oMember))
+    {
+        SetLocalInt(oMember, sKey, 1);
+        SetLocalInt(oMember, sKey + "_t", GetLocalInt(oObject, sBase + "_reward_xp_tier"));
+        SetLocalInt(oMember, sKey + "_l", GetLocalInt(oObject, sBase + "_reward_xp_level"));
+        SetLocalInt(oMember, sKey + "_x", GetLocalInt(oObject, sBase + "_reward_xp"));
+        SetLocalInt(oMember, sKey + "_g", GetLocalInt(oObject, sBase + "_reward_gold"));
+        SetLocalString(oMember, sKey + "_i", GetLocalString(oObject, sBase + "_reward_item"));
+        SetLocalString(oMember, sKey + "_s", GetLocalString(oObject, sBase + "_pc_script"));
+        oMember = SimNextPC(oPC);
+    }
+    QuestStageEffects(oObject, sBase);
+    string sText = GetLocalString(oObject, sBase + "_none");
+    if (sText != "") FloatingTextStringOnCreature(sText, oPC, FALSE);
+    WriteTimestampedLogEntry("[QUEST] early tag=" + sTag + " stage=" + IntToString(nStage) + " pc=" + GetName(oPC) + " object=" + GetTag(oObject));
+    return TRUE;
+}
+
+// What every event stage (kill, pickup, explore, trigger, use) does: advance, else remember an early deed, else tell the
+// player it is too soon. Returns TRUE when the event counted (advanced or recorded).
+int QuestEventAdvance(object oObject, object oPC, int nSlot, string sVia)
+{
+    if (QuestAdvance(oObject, oPC, nSlot, sVia)) return TRUE;
+    if (QuestRecordEarly(oObject, oPC, nSlot)) return TRUE;
+    QuestNotYet(oObject, oPC, nSlot);
+    return FALSE;
+}
+
+// Brings a kill target back after questK_respawn seconds (run on the module: the dead creature's own queue goes with it).
+void QuestRespawn(string sResref, location lSpot, string sTag)
+{
+    object oNew = CreateObject(OBJECT_TYPE_CREATURE, sResref, lSpot, FALSE, sTag);
+    WriteTimestampedLogEntry("[QUEST] respawn resref=" + sResref + " ok=" + IntToString(GetIsObjectValid(oNew)));
 }
 
 // Advances every player within fRadius of oObject (each player's own party), for an area-of-effect stage.
@@ -487,7 +605,7 @@ void QuestHandleEvent(object oObject, object oActor, string sOrigVar, string sVi
     if (nSlot < 1) return;
     object oPC = QuestResolvePC(oActor);
     if (!GetIsObjectValid(oPC)) return;
-    QuestAdvance(oObject, oPC, nSlot, sVia);
+    QuestEventAdvance(oObject, oPC, nSlot, sVia);
 }
 
 // --- Dialog helpers (shared by q_chk/q_act)
@@ -1172,6 +1290,8 @@ void main()
 `,
   q_ondeath: `// q_ondeath: kill stage. Runs the creature's original OnDeath (MCP_Q_ORIG_DEATH), then credits the killer's party.
 // A kill by a companion or summon credits its master; a kill by no one in a party credits the nearest player in 30 m.
+// A kill before the quest reaches the stage counts later with questK_early, or shows questK_none. questK_respawn = seconds
+// brings a fresh copy back (blueprint resref, same tag and place).
 #include "inc_quest"
 
 void main()
@@ -1180,13 +1300,16 @@ void main()
     if (sOrig != "") ExecuteScript(sOrig, OBJECT_SELF);
     int nSlot = QuestEventSlot(OBJECT_SELF);
     if (nSlot < 1) return;
-    object oPC = QuestResolvePC(GetLastKiller());
+    object oPC = QuestResolvePC(SimEvent(GetLastKiller()));
     if (!GetIsObjectValid(oPC))
     {
         object oNear = GetNearestCreature(CREATURE_TYPE_PLAYER_CHAR, PLAYER_CHAR_IS_PC);
         if (GetIsObjectValid(oNear) && GetDistanceToObject(oNear) <= QS_CREDIT_RADIUS) oPC = oNear;
     }
-    if (GetIsObjectValid(oPC)) QuestAdvance(OBJECT_SELF, oPC, nSlot, "kill");
+    if (GetIsObjectValid(oPC)) QuestEventAdvance(OBJECT_SELF, oPC, nSlot, "kill");
+    int nRespawn = GetLocalInt(OBJECT_SELF, QuestSlotName(nSlot) + "_respawn");
+    if (nRespawn > 0)
+        AssignCommand(GetModule(), DelayCommand(IntToFloat(nRespawn), QuestRespawn(GetResRef(OBJECT_SELF), GetLocation(OBJECT_SELF), GetTag(OBJECT_SELF))));
 }
 `,
   q_onenter: `// q_onenter: explore stage, on an area's OnEnter. Runs the area's original OnEnter (MCP_Q_ORIG_ENTER) first.
@@ -1194,7 +1317,7 @@ void main()
 
 void main()
 {
-    QuestHandleEvent(OBJECT_SELF, GetEnteringObject(), "MCP_Q_ORIG_ENTER", "explore");
+    QuestHandleEvent(OBJECT_SELF, SimEvent(GetEnteringObject()), "MCP_Q_ORIG_ENTER", "explore");
 }
 `,
   q_trigger: `// q_trigger: trigger stage, on a trigger's OnEnter. Runs the trigger's original OnEnter (MCP_Q_ORIG_ENTER) first.
@@ -1202,7 +1325,7 @@ void main()
 
 void main()
 {
-    QuestHandleEvent(OBJECT_SELF, GetEnteringObject(), "MCP_Q_ORIG_ENTER", "trigger");
+    QuestHandleEvent(OBJECT_SELF, SimEvent(GetEnteringObject()), "MCP_Q_ORIG_ENTER", "trigger");
 }
 `,
   q_onused: `// q_onused: use stage, on a placeable's OnUsed. Runs the placeable's original OnUsed (MCP_Q_ORIG_USED) first.
@@ -1210,7 +1333,7 @@ void main()
 
 void main()
 {
-    QuestHandleEvent(OBJECT_SELF, GetLastUsedBy(), "MCP_Q_ORIG_USED", "use");
+    QuestHandleEvent(OBJECT_SELF, SimEvent(GetLastUsedBy()), "MCP_Q_ORIG_USED", "use");
 }
 `,
   q_search: `// q_search: search stage, on a placeable's OnUsed. Runs the original OnUsed (MCP_Q_ORIG_USED) first.
@@ -1255,7 +1378,7 @@ void main()
     string sOrig = GetLocalString(oSelf, "MCP_Q_ORIG_USED");
     if (sOrig != "") ExecuteScript(sOrig, oSelf);
 
-    object oPC = QuestResolvePC(GetLastUsedBy());
+    object oPC = QuestResolvePC(SimEvent(GetLastUsedBy()));
     if (!GetIsObjectValid(oPC)) return;
     int nSlot = QuestEventSlot(oSelf);
     if (nSlot < 1) return;
@@ -1364,7 +1487,7 @@ ${chain}    object oItem = GetModuleItemAcquired();
     if (nSlot < 1) return;
     object oPC = QuestResolvePC(GetModuleItemAcquiredBy());
     if (!GetIsObjectValid(oPC)) return;
-    if (QuestAdvance(oItem, oPC, nSlot, "pickup")) SetLocalInt(oItem, "QS_DONE", 1);
+    if (QuestEventAdvance(oItem, oPC, nSlot, "pickup")) SetLocalInt(oItem, "QS_DONE", 1);
 }
 `;
 }
@@ -1379,6 +1502,11 @@ void main()
     SetLocalInt(GetModule(), "QS_TICK", GetLocalInt(GetModule(), "QS_TICK") + 1);
 ${chain}}
 `;
+}
+
+/** The handler a generated module-event wrapper chains, read back from its header ("...previous OnX was "<script>""). */
+export function wrapperOriginal(source: string): string | undefined {
+  return /previous\s+(?:\/\/\s*)?On\w+ was "([^"]*)"/.exec(source)?.[1];
 }
 
 export const ACQUIRE_WRAPPER = "q_mod_acquire";
