@@ -54,6 +54,7 @@ import { registerStoreMoveTools } from "./tools/store-move-tools.js";
 import { registerStartMenuTools } from "./tools/start-menu-tools.js";
 import { registerEnemyTools, registerTrapTools } from "./tools/enemy-tools.js";
 import { registerStoreKitTools } from "./tools/store-kit-tools.js";
+import { registerPaletteTools } from "./tools/palette-tools.js";
 import { registerSystestTools } from "./tools/systest-tools.js";
 import { registerTilesetTools } from "./tools/tileset-tools.js";
 import { registerTreasureCatalogTools } from "./tools/treasure-catalog-tools.js";
@@ -78,6 +79,7 @@ export function registerAll(server: McpServer): void {
   registerEnemyTools(server);
   registerTrapTools(server);
   registerStoreKitTools(server);
+  registerPaletteTools(server);
   registerResmanTools(server);
   registerTilesetTools(server);
   registerDatabaseTools(server);
