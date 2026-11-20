@@ -6,6 +6,7 @@ import { erfExtract, erfList, gffToJson, twodaToJson, tlkToJson, resmanExtract }
 import type { ResmanOptions } from "./nim-tools.js";
 import { createTempDir, cleanupTempDir } from "./util/temp-dir.js";
 import { clearWokCache, setWokCacheDir } from "./util/walkmesh.js";
+import { clearWalkGraphCache } from "./util/area-walk-graph.js";
 import { clearTilesetCache } from "./util/tileset.js";
 import { clearUndoStack } from "./util/undo.js";
 import { isDirtyUnder, clearDirtyUnder } from "./util/dirty-state.js";
@@ -130,6 +131,7 @@ async function beginLoad(absPath: string, opts: { force?: boolean }): Promise<st
     await cleanupTempDir(currentIndex.tempDir).catch(() => {});
   }
   clearWokCache();
+  clearWalkGraphCache();
   clearTilesetCache();
   clearUndoStack();
 

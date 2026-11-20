@@ -108,8 +108,14 @@ afterEach(async () => {
   await fs.rm(tempDir, { recursive: true, force: true });
 });
 
+const pairsOf = (repList: GffObj[]) =>
+  repList.map((e) => [(e.FactionID1 as { value: number }).value, (e.FactionID2 as { value: number }).value]);
+const repOf = (repList: GffObj[], a: number, b: number) =>
+  (repList.find((e) => (e.FactionID1 as { value: number }).value === a && (e.FactionID2 as { value: number }).value === b)
+    ?.FactionRep as { value: number } | undefined)?.value;
+
 describe("create_faction + verify_faction", () => {
-  it("adds a faction with bilateral reputation entries that verify_faction accepts", async () => {
+  it("adds a faction and leaves a table verify_faction accepts", async () => {
     seedFacResource(mockIndex);
 
     const { registerFactionTools } = await import("./faction-tools.js");
@@ -120,14 +126,10 @@ describe("create_faction + verify_faction", () => {
         name: "create_faction",
         arguments: { name: "Merchants", defaultReputation: "75" },
       });
-      const created = parseResult(createResult) as { success: boolean; factionId: number; reputationEntriesAdded: number };
+      const created = parseResult(createResult) as { success: boolean; factionId: number; reputationRows: number };
       expect(created.success).toBe(true);
       expect(created.factionId).toBe(2);
-      // 2 existing factions x 2 directions each — see the real bug this
-      // fixed (branch systest-live-run-and-generalized-spec): the old code
-      // wrote only the new->existing direction, leaving the engine reading
-      // a friendly 100 default for the unset reverse direction live.
-      expect(created.reputationEntriesAdded).toBe(4);
+      expect(created.reputationRows).toBe(6); // 3 factions x 2 opinion-holders (faction 0 holds none)
 
       const verifyResult = await client.callTool({ name: "verify_faction", arguments: {} });
       const verified = parseResult(verifyResult) as { status: string; errors: unknown[] };
@@ -138,7 +140,7 @@ describe("create_faction + verify_faction", () => {
     }
   });
 
-  it("writes reputation entries in both directions for every existing faction", async () => {
+  it("writes the whole table in the toolset's layout (the layout the engine needs for a custom faction)", async () => {
     const key = seedFacResource(mockIndex);
 
     const { registerFactionTools } = await import("./faction-tools.js");
@@ -148,23 +150,17 @@ describe("create_faction + verify_faction", () => {
 
       const doc = mockIndex.parsedGff.get(key) as GffObj;
       const repList = (doc.RepList as { value: GffObj[] }).value;
-      const pairs = repList.map((e) => [
-        (e.FactionID1 as { value: number }).value,
-        (e.FactionID2 as { value: number }).value,
-      ]);
-      // New faction (2) <-> each existing faction (0, 1), both directions.
-      expect(pairs).toEqual(
-        expect.arrayContaining([[2, 0], [0, 2], [2, 1], [1, 2]]),
-      );
-      expect(repList.every((e) => (e.FactionRep as { value: number }).value === 75)).toBe(true);
-
-      // The actual root cause found live: FactionRep MUST be `dword` to
-      // match every real toolset-authored entry. GFF struct fields are
-      // looked up by (label, type) together — an `int`-typed FactionRep
-      // with the right label was still invisible to a real engine's loader,
-      // silently falling back to a friendly 100 default regardless of the
-      // FactionID values or direction (both already-fixed separately above).
-      expect(repList.every((e) => (e.FactionRep as { type: string }).type === "dword")).toBe(true);
+      // FactionID1 outer 0..2, FactionID2 inner 1..2, no row toward faction 0.
+      expect(pairsOf(repList)).toEqual([[0, 1], [0, 2], [1, 1], [1, 2], [2, 1], [2, 2]]);
+      expect(repList.map((e) => e.__struct_id)).toEqual([0, 1, 2, 3, 4, 5]);
+      expect(repOf(repList, 2, 1)).toBe(75); // faction 1's opinion of the new faction
+      expect(repOf(repList, 1, 2)).toBe(75); // the new faction's opinion of faction 1
+      expect(repOf(repList, 0, 2)).toBe(75);
+      expect(repOf(repList, 2, 2)).toBe(100); // self
+      expect(repOf(repList, 0, 1)).toBe(50); // an old pair with no row gets the neutral default
+      for (const e of repList) {
+        for (const f of ["FactionID1", "FactionID2", "FactionRep"]) expect((e[f] as { type: string }).type).toBe("dword");
+      }
 
       const factionList = (doc.FactionList as { value: GffObj[] }).value;
       expect((factionList[2].FactionGlobal as { type: string }).type).toBe("word");
@@ -175,8 +171,20 @@ describe("create_faction + verify_faction", () => {
 });
 
 describe("set_faction_reputation + verify_faction", () => {
-  it("creates entries in both directions and leaves the faction table valid", async () => {
+  it("sets both opinions, skips the opinion of faction 0 (it holds none), and leaves the table valid", async () => {
     const key = seedFacResource(mockIndex);
+    const doc = mockIndex.parsedGff.get(key) as GffObj;
+    // A third faction in the old appended layout: rows toward faction 0, no self row, out of order.
+    (doc.FactionList as { value: GffObj[] }).value.push({
+      __struct_id: 2,
+      FactionName: { type: "cexostring", value: "Prisoner" },
+      FactionParentID: { type: "dword", value: 4294967295 },
+      FactionGlobal: { type: "word", value: 1 },
+    });
+    (doc.RepList as { value: GffObj[] }).value.push(
+      { __struct_id: 0, FactionID1: { type: "dword", value: 2 }, FactionID2: { type: "dword", value: 0 }, FactionRep: { type: "dword", value: 50 } },
+      { __struct_id: 1, FactionID1: { type: "dword", value: 1 }, FactionID2: { type: "dword", value: 2 }, FactionRep: { type: "dword", value: 30 } },
+    );
 
     const { registerFactionTools } = await import("./faction-tools.js");
     const { registerVerifyTools } = await import("./verify-tools.js");
@@ -186,55 +194,36 @@ describe("set_faction_reputation + verify_faction", () => {
         name: "set_faction_reputation",
         arguments: { faction1: "0", faction2: "1", reputation: "10" },
       });
-      const set = parseResult(setResult) as {
-        success: boolean;
-        reputation: number;
-        action: { forward: string; reverse: string };
-      };
+      const set = parseResult(setResult) as { success: boolean; reputation: number; action: { forward: string; reverse: string } };
       expect(set.success).toBe(true);
-      expect(set.reputation).toBe(10);
-      // Real bug fixed (branch systest-live-run-and-generalized-spec): the
-      // old code wrote only one direction and reported a flat "created"
-      // string — a real headless engine then read a friendly 100 default
-      // for the unset reverse direction regardless of what was set here.
-      expect(set.action).toEqual({ forward: "created", reverse: "created" });
+      expect(set.action.forward).toBe("created");
+      expect(set.action.reverse).toMatch(/^skipped/);
+
+      const repList = (doc.RepList as { value: GffObj[] }).value;
+      expect(pairsOf(repList)).toEqual([[0, 1], [0, 2], [1, 1], [1, 2], [2, 1], [2, 2]]);
+      expect(repOf(repList, 0, 1)).toBe(10);
+      expect(repOf(repList, 1, 2)).toBe(30); // an existing value survives the rewrite
+      expect(repOf(repList, 2, 2)).toBe(100);
 
       const verifyResult = await client.callTool({ name: "verify_faction", arguments: {} });
-      const verified = parseResult(verifyResult) as { status: string; errors: unknown[] };
+      const verified = parseResult(verifyResult) as { status: string; errors: unknown[]; warnings: unknown[] };
       expect(verified.status).toBe("pass");
-
-      const doc = mockIndex.parsedGff.get(key) as GffObj;
-      const repList = (doc.RepList as { value: GffObj[] }).value;
-      expect(repList).toHaveLength(2);
-      const pairs = repList.map((e) => [
-        (e.FactionID1 as { value: number }).value,
-        (e.FactionID2 as { value: number }).value,
-      ]);
-      expect(pairs).toEqual(expect.arrayContaining([[0, 1], [1, 0]]));
-      expect(repList.every((e) => (e.FactionRep as { value: number }).value === 10)).toBe(true);
-      // The actual root cause found live — see create_faction's test above.
-      expect(repList.every((e) => (e.FactionRep as { type: string }).type === "dword")).toBe(true);
     } finally {
       await cleanup();
     }
   });
 
-  it("writes only one entry when faction1 equals faction2 (reputation toward itself)", async () => {
+  it("sets a faction's opinion of itself once", async () => {
     const key = seedFacResource(mockIndex);
 
     const { registerFactionTools } = await import("./faction-tools.js");
     const { client, cleanup } = await createTestClient([registerFactionTools]);
     try {
-      const setResult = await client.callTool({
-        name: "set_faction_reputation",
-        arguments: { faction1: "0", faction2: "0", reputation: "100" },
-      });
-      const set = parseResult(setResult) as { action: { forward: string; reverse: string } };
-      expect(set.action).toEqual({ forward: "created", reverse: "created" });
-
+      await client.callTool({ name: "set_faction_reputation", arguments: { faction1: "1", faction2: "1", reputation: "80" } });
       const doc = mockIndex.parsedGff.get(key) as GffObj;
       const repList = (doc.RepList as { value: GffObj[] }).value;
-      expect(repList).toHaveLength(1);
+      expect(repList).toHaveLength(2);
+      expect(repOf(repList, 1, 1)).toBe(80);
     } finally {
       await cleanup();
     }

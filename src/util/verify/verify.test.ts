@@ -4,7 +4,7 @@ import type { ModuleIndex, TwoDATable } from "../../types/module.js";
 import { verifyCreature, verifyDoor, verifyItem, verifyPlaceable, verifyStore, verifyTrigger } from "./blueprints.js";
 import { isBaseGameResource, isBaseGameScript, Report } from "./common.js";
 import { verifyDialog } from "./dialog.js";
-import { verifyJournal, verifyModuleInfo } from "./journal.js";
+import { verifyFaction, verifyJournal, verifyModuleInfo } from "./journal.js";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────
 
@@ -175,13 +175,38 @@ describe("verifyCreature", () => {
     expect(report.warnings.map((w) => w.code)).toContain("appearance_race_mismatch");
   });
 
-  it("warns when a creature is in a custom faction, which never takes part in reputation checks", async () => {
-    for (const [id, expected] of [[5, true], [4, false], [1, false]] as const) {
+  it("accepts a custom faction that exists in the module's .fac and rejects one that does not", async () => {
+    const factions = Array.from({ length: 6 }, (_, i) => ({ __struct_id: i, FactionName: { type: "cexostring", value: `f${i}` } }));
+    const index = makeIndex();
+    index.resources.set("repute.fac", { resref: "repute", extension: "fac", filePath: "/tmp/fake/repute.fac", sizeBytes: 1 });
+    index.parsedGff.set("repute.fac", { FactionList: { type: "list", value: factions } } as never);
+    for (const [id, expectError] of [[5, false], [6, true], [1, false]] as const) {
       const obj = makeCreature("nw_c2_default", { FactionID: { type: "word", value: id } });
       const report = new Report("t", "utc");
-      await verifyCreature(report, makeIndex(), obj);
-      expect(report.warnings.map((w) => w.code).includes("custom_faction_unreliable"), `faction ${id}`).toBe(expected);
+      await verifyCreature(report, index, obj);
+      expect(report.errors.map((e) => e.code).includes("invalid_faction"), `faction ${id}`).toBe(expectError);
+      expect(report.warnings.map((w) => w.code)).not.toContain("custom_faction_unreliable");
     }
+  });
+
+  it("verify_faction flags a RepList not in the toolset's layout (error with a custom faction)", () => {
+    const factions = Array.from({ length: 6 }, (_, i) => ({ __struct_id: i, FactionName: { type: "cexostring", value: `f${i}` } }));
+    const row = (id: number, a: number, b: number) => ({
+      __struct_id: id,
+      FactionID1: { type: "dword", value: a },
+      FactionID2: { type: "dword", value: b },
+      FactionRep: { type: "dword", value: a === b ? 100 : 50 },
+    });
+    const canonical: GffObj[] = [];
+    for (let a = 0; a < 6; a++) for (let b = 1; b < 6; b++) canonical.push(row(canonical.length, a, b));
+    const check = (rows: GffObj[]) => {
+      const report = new Report("repute", "fac");
+      verifyFaction(report, makeIndex(), { FactionList: { type: "list", value: factions }, RepList: { type: "list", value: rows } });
+      return report.errors.map((e) => e.code);
+    };
+    expect(check(canonical)).not.toContain("replist_layout");
+    expect(check([...canonical, row(30, 5, 0)])).toContain("replist_layout");
+    expect(check([...canonical].reverse())).toContain("replist_layout");
   });
 
   it("warns when a geared creature is not lootable, unless a companion or marked LOOT_INTENTIONAL", async () => {

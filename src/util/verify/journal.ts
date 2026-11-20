@@ -7,6 +7,7 @@ import type { GffObj } from "../../types/gff.js";
 import { getFieldLocStr, getFieldNum, getFieldStr } from "../../types/gff.js";
 import type { ModuleIndex } from "../../types/module.js";
 import { flattenDialog } from "../dialog-walker.js";
+import { isCanonicalRepList } from "../faction-replist.js";
 import { collectQuestVarAwards, findEarlyKillableTargets } from "../quest-vars.js";
 import { checkScriptRef, listOf, loadScriptSources, type Report } from "./common.js";
 import { findStoryDefects } from "./story-consequences.js";
@@ -265,6 +266,16 @@ export function verifyFaction(report: Report, _index: ModuleIndex, doc: GffObj):
   if (factions.length === 0) {
     report.error("no_factions", "Faction file has an empty FactionList", "FactionList");
     return;
+  }
+
+  if (!isCanonicalRepList(factions.length, listOf(doc, "RepList"))) {
+    const severity = factions.length > 5 ? "error" : "warn";
+    report[severity](
+      "replist_layout",
+      `RepList is not in the toolset's layout (one dword row per faction pair, FactionID1 0-${factions.length - 1} outer, FactionID2 1-${factions.length - 1} inner, struct IDs in order, no rows toward faction 0). The engine ignores a custom faction whose rows are laid out differently`,
+      "RepList",
+      "set_faction_reputation on any pair rewrites the table in the toolset's layout, keeping every value",
+    );
   }
 
   for (const [i, rep] of listOf(doc, "RepList").entries()) {

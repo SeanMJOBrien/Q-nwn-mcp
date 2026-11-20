@@ -94,6 +94,10 @@ export interface ForgeParams {
   domains?: number[];
   /** spellschools.2da row for a class that picks a school (Wizard); default: the creature's package school. */
   school?: number;
+  /** Feats put into the level-1 slots first where legal (a caller's explicit choice). */
+  preferredFeats?: number[];
+  /** packages.2da row: StartingPackage, which LevelUpHenchman follows for every later level (default: the class's). */
+  packageId?: number;
 }
 
 export interface ForgeResult {
@@ -312,6 +316,9 @@ export async function forgeCreature(
     powerLevel: params.powerLevel,
     complexity: params.complexity,
     seed,
+    preferredFeats: params.preferredFeats,
+    packageId: params.packageId,
+    weaponBaseItem: params.weapons?.[0],
   });
   warnings.push(...raceWarning, ...result.warnings);
   void casterWarning; // spell abilities are written at spawn by inc_cre_level, not at build time

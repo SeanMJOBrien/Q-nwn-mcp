@@ -331,6 +331,8 @@ Use `place_store` to place the store blueprint in the area near its merchant NPC
 
 **Coordinate calculation:** Use the merchant NPC's position from `visualize_area`. Place the store at the same position or offset by 1-2 world units.
 
+**Map pin for the shop (user rule 2026-11-17):** the store itself is invisible, so mark the merchant on the map: `place_waypoint(area, tag: "wp_pin_<store>", name: "<Shop name>", x, y, mapNote: "<Shop name>")` 1-2 m in front of the merchant on walkable ground (`probe_ground` first). If the shop is inside a building in an exterior area, also pin the building's door in that exterior area ("Bram's Smithy").
+
 ---
 
 ### Phase 8: Add "Browse Wares" Dialog to Merchant NPC

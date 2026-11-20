@@ -616,7 +616,7 @@ Pick for **appearance only** — stats, class, feats, spells, and equipment are 
 - **ALL hostile creatures use faction 1 (Hostile).** No exceptions.
 - Always set `faction="1"` in `create_creature_blueprint`.
 - Standard NWN factions: 0=PC, 1=Hostile, 2=Commoner, 3=Merchant, 4=Defender.
-- **No custom factions.** Out of scope for a one-shot module, and a custom faction (`create_faction`) never takes part in live reputation checks (engine limitation, confirmed): its creatures will not behave as hostile or friendly. `verify_creature` warns `custom_faction_unreliable`.
+- **Standard factions first.** Enemies use Hostile (1). Use `create_faction` only when no standard faction fits, e.g. a prisoner or captive the Hostile guards must not attack (Hostile treats Commoner, Merchant and Defender as enemies): `create_faction(name: "Prisoner", defaultReputation: "50")`, then `set_faction_reputation` for pairs that differ, then set the creature's `FactionID`. It works in play (the tool writes the reputation table in the toolset's layout, engine-checked 2026-11-17); `verify_faction` reports `replist_layout` on a table written the old way.
 - Ambient creatures (non-hostile) were placed by `/adventure-actors` with faction 2 — don't touch them.
 
 ---
@@ -660,5 +660,5 @@ Call `phase_check(phase: "challenges", step: "end")` last. It checks this phase'
 
 A multi-part encounter can react to the first part: give the stage's `spawn` a `flag: {var, ifSet, ifUnset}` (a module variable set by a dialog line's `set_var`, e.g. an alarm) to change the count of the second part, 0 to skip it. Run `verify_encounter_chain` after building a chain.
 
-**Sample creatures for a given CR.** `list_creature_samples({cr or level, type?, class?, role?})` returns categories of hand-built creatures (type, class, level band, role) with the ranges to aim for (HP, natural AC, abilities, saves, feats, gear habits) and how to build one: `build_key_npc` / `forge_creature` arguments for player classes, or a palette creature for monster types. Pick a category near the target CR, then rename it, change its appearance and equip it differently, keeping the numbers near the category's so the challenge stays balanced. Catalog and method: `docs/creature-catalog.md`.
+**Sample creatures for a given CR.** `list_creature_samples({cr or level, type?, class?, role?})` returns categories of hand-built creatures (type, class, level band, role) with the ranges to aim for (HP, natural AC, abilities, saves, feats, gear habits) and how to build one: `build_key_npc` / `forge_creature` arguments for player classes, or a palette creature for monster types. Pick a category near the target CR, then rename it, change its appearance and equip it differently, keeping the numbers near the category's so the challenge stays balanced. Catalog and method: `docs/creature-catalog.md`. A named boss or lieutenant with chosen feats, look or gear: `build_creature` with `role: "enemy"` and a spec in names (creature-forge skill).
 

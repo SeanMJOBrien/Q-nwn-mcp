@@ -5,6 +5,37 @@ description: Use when creating or changing any class-based creature (enemy, boss
 
 # Creature forge: spawn-time levelling (preferred for every class-based creature)
 
+## One character from a spec in names: `build_creature` (2026-11-17)
+
+When the character is described in detail (sex, phenotype, size, colours, chosen feats, named gear with bonuses), write one
+spec in names and call `build_creature(spec, dryRun: true)` first, then without `dryRun`. Every name is resolved to its game
+ID (feat.2da, packages.2da, baseitems.2da, itempropdef.2da, the colour charts in `src/data/color-names.json`); an unknown or
+ambiguous name refuses the whole spec with the field and the nearest matches, so fix and resend. Schema:
+`docs/specs/creature.schema.json`.
+
+```json
+{"resref":"seamus","name":"Seamus Worlan","role":"companion","race":"human","gender":"male","class":"fighter","level":6,
+ "build":"fixed","feats":["Power Attack","Cleave","Weapon Focus (Bastard Sword)"],
+ "look":{"phenotype":"large","scale":107,"hair":"brown","skin":"lightly tanned"},
+ "gear":{"armor":{"base":"chainmail","color":"copper"},
+         "weapon":{"base":"bastard sword","properties":["attack bonus +1"]},
+         "offhand":{"base":"large shield","properties":["ac bonus +1"]}},
+ "place":{"area":"tavern","x":12,"y":8},
+ "companion":{"introduction":"...","backstory":"..."}}
+```
+
+**The package decides how a spawn-levelled creature grows.** `build: "spawn"` (default) makes a level-1 build that
+`LevelUpHenchman` levels at spawn, and every later level-up in play, with the creature's StartingPackage: each slot takes the
+first legal feat in the package's feat order. Requested feats go into the level-1 slots; the rest come from the package.
+The result's `featPlan` says for each requested feat "taken at level 1", "predicted by level N" or "not predicted", and
+`package: "auto"` picks the class package predicted to give the most of them. Engine-checked: a spawn-built level-6 human
+Gladiator Fighter got Power Attack, Cleave and Exotic Proficiency but not Weapon Focus (Bastard Sword), exactly as predicted.
+**When the character must have exactly the listed feats at its level, use `build: "fixed"`** (built at the level now, the
+requested feats first; non-casters; the package still sets later in-play level-ups). Prerequisites and weapon/armour
+proficiencies are added and listed in `addedFeats`. Colours: a palette number 0-175 or a chart name (skin, hair,
+cloth/leather, metal; tattoo numbers only). Item properties in words: `"attack bonus +1"`, `"enhancement +2"`,
+`"ac bonus +1"`, `"ability bonus strength +2"`. With any gear given the creature keeps exactly that gear (no shopping).
+
 Use this instead of hand-building stat blocks, gear and spell wiring. You supply the specification; the tools apply the rules.
 
 1. Once per module: `create_creature_level_system` (optional `stores`: JSON array of store tags/resrefs NPCs may buy from; default four base-game stores).

@@ -306,7 +306,7 @@ genuine engine-level gap. In order:
    the five standard factions (PC=0, Hostile=1, Commoner=2, Merchant=3,
    Defender=4) that ship in every module by default. A **dynamically-added
    faction (ID 5+, via `create_faction`) never participates in live
-   reputation lookups, no matter how correct its `.fac` data is** — not a
+   reputation lookups, no matter how correct its `.fac` data is** (**Corrected 2026-11-17:** custom factions do work. The old `create_faction` appended rows at the end of the RepList (including rows toward faction 0 and no self row); the engine reads only the toolset's layout (rows FactionID1 0..N-1 x FactionID2 1..N-1 in that order, struct IDs in order, all `dword`, self row 100). Rewritten that way, a sixth faction (Salt Gate's "Prisoner") took part in `GetReputation`/`GetIsEnemy` live. `create_faction` and `set_faction_reputation` now write that layout (`src/util/faction-replist.ts`) and `verify_faction` reports `replist_layout`.) — not a
    direction bug, not a type bug, not the Global flag. Root cause not found
    (would need engine source or further NWNX-level investigation, not
    attempted this session) — recorded here as a confirmed, reproducible
@@ -337,8 +337,7 @@ has been run end-to-end for the first time, building a real roster and
 running it through `run_live_verification` against a real headless engine.
 Three real bugs were found and fixed (`compile_script` resource
 registration, the log parser's timestamp-anchor, faction bilateral+type);
-one genuine engine limitation was found, fully isolated via a clean control
-test, and documented with its practical workaround; and the NPC-to-NPC
+one apparent engine limitation was recorded (custom factions; corrected 2026-11-17: it was the RepList row layout, now fixed); and the NPC-to-NPC
 dialog question was settled with a real (if unexpected) answer. Re-run
 `/systest-module` after any future change to these systems to re-confirm.
 

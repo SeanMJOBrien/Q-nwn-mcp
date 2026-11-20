@@ -202,8 +202,63 @@ main force, then a `kill` on the main force (§6 of this file and [adventure-com
 Makes `area` the place players start: writes `Mod_Entry_Area` and `Mod_Entry_X/Y/Z` in `module.ifo`. Without `x` and `y` it takes open walkable
 ground nearest the area's centre (clear radius 3 m, then 2, then 1); a given point is refused when it is not walkable. It then removes the `_start`
 stub that `create_module` makes, unless `keepStarterArea` is true, something is placed in it, or a transition leads into or out of it (a starter-store
-area); the result's `starterArea` says which. In the `areas` profile and step 5 of the areas phase prompt. `delete_area` and this tool share
+area); the result's `starterArea` says which. `delete_area` and this tool share
 `removeAreaFromModule` (`src/tools/paint-tools.ts`).
 
 `check_area_connectivity` no longer lists the DM area (`dm_area`) under `unreachable`: it is cut off on purpose and is reported as
 `disconnectedOnPurpose`.
+
+
+## 17. `check_path` and walking reachability (2026-11-17)
+
+**Height.** Ground Z at a point = the walkmesh triangle's height there + the walkmesh node offset + `Tile_Height x Transition` (5 m for most
+outdoor tilesets, 4 tcn01, 2 tno01). `probe_ground` reports it; in a script, `GetGroundHeight(location)` (`GetTileHeight` is only the level).
+
+**Reachability is not a height comparison.** The engine walks across walkmesh triangles that share an edge: a ramp or stair is a run of
+sloped walkable faces joined edge to edge, a wall-top next to a courtyard shares no edge with it. `Tile_Height`, the `.set` corner heights and
+the `zones` of `visualize_area` (tile-level, height-blind: `computeWalkableZones`) cannot answer it. `src/util/walk-graph.ts` builds the graph:
+walkable faces of every tile placed in the world, joined by shared end points and along tile borders where they overlap at the same height
+(0.3 m), plus a bridge at each placed door (a tile's door opening has no walkmesh; the door supplies it in play). `src/util/area-walk-graph.ts`
+loads it per area (cached on the tile list and door positions), finds objects and transitions (doors, triggers and portal placeables with
+`LinkedTo`), and walks the module from `Mod_Entry_*`.
+
+- `check_path(fromTag | fromArea+fromX/fromY, toTag | toX/toY [+toArea], snap?, showPath?)`: reachable, the route per area (metres, height range,
+  climb/descent, the transition taken), or why not: each end's region (height, ground area, extent), the closest approach between the two
+  regions with the height gap, and the nearest reachable spot to the target.
+- `verify_all` (default `checkWalkable: true`) and `verify_area(checkWalkable: true)`: `object_unreachable` for an NPC (non-hostile, or with a
+  conversation), a placeable with something to do (inventory, transition, conversation, module OnUsed script), a door, a transition or map-pin
+  waypoint, or a trigger with a transition or OnEnter script that stands on ground no route from the start reaches (a trigger counts at any
+  height); `area_unreachable` when nothing in an area can be walked to (DM area excepted). Opt out per object with the local int
+  `PATH_UNREACHABLE_OK = 1` (an archer on a wall). Skipped without game data.
+- Not modelled: placeable walkmeshes, closed or locked doors (count as open), creature width, script- or condition-gated transitions (count).
+  Confirm a doubtful route in the engine.
+- First run on Salt Gate: a hold wing behind a plain wall tile (no doorway), a spike trap on a raised wall block, a rat, a bat, a weapon rack
+  and a trap inside wall voids, and a map pin that `place_waypoint` put on a tower roof (z 19).
+
+## 18. `build_creature(spec, dryRun?)` — one character in names (2026-11-17)
+
+Spec type `CreatureSpec` (`src/util/creature-spec.ts`; schema `docs/specs/creature.schema.json`; `npm run specs:schema` regenerates it).
+Fields: `resref`, `name`, `role` (companion | npc | enemy), `race`, `gender`, `class`, `level`, `build` (spawn | fixed), `package`, `feats`,
+`domains` (Cleric), `school` (Wizard), `spells` (signature spells), `alignment`, `faction` (standard or a custom faction's name), `look`
+(`phenotype`, `scale` %, `hair`, `skin`, `tattoo1/2`, `head`), `gear` (armor, helmet, weapon, offhand, cloak, boots, gloves, belt, amulet,
+leftRing, rightRing; each `base`, `name`, `properties` in words, `color`), `powerLevel`, `place`, `companion` (recruit lines), `conversation`.
+
+- **Resolution.** Names match the TLK display name or the 2DA label (case and punctuation ignored); a row number also works. Unknown or
+  ambiguous names refuse the spec, every bad field listed with the nearest names. Armour names map to base AC (3.5 table) and the base game's
+  `nw_aarcl001-012` template of that name. Item properties: `<property> [<subtype>] [<value>]` against itempropdef.2da, its SubTypeResRef table
+  and its iprp_costtable table. Colours: 0-175, or a name from `src/data/color-names.json` (read by eye from the palette charts the user gave on
+  2026-11-17: skin, hair, cloth/leather, metal; tattoo numbers only; correct an entry there if the game shows another shade).
+- **Feats and package.** Prerequisites (PREREQFEAT1/2) and the proficiency a weapon, shield or armour needs are added (`addedFeats`).
+  `build: "spawn"`: level-1 build with the requested feats first, StartingPackage = the package, `LevelUpHenchman` at spawn; `featPlan`
+  predicts the later picks by walking the package's FeatPref2DA order with feat legality (`buildNpcStatBlock` `packageOrderOnly`);
+  `package: "auto"` ranks the class's packages by that prediction. `build: "fixed"`: built at the level now with the requested feats first and
+  the carried weapon's Focus/Specialization (non-casters; a fixed companion gets `HENCH_LEVEL` = its level).
+- **Look.** Phenotype, colours and head on the blueprint; `scale` as `MCP_SCALE`, applied at spawn by `cf_spawn` (`CL_ApplyScale` now applies
+  an explicit scale even when the random range is 0).
+- **Gear.** One `.uti` per item (`<resref>_<slot>`), equipped; with gear given the forge buys nothing (`gearWealth` 0). A dry run warns when gear
+  has no weapon.
+- **Kept.** The spec is saved as `creatures/<resref>.json` in the module project.
+- **Engine check (2026-11-17, Salt Gate copy):** spawn build — level 6, scale 1.07, phenotype 2, Power Attack/Cleave/Exotic held, Weapon Focus
+  (Bastard Sword) not (as predicted), specified items equipped; fixed build — all four feats. A Cleric (War/Healing) and an Evoker spawned and
+  levelled.
+

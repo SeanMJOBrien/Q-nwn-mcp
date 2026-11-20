@@ -99,7 +99,7 @@ read back correctly. **Conclusion, confirmed not guessed: `GetReputation()`/
 `GetIsEnemy()` work correctly for the five standard factions every module ships with
 (PC=0, Hostile=1, Commoner=2, Merchant=3, Defender=4) — a faction created at build time
 via `create_faction` never participates in live reputation lookups, regardless of
-direction, type, or the Global flag.** Root cause not found (would need engine source
+direction, type, or the Global flag.** (**Corrected 2026-11-17:** custom factions do work. The old `create_faction` appended rows at the end of the RepList (including rows toward faction 0 and no self row); the engine reads only the toolset's layout (rows FactionID1 0..N-1 x FactionID2 1..N-1 in that order, struct IDs in order, all `dword`, self row 100). Rewritten that way, a sixth faction (Salt Gate's "Prisoner") took part in `GetReputation`/`GetIsEnemy` live. `create_faction` and `set_faction_reputation` now write that layout (`src/util/faction-replist.ts`) and `verify_faction` reports `replist_layout`.) Root cause not found (would need engine source
 or NWNX-level investigation, not attempted this session). Practical workaround, now
 reflected in the `systest-module` skill: reuse a standard faction for
 hostility/friendliness dynamics instead of creating a new one — Defender (4) already

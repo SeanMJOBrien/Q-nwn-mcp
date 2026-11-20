@@ -143,6 +143,12 @@ export interface NpcStatBlockParams {
   deferLeveling?: boolean;
   /** Seed for deterministic bonus/generic feat-slot weapon picks — pass the target's resref/tag. */
   seed: string;
+  /** Feats picked first where legal (buildNpcStatBlock preferredFeats). */
+  preferredFeats?: number[];
+  /** packages.2da row for the feat order and StartingPackage (default: the class's own). */
+  packageId?: number;
+  /** baseitems.2da row of the carried weapon (its Focus/Spec/ImpCrit replace the seeded weapon pick). */
+  weaponBaseItem?: number;
 }
 
 export interface NpcStatBlockApplyResult {
@@ -173,6 +179,9 @@ export function applyNpcStatBlock(
     powerLevel: params.powerLevel ?? "elite",
     seed: params.seed,
     complexity: params.complexity ?? "full",
+    preferredFeats: params.preferredFeats,
+    packageId: params.packageId,
+    weaponBaseItem: params.weaponBaseItem,
   });
 
   const existingRace = getFieldNum(obj, "Race");

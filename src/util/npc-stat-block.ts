@@ -25,6 +25,7 @@ import {
   pickWeaponPreference,
   TOUGHNESS_FEAT,
   WEAPON_INVESTMENT_CLASS_IDS,
+  type WeaponPreference,
 } from "./npc-weapon-preferences.js";
 import {
   classBab,
@@ -130,6 +131,20 @@ export interface StatBlockParams {
    * CLAUDE.md's "simple NPC tier" entry.
    */
   complexity?: "full" | "simple";
+  /**
+   * Feats to pick first, in order, wherever they are legal (a caller's explicit choice: not subject to the class
+   * weapon-investment filter). Feats that do not fit or are not legal yet are left to the normal order.
+   */
+  preferredFeats?: number[];
+  /** packages.2da row whose FeatPref2DA orders the remaining picks and that becomes StartingPackage (default: classId). */
+  packageId?: number;
+  /** baseitems.2da row of the weapon the creature carries: its Focus/Specialization/Improved Critical replace the seeded pick. */
+  weaponBaseItem?: number;
+  /**
+   * Only the preferred feats, then the package order (no weapon-investment picks, no fallbacks): how LevelUpHenchman
+   * fills slots, used to predict which feats a creature levelling at spawn will end up with.
+   */
+  packageOrderOnly?: boolean;
 }
 
 export interface AbilityScores {
@@ -371,21 +386,28 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
   // Feats that are some weapon's Focus/Spec/ImpCrit are skipped for classes
   // outside WEAPON_INVESTMENT_CLASS_IDS. A slot with no legal candidate is
   // left empty with a warning, never filled with an illegal feat.
-  const weaponPref = pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed");
+  const weaponPref =
+    params.weaponBaseItem !== undefined
+      ? weaponPreferenceFor(index, params.weaponBaseItem)
+      : pickWeaponPreference(params.classId, params.seed ?? "npc-stat-block-default-seed");
   const grantWeaponInvestment = WEAPON_INVESTMENT_CLASS_IDS.has(params.classId);
   const investmentFeats = weaponInvestmentFeats(index);
-  const candidateOrder: number[] = [
+  const preferred = params.preferredFeats ?? [];
+  const candidateOrder: number[] = params.packageOrderOnly
+    ? [...preferred, ...packageFeatOrder(index, params.packageId ?? params.classId)]
+    : [
+    ...preferred,
     ...(weaponPref && grantWeaponInvestment
       ? [weaponPref.weaponFocusFeat, weaponPref.weaponSpecializationFeat, weaponPref.weaponImprovedCriticalFeat]
       : []),
-    ...packageFeatOrder(index, params.classId),
+    ...packageFeatOrder(index, params.packageId ?? params.classId),
     TOUGHNESS_FEAT,
     DODGE_FEAT,
     POWER_ATTACK_FEAT,
     CLEAVE_FEAT,
     ALERTNESS_FEAT,
     GREAT_FORTITUDE_FEAT,
-  ].filter((f) => grantWeaponInvestment || !investmentFeats.has(f));
+  ].filter((f, i) => i < preferred.length || grantWeaponInvestment || !investmentFeats.has(f));
   const access = classFeatAccess(index, params.classId);
   const legalityState = (): FeatCheckState => ({
     level,
@@ -472,7 +494,21 @@ export function buildNpcStatBlock(index: ModuleIndex, params: StatBlockParams): 
     feats,
     skillRanks,
     hp,
-    startingPackage: params.classId,
+    startingPackage: params.packageId ?? params.classId,
     warnings,
   };
+}
+
+/** Focus/Specialization/Improved Critical of one base item, from baseitems.2da (null when it has none: not a weapon). */
+export function weaponPreferenceFor(index: ModuleIndex, baseItem: number): WeaponPreference | null {
+  const row = twoDARow(index, "baseitems", baseItem);
+  const num = (c: string) => {
+    const v = Number(row?.[c]);
+    return row && row[c] !== "****" && Number.isInteger(v) ? v : undefined;
+  };
+  const focus = num("WeaponFocusFeat");
+  const spec = num("WeaponSpecializationFeat");
+  const crit = num("WeaponImprovedCriticalFeat");
+  if (focus === undefined || spec === undefined || crit === undefined) return null;
+  return { baseItem, label: row?.label ?? String(baseItem), weaponFocusFeat: focus, weaponSpecializationFeat: spec, weaponImprovedCriticalFeat: crit };
 }

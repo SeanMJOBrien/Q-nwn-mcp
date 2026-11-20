@@ -255,8 +255,8 @@ position via `Repos_PosX/Posy`), and a `VarTable` merge-by-name.
 overlay applies on top (unknown field names are dropped with a warning, not
 silently ignored). Both script sets are base-game resources and are never written
 into the module's own files. `faction` takes a standard name (`hostile`, `commoner`, `merchant`, `defender`, `pc`) or an ID; the
-result carries a `warnings` entry when the blueprint ends in faction 0 (the player faction), naming the fix. Only the five
-standard factions take part in reputation lookups reliably (CLAUDE.md "create_faction limitation").
+result carries a `warnings` entry when the blueprint ends in faction 0 (the player faction), naming the fix. A custom faction from
+`create_faction` also works (the tool writes the RepList in the toolset's layout, engine-checked 2026-11-17); prefer a standard faction when one fits.
 
 ### 2.2 Actor conventions (`/adventure-actors`)
 

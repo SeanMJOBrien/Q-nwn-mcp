@@ -188,7 +188,7 @@ const COMPANION_SOUNDSETS: Record<number, [number, number]> = {
   6: [419, 357],
 };
 
-function companionSoundset(index: ModuleIndex, classId: number, gender: number): number | undefined {
+export function companionSoundset(index: ModuleIndex, classId: number, gender: number): number | undefined {
   const row = COMPANION_SOUNDSETS[classId]?.[gender === 1 ? 1 : 0];
   if (row === undefined) return undefined;
   const r = twoDARow(index, "soundset", row);

@@ -77,17 +77,11 @@ Defender is *already* mutually hostile toward Hostile out of the box
 for fixture #8 (`systest_defender_paladin`) against fixture #7's faction
 `"1"` orc.
 
-**Do not call `create_faction` for this roster.** Confirmed live
-(`run_live_verification`, branch `systest-live-run-and-generalized-spec`): a
-dynamically-created faction's reputation entries never register with the
-live engine's `GetReputation()`/`GetIsEnemy()` — always reads back the
-friendly default (100) — regardless of writing both directions, the correct
-GFF field type, or the Global flag. Isolated via a clean control test
-pairing a standard-faction creature against another standard-faction
-creature, which read back correctly. This is a real NWN engine limitation
-(root cause not found), not a bug in this skill's build sequence — see
-CLAUDE.md's systest-module section for the full investigation. Reusing a
-standard faction sidesteps it entirely.
+**No `create_faction` needed for this roster.** (An earlier note here said a
+created faction never takes part in live reputation checks. That was the old
+`create_faction` writing the RepList in the wrong row layout; fixed
+2026-11-17, and a custom faction now works live. The standard pair is simply
+less setup.)
 
 ### Phase 3: Instrumentation
 

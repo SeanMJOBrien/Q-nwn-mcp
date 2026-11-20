@@ -16,6 +16,11 @@ Tile/orientation/height background is in the `nwn-tileset-conventions` skill.
    The response reports the **placed** z.
 2. **Probe before you guess.** `probe_ground(area, x, y)` → walkable?, surface, `groundZ`, `heightStep`, the tile, and whether the
    spot passes the placement check. Cheap and read-only: use it for any doubtful position and to pick a prop's height.
+   **Walkable is not reachable.** A wall-top, tower roof or ledge is walkable ground at its own height with no stair to it.
+   For anything the player must get to (NPC, transition, container, pin, trap), `check_path(fromTag: <landing waypoint>, toTag: <object>)`
+   or `check_path(fromArea, fromX, fromY, toX, toY)`: it follows shared walkmesh edges (ramps and stairs connect, height numbers
+   do not) and, when there is no route, gives the height gap and the nearest reachable spot. A placement whose `z` comes back far
+   above the area's ground (e.g. 9 or 19 in tno01, where the courtyard is 5) is on a wall or roof: move it.
 3. **Face with `faceTowardX/Y`, not with raw numbers.** The same `bearing` means different directions per object type (rule 4).
 4. **`bearing` is not one convention.**
    * `place_creature` / `place_waypoint`: **compass** degrees — 0 = north, 90 = east, 180 = south, 270 = west (clockwise).
@@ -64,6 +69,7 @@ block on walkability — doors sit at tile boundaries.
 | Tool | Parameters that matter here |
 |---|---|
 | `probe_ground` | `area`, `x`, `y`, `buffer` (clearance for the verdict, default 1) |
+| `check_path` | `fromTag` or `fromArea`+`fromX`/`fromY`; `toTag` or `toX`/`toY` (+`toArea` for another area); `snap` (1.5 m), `showPath`. Read-only: reachable?, route (metres, height range, climb, doors and portals taken), or why not (each end's region, closest approach, height gap, nearest reachable spot). |
 | `analyze_walkmesh` | `area`; optional `minArea` (0.1 m²), `minAltitude` (0.05 m), `cornerRadius` (1.5), `clearance` (0.5), `maxStep` (0.15), `seamStep` (0.1), `limit` (50 per category). Read-only pathing diagnostic: sliver triangles (flagged `nearCorner`), tile-seam walkable/height mismatches, and corners blocked between two open quadrants. Heuristic leads, not the engine pathfinder: confirm each with `probe_ground` at the reported coordinates, then fix the tile choice/height, not the object. |
 | `place_creature` | `bearing` (compass), `faceTowardX/Y`, `walkBuffer`, `collisionRadius` (0.75) |
 | `place_placeable` | `bearing` (raw GFF CCW), `faceTowardX/Y`, `zOffset`, `collisionRadius` (1.0), `walkBuffer` |

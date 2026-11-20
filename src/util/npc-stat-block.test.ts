@@ -455,4 +455,33 @@ describe("buildNpcStatBlock", () => {
     const result = buildNpcStatBlock(index, { race: 6, classId: 5, level: 10, powerLevel: "elite" });
     expect(result.warnings.some((w) => w.includes("unfilled"))).toBe(true);
   });
+
+  it("picks a caller's preferred feats first, takes the carried weapon's feats, and records the chosen package", () => {
+    const index = makeIndex();
+    // Level-1 Human Fighter: 2 generic slots + 1 bonus slot. Toughness (40) and Dodge (10) first, wherever legal.
+    const result = buildNpcStatBlock(index, {
+      race: 6,
+      classId: 4,
+      level: 1,
+      powerLevel: "elite",
+      seed: "pref_seed",
+      preferredFeats: [40, 10],
+      packageId: 25,
+      weaponBaseItem: 999, // not in baseitems: no weapon feats, rather than the seeded weapon
+    });
+    const picked = result.feats.filter((f) => f.source === "generic_slot" || f.source === "bonus_slot").map((f) => f.feat);
+    expect(picked.slice(0, 2)).toEqual([40, 10]);
+    const seeded = pickWeaponPreference(4, "pref_seed")!;
+    expect(picked).not.toContain(seeded.weaponFocusFeat);
+    expect(result.startingPackage).toBe(25);
+  });
+
+  it("packageOrderOnly fills slots from the preferred feats and the package only (no weapon or fallback picks)", () => {
+    const index = makeIndex();
+    const result = buildNpcStatBlock(index, { race: 6, classId: 4, level: 5, powerLevel: "elite", seed: "s", preferredFeats: [40], packageOrderOnly: true });
+    const picked = result.feats.filter((f) => f.source === "generic_slot" || f.source === "bonus_slot").map((f) => f.feat);
+    // This fixture has no package feat table: only the one preferred feat can be placed; the rest stay empty.
+    expect(picked).toEqual([40]);
+    expect(result.warnings.some((w) => w.includes("unfilled"))).toBe(true);
+  });
 });
