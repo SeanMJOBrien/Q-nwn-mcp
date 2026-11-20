@@ -4,6 +4,21 @@ MCP (Model Context Protocol) server for Neverwinter Nights Enhanced Edition modu
 
 ## Working Style
 
+- **This branch (`pre-local-models`, made 2026-11-19) is the line without the small-model work.** It starts at `1840e37`, the
+  last commit before the local-model guide (`cbdda7a`, 2026-11-13) and tool profiles (`90789d9`), and carries only the fixes
+  from after that point that help any client. Each one is a cherry-pick whose message names the source commit. Some keep
+  their original subject ("Driver fixes from the ... run"), but the driver parts are left out. Brought over:
+  set_module_start, the quest robustness work, trigger/encounter geometry struct IDs, custom factions, `check_path`,
+  map pins, `build_creature`, layouts applied by id, UpdateMCP, `set_starting_gold`, the tool CLI (`node dist/cli/tool.js`)
+  and `nwn-mcp.env`, the project-file guard, guide checks, blueprint hints, the setup scripts, `create_module` on an
+  existing module, `show_menu`, the `build_key_npc` fixes (spot check, reuse, required faction), the transition tag
+  check, `build_enemy_group`, the result contract (`tool-result.ts`, `alreadyExists`), `build_store`, `build_trap`, and
+  the creature palette. Lenient arguments and the in-process tool registry (`register-all.ts`, `tool-registry.ts`)
+  came along because those tools need them.
+  Left out: tool profiles, brief results, build specs, phase prompts, story tools, the driver, progress tracking,
+  `build_area`/`dress_area`, result shaping, slimmed descriptions, plot specs, and `place_container` (it lives in
+  `area-build-tools.ts`). Later sections of this file may still describe the earlier state.
+
 - **The TODO list tracks every branch and commit not yet merged into `master`** (user rule, 2026-11-07). Keep
   Project Health TODO #15 current: after every commit, merge, new branch or branch deletion, re-run
   `git fetch --prune` and `git rev-list --count origin/master..<branch>` for each branch and update the entry.
