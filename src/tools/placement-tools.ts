@@ -188,9 +188,10 @@ export function registerPlacementTools(server: McpServer): void {
       faceTowardY: optNumParam("World Y of the point to face (give together with faceTowardX)"),
       walkBuffer: optNumParam("Meters of walkable clearance required on all four sides of the position (default 0.5, which 74% of real props have; 1.0 only 57%). 0 = only the position itself must be walkable."),
       stripScripts: z.string().optional().describe("Strip all event scripts from the blueprint (default 'true'). Set to 'false' to keep blueprint scripts."),
+      tag: z.string().optional().describe("Tag for this placed object (default: the blueprint's tag), e.g. chest_cave1 for a container later phases fill"),
     },
     { idempotentHint: true },
-    async ({ area, blueprint, x, y, z: zPos, bearing, zOffset, collisionRadius, faceTowardX, faceTowardY, walkBuffer, stripScripts }) => {
+    async ({ area, blueprint, x, y, z: zPos, bearing, zOffset, collisionRadius, faceTowardX, faceTowardY, walkBuffer, stripScripts, tag }) => {
       const xN = toF(x), yN = toF(y), zN = toF(zPos), bearingN = toF(bearing), zOffsetN = toF(zOffset);
       const face = parseFaceToward(faceTowardX, faceTowardY);
       if ("error" in face) return { content: [{ type: "text", text: face.error }] };
@@ -282,6 +283,7 @@ export function registerPlacementTools(server: McpServer): void {
         }
       }
 
+      if (tag?.trim()) setField(obj, "Tag", "cexostring", tag.trim().slice(0, 32));
       snapshotGitForUndo(gitDoc, area, "place_placeable", `Place placeable ${blueprint}`);
       const placeableList = getFieldList(git, "Placeable List");
       placeableList.push(obj);
@@ -298,6 +300,7 @@ export function registerPlacementTools(server: McpServer): void {
             success: true,
             area,
             placeable: name,
+            tag: getFieldStr(obj, "Tag"),
             blueprint,
             appearance,
             position: { x: xN, y: yN, z: placeZ },

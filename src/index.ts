@@ -28,6 +28,7 @@ import { registerDialogWriteTools } from "./tools/dialog-write-tools.js";
 import { registerEncounterComposerTools } from "./tools/encounter-composer-tools.js";
 import { registerEncounterTools } from "./tools/encounter-tools.js";
 import { registerFactionTools } from "./tools/faction-tools.js";
+import { registerStartKitTools } from "./tools/start-kit-tools.js";
 import { registerPathTools } from "./tools/path-tools.js";
 import { registerCreatureSpecTools } from "./tools/creature-spec-tools.js";
 import { registerGearTools } from "./tools/gear-tools.js";
@@ -57,11 +58,16 @@ import { registerVerifyServerTools } from "./tools/verify-server-tools.js";
 import { registerVerifyTools } from "./tools/verify-tools.js";
 import { registerWebTools } from "./tools/web-tools.js";
 import { registerWriteTools } from "./tools/write-tools.js";
+import { withLenientArgs } from "./util/lenient-args.js";
+import { recordTools } from "./util/tool-registry.js";
 
-const server = new McpServer({
+const mcp = new McpServer({
   name: "nwn-mcp",
   version: "1.0.0",
 });
+// Every string parameter also takes a number, boolean, list or object (src/util/lenient-args.ts); recordTools keeps
+// each handler so one tool can run others in-process (src/util/tool-registry.ts).
+const server = recordTools(withLenientArgs(mcp));
 
 // ── Base tools: module reading, querying, analysis ──────────────────────
 registerCoreReadTools(server);
@@ -90,6 +96,7 @@ registerJournalTools(server);
 registerDialogWriteTools(server);
 registerModuleTools(server);
 registerFactionTools(server);
+registerStartKitTools(server);
 registerPathTools(server);
 registerCreatureSpecTools(server);
 registerBulkTools(server);
@@ -128,7 +135,7 @@ registerWebTools(server);
 
 // Start the server
 const transport = new StdioServerTransport();
-await server.connect(transport);
+await mcp.connect(transport);
 
 // Log to stderr (stdout is reserved for MCP protocol)
 console.error("NWN MCP server started");

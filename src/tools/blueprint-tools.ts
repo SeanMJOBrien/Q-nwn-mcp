@@ -15,6 +15,7 @@ import path from "path";
 import fs from "fs/promises";
 
 import { optNumParam, toI, toF } from "../util/params.js";
+import { matchRow, namedRows } from "../util/creature-spec.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { requireIndex, buildResmanOptions } from "../module-loader.js";
 import { jsonToGff } from "../nim-tools.js";
@@ -57,7 +58,7 @@ export function registerBlueprintTools(server: McpServer): void {
       cha: optNumParam("Charisma"),
       naturalAC: optNumParam("Natural armor class"),
       classes: z.string().optional().describe("JSON array of {class, level} objects. Replaces ClassList. Class IDs: 0=Barbarian 1=Bard 2=Cleric 3=Druid 4=Fighter 5=Monk 6=Paladin 7=Ranger 8=Rogue 9=Sorcerer 10=Wizard"),
-      feats: z.string().optional().describe("JSON array of feat IDs (integers). Replaces FeatList."),
+      feats: z.string().optional().describe('JSON array of feats, as feat.2da IDs or names, e.g. [45, "Weapon Proficiency (Martial)", "Toughness"]. Replaces FeatList.'),
       spells: z.string().optional().describe("JSON array of {spell, level} objects. Sets SpecAbilityList (spell-like abilities). spell=spells.2da row, level=caster level."),
       equipment: z.string().optional().describe("JSON object mapping slot names to item resrefs. Resolves from base game/HAKs. Slots: head, chest, boots, arms, righthand, lefthand, cloak, leftring, rightring, neck, belt, arrows, bullets, bolts"),
       inventory: z.string().optional().describe("JSON array of carried (non-equipped) items: [{resref: 'nw_waxhn001', quantity?: 1}]. Dropped on death if creature is lootable."),
@@ -71,6 +72,12 @@ export function registerBlueprintTools(server: McpServer): void {
     },
     { destructiveHint: true },
     async ({ resref, tag, name, sourceResref, appearance, faction, cr, hp, race, gender, conversation, str, dex, con, int: intStat, wis, cha, naturalAC, classes, feats, spells, equipment, inventory, lootable, henchman, scripts, soundset, startingPackage, varTable, appearanceLook }) => {
+      let featIds: number[] = [];
+      if (feats) {
+        const parsedFeats = resolveFeatList(requireIndex(), feats);
+        if ("error" in parsedFeats) return { isError: true, content: [{ type: "text" as const, text: JSON.stringify({ ok: false, field: "feats", error: parsedFeats.error }) }] };
+        featIds = parsedFeats.ids;
+      }
       { const bad = resrefError(resref); if (bad) return bad; }
       const index = requireIndex();
 
@@ -92,7 +99,7 @@ export function registerBlueprintTools(server: McpServer): void {
         soundset: soundset !== undefined ? toI(soundset) : undefined,
         startingPackage: startingPackage !== undefined ? toI(startingPackage) : undefined,
         classes: classes ? JSON.parse(classes) : undefined,
-        feats: feats ? JSON.parse(feats) : undefined,
+        feats: feats ? featIds : undefined,
         spells: spells ? JSON.parse(spells) : undefined,
         equipment: equipment ? JSON.parse(equipment) : undefined,
         inventory: inventory ? JSON.parse(inventory) : undefined,
@@ -509,3 +516,29 @@ export function registerBlueprintTools(server: McpServer): void {
     },
   );
 }
+
+/** A feats argument as feat.2da rows: IDs pass, names are matched (with the nearest names on a miss). */
+export function resolveFeatList(index: Parameters<typeof namedRows>[0], raw: string): { ids: number[] } | { error: string } {
+  let list: unknown;
+  try {
+    list = JSON.parse(raw);
+  } catch {
+    list = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(list)) return { error: "give a JSON list of feat IDs or names" };
+  const ids: number[] = [];
+  let rows: ReturnType<typeof namedRows> | undefined;
+  for (const [i, f] of list.entries()) {
+    if (typeof f === "number" || (typeof f === "string" && /^\d+$/.test(f.trim()))) {
+      ids.push(Number(f));
+      continue;
+    }
+    if (typeof f !== "string") return { error: `feats[${i}] must be a feat ID or name` };
+    rows ??= namedRows(index, "feat", "FEAT", "LABEL");
+    const m = matchRow(rows, f, "feat");
+    if ("error" in m) return { error: `feats[${i}]: ${m.error}` };
+    ids.push(m.row.id);
+  }
+  return { ids };
+}
+
