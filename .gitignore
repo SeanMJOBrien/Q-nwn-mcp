@@ -48,3 +48,6 @@ bundle/
 
 # Local settings for the server and the command-line tools (nwn-mcp.env.example lists the keys)
 nwn-mcp.env
+
+# neverwinter.nim tools downloaded by scripts/setup-new-machine.sh
+.tools/
