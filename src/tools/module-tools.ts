@@ -208,7 +208,10 @@ export function registerModuleTools(server: McpServer): void {
 
   server.tool(
     "create_module",
-    "Create a new empty module (.mod) from the standard template. Includes default event scripts, factions, and palette files. Creates a small starter area for the entry point. Saves to NWN_FOLDER_USER/modules/ and loads the module.",
+    "Create a new empty module (.mod) from the standard template and load it: the first call for every new adventure. " +
+      "The module is complete on its own (it uses the base game's tilesets, creatures and items; nothing is merged with " +
+      "another .mod), so never build a new adventure inside an existing or test module. Includes default event scripts, " +
+      "factions, and palette files. Creates a small starter area for the entry point. Saves to NWN_FOLDER_USER/modules/.",
     {
       name: z.string().describe("Module display name (e.g., 'The Lost Tomb')"),
       filename: z.string().describe("Module filename without .mod extension (e.g., 'the-lost-tomb')"),

@@ -40,6 +40,11 @@ import { solveArea } from "../util/zone-solver.js";
 import type { TerrainZone, CrosserPath, FeatureTile } from "../util/zone-solver.js";
 import { getFeatureCollar } from "../util/feature-collars.js";
 
+/** Layouts made by adventure_generate_layout this session, by layoutId (applied by id, not copied back). */
+const layoutStore = new Map<string, { layout: unknown; width: number; height: number; tileset: string }>();
+let layoutCounter = 0;
+let lastLayoutId: string | undefined;
+
 export function registerAdventureTools(server: McpServer): void {
   // ─── set_module_start ───────────────────────────────────────────────────
 
@@ -678,36 +683,69 @@ export function registerAdventureTools(server: McpServer): void {
       const tileset = await getTilesetInfo(tilesetResref.toLowerCase(), resmanOpts, index);
 
       const result = generateLayout(tileset, w, h, styleObj, tc, td);
+      // Keep the layout so adventure_apply_layout can take its id: a small model copying the whole JSON back drops or
+      // retypes parts of it.
+      const layoutId = `layout_${++layoutCounter}`;
+      layoutStore.set(layoutId, { layout: result, width: w, height: h, tileset: tilesetResref.toLowerCase() });
+      lastLayoutId = layoutId;
 
       return {
         content: [{
           type: "text",
-          text: JSON.stringify(result),
+          text: JSON.stringify({
+            layoutId,
+            next: `adventure_apply_layout(area: "<resref of a ${w}x${h} ${tilesetResref} area>", layoutId: "${layoutId}") — pass the id, not the layout`,
+            ...result,
+          }),
         }],
       };
     },
   );
 
   // ─── adventure_apply_layout ──────────────────────────────────────────────────────
+  // (layouts kept by adventure_generate_layout: see layoutStore at the top of the file)
 
   server.tool(
     "adventure_apply_layout",
-    "Apply a complete area layout atomically. Takes the full output of adventure_generate_layout (zones, crossers, suggestedFeatures) and paints everything in one call — terrain zones via the zone solver, crosser paths, and multi-tile feature groups.",
+    "Apply a complete area layout atomically: terrain zones via the zone solver, crosser paths, and multi-tile feature groups, in one call. " +
+      "Give the layoutId that adventure_generate_layout returned (simplest: nothing to copy); with neither layoutId nor layout it uses the " +
+      "last generated layout. The area must have the layout's width and height and tileset (create_area first).",
     {
-      area: z.string().describe("Area resref"),
-      layout: z.string().describe("JSON LayoutResult from adventure_generate_layout. Must contain zones, crossers, and suggestedFeatures arrays."),
+      area: z.string().describe("Area resref (create_area makes it, with the layout's tileset, width and height)"),
+      layoutId: z.string().optional().describe('The layoutId adventure_generate_layout returned, e.g. "layout_1" (preferred)'),
+      layout: z
+        .string()
+        .optional()
+        .describe("Alternative to layoutId: the full, unchanged output of adventure_generate_layout (zones, crossers, suggestedFeatures)."),
       autoRepack: z.string().optional().describe("If 'true', automatically repacks the module after painting."),
     },
     { idempotentHint: true },
-    async ({ area, layout: layoutJson, autoRepack: autoRepackStr }) => {
+    async ({ area, layoutId, layout: layoutJson, autoRepack: autoRepackStr }) => {
       const shouldRepack = autoRepackStr?.toLowerCase() === "true";
+
+      // The layout: by id, given in full, or the last one generated.
+      const stored = !layoutJson ? layoutStore.get(layoutId ?? lastLayoutId ?? "") : undefined;
+      if (!layoutJson && !stored) {
+        const known = [...layoutStore.keys()];
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: layoutId
+                ? `No generated layout "${layoutId}"${known.length ? `; known: ${known.join(", ")}` : ""}. Call adventure_generate_layout first and pass the layoutId it returns.`
+                : "No layout given and none generated yet: call adventure_generate_layout(tileset, width, height, style) first, then adventure_apply_layout(area, layoutId).",
+            },
+          ],
+        };
+      }
 
       // Parse the layout result
       let zones: TerrainZone[];
       let crossers: CrosserPath[];
       let suggestedFeatures: SuggestedFeature[];
       try {
-        const layout = JSON.parse(layoutJson);
+        const layout = stored ? stored.layout : JSON.parse(layoutJson as string);
         zones = layout.zones ?? [];
         crossers = layout.crossers ?? [];
         suggestedFeatures = layout.suggestedFeatures ?? [];
@@ -730,6 +768,19 @@ export function registerAdventureTools(server: McpServer): void {
       const areaHeight = getFieldNum(are, "Height");
       const tileList = getFieldList(are, "Tile_List");
       const tilesetResref = getFieldStr(are, "Tileset").toLowerCase();
+      if (stored && (stored.width !== areaWidth || stored.height !== areaHeight || stored.tileset !== tilesetResref)) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text:
+                `The layout was generated for a ${stored.width}x${stored.height} ${stored.tileset} area, but ${area} is ${areaWidth}x${areaHeight} ${tilesetResref}. ` +
+                `Create a matching area (create_area with tileset ${stored.tileset}, width ${stored.width}, height ${stored.height}) or generate a layout for this one.`,
+            },
+          ],
+        };
+      }
 
       const resmanOpts = await buildResmanOptions(index);
       const tileset = await getTilesetInfo(tilesetResref, resmanOpts, index);
