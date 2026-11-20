@@ -174,6 +174,32 @@ export function registerAdventureTools(server: McpServer): void {
       const index = requireIndex();
       const resmanOpts = await buildResmanOptions(index);
 
+      // A tag already used by another transition would share its scripts, dialogs and landing waypoints, so both
+      // portals lead to the same place (The Old Mill used "millvill" twice, 2026-11-18). The names are cut to 16
+      // characters, so the check is on the cut names.
+      const inUse = (t: string) => ["a_at_", "a_rt_", "d_at_", "d_rt_"].some((p) => index.resources.has(`${`${p}${t}`.substring(0, 16)}.nss`) || index.resources.has(`${`${p}${t}`.substring(0, 16)}.dlg`));
+      if (!/^[a-z0-9_]+$/i.test(tag)) {
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: "tag", error: `tag "${tag}" may hold only letters, digits and _` }, null, 2) }] };
+      }
+      if (inUse(tag)) {
+        const base = tag.substring(0, 9);
+        let free = "";
+        for (let n = 2; n < 100 && !free; n++) if (!inUse(`${base}${n}`)) free = `${base}${n}`;
+        return {
+          isError: true,
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              success: false,
+              field: "tag",
+              error: `tag "${tag}" is already used by another transition (tags are cut to 11 characters in script names, so "${tag.substring(0, 11)}" must be new)`,
+              ...(free ? { suggestion: free } : {}),
+              next: `Call adventure_create_transition again with tag: "${free || "<a new tag>"}" — one tag per connection.`,
+            }, null, 2),
+          }],
+        };
+      }
+
       // Validate walkability at both positions — Z is authoritative from walkmesh
       // Use 2m buffer so portals stay clear of walls and cliff edges
       const TRANSITION_BUFFER = 2.0;
@@ -457,12 +483,13 @@ export function registerAdventureTools(server: McpServer): void {
     {
       area: z.string().describe("Area resref"),
       region: z.string().optional().describe("Region to search: 'north', 'south', 'east', 'west', 'center', 'NE', 'NW', 'SE', 'SW', or a bounding box 'x1,y1,x2,y2' in world coordinates. Defaults to 'center'."),
-      count: z.string().optional().describe("Number of positions to return (default 1, max 10)"),
+      count: z.string().optional().describe("Number of positions to return (default 3, max 10)"),
       avoidEdges: z.string().optional().describe("If 'true' (default), uses 2m buffer from non-walkable surfaces instead of 1m (ignored when clearRadius is set)"),
       clearRadius: z.string().optional().describe("Meters of clear walkable ground required around each position, e.g. '6' for a camp. The (2r+1) x (2r+1) m footprint must be at least 97% walkable; results are at least 2r apart. Enables the raster search described above."),
+      avoidObjects: z.string().optional().describe("Meters to keep from objects already placed (creatures, placeables, waypoints, doors, stores, portals); default 1.5, '0' allows any spot"),
     },
     { readOnlyHint: true, idempotentHint: true },
-    async ({ area, region, count: countStr, avoidEdges, clearRadius }) => {
+    async ({ area, region, count: countStr, avoidEdges, clearRadius, avoidObjects }) => {
       const index = requireIndex();
       const areKey = `${area.toLowerCase()}.are`;
       const areDoc = index.parsedGff.get(areKey);
@@ -475,7 +502,12 @@ export function registerAdventureTools(server: McpServer): void {
       const worldW = areaWidth * 10;
       const worldH = areaHeight * 10;
 
-      const maxCount = Math.min(Math.max(1, countStr ? toI(countStr) : 1), 10);
+      const maxCount = Math.min(Math.max(1, countStr ? toI(countStr) : 3), 10);
+      // Spots next to an object already there fail place_creature's collision check: the same refused spot came back
+      // four times in a row (The Old Mill, 2026-11-18).
+      const keepAway = avoidObjects !== undefined ? toF(avoidObjects) : 1.5;
+      const taken = keepAway > 0 ? placedPoints(index, area) : [];
+      const isFree = (p: { x: number; y: number }) => taken.every((t) => Math.hypot(t.x - p.x, t.y - p.y) >= keepAway);
       const resmanOpts = await buildResmanOptions(index);
 
       // Parse region into a bounding box (world coordinates)
@@ -527,8 +559,8 @@ export function registerAdventureTools(server: McpServer): void {
           radius: clearR,
           near: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 },
           bounds: { x1, y1, x2, y2 },
-          maxResults: maxCount,
-        });
+          maxResults: maxCount * 4,
+        }).filter(isFree).slice(0, maxCount);
         if (spots.length === 0) {
           return {
             content: [{
@@ -597,6 +629,7 @@ export function registerAdventureTools(server: McpServer): void {
       const allWalkable: Array<{ x: number; y: number; z: number }> = [];
       const findBuffer = avoidEdges !== "false" ? 2.0 : 1.0;
       for (const { x, y } of candidates) {
+        if (!isFree({ x, y })) continue;
         const check = await checkPlacementWalkable(x, y, area.toLowerCase(), index, resmanOpts, findBuffer);
         if (check.ok) {
           allWalkable.push({ x, y, z: check.z ?? 0 });
@@ -1057,4 +1090,18 @@ export function registerAdventureTools(server: McpServer): void {
       };
     },
   );
+}
+
+/** Positions of the objects placed in an area (everything a creature or prop can collide with). */
+function placedPoints(index: ReturnType<typeof requireIndex>, area: string): Array<{ x: number; y: number }> {
+  const git = index.parsedGff.get(`${area.toLowerCase()}.git`) as GffObj | undefined;
+  if (!git) return [];
+  const out: Array<{ x: number; y: number }> = [];
+  for (const list of ["Creature List", "WaypointList", "StoreList", "TriggerList", "Encounter List"]) {
+    for (const o of getFieldList(git, list)) out.push({ x: getFieldNum(o, "XPosition"), y: getFieldNum(o, "YPosition") });
+  }
+  for (const list of ["Placeable List", "Door List"]) {
+    for (const o of getFieldList(git, list)) out.push({ x: getFieldNum(o, "X"), y: getFieldNum(o, "Y") });
+  }
+  return out;
 }
