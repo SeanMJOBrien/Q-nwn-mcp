@@ -14,7 +14,7 @@ package.
 **Checkpoint (end of every package):**
 - `npm run verify` passes (docs-only packages: `npm run test -- skill-lint` is enough).
 - Commit with the package id in the message (`A2: ...`). Never `git add -A` (`.swamp/`, `graphify-out/`).
-- Set the package to `done` in the Status table, with the commit hash; update CLAUDE.md TODO #15.
+- Set the package to `done` in the Status table, with the commit hash; update TODO #15 in `docs/todo.md`.
 - If tool code changed: note "MCP restart needed" in the Notes cell and tell the user in plain text.
 - No push, no `.mod` build or send, unless the user asks.
 

@@ -19,7 +19,7 @@ reading files, and can do it on any machine the manager runs on.
 3. Do that package only, finish with the checkpoint for its repo, then start the next if there is room.
 
 **Checkpoint per repo:**
-- `Q-nwn-mcp`: `npm run verify`; commit with the package id; update CLAUDE.md TODO #15 and this Status table.
+- `Q-nwn-mcp`: `npm run verify`; commit with the package id; update TODO #15 (`docs/todo.md`) and this Status table.
   If tool code changed, say "MCP restart needed" in plain text.
 - `Q-nwn-manager`: `for t in tests/test_*.py; do python3 $t; done`; for a change to the Quests page also
   `tests/ui/quests_smoke.js` on a **scratch copy** of a project (never a real one). Never `git add -A` (`.swamp/`, `.serena/`).
