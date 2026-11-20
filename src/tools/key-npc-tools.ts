@@ -34,8 +34,8 @@ export function registerKeyNpcTools(server: McpServer): void {
       resref: z.string().describe("Blueprint resref (max 16 characters); also the tag unless `tag` is given"),
       name: z.string().describe("Display name"),
       area: z.string().describe("Area resref to place the NPC in"),
-      x: numParam("X position (metres)"),
-      y: numParam("Y position (metres)"),
+      x: optNumParam("X position (metres); leave x and y out to place it on open ground near the middle of the area"),
+      y: optNumParam("Y position (metres)"),
       race: numParam("racialtypes.2da row, 0-6: Dwarf, Elf, Gnome, Halfling, Half-Elf, Half-Orc, Human"),
       classId: numParam(
         "0 Barbarian 1 Bard 2 Cleric 3 Druid 4 Fighter 5 Monk 6 Paladin 7 Ranger 8 Rogue 9 Sorcerer 10 Wizard",
@@ -45,7 +45,7 @@ export function registerKeyNpcTools(server: McpServer): void {
       faction: z
         .enum(["hostile", "commoner", "merchant", "defender"])
         .optional()
-        .describe("Standard faction (default hostile for a boss; use commoner for a friendly NPC)"),
+        .describe("Required: hostile for an enemy or boss, commoner for a friendly person, merchant for a trader, defender for a guard"),
       gearRole: z.enum(["pc", "elite", "standard", "mook"]).optional().describe("Gear budget role (default elite)"),
       lootable: z
         .boolean()
@@ -81,6 +81,8 @@ export function registerKeyNpcTools(server: McpServer): void {
       if (race < 0 || race > 6)
         return fail("race must be 0-6 (a standard PC race); use the individual tools for another look");
       if (level < 1) return fail("level must be at least 1");
+      // No silent default: a quest giver built without a faction came out hostile (The Old Mill, 2026-11-19).
+      if (!args.faction) return fail('faction is required: "hostile" for an enemy or boss, "commoner" for a friendly person, "merchant" for a trader, "defender" for a guard');
       const conversation = args.conversation?.toLowerCase();
       if (conversation && !/^[a-z0-9_]{1,16}$/.test(conversation)) {
         return fail(
@@ -115,7 +117,18 @@ export function registerKeyNpcTools(server: McpServer): void {
 
       // The spot first, before anything is written.
       const resmanOpts = await buildResmanOptions(index);
-      const spot = await checkCreatureSpot(index, resmanOpts, args.area, toF(args.x), toF(args.y));
+      let x = args.x !== undefined ? toF(args.x) : Number.NaN;
+      let y = args.y !== undefined ? toF(args.y) : Number.NaN;
+      if (Number.isNaN(x) || Number.isNaN(y)) {
+        // No position: open ground near the middle, away from what is already there.
+        if (!index.parsedGff.has(`${args.area.toLowerCase()}.git`)) return fail(`nothing was built: No area ${args.area}. Areas: ${[...index.areas.keys()].join(", ")}`);
+        const found = hasTool("adventure_find_walkable") ? await callTool("adventure_find_walkable", { area: args.area, clearRadius: "2", count: "3" }) : undefined;
+        const p = (found?.json?.positions as Array<{ x: number; y: number }> | undefined)?.[0];
+        if (!p) return fail(`nothing was built: no open ground found in ${args.area}; give x and y`);
+        x = p.x;
+        y = p.y;
+      }
+      const spot = await checkCreatureSpot(index, resmanOpts, args.area, x, y);
       if (!spot.ok) {
         return fail(`nothing was built: ${spot.error}`, {
           fix: `adventure_find_walkable(area: "${args.area}", clearRadius: "2") gives open ground away from other objects; call build_key_npc again with that x and y`,
@@ -182,8 +195,8 @@ export function registerKeyNpcTools(server: McpServer): void {
       const placed = await placeCreatureCore(index, resmanOpts, {
         area: args.area,
         blueprint: resref,
-        x: toF(args.x),
-        y: toF(args.y),
+        x,
+        y,
         bearing: args.bearing !== undefined ? toF(args.bearing) : 0,
       });
       if (!placed.success) {
