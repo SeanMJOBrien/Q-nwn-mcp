@@ -2,7 +2,7 @@
  * Shared parameter helpers for MCP tool handlers.
  *
  * Numeric tool params are declared z.string() and parsed by hand (toF/toI). At registration every string param is
- * widened by util/lenient-args.ts (src/index.ts) to also accept a number, boolean, array or object, which reaches the
+ * widened by util/lenient-args.ts (src/index.ts, with MCP_LENIENT_ARGS=1) to also accept a number, boolean, array or object, which reaches the
  * handler as a string; so a handler still sees "12" whether the client sent "12" or 12. Keep declaring z.string() here.
  */
 

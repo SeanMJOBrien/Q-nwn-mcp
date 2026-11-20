@@ -26,6 +26,7 @@ export const SETTING_KEYS = [
   "MCP_FOLDER_ADVENTURES",
   "MOONGLOW_BIN",
   "MOONGLOW_PLUGINS",
+  "MCP_LENIENT_ARGS",
 ] as const;
 
 /** `KEY=value` lines to a map; unknown keys are kept (the caller decides). */

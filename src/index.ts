@@ -9,9 +9,11 @@ const mcp = new McpServer({
   name: "nwn-mcp",
   version: "1.0.0",
 });
-// Every string parameter also takes a number, boolean, list or object (src/util/lenient-args.ts); recordTools keeps
-// each handler so one tool can run others in-process (src/util/tool-registry.ts).
-const server = recordTools(withLenientArgs(mcp));
+// MCP_LENIENT_ARGS=1: every string parameter also takes a number, boolean, list or object (src/util/lenient-args.ts).
+// Off by default: the widened schemas make the tool list ~60 % larger (~41k tokens over all tools).
+// recordTools keeps each handler so one tool can run others in-process (src/util/tool-registry.ts).
+const lenient = process.env.MCP_LENIENT_ARGS === "1";
+const server = recordTools(lenient ? withLenientArgs(mcp) : mcp);
 
 registerAll(server);
 
