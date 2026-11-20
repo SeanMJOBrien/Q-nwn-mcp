@@ -1,6 +1,6 @@
-# Local-model line (branches `master`, `systest-live-run-and-generalized-spec`; NOT on this branch)
+# Local-model line (branch `local-models`, worktree `../Q-nwn-mcp-local-models`; NOT on master)
 
-None of the pieces below exist here; port a fix from that line only when it helps any client.
+None of the pieces below exist on master; port a fix from that line only when it helps any client.
 
 Docs: user manual `docs/local-model-manual.md`, design `docs/local-model-guide.md` (packages W1-W8, section 6a context and drift).
 

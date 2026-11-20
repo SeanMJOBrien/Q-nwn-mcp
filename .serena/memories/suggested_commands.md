@@ -9,7 +9,7 @@ Run
 - `npm run dev` (tsx) / `npm run start`.
 - Any tool without an MCP client: `node dist/cli/tool.js --module <project|.mod> <tool> key=value ...`; `--calls file.json` (array of `["tool", {args}]`); `--build out.mod`; `--list [word]`; `--settings`; `--json` (`docs/tool-cli.md`).
 - Quests without an LLM: `node dist/cli/quest.js build|remove|schema|normalize` (`docs/quest-cli.md`).
-- Local-model driver (not on `pre-local-models`): `node dist/cli/drive.js --module <project> --endpoint <url/v1> --model <name> [--context-tokens N] [--plot file]`; `--report <driver-log> [--json]`.
+- Local-model driver (branch `local-models` only): `node dist/cli/drive.js --module <project> --endpoint <url/v1> --model <name> [--context-tokens N] [--plot file]`; `--report <driver-log> [--json]`.
 - `./UpdateMCP.sh` (Windows `UpdateMCP.cmd`; `--check` lists waiting commits): pull, install, build; then reconnect the MCP. New machine: `scripts/setup-new-machine.sh` (`--ollama`). Build a `.mod` from a project: `scripts/build-module-from-project.sh`.
 
 NWN tools

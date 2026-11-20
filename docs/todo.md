@@ -1,45 +1,35 @@
 # Open TODOs
 
-Full history of every numbered item: `docs/todo-archive.md`. Order of work: `docs/work-plan.md`.
+One line per open item: `#id P<priority> title: what closes it` (P1 = next). Details, when an item has more: `docs/todo/<id>.md`.
+Done items and full history: `docs/todo-archive.md`. Packages per item: `docs/work-plan.md`. Grep `^- #<id> ` to find one.
 
-S1-S9 (skill-prompt reduction) and #1, #4, #6-#11, #13, #14, #17, #18, #24, #27 are done; see the archive. Order of work and the packages that close each item: `docs/work-plan.md`. Format: priority (1 = next) · acceptance test · live-checked.
+## #15 branches and commits not in master (standing rule)
+Update in the same commit as the work; amend to "pushed" just before the push (`git fetch --prune`, `git rev-list --count origin/master..<b>`).
+- 2026-11-20: `master` = the line without small-model work (was `pre-local-models`; old master tagged `archive/master-2026-11-19`).
+- `local-models` (worktree `../Q-nwn-mcp-local-models`): the small-model line, parked for later; it splits from master at `1840e37` and has 70 commits not in master; pushed.
+- Other repos: Q-tfn-content-studio `8f873ee` (branch `feature/random-camp-events`) and Q-nwn-manager `93fe5ad`, both not pushed.
 
-- **#15 (standing, user rule 2026-11-07; moved here from CLAUDE.md 2026-11-19) — branches and commits not in `master`.** Update after every commit, merge, new branch or deletion (`git fetch --prune`, `git rev-list --count origin/master..<branch>`); the update goes in the same commit as the work and is amended to say "pushed" just before the push. State 2026-11-19 (this branch): `pre-local-models` diverges from `master` at `1840e37` and has 28 commits of its own, pushed. Earlier commit: CLAUDE.md slimmed, knowledge in Serena memories (`.serena/memories/`, `mem:core`), this file created from CLAUDE.md's TODO list. Latest commit: TODO #45-#47 story-record checks. `systest-live-run-and-generalized-spec` (local-model line) 9 ahead of `origin/master`, pushed. `master` unchanged; which line becomes `master` is the user's decision. History: `docs/todo-archive.md` (#15 state history).
-- **#2 rotation/orientation maths — P3.** Acceptance: property-based round-trip tests for `tile-solver`/`zone-solver`/`feature-collars` rotation. Live-checked: oracle covers the convention only.
-- **#3 area skills thinner than adventure skills — DONE 2026-11-14.** All biome `area-*` skills state sizing, density and a build sequence (`area-castle` gained a concrete tool call); skill-lint passes.
-- **#5 inline-only capability gaps — DONE 2026-11-14.** The gear-appearance limit (#35) is now in `create_item_blueprint`, `set_creature_equipment`, `equip_npc_by_role` and `forge_creature`; the creation-order note in `npc-stat-block.ts` was already settled (user-specified order, documented in `build_npc_stat_block`). Further gaps found later: name them where they limit.
-- **#12 tileset rules beyond flat tiles — P4.** Acceptance: `paint_tiles`/`paint_group`/solver place height-transition tiles; oracle still passes.
-- **#16 port the quest fixes to the TFN content studio — P4** (`~/git/Q-tfn-content-studio`, studio rules apply). Plan: `docs/tfn-quest-findings.md`. Acceptance: studio tests green with the listed fixes and generator additions.
-- **#19 generic check: live test — P2.** Quest and companion scripts are now simulation-checked (`docs/player-simulation.md`), event stages too since 2026-11-16 (`event: true`, `giveItem`); still open: one simulation step per `q_check`/`q_roll` with a stand-in that has the skill.
-- **#20 guided workflow: live run — mostly done 2026-11-14:** after the MCP restart, `load_module` on the Salt Gate project and `audit_module` (coop false) ran live: all 11 rows done, `gaps` and `fillIn` empty, shippable, 0 errors (74 warnings). `adopt_module` not re-run (the story already exists; it refuses without overwrite). Open: an adopt on a module with no story. (M1-M2). Acceptance: `adopt_module` + `audit_module` run on Salt Gate with the MCP restarted.
-- **#21 adventure composition, open parts — P5.** (Outcome-dependent spawns and `verify_encounter_chain` done 2026-11-10.) Rival-party shape, tone/theme check, recurring-NPC checks, import format for the user's own material (`docs/adventure-composition.md`).
-- **#22 stale generated scripts — DONE 2026-11-11.** Details: `docs/todo-archive.md` (2026-11-19 move).
-- **#23 state the goal of every test run — mostly done** (C3): `run_live_verification` takes `goal`, warns when absent, gives a `verdict` with `simulate`. Open: other test runs (systest skill, tests) still do not carry a goal.
-- **#25 cutscenes advancing per dialog choice — design written 2026-11-14 (`docs/cutscene-design.md`), P6.** A cutscene compiles to a dialog chain (one beat per click); packages X0-X5 there, three decisions for the user. Acceptance: X5 verified example.
-- **#26 horse scripts — P6.** Design first (`ActionMountObject`, mount feats, indoor restrictions), generator in the style of `create_companion_system`, `verify_*`, skill.
-- **#28 dialogs return to the main dialog — mostly done** (D1-D3 built 2026-11-10). Salt Gate dialogs: `verify_all` shows no `dialog_branch_ends` (2026-11-11); open: a live conversation check (the headless server has no player). Acceptance: `verify_dialog` has no `dialog_branch_ends` on any generated dialog.
-- **#29 modules as nasher/JSON projects, built on request — DONE 2026-11-14 (B1-B7; D1-D3 approved 2026-11-10).** Details: `docs/todo-archive.md` (2026-11-19 move).
-- **#30 area prefabs** (`docs/area-prefabs-spec.md`; text in `docs/area-todos-and-tooling-history.md`) — P6. **#31 reserve flat space for multi-tile features** — P6. **#32 rebuild one area in place** — P5. **#33 per-tileset survey pass** (`docs/survey-areas-notes.md`) — P6. All four: design first.
-- **#34 randomise head/hair/skin colour for PC-race NPCs — BUILT 2026-11-11** (open: body parts beyond the head, portraits, facial hair, a live look) and **#36 spell pool after a live level-up — DONE 2026-11-11.** Details: `docs/todo-archive.md` (2026-11-19 move).
-- **#35 randomised gear appearance** (`docs/gear-and-npc-generation-history.md`) — P6.
-- **#37 auto-fill the DM quickbar** (three unknowns, `docs/henchmen-and-caster-history.md`) — P6.
-- **#38 verify server simplification — DONE 2026-11-14** and **#39 encounter composer — DECIDED and done 2026-11-11** (`targetEL` is the whole fight). Details: `docs/todo-archive.md` (2026-11-19 move).
-- **#40 Hollow Communion open questions (armor AC premise, Elowen's 2nd-level slot) — P5**, `docs/verification-history.md`.
-- **#41 plain-`fs` writers and the project sync — done 2026-11-10 (B7).** Guarded by `src/tools/project-sync-guard.test.ts`: a new raw-fs write to the temp dir must call `util/project-sync` or be listed there with its reason.
-- **#51 creature sample catalog from The Frozen North — BUILT 2026-11-10/11 (first version).** Details: `docs/todo-archive.md` (2026-11-19 move).
-- **#52 TFN treasure for MCP-built modules — BUILT 2026-11-11.** Details: `docs/todo-archive.md` (2026-11-19 move).
-- **#53 quest building without an LLM (Q-nwn-manager console, TFN studio, quest CLI) — P2.** Built 2026-11-11, uncommitted in all three repos. Packages, decisions D1-D4 and order: `docs/quest-frontends-work-plan.md` (land and rebuild the manager binaries; play a form-built quest; idempotent rebuild; clean remove; one-file builder; shared form; #16). Acceptance: every package there `done`.
-- **#54 creature spec: ability scores and skills — P4.** `build_creature` (`src/util/creature-spec.ts`) takes race, class, level, package, feats, look and gear in names, but not ability scores or skill ranks: the stat block chooses them. Add `abilities` (e.g. `{"str":16,...}`, checked against the point-buy/power level) and `skills` (names -> ranks, capped at level + 3, class/cross-class cost) to the spec; for `build: "spawn"` only level 1 is set (the package spends later points). Acceptance: a spec with both builds, `verify_creature` passes, the engine shows the scores and ranks.
-- **#55 spells in `build_creature` fixed mode — P4.** `build: "fixed"` refuses spellcasters because it writes no spells (`build: "spawn"` chooses them at spawn). Write the spell slots for the class and level (memorised lists or spell-like abilities, as `level_creature`/the forge do), honouring `domains`, `school` and `spells`. Acceptance: a fixed level-7 Wizard and Cleric verify clean and cast the requested spells on the engine.
-- **#56 coloured light props for dark areas — P5** (user request 2026-11-18). The base game has no purple, orange, green or yellow mushroom (or crystal) props: The Glowing Deep coloured its dark cavern by placing separate `tm_pl_light*` placeables beside blue and red mushrooms (not engine-checked). Add a way to light a prop in a named colour in one step (a mushroom or crystal paired with a coloured light placeable, or a prop option `light: "purple"`), list the light placeables by colour in `util/area-recipes.ts` / the underdark and dungeon skills, and look at the result in the engine. Acceptance: a dark area dressed with five colours shows each colour in the game.
-- **#42-#50 story-versus-pipeline follow-ups** (`docs/story-vs-pipeline.md`, written 2026-11-09; finding numbers in brackets). Order: checks first, then requirements, then templates.
-  - **#42 [3] payoff has a consumer — DONE 2026-11-10.** `verify_journal` warns `payoff_item_no_consumer` (the journal names an item nothing asks for) and `item_consumed_then_needed`; `util/verify/story-consequences.ts`. Heuristic over script text and dialog parameters; tested on synthetic data and on the real modules (flagged `q_hollow_i2` in Hollow Communion).
-  - **#43 [4] journal timing — DONE 2026-11-10.** `verify_journal` warns `journal_advance_on_enter` for an area OnEnter script that advances an entry whose text is not about arriving or looking at the place. It flagged the original Salt Gate (Yorrin's stage 3) and some "chapter" advances in Siege of Ashcrown; those may be deliberate.
-  - **#44 [5] a choice carries its consequence — DONE 2026-11-10 (heuristic only).** `verify_journal` warns `stance_change_group` when a script converts one creature's faction and others sharing its tag prefix and faction keep theirs. Not done: a stage field naming the group (`affects`); it found nothing on the real modules checked (tags rarely share a prefix), so it is a narrow net.
-  - **#45 [1,2] story record required — DONE 2026-11-19 (this branch).** `src/util/story-record.ts`: `phase_check` plot end refuses `(not recorded)` in Module/Plot (`story_not_recorded`) and a missing graph from 3 locations (`story_graph_required`); `verify_story` reports the same; `adopt_module` drafts a graph (a beat per area in reach order, a return beat, a thread per quest). Acceptance met on a Salt Gate copy: adopt gives 6 beats and 4 threads with no `story_no_graph`; after the fields are filled, `verify_story` is clean and `phase_check(plot, end)` passes.
-  - **#46 [7] motives before actors — DONE 2026-11-19 (this branch).** `npc_no_motive` / `antagonist_no_motive` block `phase_check(plot, end)` and `phase_check(actors, start)`; the actors skill asks for one line of the motive in each key NPC's dialog and `phase_check(actors, end)` warns `npc_motive_not_spoken` (`src/util/story-dialog.ts`, loose word match); `audit_module` lists NPCs without a motive.
-  - **#47 [8] areas carry beats — DONE 2026-11-19 (this branch).** `area_no_beat`: a location needs a filled Role in Story or a graph beat in its area; blocks plot end, a warning at polish, listed by `audit_module`. The DM area gets its own Role in Story line on adopt.
-  - **#48 [3b] aftermath beat — P5.** Plot template gains an aftermath beat; `build_quest` ends a quest on a return stage by default.
-  - **#49 [9] sequel hook — P6.** Optional "open thread" field in the plot and a Chapter 2 template reusing NPCs and items.
-  - **#50 [10] companion lines per beat — P6.** A conditional dialog root per major beat on each companion.
-  - Adopt fill step (done 2026-11-10): `audit_module` returns `fillIn`, the `(not recorded)` fields by heading; the module-explorer skill says to ask the user.
+## Open
+- #19 P2 generic check live test: one simulation step per `q_check`/`q_roll` with a stand-in that has the skill (`19.md`).
+- #20 P2 guided workflow live run: `adopt_module` on a module with no story (`20.md`).
+- #53 P2 quest building without an LLM: every package in `docs/quest-frontends-work-plan.md` done (`53.md`).
+- #2 P3 rotation maths: property-based round-trip tests for tile/zone solver and feature-collar rotation (`02.md`).
+- #12 P4 tileset rules beyond flat tiles: `paint_tiles`/`paint_group`/solver place height-transition tiles; oracle passes.
+- #16 P4 port the quest fixes to the TFN content studio: studio tests green with `docs/tfn-quest-findings.md` fixes (`16.md`).
+- #54 P4 creature spec ability scores and skills: spec builds, `verify_creature` passes, engine shows them (`54.md`).
+- #55 P4 spells in `build_creature` fixed mode: fixed level-7 Wizard and Cleric verify and cast (`55.md`).
+- #21 P5 adventure composition: rival party, tone check, recurring NPCs, import format (`21.md`).
+- #32 P5 rebuild one area in place: design first (`30.md`).
+- #40 P5 Hollow Communion open questions (armor AC premise, Elowen's 2nd-level slot): `docs/verification-history.md`.
+- #48 P5 aftermath beat: plot template gains one; `build_quest` ends a quest on a return stage by default.
+- #56 P5 coloured light props for dark areas: five colours shown in the game (`56.md`).
+- #23 mostly done, state the goal of every test run: systest skill and tests carry a goal (`23.md`).
+- #28 mostly done, dialogs return to the main dialog: a live conversation check (`28.md`).
+- #34 built, NPC appearance: body parts beyond the head, portraits, facial hair, a live look (`34.md`).
+- #25 P6 cutscenes per dialog choice: X5 verified example; three decisions for the user (`25.md`).
+- #26 P6 horse scripts: design first (`ActionMountObject`, mount feats, indoor limits), generator, `verify_*`, skill.
+- #30 #31 #33 P6 area prefabs, flat space for multi-tile features, per-tileset survey: design first (`30.md`).
+- #35 P6 randomised gear appearance: `docs/gear-and-npc-generation-history.md`.
+- #37 P6 auto-fill the DM quickbar: three unknowns in `docs/henchmen-and-caster-history.md`.
+- #49 P6 sequel hook: optional open-thread field in the plot, Chapter 2 template reusing NPCs and items.
+- #50 P6 companion lines per beat: a conditional dialog root per major beat on each companion.

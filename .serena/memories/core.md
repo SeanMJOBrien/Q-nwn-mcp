@@ -9,7 +9,7 @@ Source map
 - `adventures/<Title-With-Dashes>/` per-module projects (git-ignored).
 
 Invariants
-- This is branch `pre-local-models`: the line without small-model support (from `1840e37` plus the general fixes; details `mem:workflow/branches`). `master` and `systest-live-run-and-generalized-spec` carry the local-model line. Open TODOs, including #15 (unmerged branches/commits), live in `docs/todo.md`; CLAUDE.md holds only the always-on rules.
+- `master` is the line without small-model support (details `mem:workflow/branches`); branch `local-models` holds the small-model line, parked. Open TODOs: `docs/todo.md` (index, #15 included), details `docs/todo/<id>.md`; CLAUDE.md holds only the always-on rules.
 - After TS changes: `npm run build`, then the MCP server must be restarted.
 - Never commit `graphify-out/`, `.swamp/`. `.serena/memories/` and `.serena/project.yml` are committed (`.serena/.gitignore` leaves out the cache).
 

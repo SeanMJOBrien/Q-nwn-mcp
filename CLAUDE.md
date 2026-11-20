@@ -3,18 +3,19 @@
 MCP server for Neverwinter Nights: Enhanced Edition modules (.mod). Wraps the neverwinter.nim CLI tools so module content
 is structured, queryable and editable by an LLM. TypeScript, stdio, one module loaded at a time.
 
-## This branch
+## Branches
 
-`pre-local-models`: the line without the small-model work (from `1840e37`, before 2026-11-13, plus the later fixes that
-help any client). No tool profiles, driver, phase prompts, story tools, `get_progress` or `build_area` here; lenient
-arguments are opt-in (`MCP_LENIENT_ARGS=1`). What came over and what did not: `mem:workflow/branches`.
+`master` is the line without the small-model work (from `1840e37`, plus later fixes that help any client); lenient
+arguments are opt-in (`MCP_LENIENT_ARGS=1`). The small-model line (tool profiles, driver, phase prompts, story tools,
+`get_progress`, `build_area`) is parked on branch `local-models`. What came over and what did not: `mem:workflow/branches`.
 
 ## Where the knowledge lives
 
 - **Serena memories** (`.serena/memories/`, start at `mem:core`): architecture, layout generator, tile solver, spatial
   conventions, GFF gotchas, transitions, verification, quests, co-op, creatures, local models, commands, conventions,
   testing, done checklist. Read the memory for the area you touch before changing it.
-- **Open TODOs:** `docs/todo.md` (history: `docs/todo-archive.md`; order of work: `docs/work-plan.md`).
+- **Open TODOs:** `docs/todo.md`, one line per item; details only in `docs/todo/<id>.md` (read the index, then the one
+  item you work on). Done items: `docs/todo-archive.md`.
 - **Docs map:** `docs/README.md`. Tool explanations: `docs/adventure-tooling-reference.md`. Pitfalls with evidence: `docs/pitfalls.md`.
 - **NWScript functions:** `nwscript-docs/<FunctionName>.md` (open by exact name; absence is not authoritative).
 
