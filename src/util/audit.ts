@@ -29,7 +29,16 @@ export interface AuditInput {
   snapshot: ModuleSnapshot;
   /** Verify results per phase (errors and warnings of the object types that phase owns). */
   verify: Partial<Record<Phase, VerifyCounts>> & { all?: VerifyCounts };
-  story: { exists: boolean; notRecorded: number; errors: number; warnings: number };
+  story: {
+    exists: boolean;
+    notRecorded: number;
+    errors: number;
+    warnings: number;
+    /** Story-record findings (TODO #45-#47): key NPCs and antagonists with no motive, locations with no beat, graph missing. */
+    noMotive?: string[];
+    noBeat?: string[];
+    graphRequired?: boolean;
+  };
   dmGuideExists: boolean;
 }
 
@@ -65,6 +74,18 @@ export function buildAudit(input: AuditInput): AuditRow[] {
         findings.push(`story graph: ${story.errors} error(s)`);
       }
       if (story.warnings > 0) findings.push(`story graph: ${story.warnings} warning(s)`);
+      if (story.graphRequired) {
+        state = "partial";
+        findings.push("no story graph, and the adventure has 3 or more locations: add ### Story Graph (beats per area, a thread per motive or mystery)");
+      }
+      if (story.noMotive?.length) {
+        state = "partial";
+        findings.push(`no motive on record for: ${story.noMotive.join(", ")}`);
+      }
+      if (story.noBeat?.length) {
+        state = "partial";
+        findings.push(`locations that serve no story beat: ${story.noBeat.join(", ")}`);
+      }
     }
     rows.push(row({ category: "Story (premise, beats, motives, ending)", phase: "plot", focus: "story", state, summary: state === "done" ? "story recorded and consistent" : "story is incomplete or unrecorded", findings }));
   }

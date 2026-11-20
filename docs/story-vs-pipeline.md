@@ -45,3 +45,7 @@ the story is, and checking that what was built still says it.
 
 Findings 3 (payoff, item used up), 4 (journal timing) and 5 (consequence) are `verify_journal` warnings (`util/verify/story-consequences.ts`, TODO #42-#44). The checks are heuristics: they read script text and dialog parameters. 3b, 7, 8, 9, 10 and the story-record requirements (1, 2) are still open (TODO #45-#50).
 
+
+## Status (2026-11-19, branch pre-local-models)
+
+Findings 1, 2, 7 and 8 are checks (TODO #45-#47, `src/util/story-record.ts`): the plot cannot end with `(not recorded)` fields, without a story graph from 3 locations, without a motive for each key NPC and the antagonists, or with a location that serves no beat; the actors phase waits for the motives and warns when an NPC's dialog never touches theirs (`src/util/story-dialog.ts`); `adopt_module` drafts the graph from the module; `audit_module` lists what is missing. Still open: 3b, 9, 10 (TODO #48-#50).

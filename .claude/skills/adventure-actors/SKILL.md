@@ -27,7 +27,7 @@ Fully autonomous. Make all decisions based on the plot document and spatial data
 
 ### Pre-Check
 
-Call `phase_check(phase: "actors", step: "start")`. If it returns an error, **STOP** and output its `stop` message.
+Call `phase_check(phase: "actors", step: "start")`. If it returns an error, **STOP** and output its `stop` message. It refuses when a Key NPC or the Antagonists have no Motivation on record (`npc_no_motive`, `antagonist_no_motive`): the people are built from what they want.
 
 ---
 
@@ -228,6 +228,7 @@ For each key NPC, create a simple greeting dialog using `create_dialog`.
 **Dialog content rules:**
 - **Flavor/personality ONLY** — no quest logic, no `AddJournalQuestEntry`, no scripts. That's `/adventure-quests`'s job.
 - Reflect the NPC's personality from the plot: gruff, nervous, welcoming, suspicious, etc.
+- **One line carries the NPC's Motivation** in their own voice ("They took every sack of grain I had, and winter's coming."), so the story is told by people, not only the journal. `phase_check(phase: "actors", step: "end")` warns `npc_motive_not_spoken` when no line of the dialog shares a word with the recorded motive.
 - NPCs can hint at the plot situation ("Strange things have been happening...") but don't assign quests.
 - PC responses should feel natural, not like a quest menu.
 

@@ -262,3 +262,20 @@ leftRing, rightRing; each `base`, `name`, `properties` in words, `color`), `powe
   (Bastard Sword) not (as predicted), specified items equipped; fixed build — all four feats. A Cleric (War/Healing) and an Evoker spawned and
   levelled.
 
+## 19. The story record (TODO #45-#47, 2026-11-19)
+
+`src/util/story-record.ts` reads `## Plot` (Locations with Resref and Role in Story, Key NPCs with Motivation, Antagonists) and the
+story graph. Codes, all errors at `phase_check(plot, end)` and in `verify_story`, warnings at polish:
+- `story_not_recorded`: a `(not recorded)` field left in `## Module` or `## Plot`.
+- `story_graph_required`: 3 or more locations and no `### Story Graph` (below 3, no graph is the old `story_no_graph` warning).
+- `npc_no_motive`, `antagonist_no_motive`: Motivation blank, `(not recorded)`, a template `[...]`, or "none"/"TBD". Antagonists written as
+  `#### Name` blocks each need one. These two also block `phase_check(actors, start)`.
+- `area_no_beat`: a location with no Role in Story and no graph beat in its area.
+- `npc_motive_not_spoken` (warning, `phase_check(actors, end)`, `src/util/story-dialog.ts`): the placed NPC of that name has a dialog
+  and no line shares a word (5-letter stems, common words left out) with the recorded motive.
+
+`adopt_module` drafts the graph (`draftStoryGraph`, `src/util/adopt.ts`): one beat per area in the order a player reaches them from the
+entry area (setup, complications, a turn in the last third, the climax in the last area), a resolution beat back at the start when the
+module has journal quests, and a thread per quest from B1 to the last beat; the DM area is left out and gets its own Role in Story.
+`audit_module`'s Story row lists NPCs without a motive, locations without a beat, and a missing graph.
+

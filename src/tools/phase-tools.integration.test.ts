@@ -184,3 +184,47 @@ describe("set_project_scope", () => {
     }
   });
 });
+
+describe("phase_check: the story record (TODO #45-#47)", () => {
+  const plot = (motive: string, role: string) =>
+    [
+      "## Module\n- **Title:** Demo\n- **Tone:** grim\n",
+      "## Plot\n\n### Premise\nA mill burns.\n\n### Locations\n",
+      `#### 1. Village\n- **Resref:** village\n- **Role in Story:** ${role}\n`,
+      "#### 2. Mill\n- **Resref:** mill\n- **Role in Story:** the fire's cause is found here\n",
+      `### Key NPCs\n\n#### Ned\n- **Role:** quest giver\n- **Location:** village\n- **Motivation:** ${motive}\n`,
+    ].join("\n");
+  const later = "\n## Areas\na\n\n## Environment\ne\n";
+
+  it("plot end refuses (not recorded) fields, a missing motive and a location with no beat", async () => {
+    await fs.writeFile(path.join(tempDir, "adventure.md"), plot("(not recorded)", "(not recorded)"));
+    const { c, close } = await client();
+    try {
+      const r = body(await c.callTool({ name: "phase_check", arguments: { phase: "plot", step: "end" } }));
+      expect(r.ok).toBe(false);
+      const errors = (r.errors as string[]).join("\n");
+      expect(errors).toMatch(/\[story_not_recorded\]/);
+      expect(errors).toMatch(/\[npc_no_motive\] Ned/);
+      expect(errors).toMatch(/\[area_no_beat\] Village/);
+    } finally {
+      await close();
+    }
+  });
+
+  it("actors start waits for the motives; a filled record passes plot end", async () => {
+    await fs.writeFile(path.join(tempDir, "adventure.md"), plot("(not recorded)", "the party arrives") + later);
+    const { c, close } = await client();
+    try {
+      const blocked = await c.callTool({ name: "phase_check", arguments: { phase: "actors", step: "start" } });
+      expect(blocked.isError).toBe(true);
+      expect((body(blocked).missing as string[]).join("\n")).toMatch(/npc_no_motive/);
+
+      await fs.writeFile(path.join(advDir(), "Demo.md"), plot("wants his grain back", "the party arrives") + later);
+      expect(body(await c.callTool({ name: "phase_check", arguments: { phase: "actors", step: "start" } })).ok).toBe(true);
+      const end = body(await c.callTool({ name: "phase_check", arguments: { phase: "plot", step: "end" } }));
+      expect((end.errors as string[]).filter((e) => e.startsWith("story ["))).toEqual([]);
+    } finally {
+      await close();
+    }
+  });
+});

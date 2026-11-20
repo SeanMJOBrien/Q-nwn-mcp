@@ -15,6 +15,7 @@ import { exportProject, isProjectDir } from "../util/project.js";
 import { gatherSnapshot } from "../util/module-snapshot.js";
 import { filterForPhase, PHASES, type Phase } from "../util/phase-check.js";
 import { parseStoryGraph, verifyStory } from "../util/story-graph.js";
+import { storyRecordFindings } from "../util/story-record.js";
 import type { VerifyResult } from "../util/verify/common.js";
 import { collectVerifyResults } from "./verify-tools.js";
 import { trackProject } from "../util/project-sync.js";
@@ -120,8 +121,20 @@ export function registerAdoptTools(server: McpServer): void {
       const md = await readIfExists(advFile(dir, "story"));
       let storyErrors = 0;
       let storyWarnings = 0;
+      const noMotive: string[] = [];
+      const noBeat: string[] = [];
+      let graphRequired = false;
       if (md) {
-        for (const f of verifyStory(parseStoryGraph(md), new Set(index.areas.keys()))) {
+        const graph = parseStoryGraph(md);
+        const record = storyRecordFindings(md, graph, { allowNotRecorded: true });
+        graphRequired = record.some((f) => f.code === "story_graph_required");
+        for (const f of record) {
+          if (f.code === "npc_no_motive") noMotive.push(f.message.split(" has no Motivation")[0]);
+          if (f.code === "antagonist_no_motive") noMotive.push("the Antagonists");
+          if (f.code === "area_no_beat") noBeat.push(f.message.split(" serves no story beat")[0]);
+        }
+        for (const f of verifyStory(graph, new Set(index.areas.keys()))) {
+          if (f.code === "story_no_graph" && graphRequired) continue;
           if (f.level === "error") storyErrors++;
           else storyWarnings++;
         }
@@ -129,7 +142,7 @@ export function registerAdoptTools(server: McpServer): void {
       const rows = buildAudit({
         snapshot,
         verify,
-        story: { exists: md !== null, notRecorded: md ? (md.match(/\(not recorded\)/g) ?? []).length : 0, errors: storyErrors, warnings: storyWarnings },
+        story: { exists: md !== null, notRecorded: md ? (md.match(/\(not recorded\)/g) ?? []).length : 0, errors: storyErrors, warnings: storyWarnings, noMotive, noBeat, graphRequired },
         dmGuideExists: await exists(advFile(dir, "dmGuide")),
       });
 

@@ -35,6 +35,8 @@ import {
 } from "../util/phase-check.js";
 import { computeConnectivity } from "./analysis-tools.js";
 import { parseStoryGraph, verifyStory } from "../util/story-graph.js";
+import { ACTOR_PREREQUISITES, storyRecordFindings } from "../util/story-record.js";
+import { motivesNotSpoken } from "../util/story-dialog.js";
 import { collectVerifyResults } from "./verify-tools.js";
 
 function text(body: unknown, isError = false) {
@@ -187,6 +189,16 @@ export function registerPhaseTools(server: McpServer): void {
         if (missing.length > 0) {
           return text({ ok: false, phase, step, missing, stop: stopMessage(missing) }, true);
         }
+        // Motives before actors (TODO #46): the people are built from who they are and what they want.
+        if (p === "actors") {
+          const noMotive = storyRecordFindings(md, parseStoryGraph(md), { allowNotRecorded: true }).filter((f) => ACTOR_PREREQUISITES.has(f.code));
+          if (noMotive.length) {
+            return text(
+              { ok: false, phase, step, missing: noMotive.map((f) => `[${f.code}] ${f.message}`), stop: "Record a Motivation for each key NPC and the antagonists in ## Plot (ask the user if it is theirs to decide), then start the actors phase again." },
+              true,
+            );
+          }
+        }
         return text({ ok: true, phase, step, required, ...(scope ? { scope } : {}), ...(skip.length ? { skippedPhases: skip } : {}) });
       }
 
@@ -219,13 +231,22 @@ export function registerPhaseTools(server: McpServer): void {
         }
       }
 
-      // The story graph (if the plot wrote one) is checked when the story is written and again at the polish pass.
+      // The story record (TODO #45-#47) and graph are checked when the story is written and again at the polish pass:
+      // at plot they block, at polish the record findings are warnings (the module is built by then).
       if (p === "plot" || p === "polish") {
-        for (const f of verifyStory(parseStoryGraph(md), new Set(index.areas.keys()))) {
+        const graph = parseStoryGraph(md);
+        const record = storyRecordFindings(md, graph);
+        for (const f of record) (p === "plot" ? errorList : warningList).push(`story [${f.code}] ${f.message}`);
+        for (const f of verifyStory(graph, new Set(index.areas.keys()))) {
           // Areas don't exist yet when the plot ends, so an unknown area is only worth reporting at polish.
           if (p === "plot" && f.code === "story_unknown_area") continue;
+          if (f.code === "story_no_graph" && record.some((r) => r.code === "story_graph_required")) continue;
           (f.level === "error" ? errorList : warningList).push(`story [${f.code}] ${f.message}`);
         }
+      }
+      // The actor dialog carries a line of each key NPC's motive (TODO #46).
+      if (p === "actors") {
+        for (const m of motivesNotSpoken(index, md)) warningList.push(`story [npc_motive_not_spoken] ${m}`);
       }
 
       const results = filterForPhase(p, await collectVerifyResults(index, { coop }));

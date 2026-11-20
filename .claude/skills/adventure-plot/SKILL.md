@@ -155,14 +155,14 @@ What is at stake? Set the scene and establish the central conflict.]
 - **Environmental Hazards:** [traps, terrain dangers, timed events]
 
 ### Story Graph
-How the beats connect, so the story holds together. One line per beat and per thread (the grammar `verify_story` reads):
+How the beats connect, so the story holds together. **Required from 3 locations on** (`story_graph_required`); every location needs a beat here or a filled Role in Story. One line per beat and per thread (the grammar `verify_story` reads):
 
 ```markdown
 - beat B1 | title: Arrival | act: setup | area: village | leads: B2, B3 | gives: letter
 - beat B2 | title: The cabin | act: complication | area: village | leads: B4 | gives: seal | needs: letter
 - thread T1 | title: Venn's motive | planted: B1 | paid: B4
 ```
-`act` is setup, complication, turn, climax or resolution. `leads` = the beats this opens; `gives`/`needs` = clue ids; every needed clue should be given by two beats, so a missed search can't stall the story. A **thread** is a motive, mystery or promise: plant it early (a rumour, an odd detail), reveal it in the middle, and pay it off in a named later beat. Give each area its beats' `Events:` count. `phase_check(phase: "plot", step: "end")` runs `verify_story` and fails on a beat that can't be reached, a clue nobody gives, or a thread that is never paid.
+`act` is setup, complication, turn, climax or resolution. `leads` = the beats this opens; `gives`/`needs` = clue ids; every needed clue should be given by two beats, so a missed search can't stall the story. A **thread** is a motive, mystery or promise: plant it early (a rumour, an odd detail), reveal it in the middle, and pay it off in a named later beat. Give each area its beats' `Events:` count. `phase_check(phase: "plot", step: "end")` runs `verify_story` and fails on a beat that can't be reached, a clue nobody gives, or a thread that is never paid. It also checks the story record: no `(not recorded)` field in `## Module`/`## Plot` (`story_not_recorded`), a real **Motivation** for every Key NPC and for the Antagonists (`npc_no_motive`, `antagonist_no_motive`; not "evil", not blank), and a beat for every location (`area_no_beat`). The actors phase will not start without the motives.
 
 ### Loot & Economy
 - **Key Items:** [plot-critical items — keys, quest tokens, mcguffins. Include name and brief description.]

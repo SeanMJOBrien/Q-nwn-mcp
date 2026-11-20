@@ -70,7 +70,7 @@ export function buildAdoptedAdventure(snapshot: ModuleSnapshot, existing: string
       `- **Scale:** ${scale(a)} (${a.width}x${a.height} tiles)`,
       `- **Events:** ${Math.max(1, ev.total)} (${ev.fights} fights, ${ev.usables} usable props, ${ev.triggers} script triggers, ${ev.talkers} talkers)`,
       `- **Description:** ${a.placeables} props, ${a.sounds} sounds, ${a.creatures.length} creatures, ${a.doors} doors, ${a.triggers} triggers`,
-      "- **Role in Story:** (not recorded)",
+      a.resref === snapshot.dmArea?.resref ? "- **Role in Story:** DM area, outside the story (players never enter it)" : "- **Role in Story:** (not recorded)",
     );
   });
   if (snapshot.areas.length) notRecorded.push("Role in Story of each location");
@@ -106,6 +106,12 @@ export function buildAdoptedAdventure(snapshot: ModuleSnapshot, existing: string
   out.push("", "### Quest Objectives");
   if (snapshot.quests.length === 0) out.push("(no journal quests)");
   for (const q of snapshot.quests) out.push(`- ${q.name} (${q.tag}): ${q.entries} journal entries${q.hasEnd ? "" : ", no end entry"}`);
+
+  const graph = draftStoryGraph(snapshot);
+  if (graph.length) {
+    out.push("", "### Story Graph", DRAFT_GRAPH_NOTE, ...graph);
+    notRecorded.push("Story graph (drafted from the module: check the beats, acts and threads)");
+  }
   out.push("");
 
   // Areas
@@ -147,6 +153,56 @@ export function buildAdoptedAdventure(snapshot: ModuleSnapshot, existing: string
   return { markdown: `${out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`, gaps, notRecorded };
 }
 
+export const DRAFT_GRAPH_NOTE =
+  "_Drafted from the module: one beat per area in the order a player reaches them, one thread per journal quest. Correct the titles, acts, leads and threads to the story the user tells._";
+
+/** Areas in the order a player reaches them (breadth-first from the entry area through transitions), then the rest; no DM area. */
+export function areaOrder(snapshot: ModuleSnapshot): AreaSnap[] {
+  const dm = snapshot.dmArea?.resref;
+  const byRef = new Map(snapshot.areas.filter((a) => a.resref !== dm).map((a) => [a.resref, a]));
+  const order: AreaSnap[] = [];
+  const seen = new Set<string>();
+  const start = byRef.has(snapshot.entryArea) ? snapshot.entryArea : [...byRef.keys()][0];
+  const queue = start ? [start] : [];
+  if (start) seen.add(start);
+  while (queue.length) {
+    const a = byRef.get(queue.shift() as string);
+    if (!a) continue;
+    order.push(a);
+    for (const to of a.transitionsTo) {
+      if (byRef.has(to) && !seen.has(to)) {
+        seen.add(to);
+        queue.push(to);
+      }
+    }
+  }
+  for (const a of byRef.values()) if (!seen.has(a.resref)) order.push(a);
+  return order;
+}
+
+/**
+ * A first story graph for an adopted module (TODO #45): a beat per area in reach order (setup, complications, a turn, the
+ * climax in the last area), a resolution beat back at the start when the module has quests, and a thread per quest planted
+ * at the first beat and paid at the last. It passes verify_story; the user corrects it to the real story.
+ */
+export function draftStoryGraph(snapshot: ModuleSnapshot): string[] {
+  const areas = areaOrder(snapshot);
+  if (areas.length === 0) return [];
+  const resolution = snapshot.quests.length > 0 && areas.length > 1;
+  const n = areas.length;
+  const act = (i: number): string => (n === 1 ? "climax" : i === 0 ? "setup" : i === n - 1 ? "climax" : i >= Math.ceil((n - 1) * 0.66) ? "turn" : "complication");
+  const lines = areas.map((a, i) => {
+    const next = i < n - 1 ? `B${i + 2}` : resolution ? `B${n + 1}` : "";
+    return `- beat B${i + 1} | title: ${a.name.replace(/\|/g, "/")} | act: ${act(i)} | area: ${a.resref}${next ? ` | leads: ${next}` : ""}`;
+  });
+  const last = resolution ? `B${n + 1}` : `B${n}`;
+  if (resolution) lines.push(`- beat B${n + 1} | title: Return to ${areas[0].name.replace(/\|/g, "/")} | act: resolution | area: ${areas[0].resref}`);
+  snapshot.quests.forEach((q, i) => {
+    lines.push(`- thread T${i + 1} | title: ${q.name.replace(/\|/g, "/")} | planted: B1 | paid: ${last}`);
+  });
+  return lines;
+}
+
 /** An adventure.md with only the heading and `## Module` counts as empty and may be adopted over without `overwrite`. */
 export function hasStoryContent(markdown: string | null): boolean {
   if (!markdown) return false;
@@ -171,7 +227,7 @@ export function listNotRecorded(md: string): NotRecordedField[] {
       where = h[1].replace(/`/g, "").trim();
       continue;
     }
-    if (!line.includes("(not recorded)")) continue;
+    if (!line.includes("(not recorded)") || line.trim() === ADOPT_NOTE) continue;
     const label = /^[-*]\s+\*\*(.+?):\*\*/.exec(line);
     out.push({ where, field: label ? label[1] : "(text)" });
   }
