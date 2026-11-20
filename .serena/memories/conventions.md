@@ -11,7 +11,7 @@ TypeScript
 
 Prose (docs, commits, tool text): plain words, short sentences.
 
-NWScript (generated or edited)
+NWScript (generated or edited); the language's limits against C, compiler-checked: `mem:global/nwscript`
 - Booleans are ints; `if (GetIsObjectValid(x))`, not `== TRUE` (only for engine functions documented to return exactly TRUE/FALSE).
 - `GetIsObjectValid()` before `DestroyObject`, `ApplyEffectToObject`, faction changes, any op on a possibly stale object.
 - BioWare Hungarian names for new code (`oPC`, `nCount`, `fDelay`, `sResRef`, `lSpawn`, `eVis`), PascalCase functions; constants for magic numbers; functions < ~80 lines; plain `//` comments.

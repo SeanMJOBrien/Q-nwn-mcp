@@ -25,4 +25,5 @@ Where to look
 - Quest system, event stages, quest CLI and front ends: `mem:domain/quests`. Party-wide rewards and journal rules: `mem:domain/coop`.
 - Creature building, henchman invariants, gear models: `mem:domain/creatures`.
 - What the local-model line has that this branch lacks, and lessons from real small-model runs: `mem:local_models/core`.
+- Other projects under ~/git and what each has already solved: `mem:global/projects`. NWScript's limits against C: `mem:global/nwscript`.
 - Stack and settings variables: `mem:tech_stack`. Commands (build, CLIs, nim tools): `mem:suggested_commands`. TypeScript/NWScript code rules: `mem:conventions`. Test tiers, guard tests, oracle: `mem:testing`. Done checklist: `mem:task_completion`.
