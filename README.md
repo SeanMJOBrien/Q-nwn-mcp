@@ -44,9 +44,9 @@ npm run build
 
 ### Updating
 
-Run `./UpdateMCP` (macOS/Linux) or `UpdateMCP.cmd` (Windows) from the checkout: it pulls the current branch
+Run `./UpdateMCP.sh` (macOS/Linux) or `UpdateMCP.cmd` (Windows) from the checkout: it pulls the current branch
 (fast-forward only; it stops if you have local changes), runs `npm install` and `npm run build`, then reminds you to
-reconnect the MCP server in your client (Claude Code: `/mcp`). `./UpdateMCP --check` only lists waiting commits.
+reconnect the MCP server in your client (Claude Code: `/mcp`). `./UpdateMCP.sh --check` only lists waiting commits.
 
 ### 2. Download neverwinter.nim tools
 
