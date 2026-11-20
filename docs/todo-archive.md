@@ -396,3 +396,67 @@ The rest are open.
 28. **PARTLY DONE 2026-11-09 — dialogs return to the main dialog (see Working Style; user rule).** Built: `util/dialog-hub.ts` (`addReturnLinks`: every dead-end NPC answer gets links back to the root's PC options with the hub's conditions, minus the question just asked, and a `[Leave.]` reply is added when there is no exit; `end: true` / Comment "end" keeps a line terminal), `create_dialog` does it by default (`returnToHub: false` opts out), the companion dialog does it (accept and farewell end on purpose), `add_dialog_return_links` retrofits an existing dialog (`endEntries`, `dryRun`), `verify_dialog` warns `dialog_branch_ends` and `dialog_no_exit_reply`, the four dialog skills state it. **Still open:** `build_quest`'s merged lines (the quest builder gives each answer its own `[Leave]` reply instead of returning to the NPC's options, `quest-builder.ts` `leave()`), `add_dialog_node` (hand-added nodes), and running `add_dialog_return_links` over every existing dialog (needs the MCP restarted; The Salt Gate Conspiracy: `dlg_brynna`, `dlg_yorrin`, `dlg_gorrukh`, `dlg_dessa`, `dlg_oswin`, the three henchman dialogs).
 
 29. **TODO (user rule, 2026-11-09) — modules as nasher/JSON projects, built on request.** Today the working copy is the extracted `.mod` in the temp dir and the MCP repacks after most edits (`repack_module`), and `adventures/<Title>/` holds only the story files. Needs design: (1) a project layout under `adventures/<Title>/` in nasher form (`src/` with `*.are.json`, `*.git.json`, `*.utc.json` … and `.nss`; `nasher.cfg`), written from the loaded module (`export_project`) and kept in step after each mutating tool (or flushed on demand), which also covers the old per-module-git-repo TODO (JSON diffs); (2) `load_module` able to open that project (nasher pack into the temp `.mod`, or build the index from the JSON) so it can be resumed in a new session; (3) `repack_module` / build only when the user asks, with the prompt "offer when complete" in the skills (`create-adventure`, `module-explorer`) and no automatic send-after-repack (the `feedback_send_module_after_repack` memory is superseded for module projects: send only when the user accepts the build); (4) `adopt_module` writing the project from an existing `.mod`; (5) docs. Open: nasher vs the nim tools for the pack step (both are in `~/git/nwn-tools`), and whether live verification (`run_live_verification`, which needs a `.mod`) builds a throwaway copy.
+
+## #15 state history (moved from CLAUDE.md 2026-11-19)
+
+The earlier states of the standing branch TODO, newest first, as they stood in CLAUDE.md.
+
+- Earlier state 2026-11-19: **pushed, not merged** — two more commits (`178da77`: the driver budget counts tool schemas and trims old arguments, each request logged with its size; with a profile the server shortens tool and parameter descriptions, `MCP_DESCRIPTION_LIMIT`; the lenient string parameter no longer repeats its description; the TODO commit `66c7265`), the working branch 3 ahead of `origin/master`; `master` unchanged.
+
+- Earlier state 2026-11-19: **pushed, not merged** — one commit (`608a1ef`: the driver raises server errors, a context overflow is not retried and the driver halves the conversation budget and asks again; manual refusal for `params must have required property 'name'`), the working branch 1 ahead of `origin/master`; `master` unchanged.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`7ec8595`: the driver streams model answers, retries dropped connections, `--no-stream`), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`cdde5ed`: `write_plot` reads plain synonyms, `normalizePlotSpec`), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`a4da18d`: protected Module section, driver-run rewards phase with drafted DM guide, quest reward at build time, earlier-phase sweep), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`ed518a5`: custom creature palette for DMs, fixes from the sixth run: container tag keys, deduped links, fights from events, companions via `build_companion`, early kill stage), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`94db625`: driver run report `--report`, replay tests from real runs), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`30da246`: result contract, typed plot through `write_plot`, more driver-run steps with `build_trap`/`build_store`, create tools safe to repeat), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`39036ce`: people and the main quest built from the plot by the driver, `build_key_npc` open-ground placement and required faction, `build_quest` lists placed people), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-19: **merged and pushed** — one more commit (`7b40a65`: base-game enemy groups `build_enemy_group`, drafted Challenges/Affordances sections, real containers only, order-independent stuck check, stricter phase checks), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (`e49b6d4`: plot prompt lists the recipe tilesets, `list_tilesets` out of the plot profile, the driver stops any call repeated 5 times), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (`4acdd82`: driver fixes from the third real-model run: key NPC retries, auto steps run by the driver, stuck loops, transition tags, plot tilesets), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (`caca48c`: start menu, `show_menu` tool and MCP prompt `start`), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (`caf67d6`: `create_module` answers an existing module with an error naming how to continue it; the driver continues it), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — two more commits (`10c6eda` driver dry-run and build-module scripts; `3131520` `scripts/setup-new-machine.sh`), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (`3f2b170`: driver fixes from the second real-model run: drafted Areas/Environment sections, prop kits, blueprint hints, comma-list `list_blueprints`, feature words, settlement size, goal recorded), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (`142dbea`: `tool.js` CLI and `nwn-mcp.env` settings file, project-file guard, DM-guide/story fact checks, racial weapon proficiencies, fewer false warnings; driver fixes from the first real-model run: setup check, stop on setup errors, stricter areas/environment phase check, lenient `build_area` spec, refused fields on step cards), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (`set_starting_gold` tool and checklist step `affordances.gold`; feat names in `create_creature_blueprint`; `place_placeable` tag; empty chests count as containers; base-game weapon-proficiency as a warning; phase-prompt wording), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-18: **merged and pushed** — one more commit (context aids for small models: progress line on every result, results kept by id with `get_result`, `build_area`/`dress_area`, `get_area_card`, goal and decisions in `get_progress`, driver step mode), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-17 (evening 3): **merged and pushed** — one more commit (whole-adventure builds do not ask the user which part comes next: server instructions and `get_progress` rule), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-17 (evening 2): **merged and pushed** — one more commit on the working branch (`get_progress` per-module checklist and `docs/build-checklist.md`; driver plans with it; every phase profile under 40 tools: `dress`, `rewards`; clearer `adventure_apply_layout` missing-area errors), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-17 (after midnight): **merged and pushed** — two more commits on the working branch (`UpdateMCP.sh` / `UpdateMCP.cmd` update scripts; the bash one renamed from `UpdateMCP`), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-17 (late night): **merged and pushed** — one more commit on the working branch (layouts applied by `layoutId`; server instructions: a new adventure is always its own `create_module` module, arguments as values or text), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-17 (night): **merged and pushed** — one more commit on the working branch (open-model support: lenient arguments and unknown-argument refusal, no-module guidance and server instructions, create_module always on, layout minimum 9, load_module on a folder), `master` fast-forwarded; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-17 (evening): **merged and pushed** — one more commit on the working branch (custom factions in the toolset RepList layout; `check_path` and walking reachability `object_unreachable`/`area_unreachable`; map-pin rule; `build_creature` creature spec in names with package-predicted feats; TODOs #54-#55), `master` fast-forwarded to it; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-17: **merged and pushed** — one commit on the working branch (geometry vertex struct IDs: 3 for triggers, 1 for encounters, `geometry_struct_id` check; `build_quest` dry run no longer writes `quests/<tag>.json`), `master` fast-forwarded to it; both 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-16: **merged and pushed** — the working branch `systest-live-run-and-generalized-spec` (36 commits on top of the last merge, the last one: quest robustness — event-stage options early/none/respawn/marker/retry, area variables on the `.git`, simulated event steps, `removeResource`, compile sync, `prune_dialog_orphans`, new verifier checks) merged `origin/master`'s `e276d39` (create-adventure skill frontmatter) and `master` was fast-forwarded to it; both are 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-14: 32 commits ahead, 30 pushed (31: #3 area-castle sequence; 32: #5 gear-appearance limit in tool descriptions) (W6 plot from a file: `PlotSpec`, `write_plot`, driver `--plot`; 29: `set_module_start`, DM area not counted unreachable, `warningsWithFix`, driver runs the start check; 28: local-model manual; 27: W2 driver; 26: W3 short phase prompts and story tools; 25: W1 tool profiles, W5 brief results, W4 build specs; before that 24: U1-U5 and the local-model guide added) (U4, T2, T3, T4, P1, P2 and status commits; earlier: 5 ahead, adding T3 and status commits, `f1a1e81`, L1: quest CLI source mode, flat sync, `syncGic`, work plan; manager `main` has `d79d3c3` unpushed). Before that: 2 commits ahead of `master` (quest CLI `src/cli/quest.ts`, `docs/quest-cli.md`; creature level system: no plain helmets, keep worn armor, no duplicate henchman after the rebuild), pushed to `origin/systest-live-run-and-generalized-spec`, not yet merged.
+
+- Earlier state 2026-11-11: **merged and pushed** — `master` was fast-forwarded to the working branch `systest-live-run-and-generalized-spec` (in-play companion re-level, treasure catalog and system #52, title-based adventure files, never-unarmed weapons); both are 0 ahead of `origin/master`.
+
+- Earlier state 2026-11-10: **merged and pushed** — the working branch `systest-live-run-and-generalized-spec` was fast-forwarded into `master` (`d1e5218`, 41 commits: work-plan phases A-G and the Salt Gate track) and both were pushed. Both are 0 ahead of `origin/master`. Only `graphify-out/` is untracked (never commit). History of earlier merges: archive.

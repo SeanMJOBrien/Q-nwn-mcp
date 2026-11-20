@@ -1,7 +1,7 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { ContextExceededError, openAiChat } from "./llm.js";
+import { ContextExceededError, isContextOverflow, openAiChat } from "./llm.js";
 
 let server: http.Server | undefined;
 afterEach(() => new Promise<void>((r) => (server ? server.close(() => r()) : r())));
@@ -79,5 +79,67 @@ describe("model calls", () => {
   it("raises any other error the server sends inside the stream instead of an empty answer", async () => {
     const url = await serve((_req, res) => sse(res, [{ choices: [{ delta: {}, finish_reason: "error" }], message: "out of memory" }]));
     await expect(openAiChat({ endpoint: url, model: "m" })([{ role: "user", content: "go" }], [])).rejects.toThrow(/model server error: out of memory/);
+  });
+
+  it("raises a context overflow the server answers as an HTTP 400 before any stream, and does not retry it", async () => {
+    let calls = 0;
+    const url = await serve((_req, res) => {
+      calls++;
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: { message: "the request exceeds the available context size, try increasing it", type: "exceed_context_size_error" } }));
+    });
+    const failing = openAiChat({ endpoint: url, model: "m", retries: 2 })([{ role: "user", content: "go" }], []);
+    await expect(failing).rejects.toBeInstanceOf(ContextExceededError);
+    expect(calls).toBe(1);
+  });
+
+  it("retries a busy server (503 while a model loads) and gets the answer", async () => {
+    const url = await serve((_req, res, n) => {
+      if (n === 1) {
+        res.writeHead(503, { "content-type": "application/json" });
+        res.end('{"error":"model is loading"}');
+        return;
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { content: "DONE" } }] }));
+    });
+    const reply = await openAiChat({ endpoint: url, model: "m", retries: 2, busyWaitMs: 10 })([{ role: "user", content: "go" }], []);
+    expect(reply.content).toBe("DONE");
+  });
+
+  it("does not take a rate limit for a context overflow", () => {
+    expect(isContextOverflow("Context size has been exceeded.")).toBe(true);
+    expect(isContextOverflow("Too many tokens per minute: rate limit reached")).toBe(false);
+    expect(isContextOverflow("model not found")).toBe(false);
+  });
+
+  it("asks for the token count in the stream and hands it back on the reply", async () => {
+    let asked: Record<string, unknown> = {};
+    const url = await serve((req, res) => {
+      asked = JSON.parse((req as unknown as { body: string }).body);
+      sse(res, [{ choices: [{ delta: { content: "DONE" } }] }, { choices: [], usage: { prompt_tokens: 1234, completion_tokens: 2 } }]);
+    });
+    const reply = await openAiChat({ endpoint: url, model: "m" })([{ role: "user", content: "go" }], []);
+    expect(asked.stream_options).toEqual({ include_usage: true });
+    expect(reply.content).toBe("DONE");
+    expect(reply.promptTokens).toBe(1234);
+  });
+
+  it("asks again without stream_options when an older server refuses it", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const url = await serve((req, res) => {
+      const body = JSON.parse((req as unknown as { body: string }).body);
+      bodies.push(body);
+      if (body.stream_options) {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end('{"error":"unknown field: stream_options"}');
+        return;
+      }
+      sse(res, [{ choices: [{ delta: { content: "DONE" } }] }]);
+    });
+    const chat = openAiChat({ endpoint: url, model: "m", retries: 0 });
+    expect((await chat([{ role: "user", content: "go" }], [])).content).toBe("DONE");
+    expect((await chat([{ role: "user", content: "again" }], [])).content).toBe("DONE");
+    expect(bodies.map((b) => Boolean(b.stream_options))).toEqual([true, false, false]);
   });
 });

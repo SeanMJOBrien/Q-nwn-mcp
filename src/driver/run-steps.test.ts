@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ChatMessage, ToolCall } from "./llm.js";
 import type { HostTool, ToolHost } from "./run-phase.js";
 import { SetupError } from "../util/setup-check.js";
-import { plotBlock, promptSections, refusedFields, runPhaseSteps, stepCard } from "./run-steps.js";
+import { nudgeText, plotBlock, promptSections, refusedFields, runPhaseSteps, saysDone, stepCard } from "./run-steps.js";
 
 const str = { type: "string" };
 const tool = (name: string, properties: Record<string, { type: string }> = {}): HostTool => ({ name, description: name, inputSchema: { type: "object", properties, required: [] } });
@@ -95,6 +95,34 @@ describe("step mode", () => {
     expect(r.openSteps).toEqual(["areas.blackwater.create", "areas.millroad.create"]);
     expect(r.status).not.toBe("success");
     expect(log.filter((l) => l.startsWith("phase_check")).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("asks once for the call when the model answers with a plan and no tool call", async () => {
+    const log: string[] = [];
+    const nudges: string[] = [];
+    const chat = async (messages: ChatMessage[]): Promise<ChatMessage> => {
+      const last = messages[messages.length - 1];
+      if (last.role === "user" && last.content.startsWith("You called no tool")) {
+        nudges.push(last.content);
+        const r = /"resref\\?":\\?"(\w+)/.exec(last.content)?.[1] ?? "blackwater";
+        return { role: "assistant", content: "", tool_calls: [call("build_area", { spec: JSON.stringify({ resref: r }) })] };
+      }
+      if (last.role === "tool") return { role: "assistant", content: "DONE" };
+      return { role: "assistant", content: "I will build the area with build_area, choosing the tileset ttr01." };
+    };
+    const r = await runPhaseSteps(fakeModule(log), chat, "areas", { stepTries: 1 });
+    expect(nudges).toHaveLength(2);
+    expect(nudges[0]).toContain("build_area(spec:");
+    expect(r.openSteps ?? []).toEqual([]);
+    expect(log.filter((l) => l.startsWith("build_area"))).toHaveLength(2);
+  });
+
+  it("does not nudge a DONE reply, and words the nudge with the step's call", () => {
+    expect(saysDone("DONE")).toBe(true);
+    expect(saysDone("The area is built. DONE")).toBe(true);
+    expect(saysDone("I will now build it.")).toBe(false);
+    expect(nudgeText({ call: "build_area(spec: ...)" })).toContain("make the call now: build_area(spec: ...)");
+    expect(nudgeText({})).toContain("call the tool for this step now");
   });
 
   it("runs a step's auto call itself and asks the model only when the step stays open", async () => {

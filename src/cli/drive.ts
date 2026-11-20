@@ -28,6 +28,8 @@
  *   --max-steps <n>          model turns per phase (default 60)
  *   --retries <n>            failed phase checks tolerated per phase (default 3)
  *   --context-chars <n>      conversation budget in characters (default 48000)
+ *   --context-tokens <n>     the model's context window in tokens: the budget follows it, at the characters per token
+ *                            the server reports (use the window the server was started with, e.g. LM Studio's)
  *   --mode step|phase        step (default): one conversation per checklist step where the phase has steps;
  *                            phase: one conversation per phase
  *   --step-turns <n>         model turns per step in step mode (default 12)
@@ -51,6 +53,7 @@ import path from "path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { JsonSchemaObject } from "../driver/coerce.js";
+import { newBudget } from "../driver/context-budget.js";
 import { type Chat, openAiChat } from "../driver/llm.js";
 import { type PhaseResult, type ToolHost, runAutoSteps, runPhase } from "../driver/run-phase.js";
 import { runPhaseSteps, STEP_PHASES } from "../driver/run-steps.js";
@@ -66,7 +69,7 @@ import { validateSpec } from "../util/spec-validate.js";
 
 const VALUE_FLAGS = new Set([
   "module", "create", "endpoint", "model", "api-key", "phases", "idea", "level", "party", "minutes", "tone",
-  "max-steps", "retries", "context-chars", "mode", "step-turns", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot", "report",
+  "max-steps", "retries", "context-chars", "context-tokens", "mode", "step-turns", "escalate-model", "escalate-endpoint", "escalate-api-key", "log", "plot", "report",
 ]);
 const BOOL_FLAGS = new Set(["force", "dry-run", "help", "json", "no-stream"]);
 
@@ -302,10 +305,16 @@ async function main(): Promise<void> {
           stream: !bools.has("no-stream"),
         })
       : undefined;
+    const sizes = {
+      contextChars: flags["context-chars"] ? Number(flags["context-chars"]) : undefined,
+      contextTokens: flags["context-tokens"] ? Number(flags["context-tokens"]) : undefined,
+    };
     const options = {
       maxSteps: flags["max-steps"] ? Number(flags["max-steps"]) : undefined,
       retries: flags.retries ? Number(flags.retries) : undefined,
-      contextChars: flags["context-chars"] ? Number(flags["context-chars"]) : undefined,
+      ...sizes,
+      // One budget for the whole run: what a phase learns about the context (a ratio, an overflow) the next one keeps.
+      budget: newBudget(sizes),
       stepTurns: flags["step-turns"] ? Number(flags["step-turns"]) : undefined,
     };
 

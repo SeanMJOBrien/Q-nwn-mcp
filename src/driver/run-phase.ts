@@ -11,7 +11,11 @@ import { isToolAllowed, resolveToolProfile } from "../tool-profiles.js";
 import { isSetupError, SetupError } from "../util/setup-check.js";
 import { validateSpec } from "../util/spec-validate.js";
 import { coerceArgs, type JsonSchemaObject } from "./coerce.js";
-import { ContextExceededError, type Chat, type ChatMessage, type ToolCall, type ToolSpec } from "./llm.js";
+import { slimDescription } from "../util/slim-descriptions.js";
+import { type ContextBudget, learnUsage, MIN_CONTEXT_CHARS, newBudget, shrinkOnOverflow } from "./context-budget.js";
+import { ContextExceededError, slimSchema, type Chat, type ChatMessage, type ToolCall, type ToolSpec } from "./llm.js";
+
+export { MIN_CONTEXT_CHARS };
 
 export interface HostTool {
   name: string;
@@ -34,6 +38,10 @@ export interface RunPhaseOptions {
   maxResultChars?: number;
   /** Character budget of the conversation; older tool results are dropped past it (default 48000, about 12k tokens). */
   contextChars?: number;
+  /** The model's context window in tokens: the budget follows it, at the characters per token the server reports. */
+  contextTokens?: number;
+  /** One budget shared by the phases of a run, so what one phase learns about the context the next uses. */
+  budget?: ContextBudget;
   /** Called for every event, for the log. */
   onEvent?: (event: Record<string, unknown>) => void;
   /** Replaces the phase prompt as the first message (a repair pass after step mode). */
@@ -139,6 +147,12 @@ export function messageChars(messages: ChatMessage[]): number {
 }
 
 /**
+ * What a trimmed tool call's arguments become: a note, not "{}", so the history never shows a call made with no
+ * arguments (a small model copies what it sees there).
+ */
+export const TRIMMED_ARGUMENTS = '{"note":"arguments removed to save space"}';
+
+/**
  * Makes the conversation fit the budget (characters of messages). First the oldest tool results go, then the oldest
  * long tool-call arguments (a written section or spec can be large). The system and first user message stay, and the
  * last four messages are never touched.
@@ -151,37 +165,39 @@ export function trimContext(messages: ChatMessage[], budget: number): void {
   for (let i = 2; i < messages.length - 4 && messageChars(messages) > budget; i++) {
     for (const call of messages[i].tool_calls ?? []) {
       const args = typeof call.arguments === "string" ? call.arguments : JSON.stringify(call.arguments);
-      if (args.length > 200) call.arguments = "{}";
+      if (args.length > 200) call.arguments = TRIMMED_ARGUMENTS;
     }
   }
 }
 
-/** The smallest conversation the driver will shrink to before it gives up on a context overflow (about 1k tokens). */
-export const MIN_CONTEXT_CHARS = 4_000;
-
 /**
- * Asks the model. When the server reports that the conversation is longer than its context window, the budget is
- * halved (the budget object is shared across the turns of a phase or step, so later turns start small too), the
- * conversation is trimmed to it, and the same turn is asked again. At the minimum the overflow is thrown.
+ * Asks the model. The conversation is trimmed to the budget first (tool schemas count, as sent). A reply that carries
+ * the server's token count tunes the budget; a context overflow shrinks it (context-budget.ts), the conversation is
+ * trimmed again and the same turn is asked again. At the minimum the overflow is thrown.
  */
 export async function askWithinContext(
   chat: Chat,
   messages: ChatMessage[],
   tools: ToolSpec[],
-  budget: { chars: number },
+  budget: ContextBudget,
   log: (event: Record<string, unknown>) => void,
 ): Promise<ChatMessage> {
+  // The tool schemas go with every request, so they count against the budget too, at the size they are sent.
+  const toolChars = JSON.stringify(tools.map((t) => ({ name: t.name, description: slimDescription(t.description, 300), parameters: slimSchema(t.parameters, 140) }))).length;
   for (;;) {
-    // The tool schemas go with every request, so they count against the budget too.
-    const toolChars = JSON.stringify(tools).length;
     trimContext(messages, Math.max(MIN_CONTEXT_CHARS, budget.chars - toolChars));
-    log({ event: "request", messageChars: messageChars(messages), toolChars, budget: budget.chars });
+    const sent = messageChars(messages) + toolChars;
+    log({ event: "request", messageChars: sent - toolChars, toolChars, budget: budget.chars });
     try {
-      return await chat(messages, tools);
+      const reply = await chat(messages, tools);
+      if (reply.promptTokens) {
+        learnUsage(budget, sent, reply.promptTokens);
+        log({ event: "usage", promptTokens: reply.promptTokens, charsPerToken: Number(budget.charsPerToken?.toFixed(2)), budget: budget.chars });
+      }
+      return reply;
     } catch (e) {
-      if (!(e instanceof ContextExceededError) || budget.chars <= MIN_CONTEXT_CHARS) throw e;
-      budget.chars = Math.max(MIN_CONTEXT_CHARS, Math.floor(budget.chars / 2));
-      log({ event: "context_exceeded", budget: budget.chars, message: (e as Error).message.slice(0, 300) });
+      if (!(e instanceof ContextExceededError) || !shrinkOnOverflow(budget, sent, (e as Error).message)) throw e;
+      log({ event: "context_exceeded", budget: budget.chars, tokens: budget.tokens, message: (e as Error).message.slice(0, 300) });
     }
   }
 }
@@ -284,7 +300,7 @@ export async function runPhase(host: ToolHost, chat: Chat, phase: Phase, options
   const maxSteps = options.maxSteps ?? 60;
   const retries = options.retries ?? 3;
   const maxResult = options.maxResultChars ?? 6000;
-  const budget = { chars: options.contextChars ?? 48_000 };
+  const budget = options.budget ?? newBudget(options);
   const log = options.onEvent ?? (() => {});
   const result: PhaseResult = { phase, status: "failed", steps: 0, toolCalls: 0, errors: [] };
 

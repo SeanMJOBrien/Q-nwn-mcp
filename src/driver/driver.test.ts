@@ -46,7 +46,7 @@ describe("toolCallsFromText", () => {
 describe("slimSchema", () => {
   it("cuts long descriptions at any depth and keeps the rest", () => {
     const schema = { $schema: "x", type: "object", properties: { a: { type: "string", description: "d".repeat(50), enum: ["p", "q"] } }, required: ["a"] };
-    expect(slimSchema(schema, 10)).toEqual({ type: "object", properties: { a: { type: "string", description: "dddddddddd...", enum: ["p", "q"] } }, required: ["a"] });
+    expect(slimSchema(schema, 10)).toEqual({ type: "object", properties: { a: { type: "string", description: "ddddddd...", enum: ["p", "q"] } }, required: ["a"] });
   });
 });
 

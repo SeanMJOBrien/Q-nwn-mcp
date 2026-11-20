@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { shortenText, slimLimitsFromEnv, slimShape, withSlimDescriptions } from "./slim-descriptions.js";
+import { shortenText, slimDescription, slimLimitsFromEnv, slimShape, withSlimDescriptions } from "./slim-descriptions.js";
 
 describe("shortenText", () => {
   it("keeps short text and cuts long text at a word, marked with ...", () => {
@@ -14,6 +14,33 @@ describe("shortenText", () => {
 
   it("keeps everything when the limit is 0", () => {
     expect(shortenText("x".repeat(1000), 0)).toHaveLength(1000);
+  });
+});
+
+describe("slimDescription", () => {
+  const intro = "Build one area from a short spec, in one call: it picks the size and the feature groups when they are not given, then creates it.";
+  const spec = 'spec: {"resref":"millroad","tileset":"ttr01"} plus optional style, purpose (inn, shop, home... for interiors), width.';
+  const tail = " On a failure it names the step and field. Call it again with the field fixed.";
+
+  it("keeps the sentence with the call format when the cut falls inside or before it", () => {
+    const out = slimDescription(`${intro} ${spec}${tail}`, 150);
+    expect(out).toContain('{"resref":"millroad","tileset":"ttr01"}');
+    expect(out).toContain("width.");
+    expect(out).not.toContain("On a failure");
+  });
+
+  it("does not end the sentence at an ellipsis or e.g.", () => {
+    const out = slimDescription(`${intro} Give props, e.g. ["plc_barrel"] or home... for more. Then stop here. ${"x ".repeat(80)}`, 150);
+    expect(out).toContain('e.g. ["plc_barrel"] or home... for more.');
+  });
+
+  it("cuts as before when there is no example, or the example is fully kept, or too long", () => {
+    const plain = `${intro} ${"word ".repeat(60)}`;
+    expect(slimDescription(plain, 100)).toBe(shortenText(plain, 100));
+    const early = `Takes {"a":1}. ${"word ".repeat(60)}`;
+    expect(slimDescription(early, 100)).toBe(shortenText(early, 100));
+    const huge = `${intro} spec: {"a":"${"y".repeat(400)}"}.`;
+    expect(slimDescription(huge, 100)).toBe(shortenText(huge, 100));
   });
 });
 

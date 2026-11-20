@@ -12,6 +12,7 @@
 import type { Phase } from "../util/phase-check.js";
 import { loadPhasePrompt } from "../util/phase-prompts.js";
 import { STEP_BASE_TOOLS } from "../util/progress.js";
+import { newBudget } from "./context-budget.js";
 import type { Chat, ChatMessage, ToolSpec } from "./llm.js";
 import { callSignature, checkOk, clip, DRIVER_ONLY, type HostTool, type PhaseResult, runPhase, type RunPhaseOptions, runTool, STUCK_REPEATS, type ToolHost, askWithinContext } from "./run-phase.js";
 
@@ -26,6 +27,18 @@ export interface RunStepsOptions extends RunPhaseOptions {
 
 /** Phases run step by step; plot, polish and rewards have no per-item steps and run in phase mode. */
 export const STEP_PHASES: readonly Phase[] = ["areas", "environment", "actors", "quests", "challenges", "affordances"];
+
+/** Whether a reply without a tool call ends the step on purpose (DONE), not a plan written out instead of a call. */
+export function saysDone(content: string): boolean {
+  return /^\W*done\W*$/i.test(content.trim()) || /\bDONE\b/.test(content);
+}
+
+/** The message after a reply with no tool call: the step's call, to make now. */
+export function nudgeText(step: Pick<OpenStep, "call">): string {
+  return step.call
+    ? `You called no tool. Do not describe the plan; make the call now: ${step.call}. Reply DONE only if the step is already done.`
+    : "You called no tool. Do not describe the plan; call the tool for this step now, or reply DONE if it is already done.";
+}
 
 export interface OpenStep {
   id: string;
@@ -146,7 +159,7 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
   const maxRuns = options.maxStepRuns ?? 60;
   const tries = options.stepTries ?? 2;
   const maxResult = options.maxResultChars ?? 6000;
-  const budget = { chars: options.contextChars ?? 48_000 };
+  const budget = options.budget ?? newBudget(options);
   const result: PhaseResult = { phase, status: "failed", steps: 0, toolCalls: 0, errors: [] };
 
   const start = checkOk((await host.callTool("phase_check", { phase, step: "start" })).text);
@@ -233,12 +246,21 @@ export async function runPhaseSteps(host: ToolHost, chat: Chat, phase: Phase, op
     let lastFailing = "";
     let sameFailures = 0;
     let stuck = false;
+    let nudged = false;
     for (let turn = 0; turn < stepTurns && !stuck; turn++) {
       const reply = await askWithinContext(chat, messages, specs, budget, log);
       result.steps++;
       messages.push(reply);
       log({ event: "model", step: result.steps, id: step.id, content: reply.content.slice(0, 300), calls: reply.tool_calls?.map((c) => c.name) ?? [] });
-      if (!reply.tool_calls?.length) break;
+      if (!reply.tool_calls?.length) {
+        // A small model often answers with its plan and no call (it stalled the areas phase this way). Ask once for the
+        // call itself before the step counts as tried.
+        if (nudged || saysDone(reply.content)) break;
+        nudged = true;
+        log({ event: "nudge", id: step.id });
+        messages.push({ role: "user", content: nudgeText(step) });
+        continue;
+      }
       for (const call of reply.tool_calls) {
         result.toolCalls++;
         const out = await runTool(call, byName, host, log);

@@ -145,6 +145,7 @@ It never builds the `.mod`. When the run is finished, build it yourself (section
 | `--retries <n>` | Failed phase checks allowed per phase (default 3) |
 | `--no-stream` | Ask for each answer whole instead of streamed. Streaming is the default because a slow model's long answer (a whole plot on a CPU) otherwise hits Node's 5-minute wait for the first response bytes and ends as "fetch failed". A dropped connection is retried twice; the error then names the cause |
 | `--context-chars <n>` | Conversation size in characters before old results are dropped (default 48000) |
+| `--context-tokens <n>` | The context window the model server was started with, in tokens (LM Studio's "Context Length"). The budget follows it, at the characters per token the server reports; use this instead of `--context-chars` |
 | `--mode step\|phase` | `step` (default): one conversation per checklist step where a phase has steps. `phase`: one conversation per phase |
 | `--step-turns <n>` | Model turns per step in step mode (default 12) |
 | `--escalate-model <name>` | A stronger model that gets one attempt at a phase the first model failed. With `--escalate-endpoint` and `--escalate-api-key` it can be on another server |
@@ -211,8 +212,16 @@ Estimated peak per request, including the tool definitions, at the default setti
 | polish, challenges, affordances, actors, rewards | 7,000-10,000 | 20,000-25,000 |
 | areas, environment | 11,000-13,000 | 24,000-28,000 |
 
-Add 2,000-4,000 tokens for the model's reply. **Use 65536.** With 32768, add `--context-chars 30000`. The numbers are
-estimates from character counts, not counted with your model's tokenizer.
+Add 2,000-4,000 tokens for the model's reply. **Use 65536.** Tell the driver the size with `--context-tokens 65536`
+(or `32768`): it reads the token count the server reports with each answer (`usage.prompt_tokens`, asked for with
+`stream_options`; a server that refuses that option is asked again without it) and keeps each request under 80 % of the
+window. Without the flag it uses 48,000 characters and learns from an overflow: when the error names the window
+("exceeds the available context size (8192 tokens)") it shrinks to that, otherwise it halves. One budget serves the
+whole run. The table's numbers are estimates from character counts, not counted with your model's tokenizer.
+
+A server that answers 429 or 5xx (LM Studio says 503 while it loads a model) is asked again after 10 and 20 seconds
+(or the wait its `Retry-After` names). A reply with no tool call that does not say DONE gets one reminder naming the
+step's call before the step counts as tried.
 
 Ollama does not report an overflow: it drops the oldest text, which is the instructions. A model that suddenly ignores
 the steps late in a phase has probably run out of context.

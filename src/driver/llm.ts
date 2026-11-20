@@ -1,5 +1,7 @@
 /** Minimal client for an OpenAI-compatible chat-completions endpoint (Ollama, llama.cpp, LM Studio, vLLM, ...). */
 
+import { slimDescription } from "../util/slim-descriptions.js";
+
 export interface ToolCall {
   id: string;
   name: string;
@@ -12,6 +14,8 @@ export interface ChatMessage {
   content: string;
   tool_calls?: ToolCall[];
   tool_call_id?: string;
+  /** Tokens the server counted for the request this reply answers (its `usage`), when it reported them. Not sent. */
+  promptTokens?: number;
 }
 
 export interface ToolSpec {
@@ -34,6 +38,8 @@ export interface LlmOptions {
   stream?: boolean;
   /** Retries after a dropped connection (default 2). */
   retries?: number;
+  /** Pause before retrying a busy server (429/5xx without Retry-After), times the attempt number (default 10000 ms). */
+  busyWaitMs?: number;
   /** Longest tool description sent, in characters (the full ones are written for large models). */
   maxDescription?: number;
   /** Longest parameter description sent, in characters. */
@@ -74,7 +80,7 @@ export function slimSchema(schema: unknown, maxDescription: number): unknown {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
     if (k === "$schema") continue;
-    if (k === "description" && typeof v === "string") out[k] = v.length > maxDescription ? `${v.slice(0, maxDescription)}...` : v;
+    if (k === "description" && typeof v === "string") out[k] = slimDescription(v, maxDescription);
     else out[k] = slimSchema(v, maxDescription);
   }
   return out;
@@ -82,7 +88,8 @@ export function slimSchema(schema: unknown, maxDescription: number): unknown {
 
 type WireCall = { id?: string; index?: number; function?: { name?: string; arguments?: unknown } };
 type WireMessage = { content?: string | null; tool_calls?: WireCall[] };
-type WireAnswer = { choices?: Array<{ message?: WireMessage }> };
+type WireUsage = { prompt_tokens?: number };
+type WireAnswer = { choices?: Array<{ message?: WireMessage }>; usage?: WireUsage };
 
 /** A failure that another attempt with the same request would repeat: not retried. */
 class NoRetryError extends Error {}
@@ -93,6 +100,52 @@ class HttpError extends NoRetryError {}
 export class ContextExceededError extends NoRetryError {}
 
 const CONTEXT_EXCEEDED = /context (size|length|window)|exceeds? (the )?(available )?context|prompt is too long|too many tokens/i;
+/** A hosted endpoint's rate limit can also say "too many tokens" ("... per minute"): that is not an overflow. */
+const RATE_LIMIT = /rate.?limit|per (second|minute|hour|day)|tokens per|quota/i;
+
+/** Whether a server's error message says the conversation is longer than the model's context. */
+export function isContextOverflow(message: string): boolean {
+  return CONTEXT_EXCEEDED.test(message) && !RATE_LIMIT.test(message);
+}
+
+/** HTTP statuses of a busy, loading or restarting server (LM Studio answers 503 while it loads a model): retried. */
+const BUSY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+/** A busy server: another attempt after a pause may work. `waitMs` is the server's Retry-After, when it gave one. */
+class BusyError extends Error {
+  constructor(
+    message: string,
+    readonly waitMs?: number,
+  ) {
+    super(message);
+  }
+}
+
+/** The pause a Retry-After header asks for (seconds or a date), at most a minute. */
+function retryAfterMs(res: Response): number | undefined {
+  const raw = res.headers.get("retry-after");
+  if (!raw) return undefined;
+  const ms = /^\d+$/.test(raw.trim()) ? Number(raw) * 1000 : Date.parse(raw) - Date.now();
+  return Number.isFinite(ms) && ms >= 0 ? Math.min(ms, 60_000) : undefined;
+}
+
+/**
+ * Throws for an HTTP error answer: a context overflow (llama.cpp, vLLM and LM Studio answer 400 before any stream
+ * starts) as ContextExceededError, a busy server as BusyError (retried), anything else as HttpError (not retried).
+ */
+async function throwHttpError(res: Response): Promise<never> {
+  const text = (await res.text()).slice(0, 4000);
+  let message = text;
+  try {
+    message = errorMessageOf(JSON.parse(text)) ?? text;
+  } catch {
+    /* not JSON */
+  }
+  if (res.status !== 429 && isContextOverflow(message)) throw new ContextExceededError(`model context exceeded: ${message.slice(0, 400)}`);
+  const what = `model endpoint answered ${res.status}: ${message.slice(0, 400)}`;
+  if (BUSY_STATUS.has(res.status)) throw new BusyError(what, retryAfterMs(res));
+  throw new HttpError(what);
+}
 
 /** The message of an error the server put in its answer: a stream event or a JSON body, whatever its shape. */
 function errorMessageOf(value: unknown): string | undefined {
@@ -109,7 +162,7 @@ function errorMessageOf(value: unknown): string | undefined {
 
 /** Throws the server's error: a context overflow as ContextExceededError, anything else as a plain failure (not retried). */
 function throwServerError(message: string): never {
-  if (CONTEXT_EXCEEDED.test(message)) throw new ContextExceededError(`model context exceeded: ${message}`);
+  if (isContextOverflow(message)) throw new ContextExceededError(`model context exceeded: ${message}`);
   throw new NoRetryError(`model server error: ${message}`);
 }
 
@@ -120,15 +173,16 @@ function causeOf(e: unknown): string {
 }
 
 /** An OpenAI-style server-sent-event answer, its content and tool-call pieces put together. */
-async function readStream(res: Response): Promise<WireMessage> {
+async function readStream(res: Response): Promise<WireMessage & { usage?: WireUsage }> {
   let content = "";
+  let usage: WireUsage | undefined;
   const calls: WireCall[] = [];
   const text = res.body ? res.body.pipeThrough(new TextDecoderStream()) : null;
   let buffer = "";
   const take = (line: string) => {
     const data = line.replace(/^data:\s*/, "").trim();
     if (!data || data === "[DONE]") return;
-    let chunk: { choices?: Array<{ delta?: WireMessage; message?: WireMessage; finish_reason?: unknown }>; error?: unknown; message?: unknown };
+    let chunk: { choices?: Array<{ delta?: WireMessage; message?: WireMessage; finish_reason?: unknown }>; error?: unknown; message?: unknown; usage?: WireUsage };
     try {
       chunk = JSON.parse(data);
     } catch {
@@ -136,6 +190,7 @@ async function readStream(res: Response): Promise<WireMessage> {
     }
     const failed = errorMessageOf(chunk);
     if (failed !== undefined) throwServerError(failed);
+    if (chunk.usage?.prompt_tokens) usage = chunk.usage;
     const d = chunk.choices?.[0]?.delta ?? chunk.choices?.[0]?.message;
     if (!d) return;
     if (d.content) content += d.content;
@@ -160,13 +215,14 @@ async function readStream(res: Response): Promise<WireMessage> {
     }
     if (buffer.startsWith("data:")) take(buffer);
   }
-  return { content, tool_calls: calls.filter((c) => c?.function?.name) };
+  return { content, tool_calls: calls.filter((c) => c?.function?.name), ...(usage ? { usage } : {}) };
 }
 
 export function openAiChat(options: LlmOptions): Chat {
   const url = `${options.endpoint.replace(/\/+$/, "")}/chat/completions`;
   const maxDescription = options.maxDescription ?? 300;
   const maxParam = options.maxParamDescription ?? 140;
+  let usageInStream = true;
   return async (messages, tools) => {
     const body = {
       model: options.model,
@@ -189,7 +245,7 @@ export function openAiChat(options: LlmOptions): Chat {
         ? {
             tools: tools.map((t) => ({
               type: "function",
-              function: { name: t.name, description: t.description.slice(0, maxDescription), parameters: slimSchema(t.parameters, maxParam) },
+              function: { name: t.name, description: slimDescription(t.description, maxDescription), parameters: slimSchema(t.parameters, maxParam) },
             })),
             tool_choice: "auto",
           }
@@ -198,28 +254,47 @@ export function openAiChat(options: LlmOptions): Chat {
     const stream = options.stream !== false;
     const retries = options.retries ?? 2;
     let msg: WireMessage | undefined;
+    let usage: WireUsage | undefined;
     for (let attempt = 0; ; attempt++) {
       try {
         const res = await fetch(url, {
           method: "POST",
           headers: { "content-type": "application/json", ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}) },
-          body: JSON.stringify({ ...body, ...(stream ? { stream: true } : {}) }),
+          // include_usage makes the last stream chunk carry the token count the budget learns from (context-budget.ts).
+          body: JSON.stringify({ ...body, ...(stream ? { stream: true, ...(usageInStream ? { stream_options: { include_usage: true } } : {}) } : {}) }),
           signal: AbortSignal.timeout(options.timeoutMs ?? 900_000),
         });
-        if (!res.ok) throw new HttpError(`model endpoint answered ${res.status}: ${(await res.text()).slice(0, 400)}`);
-        if ((res.headers.get("content-type") ?? "").includes("text/event-stream")) msg = await readStream(res);
-        else {
+        if (!res.ok) {
+          if (res.status === 400 && stream && usageInStream) {
+            // An older server that does not know stream_options: ask again without it (not counted as a retry).
+            const text = await res.clone().text();
+            if (/stream_options|include_usage/i.test(text)) {
+              usageInStream = false;
+              attempt--;
+              continue;
+            }
+          }
+          await throwHttpError(res);
+        }
+        if ((res.headers.get("content-type") ?? "").includes("text/event-stream")) {
+          const read = await readStream(res);
+          msg = read;
+          usage = read.usage;
+        } else {
           const body = (await res.json()) as WireAnswer & { error?: unknown };
           const failed = errorMessageOf(body);
           if (failed !== undefined) throwServerError(failed);
           msg = body.choices?.[0]?.message;
+          usage = body.usage;
         }
         break;
       } catch (e) {
-        // A dropped or timed-out connection is retried; an HTTP error (bad request, unknown model) is not.
+        // A dropped or timed-out connection and a busy server are retried; an HTTP error (bad request, unknown model)
+        // and a context overflow are not. A busy server gets longer pauses: loading a model takes tens of seconds.
         if (e instanceof NoRetryError) throw e;
         if (attempt >= retries) throw new Error(`${(e as Error).message}${causeOf(e)}`);
-        await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+        const wait = e instanceof BusyError ? (e.waitMs ?? (options.busyWaitMs ?? 10_000) * (attempt + 1)) : 3000 * (attempt + 1);
+        await new Promise((r) => setTimeout(r, wait));
       }
     }
     if (!msg) throw new Error("model endpoint answered without a message");
@@ -232,6 +307,6 @@ export function openAiChat(options: LlmOptions): Chat {
         arguments: (c.function?.arguments ?? {}) as string | Record<string, unknown>,
       }));
     if (calls.length === 0 && content) calls = toolCallsFromText(content);
-    return { role: "assistant", content, ...(calls.length ? { tool_calls: calls } : {}) };
+    return { role: "assistant", content, ...(calls.length ? { tool_calls: calls } : {}), ...(usage?.prompt_tokens ? { promptTokens: usage.prompt_tokens } : {}) };
   };
 }
