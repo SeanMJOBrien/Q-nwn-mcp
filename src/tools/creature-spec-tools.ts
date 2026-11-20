@@ -8,6 +8,8 @@
  * ended up. The spec is kept in the module project as creatures/<resref>.json for a rebuild.
  */
 
+import { findPlacedCreature } from "../util/creature-placer.js";
+import { alreadyExistsResult } from "../util/tool-result.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -269,7 +271,12 @@ export async function buildCreatureFromJson(specText: string, dryRun?: boolean) 
     };
   }
 
-  if (index.resources.has(`${resref}.utc`)) return fail(`${resref}.utc already exists`);
+  if (index.resources.has(`${resref}.utc`)) {
+    // Built by an earlier call: placed means done; not placed means place it (small models retry).
+    const at = findPlacedCreature(index, resref);
+    if (at) return alreadyExistsResult(`${resref}.utc`, `It stands in ${at.area} at (${Math.round(at.x)}, ${Math.round(at.y)}); nothing more to do.`);
+    return fail(`${resref}.utc already exists but is not placed`, { field: "resref", next: `place_creature(area: "<area>", blueprint: "${resref}", ...) places it` });
+  }
   const steps: string[] = [];
   const isCompanion = spec.role === "companion";
   if (isCompanion && !index.resources.has("a_hen_join.ncs")) {

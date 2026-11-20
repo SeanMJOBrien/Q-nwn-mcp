@@ -270,6 +270,8 @@ For each trap location identified in the plan, place a trigger and put a check o
 **Step 1: Create the trap blueprint** (detection/disarm DCs, one-shot, no script):
 
 ```
+**Quickest trap: `build_trap(area, kind?)`** (fire, acid, spikes, electric, cold) creates the blueprint, places the trigger on open ground and adds the party-wide Reflex save (DC 10 + level, damage by level). The three calls below do the same by hand.
+
 create_trap_blueprint(resref: "trap_fire_01", tag: "trap_fire_01", name: "Fire Trap",
                       detectDC: "15", disarmDC: "15", oneShot: true, size: "3.0")
 ```

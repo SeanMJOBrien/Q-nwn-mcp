@@ -150,6 +150,8 @@ or try patterns like `nw_shopgen`, `x2_store`, `nw_mer`. Pick the simplest store
 
 ### Phase 5: Create Store Blueprint
 
+**Quickest shop: `build_store(merchant: "<tag>")`** creates a general store, places it beside the merchant, writes the open-store script and adds "Show me what you have for sale." to the merchant's greeting (the merchant needs a conversation). Calling it again answers "already in place". For a custom stock, use the steps below.
+
 Use `create_store_blueprint` to create a fully stocked store in one call:
 
 ```

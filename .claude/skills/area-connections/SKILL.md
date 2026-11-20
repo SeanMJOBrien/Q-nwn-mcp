@@ -6,6 +6,8 @@ allowed-tools: Bash(echo *), Read, Grep, Glob
 
 # Connecting areas
 
+
+**Portals without coordinates:** `adventure_create_transition(areaA, areaB)` with no `aX/aY/bX/bY` uses open ground with 2 m clear in each area, and with no `tag` makes a unique one from the two names. A tag already in use is refused with a free suggestion.
 ## What real modules do
 
 Measured across 12,507 hand-built areas in `~/git`:

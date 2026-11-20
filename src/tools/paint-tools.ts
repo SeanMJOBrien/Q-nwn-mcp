@@ -9,6 +9,7 @@
  * - set_area_properties: Modify area lighting, music, weather, etc.
  */
 
+import { alreadyExistsResult } from "../util/tool-result.js";
 import type { ModuleIndex } from "../types/module.js";
 import { afterWrite, beforeWrite, removeResource } from "../util/project-sync.js";
 import { z } from "zod";
@@ -91,7 +92,7 @@ export function registerPaintTools(server: McpServer): void {
       const areKey = `${resrefLower}.are`;
 
       if (index.resources.has(areKey)) {
-        return { content: [{ type: "text", text: `Area already exists: ${resrefLower}` }] };
+        return alreadyExistsResult(areKey, `Lay it out with build_area (it reuses an empty area) or paint_tiles(area: "${resrefLower}").`);
       }
 
       const resmanOpts = await buildResmanOptions(index);
