@@ -101,7 +101,7 @@ export function registerStoreKitTools(server: McpServer): void {
         if (line.isError) return json({ success: false, error: `add_dialog_node: ${line.text.slice(0, 200)}`, steps }, true);
         steps.push(`shop line on ${dialog}`);
       }
-      return json({ success: true, store: resref, area: found.area, merchant: want, dialog, steps: steps.length ? steps : ["already in place"], next: "get_progress() for the next step" });
+      return json({ success: true, store: resref, area: found.area, merchant: want, dialog, steps: steps.length ? steps : ["already in place"], next: "talk to the merchant in play to check the store opens" });
     },
   );
 }

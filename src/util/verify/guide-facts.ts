@@ -113,7 +113,7 @@ export function checkWeaponClaims(texts: Array<{ file: string; text: string }>, 
         code: "guide_weapon_mismatch",
         message: `${file} says ${known[0].name} fights with a ${claim.word}, but ${known.map((c) => c.tag).join("/")} carries ${has}: "${claim.sentence}"`,
         field: file,
-        fix: `correct the text (write_dm_guide / write_story_section), or give ${known[0].tag} that weapon (MCP_GEAR_WEAPONS or set_creature_equipment)`,
+        fix: `correct the text in the DM guide or the story file, or give ${known[0].tag} that weapon (MCP_GEAR_WEAPONS or set_creature_equipment)`,
       });
     }
   }

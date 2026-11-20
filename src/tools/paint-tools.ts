@@ -92,7 +92,7 @@ export function registerPaintTools(server: McpServer): void {
       const areKey = `${resrefLower}.are`;
 
       if (index.resources.has(areKey)) {
-        return alreadyExistsResult(areKey, `Lay it out with build_area (it reuses an empty area) or paint_tiles(area: "${resrefLower}").`);
+        return alreadyExistsResult(areKey, `Lay it out with adventure_generate_layout + adventure_apply_layout or paint_tiles(area: "${resrefLower}").`);
       }
 
       const resmanOpts = await buildResmanOptions(index);

@@ -120,7 +120,6 @@ export function registerStartKitTools(server: McpServer): void {
         wealth: amount,
         ...(previous ? { chained: previous } : {}),
         note: "Each player, once: XP to the start of the level, then gold up to the wealth figure counting what they carry.",
-        next: "get_progress() for the next step",
       });
     },
   );

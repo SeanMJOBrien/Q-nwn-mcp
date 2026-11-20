@@ -81,7 +81,7 @@ export function registerEnemyTools(server: McpServer): void {
           placed,
           ...(failed.length ? { failed } : {}),
           encounterLevel: el,
-          next: placed.length ? "get_progress() for the next step" : "Try another region, or place_creature by hand at a point from adventure_find_walkable.",
+          next: placed.length ? "verify_area(area) to check the group" : "Try another region, or place_creature by hand at a point from adventure_find_walkable.",
         },
         placed.length === 0,
       );
@@ -140,7 +140,7 @@ export function registerTrapTools(server: McpServer): void {
       const check = { save: "reflex", dc: 10 + lvl, fail_damage: trapDice(lvl), half: "1", damage_type: def.damage, fail_msg: def.msg };
       const wired = await callTool("add_skill_check", { area: a, tag: resref, kind: "trigger", check: JSON.stringify(check) });
       if (wired.isError) return json({ ok: false, error: `add_skill_check: ${wired.text.slice(0, 200)}` }, true);
-      return json({ ok: true, area: a, trap: resref, kind: k, at: placedAt, check, next: "get_progress() for the next step" });
+      return json({ ok: true, area: a, trap: resref, kind: k, at: placedAt, check, next: "verify_area(area) to check the trap" });
     },
   );
 }

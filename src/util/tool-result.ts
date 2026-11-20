@@ -26,7 +26,7 @@ export function failResult(error: string, opts: { field?: string; valid?: string
 }
 
 /** Tools whose answer is a verdict (a check, a probe): `ok: false` there is the answer, not a failed call. */
-const CHECK_TOOLS = /^(verify_|check_|validate_|phase_check$|audit_module$|probe_ground$|get_progress$|verify$|trace_dialog_path$|get_balance_report$)/;
+const CHECK_TOOLS = /^(verify_|check_|validate_|phase_check$|audit_module$|probe_ground$|verify$|trace_dialog_path$|get_balance_report$)/;
 
 /** Did this JSON answer say the call failed? */
 export function saysFailure(text: string): boolean {

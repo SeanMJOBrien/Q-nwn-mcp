@@ -845,7 +845,7 @@ export function registerPlacementTools(server: McpServer): void {
       // Find the container by tag. Only real containers (chests, crates, barrels...): a small model filled a rock, which
       // no player can open (The Old Mill, 2026-11-18).
       const containers = placeableList.filter((p) => isContainerPlaceable(p));
-      const available = [...new Set(containers.map((p) => getFieldStr(p, "Tag")).filter(Boolean))].join(", ") || "none (dress_area(area, props: [\"plc_chest1\"]) places a chest)";
+      const available = [...new Set(containers.map((p) => getFieldStr(p, "Tag")).filter(Boolean))].join(", ") || "none (place_placeable(area, blueprint: \"plc_chest1\", x, y) places a chest)";
       const named = placeableList.find((p) => getFieldStr(p, "Tag") === containerTag);
       const container = named && isContainerPlaceable(named) ? named : undefined;
       if (!container) {

@@ -229,7 +229,7 @@ export function registerAdventureTools(server: McpServer): void {
       const TRANSITION_BUFFER = 2.0;
       const aWalk = await checkPlacementWalkable(axN, ayN, areaA.toLowerCase(), index, resmanOpts, TRANSITION_BUFFER);
       if (!aWalk.ok) {
-        return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: "aX", error: "areaA position not safe", area: areaA, position: { x: axN, y: ayN }, detail: aWalk.reason, next: "leave aX/aY out to use a free transition point, or pick one from get_area_card" }, null, 2) }] };
+        return { isError: true, content: [{ type: "text", text: JSON.stringify({ success: false, field: "aX", error: "areaA position not safe", area: areaA, position: { x: axN, y: ayN }, detail: aWalk.reason, next: "leave aX/aY out to use open ground, or pick a point with adventure_find_walkable" }, null, 2) }] };
       }
       const bWalk = await checkPlacementWalkable(bxN, byN, areaB.toLowerCase(), index, resmanOpts, TRANSITION_BUFFER);
       if (!bWalk.ok) {

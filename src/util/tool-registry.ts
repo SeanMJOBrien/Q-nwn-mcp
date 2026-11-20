@@ -1,7 +1,6 @@
 /**
- * Every tool's handler, kept so one tool can run others in-process (build_area runs suggest_area_size, the layout
- * tools, create_area, place_tile_doors and set_area_properties). Recorded at registration, outside the tool-profile
- * filter, so a combined tool works whatever profile hides the tools it uses.
+ * Every tool's handler, kept so one tool can run others in-process (set_starting_gold runs write_script, compile_script
+ * and set_module_scripts; build_enemy_group runs adventure_find_walkable). Recorded at registration.
  */
 
 import { z } from "zod";

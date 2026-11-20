@@ -1,7 +1,7 @@
 /**
  * Real blueprints like one that does not exist: a model guesses `plc_crate` (the base game's crates are
  * `x2_easy_crate1` and friends) and then `plc_crate1` ... `plc_crate4` (The Mill on Blackwater, 2026-11-18). The
- * not-found answers of place_placeable and dress_area name a few real ones found by the guess's main word.
+ * not-found answers of place_placeable name a few real ones found by the guess's main word.
  */
 import { callTool, hasTool } from "./tool-registry.js";
 
