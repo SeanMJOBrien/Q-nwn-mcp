@@ -1,6 +1,7 @@
 # Open TODOs
 
 One line per open item: `#id P<priority> title: what closes it` (P1 = next). Details, when an item has more: `docs/todo/<id>.md`.
+Edit on the web: https://claude.ai/artifact/2sXeZJfkKsL3CbGfg164ar (tick "work on this next", notes, new items; then "start the next tasks": the shared `todo-page` skill).
 Done items and full history: `docs/todo-archive.md`. Packages per item: `docs/work-plan.md`. Grep `^- #<id> ` to find one.
 
 ## #15 branches and commits not in master (standing rule)

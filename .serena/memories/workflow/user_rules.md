@@ -21,6 +21,6 @@ Sessions
 - After code changes the MCP server needs a restart: say so in plain text and wait (no AskUserQuestion for it).
 
 Repo
-- TODO list: `docs/todo.md` is an index, one line per open item (`- #id P<n> title: what closes it`); longer notes only in `docs/todo/<id>.md`; done items move to `docs/todo-archive.md`. Keep index lines short.
+- TODO list: `docs/todo.md` is an index, one line per open item (`- #id P<n> title: what closes it`); longer notes only in `docs/todo/<id>.md`; done items move to `docs/todo-archive.md`. Keep index lines short. The user picks tasks on a claude.ai page (link in `docs/todo.md`); its submissions reach the markdown only through `todo.mjs` of `~/git/Q-todo-page` (shared skill `todo-page`: "start the next tasks"; one page for every repo under ~/git).
 - TODO #15 in `docs/todo.md` (moved from CLAUDE.md 2026-11-19) tracks every branch and commit not in `master`: after each commit/merge/branch change run `git fetch --prune` + `git rev-list --count origin/master..<branch>`; the update goes in the same commit as the work; amend to "pushed" just before pushing; old states go to `docs/todo-archive.md` (#15 history).
 - Commit/push only on request. Keep skills in sync with tools (skills drive the LLM, not schemas).

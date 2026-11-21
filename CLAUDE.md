@@ -15,7 +15,8 @@ arguments are opt-in (`MCP_LENIENT_ARGS=1`). The small-model line (tool profiles
   conventions, GFF gotchas, transitions, verification, quests, co-op, creatures, local models, commands, conventions,
   testing, done checklist. Read the memory for the area you touch before changing it.
 - **Open TODOs:** `docs/todo.md`, one line per item; details only in `docs/todo/<id>.md` (read the index, then the one
-  item you work on). Done items: `docs/todo-archive.md`.
+  item you work on). Done items: `docs/todo-archive.md`. The user picks tasks on a web page; "start the next tasks"
+  runs the shared `todo-page` skill (`~/git/Q-todo-page`).
 - **Docs map:** `docs/README.md`. Tool explanations: `docs/adventure-tooling-reference.md`. Pitfalls with evidence: `docs/pitfalls.md`.
 - **NWScript functions:** `nwscript-docs/<FunctionName>.md` (open by exact name; absence is not authoritative).
 
